@@ -1,0 +1,62 @@
+# Copyright 2017 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Test util module."""
+
+from __future__ import print_function
+import subprocess
+import unittest
+
+from bisect_kit import util
+
+
+class TestUtilFunctions(unittest.TestCase):
+  """Test functions in util module."""
+
+  def test_is_version_lesseq(self):
+    assert util.is_version_lesseq('1.1', '1.1')
+    assert util.is_version_lesseq('1.1.1', '1.1.1')
+
+    assert util.is_version_lesseq('1.1.1', '1.1.2')
+    assert not util.is_version_lesseq('1.1.2', '1.1.0')
+
+    assert util.is_version_lesseq('1.1.1', '2.0.0')
+    assert not util.is_version_lesseq('2.0.0', '1.1.1')
+
+  def test_is_direct_relative_version(self):
+    assert util.is_direct_relative_version('9123.0.0', '9100.0.0')
+    assert util.is_direct_relative_version('9123.3.0', '9100.0.0')
+    assert util.is_direct_relative_version('9123.0.5', '9100.0.0')
+
+    assert not util.is_direct_relative_version('9123.0.0', '9100.1.0')
+    assert not util.is_direct_relative_version('9123.0.0', '9100.1.2')
+
+    assert not util.is_direct_relative_version('1.0.1', '2.0.9')
+
+
+class TestPopen(unittest.TestCase):
+  """Test util.Popen."""
+
+  def test_check_output(self):
+    self.assertEqual(util.check_output('echo', 'foobar'), 'foobar\n')
+    self.assertEqual(
+        util.check_output('sh', '-c', 'echo 1; sleep 0.05; echo 2'), '1\n2\n')
+    self.assertEqual(util.check_output('echo 1; echo 2', shell=True), '1\n2\n')
+
+    with self.assertRaises(subprocess.CalledProcessError):
+      util.check_output('false')
+
+    self.assertEqual(util.check_output('env', env=dict(foo='bar')), 'foo=bar\n')
+
+  def test_check_call(self):
+    util.check_call('true')
+    with self.assertRaises(subprocess.CalledProcessError):
+      util.check_call('false')
+
+  def test_call(self):
+    self.assertEqual(util.call('true'), 0)
+    self.assertEqual(util.call('false'), 1)
+
+
+if __name__ == '__main__':
+  unittest.main()

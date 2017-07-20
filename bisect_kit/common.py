@@ -1,0 +1,109 @@
+# Copyright 2017 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Common functions used by almost of all bisect kit scripts."""
+
+from __future__ import print_function
+import logging
+import logging.config
+import os
+
+# better_exceptions can print beautiful detail for unhandled exceptions, like
+# value of variables on the stack frames. This is helpful for debugging and
+# optional.
+try:
+  # pylint: disable=unused-import
+  import better_exceptions
+except ImportError:
+  pass
+
+from bisect_kit import util
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_LOG_FILENAME = 'bisect-kit.log'
+
+
+def config_logging(opts):
+  """Config logging handlers.
+
+  bisect-kit will write full DEBUG level messages to log file and INFO level
+  messages to console.
+
+  If command line argument --session is specified, the log file is stored
+  inside session directory; otherwise, stored in current working directory.
+
+  Args:
+    opts: An argparse.Namespace to hold command line arguments.
+  """
+  if hasattr(config_logging, 'configured'):
+    return
+  config_logging.configured = True
+
+  if opts.log_file is None:
+    if getattr(opts, 'session', None):
+      assert hasattr(opts, 'session_base')
+      session_dir = os.path.join(opts.session_base, opts.session)
+      opts.log_file = os.path.join(session_dir, DEFAULT_LOG_FILENAME)
+      if not os.path.exists(session_dir):
+        os.makedirs(session_dir)
+    else:
+      opts.log_file = DEFAULT_LOG_FILENAME
+  os.environ['LOG_FILE'] = opts.log_file
+
+  root_handlers = ['file-log']
+  # When running nested, for example bisector calling runner, disable console
+  # output to avoid duplication.
+  if not os.environ.get('DISABLE_CONSOLE_OUTPUT'):
+    root_handlers.append('console')
+    os.environ['DISABLE_CONSOLE_OUTPUT'] = '1'
+
+  logging.config.dictConfig({
+      'version': 1,
+      'disable_existing_loggers': False,
+      'formatters': {
+          'verbose': {
+              'format': '%(asctime)s %(module)s pid=%(process)d %(levelname)s '
+                        '%(message)s'
+          },
+          'simple': {
+              'format': '%(asctime)s %(levelname)s %(message)s',
+              'datefmt': '%H:%M:%S'
+          },
+      },
+      'handlers': {
+          'console': {
+              'level': 'INFO',
+              'class': 'logging.StreamHandler',
+              'formatter': 'simple',
+          },
+          'file-log': {
+              'level': 'DEBUG',
+              'class': 'logging.handlers.TimedRotatingFileHandler',
+              'formatter': 'verbose',
+              'filename': opts.log_file,
+              'when': 'd',
+              'backupCount': 2,
+          },
+      },
+      'root': {
+          'handlers': root_handlers,
+          'level': 'DEBUG',
+      },
+  })
+
+
+def add_logging_arguments(parser, defaults=None):
+  """Add common arguments to command line parser.
+
+  Args:
+    parser: An argparse.ArgumentParser instance.
+    defaults: An util.DefaultConfig instance to look up default values.
+  """
+  if defaults is None:
+    defaults = util.DefaultConfig()
+  parser.add_argument(
+      '--log_file',
+      metavar='LOG_FILE',
+      default=defaults.get('LOG_FILE'),
+      help='Override log filename')
