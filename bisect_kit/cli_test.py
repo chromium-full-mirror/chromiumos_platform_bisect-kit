@@ -79,6 +79,14 @@ class TestCli(unittest.TestCase):
     with self.assertRaises(core.ExecutionFatalError):
       cli._collect_bisect_result_values(values, 'BISECT_RESULT_VALUES=hello\n')
 
+  def test_check_executable(self):
+    self.assertEqual(cli.check_executable('/bin/true'), None)
+
+    self.assertRegexpMatches(cli.check_executable('/'), r'Not a file')
+    self.assertRegexpMatches(cli.check_executable('LICENSE'), r'chmod')
+    self.assertRegexpMatches(cli.check_executable('what'), r'PATH')
+    self.assertRegexpMatches(cli.check_executable('eval-manually.sh'), r'\./')
+
 
 class DummyDomain(core.BisectDomain):
   """Dummy subclass of BisectDomain."""

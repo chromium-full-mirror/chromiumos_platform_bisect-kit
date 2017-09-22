@@ -178,6 +178,34 @@ def _collect_bisect_result_values(values, line):
           'BISECT_RESULT_VALUES should be list of floats: %r' % m.group(1))
 
 
+def check_executable(program):
+  """Checks whether a program is executable.
+
+  Args:
+    program: program path in question
+
+  Returns:
+    string as error message if `program` is not executable, or None otherwise.
+    It will return None if unable to determine as well.
+  """
+  returncode = util.call('which', program)
+  if returncode == 127:  # No 'which' on this platform, skip the check.
+    return None
+  if returncode == 0:  # is executable
+    return None
+
+  hint = ''
+  if not os.path.exists(program):
+    hint = 'Not in PATH?'
+  elif not os.path.isfile(program):
+    hint = 'Not a file'
+  elif not os.access(program, os.X_OK):
+    hint = 'Forgot to chmod +x?'
+  elif '/' not in program:
+    hint = 'Forgot to prepend "./" ?'
+  return '%r is not executable. %s' % (program, hint)
+
+
 def do_evaluate(evaluate_cmd, domain, rev):
   """Invokes evaluator command.
 
@@ -571,6 +599,11 @@ class BisectorCommandLineInterface(object):
       return
 
     if opts.key in ['switch', 'eval']:
+      result = check_executable(opts.value[0])
+      if result:
+        raise core.ExecutionFatalError('%s config %s: %s' % (sys.argv[0],
+                                                             opts.key, result))
+
       self.states.config[opts.key] = opts.value
 
     elif opts.key == 'confidence':

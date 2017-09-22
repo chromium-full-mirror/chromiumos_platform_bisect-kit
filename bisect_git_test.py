@@ -47,8 +47,8 @@ class TestGitDomain(unittest.TestCase):
         bisector.main('init', '--old', old, '--new', new, '--git_repo',
                       self.git_repo)
 
-    bisector.main('config', 'switch', 'abcd')
-    bisector.main('config', 'eval', 'efgh')
+    bisector.main('config', 'switch', 'true')
+    bisector.main('config', 'eval', 'true')
 
     with mock.patch('bisect_kit.util.Popen') as mock_popen:
       run_mocks = [mock.Mock(), mock.Mock()]
