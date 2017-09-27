@@ -5,7 +5,6 @@
 
 from __future__ import print_function
 import logging
-import os
 import Queue
 import subprocess
 import threading
@@ -14,27 +13,6 @@ import time
 import psutil
 
 logger = logging.getLogger(__name__)
-
-
-class DefaultConfig(object):
-  """Helper to query user configuration.
-
-  In order to avoid typing common arguments repeatedly in the command line,
-  this class helps query configurations from environment variables.
-  """
-
-  def get(self, name, default=None):
-    """Gets configuration value.
-
-    Args:
-      name: Configuration key.
-      default: Default value if the configuration is not available.
-
-    Returns:
-      Configuration value.
-    """
-    # TODO(kcwu): get default from config file.
-    return os.environ.get(name, default)
 
 
 class Popen(object):

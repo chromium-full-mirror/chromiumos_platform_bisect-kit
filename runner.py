@@ -67,7 +67,7 @@ def create_argument_parser():
           only if any conditions meet.
       """),
       formatter_class=argparse.RawDescriptionHelpFormatter)
-  common.add_logging_arguments(parser)
+  common.add_common_arguments(parser)
   group = parser.add_mutually_exclusive_group(required=True)
   group.add_argument(
       '--new',
@@ -282,6 +282,7 @@ def criteria_is_met(ratio, counter, rest, want):
 
 
 def main(args=None):
+  common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
   common.config_logging(opts)

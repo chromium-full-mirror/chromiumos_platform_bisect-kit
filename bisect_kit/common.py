@@ -17,6 +17,7 @@ try:
 except ImportError:
   pass
 
+from bisect_kit import configure
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -93,17 +94,25 @@ def config_logging(opts):
   })
 
 
-def add_logging_arguments(parser, defaults=None):
+def add_common_arguments(parser):
   """Add common arguments to command line parser.
 
   Args:
     parser: An argparse.ArgumentParser instance.
-    defaults: An util.DefaultConfig instance to look up default values.
   """
-  if defaults is None:
-    defaults = util.DefaultConfig()
   parser.add_argument(
       '--log_file',
       metavar='LOG_FILE',
-      default=defaults.get('LOG_FILE'),
+      default=configure.get('LOG_FILE'),
       help='Override log filename')
+
+  parser.add_argument(
+      '--config',
+      metavar='BISECT_KIT_CONFIG',
+      help='Configuration file.'
+      ' Special value "none" to suppress config file searching.')
+
+
+def init():
+  configure.load_config()
+  configure.root.load_plugins()

@@ -14,6 +14,7 @@ import textwrap
 import time
 
 from bisect_kit import common
+from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import strategy
 from bisect_kit import util
@@ -577,8 +578,7 @@ class BisectorCommandLineInterface(object):
     if not session:
       session = DEFAULT_SESSION_NAME
     if not session_base:
-      defaults = util.DefaultConfig()
-      session_base = defaults.get('SESSION_BASE', DEFAULT_SESSION_BASE)
+      session_base = configure.get('SESSION_BASE', DEFAULT_SESSION_BASE)
 
     session_file = os.path.join(session_base, session, self.domain_cls.__name__)
 
@@ -631,7 +631,6 @@ class BisectorCommandLineInterface(object):
     self.states.save()
 
   def create_argument_parser(self, prog):
-    defaults = util.DefaultConfig()
     parser = argparse.ArgumentParser(
         prog=prog,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -641,11 +640,15 @@ class BisectorCommandLineInterface(object):
         When running switcher and evaluator, it will set BISECT_REV environment
         variable, indicates current rev to switch/evaluate.
         ''' % self.domain_cls.__name__) + textwrap.dedent(self.domain_cls.help))
-    common.add_logging_arguments(parser, defaults)
+    common.add_common_arguments(parser)
+    parser.add_argument(
+        '--rc',
+        help='Specify config file to use. Otherwise searches default '
+        'locations. Use "none" to surpress config file searching.')
     parser.add_argument(
         '--session_base',
         type=argtype_dir_path,
-        default=defaults.get('SESSION_BASE', DEFAULT_SESSION_BASE),
+        default=configure.get('SESSION_BASE', DEFAULT_SESSION_BASE),
         help='Directory to store sessions (default: %(default)r)')
     parser.add_argument(
         '--session',
@@ -786,6 +789,7 @@ class BisectorCommandLineInterface(object):
           'prog': Program name; optional.
         }
     """
+    common.init()
     parser = self.create_argument_parser(kwargs.get('prog'))
     opts = parser.parse_args(args or None)
     common.config_logging(opts)

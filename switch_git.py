@@ -19,6 +19,7 @@ import logging
 
 from bisect_kit import cli
 from bisect_kit import common
+from bisect_kit import configure
 from bisect_kit import git_util
 from bisect_kit import util
 
@@ -26,27 +27,27 @@ logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-  defaults = util.DefaultConfig()
   parser = argparse.ArgumentParser()
-  common.add_logging_arguments(parser, defaults)
+  common.add_common_arguments(parser)
   parser.add_argument(
       'git_rev',
       nargs='?',
       type=git_util.argtype_git_rev,
       metavar='GIT_REV',
-      default=defaults.get('GIT_REV', ''),
+      default=configure.get('GIT_REV', ''),
       help='Git revision id')
   parser.add_argument(
       '--git_repo',
       type=cli.argtype_dir_path,
       metavar='GIT_REPO',
-      default=defaults.get('GIT_REPO'),
+      default=configure.get('GIT_REPO'),
       help='Git repository path')
 
   return parser
 
 
 def main(args=None):
+  common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
   common.config_logging(opts)
