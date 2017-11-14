@@ -614,7 +614,7 @@ class NoisyBinarySearch(object):
 
     if more:
       for i, info in enumerate(self.rev_info):
-        if sum(info.values()) > 0:
+        if sum(info.result_counter.values()) > 0:
           interesting.add(i)
 
     for i in sorted(interesting):
