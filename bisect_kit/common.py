@@ -107,10 +107,10 @@ def add_common_arguments(parser):
       help='Override log filename')
 
   parser.add_argument(
-      '--config',
-      metavar='BISECT_KIT_CONFIG',
-      help='Configuration file.'
-      ' Special value "none" to suppress config file searching.')
+      '--rc',
+      metavar=configure.CONFIG_ENV_NAME,
+      help='Specify config file to use. Otherwise searches default '
+      'locations. Use "none" to surpress config file searching.')
 
 
 def init():

@@ -642,10 +642,6 @@ class BisectorCommandLineInterface(object):
         ''' % self.domain_cls.__name__) + textwrap.dedent(self.domain_cls.help))
     common.add_common_arguments(parser)
     parser.add_argument(
-        '--rc',
-        help='Specify config file to use. Otherwise searches default '
-        'locations. Use "none" to surpress config file searching.')
-    parser.add_argument(
         '--session_base',
         type=argtype_dir_path,
         default=configure.get('SESSION_BASE', DEFAULT_SESSION_BASE),
