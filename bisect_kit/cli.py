@@ -631,15 +631,19 @@ class BisectorCommandLineInterface(object):
     self.states.save()
 
   def create_argument_parser(self, prog):
+    if self.domain_cls.help:
+      description = self.domain_cls.help
+    else:
+      description = 'Bisector for %s' % self.domain_cls.__name__
+    description += textwrap.dedent('''
+        When running switcher and evaluator, it will set BISECT_REV environment
+        variable, indicates current rev to switch/evaluate.
+    ''')
+
     parser = argparse.ArgumentParser(
         prog=prog,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent('''\
-        Bisector for %s.
-
-        When running switcher and evaluator, it will set BISECT_REV environment
-        variable, indicates current rev to switch/evaluate.
-        ''' % self.domain_cls.__name__) + textwrap.dedent(self.domain_cls.help))
+        description=description)
     common.add_common_arguments(parser)
     parser.add_argument(
         '--session_base',

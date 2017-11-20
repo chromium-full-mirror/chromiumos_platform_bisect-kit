@@ -216,7 +216,7 @@ class BisectDomain(object):
     - Provide users the information to difference of two version numbers.
   """
 
-  # Additional description message for bisector command line --help.
+  # Bisector help message shown on command line --help.
   help = ''
 
   @staticmethod

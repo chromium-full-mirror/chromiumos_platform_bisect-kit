@@ -21,6 +21,7 @@ from bisect_kit import git_util
 class GitDomain(core.BisectDomain):
   """BisectDomain for git revisions."""
   revtype = staticmethod(git_util.argtype_git_rev)
+  help = globals()['__doc__']
 
   @staticmethod
   def add_init_arguments(parser):
