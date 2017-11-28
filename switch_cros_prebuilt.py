@@ -1,0 +1,79 @@
+#!/usr/bin/env python2
+# Copyright 2017 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Switcher for ChromeOS prebuilt"""
+
+from __future__ import print_function
+import argparse
+import logging
+import os
+
+from bisect_kit import cli
+from bisect_kit import common
+from bisect_kit import configure
+from bisect_kit import cros_util
+
+logger = logging.getLogger(__name__)
+
+
+def create_argument_parser():
+  parser = argparse.ArgumentParser(description=__doc__)
+  common.add_common_arguments(parser)
+  parser.add_argument(
+      'dut',
+      nargs='?',
+      type=cli.argtype_notempty,
+      metavar='DUT',
+      default=configure.get('DUT', ''))
+  parser.add_argument(
+      'version',
+      nargs='?',
+      type=cros_util.argtype_cros_version,
+      metavar='CROS_VERSION',
+      default=configure.get('CROS_VERSION', ''),
+      help='ChromeOS version number, short (10162.0.0) or full (R64-10162.0.0)')
+  parser.add_argument(
+      '--board',
+      metavar='BOARD',
+      default=configure.get('BOARD', ''),
+      help='ChromeOS board name')
+  parser.add_argument(
+      '--clobber-stateful',
+      action='store_true',
+      help='Clobber stateful partition when performing update')
+  parser.add_argument(
+      '--no-disable-rootfs-verification',
+      dest='disable_rootfs_verification',
+      action='store_false',
+      help="Don't disable rootfs verification after update is completed")
+  parser.add_argument(
+      '--default_chromeos_root',
+      type=cli.argtype_dir_path,
+      default=configure.get('DEFAULT_CHROMEOS_ROOT',
+                            os.path.expanduser('~/chromiunos')),
+      help='Default chromeos tree to run "cros flash" (default: %(default)s)')
+
+  return parser
+
+
+def main(args=None):
+  common.init()
+  parser = create_argument_parser()
+  opts = parser.parse_args(args)
+  common.config_logging(opts)
+
+  assert cros_util.is_dut(opts.dut)
+  board = opts.board or cros_util.query_dut_board(opts.dut)
+
+  cros_util.cros_flash(
+      opts.default_chromeos_root,
+      opts.dut,
+      board,
+      opts.version,
+      clobber_stateful=opts.clobber_stateful,
+      disable_rootfs_verification=opts.disable_rootfs_verification)
+
+
+if __name__ == '__main__':
+  main()
