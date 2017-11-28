@@ -113,7 +113,7 @@ class Popen(object):
     # Need to ignore failures because sometimes they are expected.
     # For example, the owner of child process is different to current and
     # unable to be killed by current process. 'cros_sdk' is one of such case.
-    for proc in psutil.Process(self.p.pid).get_children(recursive=True):
+    for proc in psutil.Process(self.p.pid).children(recursive=True):
       try:
         proc.terminate()
       except psutil._error.AccessDenied:  # pylint: disable=protected-access
