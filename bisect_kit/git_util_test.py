@@ -87,6 +87,17 @@ class TestGitOperation(unittest.TestCase):
     git_util.checkout_version(self.git_repo, self.commit[1])
     self.assertEqual(open(full_path).read(), 'commit 2')
 
+  def test_get_commit_log(self):
+    self.assertIn('commit 2',
+                  git_util.get_commit_log(self.git_repo, self.commit[1]))
+
+  def test_get_commit_hash(self):
+    tag_name = 'foo'
+    subprocess.check_call(
+        ['git', 'tag', tag_name, self.commit[2]], cwd=self.git_repo)
+    self.assertEqual(
+        git_util.get_commit_hash(self.git_repo, tag_name), self.commit[2])
+
 
 class TestGitUtil(unittest.TestCase):
   """Tests logic part of git_util module.

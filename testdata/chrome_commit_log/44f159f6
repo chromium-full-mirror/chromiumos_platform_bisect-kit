@@ -1,0 +1,9 @@
+Enumerate Bluetooth LE services and expose them to chrome.bluetooth API.
+
+BUG=388016
+TBR=armansito@chromium.org
+
+Review URL: https://codereview.chromium.org/395633003
+
+git-svn-id: svn://svn.chromium.org/chrome/trunk/src@284374 0039d316-1c4b-4281-b951-d872f2087c98
+

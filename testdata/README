@@ -1,3 +1,6 @@
+chrome_commit_log/*
+    commit logs extracted from chrome
+
 lsb-release
     Redacted from samus's /etc/lsb-release.
 

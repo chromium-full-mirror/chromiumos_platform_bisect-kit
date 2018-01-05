@@ -83,3 +83,34 @@ def get_revlist(git_repo, old, new):
   cmd = ['git', 'rev-list', '--reverse', '%s^..%s' % (old, new)]
   revlist = util.check_output(*cmd, cwd=git_repo).splitlines()
   return revlist
+
+
+def get_commit_log(git_repo, rev):
+  """Get git commit log.
+
+  Args:
+    git_repo: path of git repo.
+    rev: git commit revision.
+
+  Returns:
+    commit log message
+  """
+  cmd = ['git', 'log', '-1', '--format=%B', rev]
+  msg = util.check_output(*cmd, cwd=git_repo)
+  return msg
+
+
+def get_commit_hash(git_root, rev):
+  """Get git commit hash.
+
+  Args:
+    git_repo: path of git repo.
+    rev: could be git tag, branch, or (shortened) commit hash
+
+  Returns:
+    full git commit hash
+  """
+  cmd = ['git', 'rev-parse', rev]
+  git_rev = util.check_output(*cmd, cwd=git_root).strip()
+  assert git_rev
+  return git_rev

@@ -1,0 +1,19 @@
+Set proper settings for mobile emulator overlay scrollbar.
+
+This issue is caused by mobile emulator does not set proper settings.
+
+1. solid_color_scrollbar need to be true to create animation controller.
+2. Need to use correct scrollbar theme for FrameView and PLSA.
+
+After this patch, when toggle mobile emulator, scrollbar will paint
+animating as Android Scrollbar.
+
+Bug: 740879
+Cq-Include-Trybots: master.tryserver.chromium.linux:linux_layout_tests_slimming_paint_v2
+Change-Id: I2cedba08609e9c0d2f06d26ec2ca92d508f83c48
+Reviewed-on: https://chromium-review.googlesource.com/646727
+Commit-Queue: Jianpeng Chao <chaopeng@chromium.org>
+Reviewed-by: Pavel Feldman <pfeldman@chromium.org>
+Reviewed-by: Philip Rogers <pdr@chromium.org>
+Reviewed-by: David Bokan <bokan@chromium.org>
+Cr-Commit-Position: refs/heads/master@{#514085}
