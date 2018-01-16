@@ -34,5 +34,5 @@
   // higher precedence. And precedence of parent config file is higher than
   // children files.
   "options": {
-  },
+  }
 }

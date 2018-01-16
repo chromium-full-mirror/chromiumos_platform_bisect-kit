@@ -71,7 +71,7 @@ class ConfigStore(object):
 
     content = file(self.path).read()
     # strip comments as they are not allowed in standard json
-    content = re.sub(r'^\s*//.*', '', content)
+    content = re.sub(r'^\s*//.*', '', content, 0, re.M)
 
     config = json.loads(content)
 

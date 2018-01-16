@@ -115,6 +115,14 @@ class TestConfigure(unittest.TestCase):
       with mock.patch.dict(os.environ, {configure.CONFIG_ENV_NAME: path}):
         configure.search_config_file(args)
 
+  def test_load_sample_config(self):
+    filename = 'bisect_kit.json.sample'
+    path = os.path.join(os.path.dirname(__file__), '..', filename)
+    config = configure.ConfigStore(path)
+
+    # Load succeeded, no exceptions.
+    config.load_config()
+
   def test_include(self):
     subdir = os.path.join(self.progdir, 'subdir')
     os.mkdir(subdir)
