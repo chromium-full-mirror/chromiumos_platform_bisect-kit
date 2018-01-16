@@ -343,6 +343,7 @@ class BisectorCommandLineInterface(object):
     See init command's help message for more detail.
     """
     config, revlist = self.domain_cls.init(opts)
+    logger.info('found %d revs to bisect', len(revlist))
     logger.debug('revlist %r', revlist)
     if 'new' not in config:
       config['new'] = opts.new

@@ -120,6 +120,12 @@ class NoisyBinarySearch(object):
 
     self.old_p, self.new_p = self._estimate_model()
 
+  def is_noisy(self):
+    """Is noisy case?"""
+    if self.oracle and self.oracle != (0, 1):
+      return True
+    return self.prior_observation is not None
+
   @staticmethod
   def _parse_observation(observation):
     """Parses prior from argument.
@@ -557,7 +563,7 @@ class NoisyBinarySearch(object):
         if p < cut * GAP:
           break
       candidates.add(i)
-    assert cut is not None
+    assert cut is not None or confidence == 1
 
     left = max(min(candidates) - 1, self.old_idx)
     # Sometimes left has old probability due to 'skip', not 'old'. Seeks for
@@ -606,16 +612,33 @@ class NoisyBinarySearch(object):
     """
     prob_rank = sorted(
         ((p, i) for i, p in enumerate(self.prob) if p > 0), reverse=True)
-    interesting = set(i for p, i in prob_rank[:10])
-
     left, right = self.get_range(1.0 - self.confidence)
-    for i in [left, right]:
-      interesting.add(i)
+    interesting = set([left, right])
+
+    if self.is_noisy():
+      # show top candidates
+      interesting.update(i for p, i in prob_rank[:10])
+    else:
+      # show all skip within range
+      for i in range(left + 1, right):
+        if self.rev_info[i]['skip'] and self.prob[i] > 0:
+          interesting.add(i)
 
     if more:
+      # show all revs with test results
       for i, info in enumerate(self.rev_info):
         if sum(info.result_counter.values()) > 0:
           interesting.add(i)
+
+    size = right - left
+    if size > 1 and not self.is_noisy():
+      steps = math.ceil(math.log(size) / math.log(2))
+      logger.info('Range: (%s, %s], %d revs left (roughly %.0f steps)',
+                  self.rev_info[left].rev, self.rev_info[right].rev, size,
+                  steps)
+    else:
+      logger.info('Range: (%s, %s], %d revs left', self.rev_info[left].rev,
+                  self.rev_info[right].rev, size)
 
     for i in sorted(interesting):
       note = ''
@@ -632,9 +655,14 @@ class NoisyBinarySearch(object):
         value_display = 'n=%d,avg=%.3f,median=%.3f,min=%.3f,max=%.3f' % (
             len(values), sum(values) / len(values), values[len(values) // 2],
             values[0], values[-1])
-      logger.info('[%d] %s %.4f%%; %s %s %s', i, self.rev_info[i].rev,
-                  self.prob[i] * 100, self.rev_info[i].result_counter,
-                  value_display, note)
+
+      if self.is_noisy():
+        logger.info('[%d] %s %.4f%%; %s %s %s', i, self.rev_info[i].rev,
+                    self.prob[i] * 100, self.rev_info[i].result_counter,
+                    value_display, note)
+      else:
+        logger.info('[%d] %s; %s %s %s', i, self.rev_info[i].rev,
+                    self.rev_info[i].result_counter, value_display, note)
 
   def is_done(self):
     """If we have an answer with high confidence."""
