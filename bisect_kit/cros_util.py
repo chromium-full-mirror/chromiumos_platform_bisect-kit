@@ -423,3 +423,17 @@ def version_info(board, version):
         'Note, so far no quick way to look up version info for too old builds')
 
   return info
+
+
+def query_chrome_version(board, version):
+  """Queries chrome version of chromeos build
+
+  Args:
+    board: ChromeOS board name
+    version: ChromeOS version number in short or full format
+
+  Returns:
+    Chrome version number
+  """
+  info = version_info(board, version)
+  return info['cr_version']

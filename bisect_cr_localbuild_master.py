@@ -137,6 +137,14 @@ class ChromeSrcMasterDomain(core.BisectDomain):
     new = guess_git_rev(opts, opts.new)
 
     revlist = git_util.get_revlist(chrome_src, old, new)
+
+    # If opts.old is chromeos version or chrome version, `old` is pointed to a
+    # git tag commit. But what we used to bisect is the parent of the tag. In
+    # other words, `old` is not in the returned list of get_revlist(). Here I
+    # don't verify the commit graph carefully and just re-assign revlist[0] as
+    # `old`.
+    old = revlist[0]
+
     config = dict(
         chrome_root=opts.chrome_root,
         chrome_src=chrome_src,
@@ -156,9 +164,9 @@ class ChromeSrcMasterDomain(core.BisectDomain):
     env['REV'] = rev
 
     if self.config['board']:
-      env['BOARD'] = self.config['BOARD']
+      env['BOARD'] = self.config['board']
     if self.config['dut']:
-      env['DUT'] = self.config['DUT']
+      env['DUT'] = self.config['dut']
 
   def view(self, old, new):
     url = ('https://chromium.googlesource.com/'

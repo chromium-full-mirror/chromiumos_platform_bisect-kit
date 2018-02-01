@@ -7,6 +7,7 @@
 from __future__ import print_function
 import json
 import logging
+import os
 import re
 import subprocess
 import urllib2
@@ -166,3 +167,37 @@ def query_git_rev(chrome_src, rev):
     return query_git_rev_by_commit_position(chrome_src, 'master', m.group(1))
 
   raise ValueError, 'unknown rev format: %s' % rev
+
+
+def build_and_deploy(chrome_src, board, dut, targets):
+  """Build and deploy Chrome binaries to ChromeOS DUT
+
+  Args:
+    chrome_src: git repo path of chrome/src
+    board: ChromeOS board name
+    dut: DUT address
+    targets: ninja targets. Default to build chrome.
+  """
+  # The main steps are written in the helper shell script because it is
+  # expected to be often local hacked by users.
+  dirname = os.path.dirname(os.path.abspath(__file__))
+  build_and_deploy_script = os.path.join(dirname, '..',
+                                         'build_and_deploy_chrome_helper.sh')
+
+  # To run command inside chrome-sdk shell.
+  prefix = [
+      'cros',
+      'chrome-sdk',
+      '--board=%s' % board,
+      '--internal',
+      '--',
+  ]
+
+  # The actual command to run.
+  cmd = [ 'sh', '-ex', build_and_deploy_script ] + targets
+  full_cmd = prefix + cmd
+
+  env = os.environ.copy()
+  env['DUT'] = dut
+
+  util.check_call(*full_cmd, cwd=chrome_src, env=env)
