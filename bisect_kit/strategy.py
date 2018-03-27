@@ -488,8 +488,8 @@ class NoisyBinarySearch(object):
     if self._is_changing_skip_weight(idx, result):
       # Incremental update by skip_weight.
       new_skip_weight = self.get_weight_by_skip(self.rev_info)
-      for i, (cur_skip_w,
-              new_skip_w) in enumerate(zip(self.skip_weight, new_skip_weight)):
+      for i, (cur_skip_w, new_skip_w) in enumerate(
+          zip(self.skip_weight, new_skip_weight)):
         if new_skip_w != cur_skip_w:
           self.prob[i] *= new_skip_w / cur_skip_w
       self.skip_weight = new_skip_weight

@@ -32,8 +32,8 @@ class TestCrUtil(unittest.TestCase):
     with testing.mock_function_by_file(git_util, 'get_commit_log',
                                        'chrome_commit_log/e4940332'):
       self.assertEqual(
-          cr_util.query_commit_position(chrome_src, git_rev), ('master',
-                                                               '514085'))
+          cr_util.query_commit_position(chrome_src, git_rev),
+          ('master', '514085'))
 
     # branch
     with testing.mock_function_by_file(git_util, 'get_commit_log',
@@ -45,15 +45,15 @@ class TestCrUtil(unittest.TestCase):
     with testing.mock_function_by_file(git_util, 'get_commit_log',
                                        'chrome_commit_log/44f159f6'):
       self.assertEqual(
-          cr_util.query_commit_position(chrome_src, git_rev), ('master',
-                                                               '284374'))
+          cr_util.query_commit_position(chrome_src, git_rev),
+          ('master', '284374'))
 
     # branch (old)
     with testing.mock_function_by_file(git_util, 'get_commit_log',
                                        'chrome_commit_log/3fe30a09'):
       self.assertEqual(
-          cr_util.query_commit_position(chrome_src, git_rev), ('2100',
-                                                               '284389'))
+          cr_util.query_commit_position(chrome_src, git_rev),
+          ('2100', '284389'))
 
     # fail
     with mock.patch.object(git_util, 'get_commit_log', return_value='foo'):

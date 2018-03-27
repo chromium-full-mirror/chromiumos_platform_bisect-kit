@@ -54,8 +54,8 @@ class Popen(object):
     if isinstance(args, str):
       logger.debug('cwd=%s, run %r', kwargs.get('cwd'), args)
     else:
-      logger.debug('cwd=%s, run %r',
-                   kwargs.get('cwd'), subprocess.list2cmdline(args))
+      logger.debug('cwd=%s, run %r', kwargs.get('cwd'),
+                   subprocess.list2cmdline(args))
     self.p = subprocess.Popen(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
 

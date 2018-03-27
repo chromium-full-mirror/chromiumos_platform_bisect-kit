@@ -73,8 +73,8 @@ class TestGitOperation(unittest.TestCase):
     self.assertTrue(
         git_util.is_containing_commit(self.git_repo, self.commit[0][:10]))
     self.assertFalse(
-        git_util.is_containing_commit(self.git_repo, self.commit[0][:-10] +
-                                      'a' * 10))
+        git_util.is_containing_commit(self.git_repo,
+                                      self.commit[0][:-10] + 'a' * 10))
 
   def test_get_revlist(self):
     self.assertEqual(

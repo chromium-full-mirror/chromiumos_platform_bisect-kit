@@ -194,7 +194,7 @@ def build_and_deploy(chrome_src, board, dut, targets):
   ]
 
   # The actual command to run.
-  cmd = [ 'sh', '-ex', build_and_deploy_script ] + targets
+  cmd = ['sh', '-ex', build_and_deploy_script] + targets
   full_cmd = prefix + cmd
 
   env = os.environ.copy()
