@@ -38,7 +38,7 @@ VERSION_KEY_CROS_SHORT_VERSION = 'cros_short_version'
 VERSION_KEY_CROS_FULL_VERSION = 'cros_full_version'
 VERSION_KEY_MILESTONE = 'milestone'
 VERSION_KEY_CR_VERSION = 'cr_version'
-VERSION_KEY_ANDROID_BID = 'android_bid'
+VERSION_KEY_ANDROID_BUILD_ID = 'android_build_id'
 VERSION_KEY_ANDROID_BRANCH = 'android_branch'
 
 
@@ -145,7 +145,10 @@ def reboot(host):
   # Depends on timing, ssh may return failure due to broken pipe,
   # so don't check ssh return code.
   util.call('ssh', host, 'reboot')
+  wait_reboot_done(host, boot_id)
 
+
+def wait_reboot_done(host, boot_id):
   # For dev-mode test image, the reboot time is roughly at least 16 seconds
   # (dev screen short delay) or more (long delay).
   time.sleep(15)
@@ -384,7 +387,7 @@ def version_info(board, version):
       cros_full_version: ChromeOS version
       milestone: milestone of ChromeOS
       cr_version: Chrome version
-      android_bid: Android build id
+      android_build_id: Android build id
       android_branch: Android branch, in format like 'git_nyc-mr1-arc'
   """
   info = {}
@@ -410,7 +413,7 @@ def version_info(board, version):
       })
 
       if 'android' in v:
-        info[VERSION_KEY_ANDROID_BID] = v['android']
+        info[VERSION_KEY_ANDROID_BUILD_ID] = v['android']
       if 'android-branch' in v:  # this appears since R58-9317.0.0
         info[VERSION_KEY_ANDROID_BRANCH] = v['android-branch']
       elif 'android-container-branch' in board_metadata:
@@ -436,3 +439,15 @@ def query_chrome_version(board, version):
   """
   info = version_info(board, version)
   return info['cr_version']
+
+
+def query_android_build_id(board, rev):
+  info = version_info(board, rev)
+  rev = info['android_build_id']
+  return rev
+
+
+def query_android_branch(board, rev):
+  info = version_info(board, rev)
+  rev = info['android_branch']
+  return rev
