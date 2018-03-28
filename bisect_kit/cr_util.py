@@ -14,7 +14,6 @@ import urllib2
 
 from bisect_kit import cli
 from bisect_kit import core
-from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import util
 
