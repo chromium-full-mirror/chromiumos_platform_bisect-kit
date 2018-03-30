@@ -18,7 +18,6 @@ except ImportError:
   pass
 
 from bisect_kit import configure
-from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 

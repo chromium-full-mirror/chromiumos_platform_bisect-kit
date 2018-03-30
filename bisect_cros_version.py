@@ -92,6 +92,7 @@ def get_revlist(board, old, new, only_good_build=True):
 
 
 class ChromeOSVersionDomain(core.BisectDomain):
+  """BisectDomain for chromeos versions."""
   revtype = staticmethod(cros_util.argtype_cros_version)
   help = globals()['__doc__']
 
@@ -145,4 +146,4 @@ class ChromeOSVersionDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLineInterface(ChromeOSVersionDomain).main()
+  cli.BisectorCommandLine(ChromeOSVersionDomain).main()

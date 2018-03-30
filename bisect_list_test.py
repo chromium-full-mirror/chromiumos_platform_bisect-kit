@@ -22,7 +22,7 @@ class TestListDomain(unittest.TestCase):
     # Testing ListDomain via BisectorCommandLineInterface, remember our purpose
     # is testing ListDomain, not bisector. Bisector logic should be tested
     # by its own unit test, not here.
-    bisector = cli.BisectorCommandLineInterface(bisect_list.ListDomain)
+    bisector = cli.BisectorCommandLine(bisect_list.ListDomain)
 
     with mock.patch('sys.stdin', StringIO.StringIO('S\nM\nL\nXL\nXXL\n')):
       bisector.main('init', '--old', 'S', '--new', 'XXL')

@@ -15,6 +15,7 @@ import bisect_cr_localbuild_master
 
 
 class TestBisectCrLocalbuildMaster(unittest.TestCase):
+  """Test bisect_cr_localbuild_master.py."""
 
   def setUp(self):
     self.chrome_root = tempfile.mkdtemp()

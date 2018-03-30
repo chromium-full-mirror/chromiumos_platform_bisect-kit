@@ -1,9 +1,9 @@
-#!/usr/bin/env python
 # Copyright 2017 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Test cr_util module"""
+
 from __future__ import print_function
-import os
 import unittest
 
 import mock
@@ -14,6 +14,7 @@ from bisect_kit import testing
 
 
 class TestCrUtil(unittest.TestCase):
+  """Test cr_util functions."""
 
   def test_is_chrome_version(self):
     assert cr_util.is_chrome_version('59.0.3065.0')

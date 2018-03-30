@@ -53,4 +53,4 @@ class GitDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLineInterface(GitDomain).main()
+  cli.BisectorCommandLine(GitDomain).main()

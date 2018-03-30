@@ -122,9 +122,8 @@ class DummyDomain(core.BisectDomain):
 
 
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())
-# This is not an python "interface". pylint: disable=interface-not-implemented
-class TestBisectorCommandLineInterface(unittest.TestCase):
-  """Test cli.BisectorCommandLineInterface class."""
+class TestBisectorCommandLine(unittest.TestCase):
+  """Test cli.BisectorCommandLine class."""
 
   def setUp(self):
     self.session_base = tempfile.mkdtemp()
@@ -137,7 +136,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
     self.patcher.stop()
 
   def test_run_true(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=10', '--old=0', '--new=9')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'true')
@@ -145,7 +144,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
       bisector.main('run')
 
   def test_run_false(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=10', '--old=0', '--new=9')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
@@ -153,7 +152,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
       bisector.main('run')
 
   def test_simple(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=20', '--old=3', '--new=15')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'sh', '-c', '[ "$BISECT_REV" -lt 7 ]')
@@ -161,7 +160,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
     self.assertEqual(bisector.strategy.get_best_guess(), 7)
 
   def test_switch_fail(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=20', '--old=3', '--new=15')
     bisector.main('config', 'switch', 'false')
     bisector.main('config', 'eval', 'sh', '-c', '[ "$BISECT_REV" -lt 7 ]')
@@ -169,7 +168,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
       bisector.main('run')
 
   def test_run_classic(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=200', '--old=0', '--new=99')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
@@ -206,7 +205,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
       self.assertEqual(mock_stdout.getvalue(), 'done\n')
 
   def test_run_noisy(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=100', '--old=0', '--new=99',
                   '--noisy=old=1/10,new=9/10')
     bisector.main('config', 'switch', 'true')
@@ -233,7 +232,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
 
   def test_cmd_old_and_new(self):
     """Tests cmd_old and cmd_new"""
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=100', '--old=0', '--new=99')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
@@ -253,7 +252,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
 
   def test_cmd_switch(self):
     """Test cmd_switch"""
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=100', '--old=0', '--new=99')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
@@ -271,14 +270,14 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
       self.assertEqual(switched, ['99', '3', '5', '4'])
 
   def test_cmd_view(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=100', '--old=10', '--new=90')
     with mock.patch.object(DummyDomain, 'view') as mock_view:
       bisector.main('view')
       mock_view.assert_called_with('10', '90')
 
   def test_cmd_config_confidence(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=100', '--old=10', '--new=90',
                   '--confidence=0.75')
 
@@ -292,7 +291,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
     self.assertEqual(bisector.states.config['confidence'], 0.875)
 
   def test_cmd_config_noisy(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=100', '--old=10', '--new=90',
                   '--noisy=new=9/10')
 
@@ -304,7 +303,7 @@ class TestBisectorCommandLineInterface(unittest.TestCase):
     self.assertEqual(bisector.states.config['noisy'], 'old=1/10,new=8/9')
 
   def test_current_status(self):
-    bisector = cli.BisectorCommandLineInterface(DummyDomain)
+    bisector = cli.BisectorCommandLine(DummyDomain)
     result = bisector.current_status()
     self.assertEqual(result.get('inited'), False)
 

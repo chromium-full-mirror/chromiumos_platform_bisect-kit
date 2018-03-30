@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2017 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -13,7 +12,6 @@ import subprocess
 import urllib2
 
 from bisect_kit import cli
-from bisect_kit import core
 from bisect_kit import git_util
 from bisect_kit import util
 

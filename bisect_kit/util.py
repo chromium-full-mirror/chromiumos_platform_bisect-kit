@@ -116,7 +116,7 @@ class Popen(object):
     for proc in psutil.Process(self.p.pid).children(recursive=True):
       try:
         proc.terminate()
-      except psutil._error.AccessDenied:  # pylint: disable=protected-access
+      except psutil.AccessDenied:
         logger.warning('Unable to terminate pid=%d; ignore', proc.pid)
     try:
       self.p.terminate()

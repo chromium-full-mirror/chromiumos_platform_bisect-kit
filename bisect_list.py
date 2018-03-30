@@ -60,4 +60,4 @@ class ListDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLineInterface(ListDomain).main()
+  cli.BisectorCommandLine(ListDomain).main()

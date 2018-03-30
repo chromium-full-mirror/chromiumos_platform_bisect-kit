@@ -100,7 +100,7 @@ def get_commit_log(git_repo, rev):
   return msg
 
 
-def get_commit_hash(git_root, rev):
+def get_commit_hash(git_repo, rev):
   """Get git commit hash.
 
   Args:
@@ -111,6 +111,6 @@ def get_commit_hash(git_root, rev):
     full git commit hash
   """
   cmd = ['git', 'rev-parse', rev]
-  git_rev = util.check_output(*cmd, cwd=git_root).strip()
+  git_rev = util.check_output(*cmd, cwd=git_repo).strip()
   assert git_rev
   return git_rev

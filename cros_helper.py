@@ -2,13 +2,13 @@
 # Copyright 2017 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Helper script to manipulate chromeos DUT or query info."""
 from __future__ import print_function
 import argparse
 import json
 import logging
 
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import cros_util
 
 logger = logging.getLogger(__name__)

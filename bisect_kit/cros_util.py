@@ -19,7 +19,6 @@ import subprocess
 import time
 
 from bisect_kit import cli
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import util
 

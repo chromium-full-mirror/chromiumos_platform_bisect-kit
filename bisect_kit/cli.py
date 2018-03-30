@@ -133,8 +133,7 @@ def argtype_multiplier(argtype):
     try:
       if m:
         return argtype(m.group(1)), int(m.group(2))
-      else:
-        return argtype(s), 1
+      return argtype(s), 1
     except ArgTypeError as e:
       # It should be okay to gives multiplier example only for the first one
       # because it is just "example", no need to enumerate all possibilities.
@@ -297,14 +296,13 @@ def do_switch(switch_cmd, domain, rev):
   return None
 
 
-# This is not an python "interface". pylint: disable=interface-not-implemented
-class BisectorCommandLineInterface(object):
+class BisectorCommandLine(object):
   """Bisector command line interface.
 
   The typical usage pattern:
 
     if __name__ == '__main__':
-        BisectorCommandLineInterface(CustomDomain).main()
+        BisectorCommandLine(CustomDomain).main()
 
   where CustomDomain is a derived class of core.BisectDomain. See
   bisect-list.py as example.
@@ -376,7 +374,6 @@ class BisectorCommandLineInterface(object):
         status: Execution result ('old', 'new', or 'skip').
         values: Collected values from eval step. None if last step is 'switch'.
     """
-    idx = self.states.rev2idx(rev)
     if prev_rev != rev:
       logger.debug('switch to rev=%s', rev)
       t0 = time.time()

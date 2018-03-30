@@ -8,16 +8,17 @@ import unittest
 import subprocess
 import logging
 
+import mock
+
 from bisect_kit import cli
 from bisect_kit import cros_util
 from bisect_kit import testing
-
-import mock
 
 logger = logging.getLogger(__name__)
 
 
 class TestCrosUtil(unittest.TestCase):
+  """Test cros_util functions."""
 
   def test_is_cros_short_version(self):
     self.assertTrue(cros_util.is_cros_short_version('1234.0.0'))

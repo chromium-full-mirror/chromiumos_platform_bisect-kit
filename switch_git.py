@@ -21,7 +21,6 @@ from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import git_util
-from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 

@@ -30,7 +30,6 @@ will be set:
 from __future__ import print_function
 import os
 import logging
-import re
 
 from bisect_kit import cli
 from bisect_kit import configure
@@ -96,6 +95,7 @@ def verify_gclient_dep(chrome_root):
 
 
 class ChromeSrcMasterDomain(core.BisectDomain):
+  """BisectDomain for Chrome master tree"""
   revtype = staticmethod(revtype)
   help = globals()['__doc__']
 
@@ -176,4 +176,4 @@ class ChromeSrcMasterDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLineInterface(ChromeSrcMasterDomain).main()
+  cli.BisectorCommandLine(ChromeSrcMasterDomain).main()

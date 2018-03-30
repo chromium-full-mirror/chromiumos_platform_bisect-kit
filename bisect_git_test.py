@@ -23,7 +23,7 @@ class TestGitDomain(unittest.TestCase):
 
   def test_basic(self):
     """Tests basic functionality."""
-    bisector = cli.BisectorCommandLineInterface(bisect_git.GitDomain)
+    bisector = cli.BisectorCommandLine(bisect_git.GitDomain)
 
     start = 12345678000
     fake_commits = map(str, range(start, start + 10))
