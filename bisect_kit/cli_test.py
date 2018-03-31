@@ -13,6 +13,8 @@ import StringIO
 import mock
 
 from bisect_kit import cli
+from bisect_kit import configure
+from bisect_kit import common
 from bisect_kit import core
 
 
@@ -134,6 +136,7 @@ class TestBisectorCommandLine(unittest.TestCase):
   def tearDown(self):
     shutil.rmtree(self.session_base)
     self.patcher.stop()
+    configure.reset()
 
   def test_run_true(self):
     bisector = cli.BisectorCommandLine(DummyDomain)
@@ -303,6 +306,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     self.assertEqual(bisector.states.config['noisy'], 'old=1/10,new=8/9')
 
   def test_current_status(self):
+    common.init()
     bisector = cli.BisectorCommandLine(DummyDomain)
     result = bisector.current_status()
     self.assertEqual(result.get('inited'), False)

@@ -162,3 +162,14 @@ def get(name, default=None):
     return value
 
   return os.environ.get(name, default)
+
+
+def reset():
+  """Resets global config store.
+
+  Usually you don't need this function and keep the parsed config live during
+  the script runs. On the other hand, unittests may need to reset the global
+  state.
+  """
+  global root  # pylint: disable=global-statement
+  root = None

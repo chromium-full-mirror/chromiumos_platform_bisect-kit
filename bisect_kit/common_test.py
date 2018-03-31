@@ -11,6 +11,7 @@ import tempfile
 import unittest
 
 from bisect_kit import common
+from bisect_kit import configure
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,10 @@ class TestCommon(unittest.TestCase):
   def tearDown(self):
     if os.path.exists(self.log_file):
       os.unlink(self.log_file)
+    configure.reset()
 
   def test_logging(self):
+    common.init()
     parser = argparse.ArgumentParser()
     common.add_common_arguments(parser)
     opts = parser.parse_args(['--log_file', self.log_file])
