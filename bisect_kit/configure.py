@@ -13,7 +13,7 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-SURPRESS_CONFIG = 'none'
+SUPPRESS_CONFIG = 'none'
 DEFAULT_CONFIG_FILENAME = 'bisect_kit.json'
 CONFIG_ENV_NAME = 'BISECT_KIT_CONFIG'
 
@@ -115,12 +115,12 @@ def search_config_file(args):
     args: command line arguments. Note args[0] is program path.
 
   Returns:
-    Path to config file. None if not found or surpressed.
+    Path to config file. None if not found or suppressed.
   """
   config = _parse_config_file(args)
   if not config:
     config = os.environ.get(CONFIG_ENV_NAME, None)
-  if config == SURPRESS_CONFIG:
+  if config == SUPPRESS_CONFIG:
     return None
 
   if config:

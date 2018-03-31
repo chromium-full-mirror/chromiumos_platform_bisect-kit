@@ -146,7 +146,7 @@ def reboot(host):
   # so don't check ssh return code.
   util.call('ssh', host, 'reboot')
 
-  # For dev-mode test image, the reboot time is roughtly at least 16 seconds
+  # For dev-mode test image, the reboot time is roughly at least 16 seconds
   # (dev screen short delay) or more (long delay).
   time.sleep(15)
   for _ in range(100):
@@ -207,7 +207,7 @@ def gsutil_ls(*args, **kwargs):
   Args:
     args: arguments passed to 'gsutil ls'
     kwargs: extra parameters, where
-      ignore_errors: if true, return empty list instead of rasing
+      ignore_errors: if true, return empty list instead of raising
           exception, ex. path not found.
 
   Returns:
@@ -339,7 +339,7 @@ def cros_flash(chromeos_root,
     if not os.path.exists(tmp_dir):
       os.makedirs(tmp_dir)
     # gs://chromeos-releases may have more old images than
-    # gs://chromeos-image-archive, but 'cros flash' dones't support it. We have
+    # gs://chromeos-image-archive, but 'cros flash' doesn't support it. We have
     # to fetch the image by ourselves
     for channel in ['canary', 'dev', 'beta', 'stable']:
       fn = 'ChromeOS-test-{full_version}-{board}.tar.xz'.format(

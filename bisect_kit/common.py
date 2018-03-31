@@ -109,7 +109,7 @@ def add_common_arguments(parser):
       '--rc',
       metavar=configure.CONFIG_ENV_NAME,
       help='Specify config file to use. Otherwise searches default '
-      'locations. Use "none" to surpress config file searching.')
+      'locations. Use "none" to suppress config file searching.')
 
 
 def init():
