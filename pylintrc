@@ -1,0 +1,49 @@
+# Copyright 2018 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+[MASTER]
+load-plugins=chromite.cli.cros.lint
+
+[MESSAGES CONTROL]
+# The trailing commas after comments are intended. The trick is that old
+# version of pylint doesn't support inline comments, however pylint silently
+# ignores items it doesn't understand.
+# TODO(kcwu): remove trailing commas after pylint is upreved to newer version
+#             (crbug.com/732726).
+disable=
+  C0103, # invalid-name,
+  C0111, # missing-docstring,
+  C0302, # too-many-lines,
+  I0011, # locally-disabled,
+  I0012, # locally-enabled,
+  R0201, # no-self-use,
+  R0902, # too-many-instance-attributes,
+  R0903, # too-few-public-methods,
+  R0904, # too-many-public-methods,
+  R0911, # too-many-return-statements,
+  R0912, # too-many-branches,
+  R0913, # too-many-arguments,
+  R0914, # too-many-locals,
+  R0915, # too-many-statements,
+  R0921, # abstract-class-not-used,
+  R0922, # abstract-class-little-used,
+  W0122, # exec-used,
+  W0141, # bad-builtin,
+  W0142, # star-args,
+  W0511, # fixme,
+  W0703, # broad-except,
+
+[REPORTS]
+output-format=parseable
+reports=no
+
+[FORMAT]
+max-line-length=80
+indent-string='  '
+
+[SIMILARITIES]
+min-similarity-lines=20
+
+[VARIABLES]
+dummy-variables-rgx=_|unused_
