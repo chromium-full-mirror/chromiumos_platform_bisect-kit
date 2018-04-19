@@ -20,6 +20,8 @@ import time
 
 from bisect_kit import cli
 from bisect_kit import core
+from bisect_kit import git_util
+from bisect_kit import repo_util
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -93,7 +95,7 @@ def query_dut_lsb_release(host):
 
 
 def is_dut(host):
-  """Determines whether a host is a chromeos device
+  """Determines whether a host is a chromeos device.
 
   Args:
     host: the DUT address
@@ -121,7 +123,7 @@ def query_dut_short_version(host):
 
 
 def query_dut_boot_id(host, connect_timeout=None):
-  """Query boot id
+  """Query boot id.
 
   Args:
     host: DUT address
@@ -167,7 +169,7 @@ def wait_reboot_done(host, boot_id):
 
 
 def gsutil(*args, **kwargs):
-  """gsutil command line wrapper
+  """gsutil command line wrapper.
 
   Args:
     args: command line arguments passed to gsutil
@@ -205,7 +207,7 @@ def gsutil(*args, **kwargs):
 
 
 def gsutil_ls(*args, **kwargs):
-  """gsutil ls
+  """gsutil ls.
 
   Args:
     args: arguments passed to 'gsutil ls'
@@ -223,7 +225,7 @@ def gsutil_ls(*args, **kwargs):
 
 
 def query_milestone_by_version(board, short_version):
-  """Query milestone by ChromeOS version number
+  """Query milestone by ChromeOS version number.
 
   Args:
     board: ChromeOS board name
@@ -254,7 +256,7 @@ def query_milestone_by_version(board, short_version):
 
 
 def recognize_version(board, version):
-  """Recognize ChromeOS version
+  """Recognize ChromeOS version.
 
   Args:
     board: ChromeOS board name
@@ -272,7 +274,7 @@ def recognize_version(board, version):
 
 
 def version_to_short(version):
-  """Convert ChromeOS version number to short format
+  """Convert ChromeOS version number to short format.
 
   Args:
     version: ChromeOS version number in short or full format
@@ -287,7 +289,7 @@ def version_to_short(version):
 
 
 def version_to_full(board, version):
-  """Convert ChromeOS version number to full format
+  """Convert ChromeOS version number to full format.
 
   Args:
     board: ChromeOS board name
@@ -302,33 +304,20 @@ def version_to_full(board, version):
   return make_cros_full_version(milestone, version)
 
 
-def cros_flash(chromeos_root,
-               host,
-               board,
-               version,
-               clobber_stateful=False,
-               disable_rootfs_verification=True):
-  """Flash a DUT with ChromeOS image of given version
+def prepare_prebuilt_image(board, version):
+  """Prepare chromeos prebuilt image.
 
-  This is implemented by 'cros flash' command line.
-  This supports more old versions than 'cros flash'.
+  It searches for xbuddy image which "cros flash" can use, or fetch image to
+  local disk.
 
   Args:
-    chromeos_root: use 'cros flash' of which chromeos tree
-    host: DUT address
     board: ChromeOS board name
-    version: ChromeOS version in short or full format
-    clobber_stateful: Clobber stateful partition when performing update
-    disable_rootfs_verification: Disable rootfs verification after update
-                                 is completed
+    version: ChromeOS version number in short or full format
+
+  Returns:
+    xbuddy path or file path (outside chroot)
   """
-  logger.info('cros_flash %s %s %s', host, board, version)
   assert is_cros_version(version)
-
-  # Reboot is necessary because sometimes previous 'cros flash' failed and
-  # entered a bad state.
-  reboot(host)
-
   full_version = version_to_full(board, version)
   short_version = version_to_short(full_version)
 
@@ -359,6 +348,39 @@ def cros_flash(chromeos_root,
         break
 
   assert image_path
+  return image_path
+
+
+def cros_flash(chromeos_root,
+               host,
+               board,
+               image_path,
+               version=None,
+               clobber_stateful=False,
+               disable_rootfs_verification=True,
+               run_inside_chroot=False):
+  """Flash a DUT with given ChromeOS image.
+
+  This is implemented by 'cros flash' command line.
+
+  Args:
+    chromeos_root: use 'cros flash' of which chromeos tree
+    host: DUT address
+    board: ChromeOS board name
+    image_path: chromeos image xbuddy path or file path. If
+        run_inside_chroot is True, the file path is relative to src/scrips.
+        Otherwise, the file path is relative to chromeos_root.
+    version: ChromeOS version in short or full format
+    clobber_stateful: Clobber stateful partition when performing update
+    disable_rootfs_verification: Disable rootfs verification after update
+        is completed
+    run_inside_chroot: if True, run 'cros flash' command inside the chroot
+  """
+  logger.info('cros_flash %s %s %s %s', host, board, version, image_path)
+
+  # Reboot is necessary because sometimes previous 'cros flash' failed and
+  # entered a bad state.
+  reboot(host)
 
   args = ['--no-ping', host, image_path]
   if clobber_stateful:
@@ -366,12 +388,17 @@ def cros_flash(chromeos_root,
   if disable_rootfs_verification:
     args.append('--disable-rootfs-verification')
 
-  # TODO(kcwu): clear cache of cros flash
-  util.check_call('chromite/bin/cros', 'flash', *args, cwd=chromeos_root)
+  if run_inside_chroot:
+    cros_sdk(chromeos_root, 'cros', 'flash', *args)
+  else:
+    util.check_call('chromite/bin/cros', 'flash', *args, cwd=chromeos_root)
 
-  # In the past, cros flash may fail with returncode=0
-  # So let's have an extra check.
-  assert query_dut_short_version(host) == short_version
+  if version:
+    # In the past, cros flash may fail with returncode=0
+    # So let's have an extra check.
+    short_version = version_to_short(version)
+    dut_version = query_dut_short_version(host)
+    assert dut_version == short_version
 
 
 def version_info(board, version):
@@ -428,7 +455,7 @@ def version_info(board, version):
 
 
 def query_chrome_version(board, version):
-  """Queries chrome version of chromeos build
+  """Queries chrome version of chromeos build.
 
   Args:
     board: ChromeOS board name
@@ -451,3 +478,178 @@ def query_android_branch(board, rev):
   info = version_info(board, rev)
   rev = info['android_branch']
   return rev
+
+
+def is_inside_chroot():
+  """Returns True if we are inside chroot."""
+  return os.path.exists('/etc/cros_chroot_version')
+
+
+def cros_sdk(chromeos_root, *args, **kwargs):
+  """Run commands inside chromeos chroot.
+
+  Args:
+    chromeos_root: chromeos tree root
+    *args: command to run
+    **kwargs:
+      env: (dict) environment variables for the command
+      stdin: standard input file handle for the command
+  """
+  envs = []
+  for k, v in kwargs.get('env', {}).items():
+    assert re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', k)
+    envs.append('%s=%s' % (k, v))
+
+  # Use --no-ns-pid to prevent cros_sdk change our pgid, otherwise subsequent
+  # commands would be considered as background process.
+  cmd = ['chromite/bin/cros_sdk', '--no-ns-pid'] + envs + ['--'] + list(args)
+  return util.check_output(*cmd, cwd=chromeos_root, stdin=kwargs.get('stdin'))
+
+
+def copy_into_chroot(chromeos_root, src, dst):
+  """Copies file into chromeos chroot.
+
+  Args:
+    chromeos_root: chromeos tree root
+    src: path outside chroot
+    dst: path inside chroot
+  """
+  # chroot may be an image, so we cannot copy to corresponding path
+  # directly.
+  cros_sdk(chromeos_root, 'sh', '-c', 'cat > %s' % dst, stdin=open(src))
+
+
+def exists_in_chroot(chromeos_root, path):
+  """Determine whether a path exists in the chroot.
+
+  Args:
+    chromeos_root: chromeos tree root
+    path: path inside chroot, relative to src/scripts
+
+  Returns:
+    True if a path exists
+  """
+  try:
+    cros_sdk(chromeos_root, '[', '-e', path, ']')
+  except subprocess.CalledProcessError:
+    return False
+  return True
+
+
+def build_image(chromeos_root, board, rev):
+  """Build ChromeOS image.
+
+  Args:
+    chromeos_root: chromeos tree root
+    board: ChromeOS board name
+    rev: the version name to build
+
+  Returns:
+    Image path
+  """
+
+  # If the given version is already built, reuse it.
+  image_name = 'bisect-%s' % rev
+  image_path = os.path.join('../build/images', board, image_name,
+                            'chromiumos_test_image.bin')
+  if exists_in_chroot(chromeos_root, image_path):
+    logger.info('"%s" already exists, skip build step', image_path)
+    return image_path
+
+  dirname = os.path.dirname(os.path.abspath(__file__))
+  script_name = 'build_cros_helper.sh'
+  copy_into_chroot(chromeos_root, os.path.join(dirname, '..', script_name),
+                   script_name)
+  cros_sdk(chromeos_root, 'chmod', '+x', script_name)
+  cros_sdk(chromeos_root, './%s' % script_name, board, image_name)
+  return image_path
+
+
+class ChromeOSManifestManager(repo_util.ManifestManager):
+  """Manifest operations for chromeos repo"""
+
+  def __init__(self, config):
+    self.config = config
+
+  def _query_manifest_name(self, rev):
+    assert is_cros_full_version(rev)
+    milestone, short_version = version_split(rev)
+    manifest_name = os.path.join('buildspecs', milestone,
+                                 '%s.xml' % short_version)
+    return manifest_name
+
+  def sync_disk_state(self, rev):
+    manifest_name = self._query_manifest_name(rev)
+
+    # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
+    # manifest. 'repo sync -m' is not enough
+    repo_util.init(
+        self.config['repo_dir'],
+        'https://chrome-internal.googlesource.com/chromeos/manifest-versions/',
+        manifest_name=manifest_name,
+        repo_url='https://chromium.googlesource.com/external/repo.git')
+
+    # Note, don't sync with current_branch=True for chromeos. One of its
+    # build steps (inside mark_as_stable) executes "git describe" which
+    # needs git tag information.
+    repo_util.sync(self.config['repo_dir'])
+
+  def fetch_git_repos(self, rev):
+    # Early return if necessary git history are already fetched.
+    mf = self.fetch_manifest(rev)
+    repo_set = repo_util.parse_repo_set(self.config['repo_dir'], mf)
+    all_have = True
+    for path, git_rev in repo_set.items():
+      git_root = os.path.join(self.config['repo_dir'], path)
+      if not os.path.exists(git_root):
+        all_have = False
+        break
+      if not git_util.is_containing_commit(git_root, git_rev):
+        all_have = False
+        break
+    if all_have:
+      return
+
+    # TODO(kcwu): fetch git history but don't switch current disk state.
+    self.sync_disk_state(rev)
+
+  def enumerate_manifest(self, old, new):
+    assert is_cros_full_version(old)
+    assert is_cros_full_version(new)
+    old_milestone, old_short_version = version_split(old)
+    new_milestone, new_short_version = version_split(new)
+
+    # TODO(kcwu): fetch manifests but don't switch current disk state.
+    self.sync_disk_state(new)
+
+    spec_dir = os.path.join(self.config['repo_dir'], '.repo', 'manifests',
+                            'buildspecs')
+    result = []
+    for root, dirs, files in os.walk(spec_dir):
+      dirs[:] = [
+          dn for dn in dirs if dn.isdigit() and
+          int(old_milestone) <= int(dn) <= int(new_milestone)
+      ]
+
+      for fn in files:
+        short_version, ext = os.path.splitext(fn)
+        if ext != '.xml':
+          continue
+        milestone = os.path.basename(root)
+        if (util.is_version_lesseq(old_short_version, short_version) and
+            util.is_version_lesseq(short_version, new_short_version) and
+            util.is_direct_relative_version(short_version, new_short_version)):
+          result.append(make_cros_full_version(milestone, short_version))
+
+    def version_key_func(full_version):
+      _milestone, short_version = version_split(full_version)
+      return util.version_key_func(short_version)
+
+    result.sort(key=version_key_func)
+    assert result[0] == old
+    assert result[-1] == new
+    return result
+
+  def fetch_manifest(self, rev):
+    # The manifest is already synced, no need to fetch.
+    return self._query_manifest_name(rev)

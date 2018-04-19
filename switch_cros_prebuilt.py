@@ -66,11 +66,14 @@ def main(args=None):
   assert cros_util.is_dut(opts.dut)
   board = opts.board or cros_util.query_dut_board(opts.dut)
 
+  # TODO(kcwu): clear cache of cros flash
+  image_path = cros_util.prepare_prebuilt_image(board, opts.version)
   cros_util.cros_flash(
       opts.default_chromeos_root,
       opts.dut,
       board,
-      opts.version,
+      image_path,
+      version=opts.version,
       clobber_stateful=opts.clobber_stateful,
       disable_rootfs_verification=opts.disable_rootfs_verification)
 

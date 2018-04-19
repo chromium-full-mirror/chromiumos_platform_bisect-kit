@@ -5,6 +5,7 @@
 
 from __future__ import print_function
 import logging
+import os
 import re
 import subprocess
 
@@ -67,6 +68,27 @@ def is_containing_commit(git_repo, rev):
     return False
 
 
+def is_ancestor_commit(git_repo, old, new):
+  """Determines `old` commit is ancestor of `new` commit.
+
+  Args:
+    git_repo: path of git repo.
+    old: the ancestor commit.
+    new: the descendant commit.
+
+  Returns:
+    True only if `old` is the ancestor of `new`. One commit is not considered
+    as ancestor of itself.
+  """
+  return util.check_output(
+      'git',
+      'rev-list',
+      '--ancestry-path',
+      '-1',
+      '%s..%s' % (old, new),
+      cwd=git_repo) != ''
+
+
 def get_revlist(git_repo, old, new):
   """Enumerates git commit between two revisions (inclusive).
 
@@ -114,3 +136,143 @@ def get_commit_hash(git_repo, rev):
   git_rev = util.check_output(*cmd, cwd=git_repo).strip()
   assert git_rev
   return git_rev
+
+
+class Diff(object):
+  """Class to describe the difference between git commits.
+
+  Attributes:
+    timestamp: commit timestamp
+    path: git repo path relative to project root
+    action: action to make the diff, possible value: CHECKOUT_TO, ADD, REMOVE.
+    git_rev: git commit hash
+  """
+  CHECKOUT_TO = 'checkout_to'
+  ADD = 'add'
+  REMOVE = 'remove'
+
+  def __init__(self, timestamp, path, action, git_rev=None):
+    self.timestamp = timestamp
+    self.path = path
+    self.action = action
+    self.git_rev = git_rev
+
+  def apply(self, base_dir):
+    """Applies the diff on disk.
+
+    Args:
+      base_dir: the project root where self.path is relative to
+    """
+    assert self.path
+    git_repo = os.path.join(base_dir, self.path)
+    if self.action == Diff.CHECKOUT_TO:
+      checkout_version(git_repo, self.git_rev)
+      return
+    if self.action in ['add', 'remove']:
+      raise NotImplementedError
+    assert 0
+
+  def summary(self, base_dir):
+    """Summary string of this diff.
+
+    Args:
+      base_dir: the project root where self.path is relative to
+    """
+    if self.action == Diff.CHECKOUT_TO:
+      git_repo = os.path.join(base_dir, self.path)
+      summary = get_commit_log(git_repo, self.git_rev).splitlines()[0]
+      return '%s %s %r' % (self.git_rev[:10], self.path, summary)
+    return '%s %s' % (self.action, self.path)
+
+  def __eq__(self, rhs):
+    return (self.timestamp == rhs.timestamp and self.path == rhs.path and
+            self.action == rhs.action and self.git_rev == rhs.git_rev)
+
+
+def get_difflist_between_two_commit(base_dir, path, old, new):
+  """Get difflist between (old, new].
+
+  Args:
+    base_dir: the project root
+    path: the path relative to the project root
+    old: old commit hash (exclusive)
+    new: new commit hash (inclusive)
+
+  Returns:
+    list of Diff objects
+  """
+  git_repo = os.path.join(base_dir, path)
+  assert old and new
+  assert old == new or is_ancestor_commit(git_repo, old, new)
+  difflist = []
+  # --first-parent is necessary for Android, see following link for more
+  # discussion.
+  # https://docs.google.com/document/d/1c8qiq14_ObRRjLT62sk9r5V5cyCGHX66dLYab4MVnks/edit#heading=h.n3i6mt2n6xuu
+  for line in util.check_output(
+      'git',
+      'rev-list',
+      '--timestamp',
+      '--reverse',
+      '--first-parent',
+      '%s..%s' % (old, new),
+      cwd=git_repo).splitlines():
+    timestamp, git_rev = line.split()
+    difflist.append(Diff(int(timestamp), path, Diff.CHECKOUT_TO, git_rev))
+
+  # bisect-kit has a fundamental assumption that commit timestamps are
+  # increasing because we sort and bisect the commits by timestamp across git
+  # repos. If not increasing, we have to adjust the timestamp as workaround.
+  # This might lead to bad bisect result, however the bad probability is low in
+  # practice since most machines' clocks are good enough.
+  if difflist != sorted(difflist, key=lambda x: x.timestamp):
+    logger.warning('Commit timestamps are not increasing')
+    last_timestamp = -1
+    adjusted = 0
+    for diff in difflist:
+      if diff.timestamp < last_timestamp:
+        diff.timestamp = last_timestamp
+        adjusted += 1
+
+      last_timestamp = diff.timestamp
+    logger.warning('%d timestamps adjusted', adjusted)
+
+  return difflist
+
+
+def get_difflist_between_two_set(base_dir, old_set, new_set):
+  result = []
+  for path in set(old_set) | set(new_set):
+    git_repo = os.path.join(base_dir, path)
+    if path in old_set and path in new_set:
+      old = old_set[path]
+      new = new_set[path]
+      if old == new:
+        # nochange, do nothing
+        pass
+      elif is_ancestor_commit(git_repo, old, new):
+        # normal case
+        for diff in get_difflist_between_two_commit(base_dir, path, old, new):
+          result.append(diff)
+      else:
+        # maybe switch branch?
+        # TODO(kcwu): handle discontinuous properly (crbug.com/827092)
+        logger.warning(
+            'Warning: dependency "%s" discontinuous. Not supported yet', path)
+        return []
+    elif path in old_set:
+      # remove dependency
+      # TODO(kcwu): handle removal properly (crbug.com/827092)
+      logger.warning('Warning: dependency "%s" was removed. Not supported yet',
+                     path)
+      return []
+    else:
+      assert path in new_set
+      # add dependency
+      # TODO(kcwu): handle addition properly (crbug.com/827092)
+      logger.warning('Warning: dependency "%s" was added. Not supported yet',
+                     path)
+      return []
+
+  result.sort(key=lambda diff: (diff.timestamp, diff.path))
+
+  return result
