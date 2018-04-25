@@ -45,30 +45,12 @@ def search_push_to_device_script_path(android_root):
   assert 0
 
 
-def push_prebuilt_to_device(dut, flavor, build_id, android_root=None):
-  """Pushes prebuilt ARC container to DUT.
-
-  Args:
-    dut: address of DUT
-    flavor: android build flavor
-    build_id: android build id.
-    android_root: root path of android tree (optional). If specified, it
-        searches checked out push_to_device.py first.
-  """
-  # assume ARC's flavor is always product-variant
-  assert '-' in flavor
-  product, variant = flavor.split('-')
-  push_script = search_push_to_device_script_path(android_root)
-  cmd = [
-      push_script,
-      dut,
-      '--use-prebuilt',
-      '{product}/{variant}/{build_id}'.format(
-          product=product, variant=variant, build_id=build_id),
-  ]
-
+def _push_to_device(dut, args, android_root, flavor):
+  """Helper function to run push_to_device.py"""
   boot_id = cros_util.query_dut_boot_id(dut)
 
+  push_script = search_push_to_device_script_path(android_root)
+  cmd = [push_script] + args
   stderr_lines = []
 
   def collect_stderr(line):
@@ -85,6 +67,40 @@ def push_prebuilt_to_device(dut, flavor, build_id, android_root=None):
   stderr = ''.join(stderr_lines)
   if '*** Reboot required. ***' in stderr:
     cros_util.wait_reboot_done(dut, boot_id)
+
+
+def push_prebuilt_to_device(dut, flavor, build_id, android_root=None):
+  """Pushes prebuilt ARC container to DUT.
+
+  Args:
+    dut: address of DUT
+    flavor: android build flavor
+    build_id: android build id.
+    android_root: root path of android tree (optional). If specified, it
+        searches checked out push_to_device.py first.
+  """
+  # assume ARC's flavor is always product-variant
+  assert '-' in flavor
+  product, variant = flavor.split('-')
+  args = [
+      dut,
+      '--use-prebuilt',
+      '{product}/{variant}/{build_id}'.format(
+          product=product, variant=variant, build_id=build_id),
+  ]
+
+  _push_to_device(dut, args, android_root, flavor)
+
+
+def push_localbuild_to_device(android_root, dut, flavor):
+  """Pushes localbuild ARC container to DUT.
+
+  Args:
+    android_root: root path of android tree.
+    dut: address of DUT
+    flavor: android build flavor
+  """
+  _push_to_device(dut, [dut], android_root, flavor)
 
 
 def get_build_prop(host):

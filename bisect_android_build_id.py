@@ -15,7 +15,7 @@ will be set:
   ANDROID_BRANCH (e.g. git_mnc-dr-arc-dev),
   ANDROID_FLAVOR (e.g. cheets_x86-user),
   ANDROID_BUILD_ID (e.g. 9876543),
-  DEFAULT_ANDROID_ROOT (if available), and
+  ANDROID_ROOT (if available), and
   DUT (e.g. samus-dut, if available).
 """
 

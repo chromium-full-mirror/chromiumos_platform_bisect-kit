@@ -26,8 +26,9 @@ from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
-re_chromeos_short_version = r'^\d+\.\d+\.\d+$'
 re_chromeos_full_version = r'^R\d+-\d+\.\d+\.\d+$'
+re_chromeos_localbuild_version = r'^\d+\.\d+\.\d{4}_\d\d_\d\d_\d{4}$'
+re_chromeos_short_version = r'^\d+\.\d+\.\d+$'
 
 gs_archive_path = 'gs://chromeos-image-archive/{board}-release'
 gs_release_path = (
@@ -45,12 +46,23 @@ VERSION_KEY_ANDROID_BRANCH = 'android_branch'
 
 
 def is_cros_short_version(s):
-  """Determines if `s` is chromeos short version"""
+  """Determines if `s` is chromeos short version.
+
+  This function doesn't accept version number of local build.
+  """
   return bool(re.match(re_chromeos_short_version, s))
 
 
+def is_cros_localbuild_version(s):
+  """Determines if `s` is chromeos local build version."""
+  return bool(re.match(re_chromeos_localbuild_version, s))
+
+
 def is_cros_full_version(s):
-  """Determines if `s` is chromeos full version"""
+  """Determines if `s` is chromeos full version.
+
+  This function doesn't accept version number of local build.
+  """
   return bool(re.match(re_chromeos_full_version, s))
 
 
@@ -61,6 +73,7 @@ def is_cros_version(s):
 
 def make_cros_full_version(milestone, short_version):
   """Makes full_version from milestone and short_version"""
+  assert milestone
   return 'R%s-%s' % (milestone, short_version)
 
 
@@ -118,7 +131,11 @@ def query_dut_board(host):
 
 
 def query_dut_short_version(host):
-  """Query short version of a given DUT"""
+  """Query short version of a given DUT.
+
+  This function may return version of local build, which
+  is_cros_short_version() is false.
+  """
   return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_VERSION')
 
 
@@ -301,6 +318,7 @@ def version_to_full(board, version):
   if is_cros_full_version(version):
     return version
   milestone = query_milestone_by_version(board, version)
+  assert milestone
   return make_cros_full_version(milestone, version)
 
 
@@ -530,7 +548,7 @@ def exists_in_chroot(chromeos_root, path):
     True if a path exists
   """
   try:
-    cros_sdk(chromeos_root, '[', '-e', path, ']')
+    cros_sdk(chromeos_root, 'test', '-e', path)
   except subprocess.CalledProcessError:
     return False
   return True

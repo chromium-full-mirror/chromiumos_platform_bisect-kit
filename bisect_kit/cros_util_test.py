@@ -23,10 +23,18 @@ class TestCrosUtil(unittest.TestCase):
   def test_is_cros_short_version(self):
     self.assertTrue(cros_util.is_cros_short_version('1234.0.0'))
     self.assertFalse(cros_util.is_cros_short_version('R99-1234.0.0'))
+    self.assertFalse(cros_util.is_cros_short_version('1234.0.2018_01_01_1259'))
 
   def test_is_cros_full_version(self):
     self.assertFalse(cros_util.is_cros_full_version('1234.0.0'))
     self.assertTrue(cros_util.is_cros_full_version('R99-1234.0.0'))
+    self.assertFalse(cros_util.is_cros_full_version('1234.0.2018_01_01_1259'))
+
+  def test_is_cros_localbuild_version(self):
+    self.assertTrue(
+        cros_util.is_cros_localbuild_version('1234.0.2018_01_01_1259'))
+    self.assertFalse(cros_util.is_cros_localbuild_version('1234.0.0'))
+    self.assertFalse(cros_util.is_cros_localbuild_version('R99-1234.0.0'))
 
   def test_is_cros_version(self):
     self.assertTrue(cros_util.is_cros_version('1234.0.0'))

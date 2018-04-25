@@ -7,7 +7,7 @@
 Typical usage:
   $ bisect_android_build_id.py config switch ./switch_arc_prebuilt.py
 
-It is implemeneted by calling Android's push_to_device.py.
+It is implemented by calling Android's push_to_device.py.
 """
 
 from __future__ import print_function

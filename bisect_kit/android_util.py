@@ -17,6 +17,7 @@ import logging
 import os
 
 from bisect_kit import cli
+from bisect_kit import repo_util
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ def fetch_android_build_data(url):
   Returns:
     file content (str). None if failed.
   """
-  # Fetching android build data directly will fail without authetication.
+  # Fetching android build data directly will fail without authentication.
   # Following code is just serving as demo purpose. You should modify or hook
   # it with your own implementation.
   logger.warn('fetch_android_build_data need to be hooked')
@@ -157,3 +158,32 @@ def fetch_manifest(android_root, flavor, build_id):
   if not os.path.exists(manifest_path):
     fetch_artifact(flavor, build_id, manifest_name, manifest_path)
   return manifest_name
+
+
+class AndroidManifestManager(repo_util.ManifestManager):
+  """Manifest operations for Android repo"""
+
+  def __init__(self, config):
+    self.config = config
+    self.flavor = config['flavor']
+
+  def sync_disk_state(self, rev):
+    manifest_name = self.fetch_manifest(rev)
+    repo_util.sync(
+        self.config['android_root'],
+        manifest_name=manifest_name,
+        current_branch=True)
+
+  def fetch_git_repos(self, rev):
+    # TODO(kcwu): fetch git history but don't switch current disk state.
+    self.sync_disk_state(rev)
+
+  def enumerate_manifest(self, old, new):
+    revlist = get_build_ids_between(self.config['branch'], int(old), int(new))
+
+    assert revlist[0] == old
+    assert revlist[-1] == new
+    return revlist
+
+  def fetch_manifest(self, rev):
+    return fetch_manifest(self.config['android_root'], self.flavor, rev)
