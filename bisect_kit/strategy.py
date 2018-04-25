@@ -491,6 +491,11 @@ class NoisyBinarySearch(object):
       for i, (cur_skip_w, new_skip_w) in enumerate(
           zip(self.skip_weight, new_skip_weight)):
         if new_skip_w != cur_skip_w:
+          # A non-skip result after several skips, the weight will jump from
+          # zero to non-zero and unable to update incrementally.
+          if cur_skip_w == 0:
+            self.rebuild()
+            return
           self.prob[i] *= new_skip_w / cur_skip_w
       self.skip_weight = new_skip_weight
 

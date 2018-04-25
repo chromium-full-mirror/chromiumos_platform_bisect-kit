@@ -133,6 +133,20 @@ class TestNoisyBinarySearch(unittest.TestCase):
     self.assertEqual(bsearch.get_range(), (0, 99))
     self.assertNotEqual(bsearch.next_idx(), 45)
 
+  def test_skip_then_success(self):
+    bsearch = strategy.NoisyBinarySearch(self.rev_info)
+    self.rev_info[0]['old'] += 1
+    self.rev_info[99]['skip'] += 10
+    bsearch.rebuild()
+    # Skip too many times, the probability is set to 0.
+    self.assertEqual(bsearch.prob[99], 0)
+
+    # Suddenly the result is not 'skip' any more. The probability jump from
+    # zero to non-zero.
+    self.rev_info[99]['new'] += 1
+    bsearch.update(99, 'new')
+    self.assertGreater(bsearch.prob[99], 0)
+
   def test_get_range_with_skip(self):
     bsearch = strategy.NoisyBinarySearch(self.rev_info, oracle=(0, 0.9))
     self.rev_info[0]['old'] += 1
