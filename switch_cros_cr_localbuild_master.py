@@ -24,7 +24,8 @@ from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cros_util
 from bisect_kit import cr_util
-from bisect_kit import util
+from bisect_kit import gclient_util
+from bisect_kit import git_util
 import bisect_cr_localbuild_master
 
 logger = logging.getLogger(__name__)
@@ -80,9 +81,8 @@ def main(args=None):
   assert bisect_cr_localbuild_master.verify_gclient_dep(opts.chrome_root)
   rev = bisect_cr_localbuild_master.guess_git_rev(opts, opts.rev)
 
-  util.check_call('git', 'checkout', rev, cwd=opts.chrome_src)
-
-  util.check_call('gclient', 'sync', '--jobs', '8', cwd=opts.chrome_src)
+  git_util.checkout_version(opts.chrome_src, rev)
+  gclient_util.sync(opts.chrome_src)
 
   if not opts.target:
     opts.target = ['chrome', 'chrome_sandbox', 'nacl_helper']

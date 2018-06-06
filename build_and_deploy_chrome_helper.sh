@@ -13,6 +13,8 @@ fi
 
 out_dir=out_${SDK_BOARD}/Release
 
+# This step is redundant and harmless for recent chrome. Keep it for older
+# versions.
 ./buildtools/linux64/gn gen $out_dir --args="$GN_ARGS"
 
 ./third_party/depot_tools/ninja -C $out_dir -j3000 -l 10 $TARGETS

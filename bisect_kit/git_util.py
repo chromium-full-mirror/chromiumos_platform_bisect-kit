@@ -44,6 +44,11 @@ def argtype_git_rev(s):
   return s
 
 
+def is_git_root(path):
+  """Is given path root of git repo."""
+  return os.path.exists(os.path.join(path, '.git'))
+
+
 def checkout_version(git_repo, rev):
   """git checkout.
 
@@ -60,11 +65,17 @@ def is_containing_commit(git_repo, rev):
   Args:
     git_repo: path of git repo.
     rev: git commit revision in query.
+
+  Returns:
+    True if rev is inside given git repo. If git_repo is not a git folder,
+    returns False as well.
   """
   try:
     return util.check_output(
         'git', 'cat-file', '-t', rev, cwd=git_repo) == 'commit\n'
   except subprocess.CalledProcessError:
+    return False
+  except OSError:
     return False
 
 
@@ -138,6 +149,80 @@ def get_commit_hash(git_repo, rev):
   return git_rev
 
 
+def get_commit_time(git_repo, rev):
+  """Get git commit timestamp.
+
+  Args:
+    git_repo: path of git repo
+    rev: git commit id
+
+  Returns:
+    timestamp (int)
+  """
+  line = util.check_output(
+      'git', 'log', '-1', '--format=%ct', rev, cwd=git_repo)
+  return int(line)
+
+
+def get_file_from_revision(git_repo, rev, path):
+  """Get file content of given revision.
+
+  Args:
+    git_repo: path of git repo
+    rev: git commit id
+    path: file path
+
+  Returns:
+    file content (str)
+  """
+  return util.check_output(
+      'git', 'show', '%s:%s' % (rev, path), cwd=git_repo, log_output=False)
+
+
+def get_rev_by_time(git_repo, timestamp, *args):
+  """Query commit of given time.
+
+  Args:
+    git_repo: path of git repo.
+    timestamp: timestamp
+    args: only the selected subset of history to query. If branch name is
+        specified, only parent of the said branch is queried. If omitted, only
+        queries the parent of current working directory.
+
+  Returns:
+    git commit hash
+  """
+  return util.check_output(
+      'git',
+      'log',
+      '-1',
+      '--before',
+      str(timestamp),
+      '--format=%H',
+      *args,
+      cwd=git_repo).strip()
+
+
+def get_history(git_repo, path, after=None):
+  """Get commit history of given path.
+
+  Args:
+    git_repo: path of git repo.
+    path: path to query, relative to git_repo
+    after: limit history after given time
+
+  Yields:
+    commit timestamp, git hash
+  """
+  cmd = ['git', 'log', '--reverse', '--format=%ct %H']
+  if after:
+    cmd += ['--after', str(after)]
+  cmd.append(path)
+  for line in util.check_output(*cmd, cwd=git_repo).splitlines():
+    commit_time, git_rev = line.split()
+    yield int(commit_time), git_rev
+
+
 class Diff(object):
   """Class to describe the difference between git commits.
 
@@ -189,6 +274,54 @@ class Diff(object):
             self.action == rhs.action and self.git_rev == rhs.git_rev)
 
 
+def list_commits_between_commits(git_repo, old, new):
+  """Get all commits between (old, new].
+
+  Args:
+    git_repo: path of git repo.
+    old: old commit hash (exclusive)
+    new: new commit hash (inclusive)
+
+  Returns:
+    list of (timestamp, rev)
+  """
+  assert old and new
+  assert old == new or is_ancestor_commit(git_repo, old, new)
+  commits = []
+  # --first-parent is necessary for Android, see following link for more
+  # discussion.
+  # https://docs.google.com/document/d/1c8qiq14_ObRRjLT62sk9r5V5cyCGHX66dLYab4MVnks/edit#heading=h.n3i6mt2n6xuu
+  for line in util.check_output(
+      'git',
+      'rev-list',
+      '--timestamp',
+      '--reverse',
+      '--first-parent',
+      '%s..%s' % (old, new),
+      cwd=git_repo).splitlines():
+    timestamp, git_rev = line.split()
+    commits.append([int(timestamp), git_rev])
+
+  # bisect-kit has a fundamental assumption that commit timestamps are
+  # increasing because we sort and bisect the commits by timestamp across git
+  # repos. If not increasing, we have to adjust the timestamp as workaround.
+  # This might lead to bad bisect result, however the bad probability is low in
+  # practice since most machines' clocks are good enough.
+  if commits != sorted(commits, key=lambda x: x[0]):
+    logger.warning('Commit timestamps are not increasing')
+    last_timestamp = -1
+    adjusted = 0
+    for commit in commits:
+      if commit[0] < last_timestamp:
+        commit[0] = last_timestamp
+        adjusted += 1
+
+      last_timestamp = commit[0]
+    logger.warning('%d timestamps adjusted', adjusted)
+
+  return commits
+
+
 def get_difflist_between_two_commit(base_dir, path, old, new):
   """Get difflist between (old, new].
 
@@ -202,40 +335,9 @@ def get_difflist_between_two_commit(base_dir, path, old, new):
     list of Diff objects
   """
   git_repo = os.path.join(base_dir, path)
-  assert old and new
-  assert old == new or is_ancestor_commit(git_repo, old, new)
   difflist = []
-  # --first-parent is necessary for Android, see following link for more
-  # discussion.
-  # https://docs.google.com/document/d/1c8qiq14_ObRRjLT62sk9r5V5cyCGHX66dLYab4MVnks/edit#heading=h.n3i6mt2n6xuu
-  for line in util.check_output(
-      'git',
-      'rev-list',
-      '--timestamp',
-      '--reverse',
-      '--first-parent',
-      '%s..%s' % (old, new),
-      cwd=git_repo).splitlines():
-    timestamp, git_rev = line.split()
-    difflist.append(Diff(int(timestamp), path, Diff.CHECKOUT_TO, git_rev))
-
-  # bisect-kit has a fundamental assumption that commit timestamps are
-  # increasing because we sort and bisect the commits by timestamp across git
-  # repos. If not increasing, we have to adjust the timestamp as workaround.
-  # This might lead to bad bisect result, however the bad probability is low in
-  # practice since most machines' clocks are good enough.
-  if difflist != sorted(difflist, key=lambda x: x.timestamp):
-    logger.warning('Commit timestamps are not increasing')
-    last_timestamp = -1
-    adjusted = 0
-    for diff in difflist:
-      if diff.timestamp < last_timestamp:
-        diff.timestamp = last_timestamp
-        adjusted += 1
-
-      last_timestamp = diff.timestamp
-    logger.warning('%d timestamps adjusted', adjusted)
-
+  for timestamp, git_rev in list_commits_between_commits(git_repo, old, new):
+    difflist.append(Diff(timestamp, path, Diff.CHECKOUT_TO, git_rev))
   return difflist
 
 

@@ -20,6 +20,7 @@ import time
 
 from bisect_kit import cli
 from bisect_kit import core
+from bisect_kit import cr_util
 from bisect_kit import git_util
 from bisect_kit import repo_util
 from bisect_kit import util
@@ -98,12 +99,16 @@ def query_dut_lsb_release(host):
     host: the DUT address
 
   Returns:
-    dict for keys and values of /etc/lsb-release. Return empty dict if failed.
+    dict for keys and values of /etc/lsb-release.
+
+  Raises:
+    core.ExecutionFatalError: cannot connect to host or lsb-release file
+        doesn't exist
   """
   try:
     output = util.check_output('ssh', host, 'cat', '/etc/lsb-release')
   except subprocess.CalledProcessError:
-    return {}
+    raise core.ExecutionFatalError('cannot connect to DUT or not a DUT')
   return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
 
 
@@ -495,6 +500,24 @@ def query_android_build_id(board, rev):
 def query_android_branch(board, rev):
   info = version_info(board, rev)
   rev = info['android_branch']
+  return rev
+
+
+def guess_chrome_version(board, rev):
+  """Guess chrome version number.
+
+  Args:
+    board: chromeos board name
+    rev: chrome or chromeos version
+
+  Returns:
+    chrome version number
+  """
+  if is_cros_version(rev):
+    assert board, 'need to specify BOARD for cros version'
+    rev = query_chrome_version(board, rev)
+    assert cr_util.is_chrome_version(rev)
+
   return rev
 
 
