@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2018 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -115,7 +116,7 @@ def parse_deps(content, custom_vars):
   global_scope = dict(Var=var_function)
   local_scope = {}
   try:
-    exec (content, global_scope, local_scope)
+    exec (content, global_scope, local_scope)  # pylint: disable=exec-used
   except SyntaxError:
     raise
 

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2017 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -96,7 +97,7 @@ class ConfigStore(object):
       if not os.path.exists(path):
         raise ValueError('%s plugin %r: file not found' % (self.path, path))
       module = {}
-      exec file(path) in module
+      exec file(path) in module  # pylint: disable=exec-used
       loaded_func = module.get('loaded', None)
       if loaded_func:
         loaded_func()

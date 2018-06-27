@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 # Copyright 2017 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -87,6 +88,7 @@ def guess_git_rev(opts, rev):
 def verify_gclient_dep(chrome_root):
   """Makes sure gclient deps_file follow git checkout."""
   context = {}
+  # pylint: disable=exec-used
   exec open(os.path.join(chrome_root, '.gclient')) in context
   for solution in context['solutions']:
     if solution['name'] == 'src':
