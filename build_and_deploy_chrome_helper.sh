@@ -17,7 +17,7 @@ out_dir=out_${SDK_BOARD}/Release
 # versions.
 ./buildtools/linux64/gn gen $out_dir --args="$GN_ARGS"
 
-./third_party/depot_tools/ninja -C $out_dir -j3000 -l 10 $TARGETS
+./third_party/depot_tools/ninja -C $out_dir -j3000 -l 100 $TARGETS
 
 for TARGET in $TARGETS; do
     case "$TARGET" in
@@ -29,7 +29,7 @@ for TARGET in $TARGETS; do
             # automatically
             deploy_chrome --force --build-dir=$out_dir --to=$DUT
             ;;
-        video_*_unittest|jpeg_*_unittest)
+        *_unittest|*_unittests)
             chmod o+x $out_dir/$TARGET
             rsync $out_dir/$TARGET \
             $DUT:/usr/local/autotest/deps/chrome_test/test_src/out/Release/

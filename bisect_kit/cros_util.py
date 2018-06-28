@@ -11,6 +11,7 @@ Terminology used in this module.
 """
 
 from __future__ import print_function
+import ast
 import errno
 import json
 import logging
@@ -38,6 +39,10 @@ gs_release_path = (
 
 # Assume gsutil is in PATH.
 gsutil_bin = 'gsutil'
+
+chromeos_root_inside_chroot = '/mnt/host/source'
+# relative to chromeos_root
+prebuilt_autotest_dir = 'tmp/autotest-prebuilt'
 
 VERSION_KEY_CROS_SHORT_VERSION = 'cros_short_version'
 VERSION_KEY_CROS_FULL_VERSION = 'cros_full_version'
@@ -605,6 +610,96 @@ def build_image(chromeos_root, board, rev):
   cros_sdk(chromeos_root, 'chmod', '+x', script_name)
   cros_sdk(chromeos_root, './%s' % script_name, board, image_name)
   return image_path
+
+
+class AutotestControlInfo(object):
+  """Parsed content of autotest control file.
+
+  Attributes:
+    name: test name
+    path: control file path
+    variables: dict of top-level control variables. Sample keys: NAME, AUTHOR,
+        DOC, ATTRIBUTES, DEPENDENCIES, etc.
+  """
+
+  def __init__(self, path, variables):
+    self.name = variables['NAME']
+    self.path = path
+    self.variables = variables
+
+
+def parse_autotest_control_file(path):
+  """Parses autotest control file.
+
+  This only parses simple top-level string assignments.
+
+  Returns:
+    AutotestControlInfo object
+  """
+  variables = {}
+  code = ast.parse(open(path).read())
+  for stmt in code.body:
+    # Skip if not simple "NAME = *" assignment.
+    if not (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and
+            isinstance(stmt.targets[0], ast.Name)):
+      continue
+
+    # Only support string value.
+    if isinstance(stmt.value, ast.Str):
+      variables[stmt.targets[0].id] = stmt.value.s
+
+  return AutotestControlInfo(path, variables)
+
+
+def enumerate_autotest_control_files(autotest_dir):
+  """Enumerate autotest control files.
+
+  Args:
+    autotest_dir: autotest folder
+
+  Returns:
+    list of paths to control files
+  """
+  # Where to find control files. Relative to autotest_dir.
+  subpaths = [
+      'server/site_tests',
+      'client/site_tests',
+      'server/tests',
+      'client/tests',
+  ]
+
+  blacklist = ['site-packages', 'venv', 'results', 'logs', 'containers']
+  result = []
+  for subpath in subpaths:
+    path = os.path.join(autotest_dir, subpath)
+    for root, dirs, files in os.walk(path):
+
+      for black in blacklist:
+        if black in dirs:
+          dirs.remove(black)
+
+      for filename in files:
+        if filename == 'control' or filename.startswith('control.'):
+          result.append(os.path.join(root, filename))
+
+  return result
+
+
+def get_autotest_test_info(autotest_dir, test_name):
+  """Get metadata of given test.
+
+  Args:
+    autotest_dir: autotest folder
+    test_name: test name
+
+  Returns:
+    AutotestControlInfo object. None if test not found.
+  """
+  for control_file in enumerate_autotest_control_files(autotest_dir):
+    info = parse_autotest_control_file(control_file)
+    if info.name == test_name:
+      return info
+  return None
 
 
 class ChromeOSManifestManager(repo_util.ManifestManager):

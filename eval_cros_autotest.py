@@ -1,0 +1,269 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+# Copyright 2018 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Evaluate ChromeOS autotest.
+
+Note that by default 'test_that' will install dependency packages of autotest
+only once. For example, if you overwrote chrome's unittest binary, your new
+binary will be persistant across autotest runs. Add --reinstall if you want
+clean autotest install.
+"""
+from __future__ import print_function
+import argparse
+import json
+import logging
+import os
+import re
+import subprocess
+import sys
+
+from bisect_kit import cli
+from bisect_kit import common
+from bisect_kit import configure
+from bisect_kit import cros_util
+from bisect_kit import util
+
+logger = logging.getLogger(__name__)
+
+OLD = 'old'
+NEW = 'new'
+SKIP = 'skip'
+FATAL = 'fatal'
+
+EXIT_CODE_MAP = {
+    OLD: 0,
+    NEW: 1,
+    SKIP: 125,
+    FATAL: 126,
+}
+
+
+def create_argument_parser():
+  parser = argparse.ArgumentParser(description=__doc__)
+  common.add_common_arguments(parser)
+  parser.add_argument(
+      'dut',
+      nargs='?',
+      type=cli.argtype_notempty,
+      metavar='DUT',
+      default=configure.get('DUT', ''))
+  parser.add_argument(
+      '--chromeos_root',
+      type=cli.argtype_dir_path,
+      metavar='CHROMEOS_ROOT',
+      default=configure.get('CHROMEOS_ROOT', ''),
+      help='ChromeOS tree root')
+  parser.add_argument(
+      '--test_name',
+      required=True,
+      help='Test name, like "video_VideoDecodeAccelerator.h264"')
+  parser.add_argument(
+      '--metric',
+      help=
+      'Metric name of performance test; example: "cheets_SystemRawImageSize"')
+  parser.add_argument(
+      '--old_value',
+      type=float,
+      help='For performance test, old value of given metric')
+  parser.add_argument(
+      '--new_value',
+      type=float,
+      help='For performance test, new value of given metric')
+  parser.add_argument(
+      '--prebuilt',
+      action='store_true',
+      help='Run autotest using existing prebuilt package if specified; '
+      'otherwise use the default one')
+  parser.add_argument(
+      '--reinstall',
+      action='store_true',
+      help='Remove existing autotest folder on the DUT first')
+  parser.add_argument(
+      '--args',
+      help='Extra args passed to "test_that --args"; Overrides the default')
+
+  return parser
+
+
+def parse_test_report_log(result_log, metric):
+  """Parses autotest result log.
+
+  Args:
+    result_log: content of test_report.log
+    metric: what metric to capture if not None
+
+  Returns:
+    passed, values:
+      passed: True if test run successfully
+      values: captured metric values; None if test failed or metric is None
+  """
+  m = re.search(r'Total PASS: (\d+)/(\d+)', result_log)
+  if not m or m.group(1) != m.group(2):
+    return False, None
+
+  if not metric:
+    return True, None
+
+  values = []
+  for line in result_log.splitlines():
+    m = re.match(r'^(\S+)\s+(\w+)(?:\{\d+\})?\s+(\d+\.\d+)$', line)
+    if not m:
+      continue
+    if m.group(2) == metric:
+      values.append(float(m.group(3)))
+  return True, values
+
+
+def parse_test_result_chart(json_path, metric):
+  data = json.load(open(json_path))
+  if metric not in data:
+    logger.error('metric "%s" not in %s', metric, json_path)
+    return None
+
+  summary = data[metric]['summary']
+  if 'values' in summary:
+    return summary['values']
+  return [summary['value']]
+
+
+def get_additional_test_args(test_name):
+  """Gets extra arguments to specific test.
+
+  Some tests may require special arguments to run.
+
+  Args:
+    test_name: test name
+
+  Returns:
+    arguments (str)
+  """
+  if test_name.startswith('telemetry_'):
+    return 'local=True'
+  return ''
+
+
+def run_test(opts):
+  """Runs an autotest test.
+
+  Args:
+    opts: An argparse.Namespace to hold command line arguments.
+
+  Returns:
+    path of test result (outside chroot)
+  """
+  if opts.reinstall:
+    util.check_call('ssh', opts.dut, 'rm', '-rf', '/usr/local/autotest')
+
+  prebuilt_autotest_dir = os.path.join(cros_util.chromeos_root_inside_chroot,
+                                       cros_util.prebuilt_autotest_dir)
+  # Set results dir inside source tree, so it's easier to access them outside
+  # chroot.
+  results_dir = os.path.join(cros_util.chromeos_root_inside_chroot,
+                             'tmp/autotest_results_tmp')
+  if opts.prebuilt:
+    test_that_bin = os.path.join(prebuilt_autotest_dir,
+                                 'site_utils/test_that.py')
+  else:
+    test_that_bin = '/usr/bin/test_that'
+  cmd = [test_that_bin, opts.dut, opts.test_name, '--results_dir', results_dir]
+  if opts.prebuilt:
+    cmd += ['--autotest_dir', prebuilt_autotest_dir]
+
+  args = get_additional_test_args(opts.test_name)
+  if opts.args:
+    if args:
+      logger.info('default test_that args `%s` is overriden by '
+                  'command line option `%s`', args, opts.args)
+    cmd += ['--args', opts.args]
+  elif args:
+    cmd += ['--args', args]
+
+  output = cros_util.cros_sdk(opts.chromeos_root, *cmd)
+
+  m = re.search(r'Finished running tests. Results can be found in (\S+)',
+                output)
+  if not m:
+    logger.error('result dir is unknown')
+    return None
+  assert m.group(1) == results_dir
+  return results_dir.replace(cros_util.chromeos_root_inside_chroot,
+                             opts.chromeos_root)
+
+
+def gather_test_result(opts, result_dir):
+  result_log_path = os.path.join(result_dir, 'test_report.log')
+  result_log = open(result_log_path).read()
+
+  passed, values = parse_test_report_log(result_log, opts.metric)
+  if passed and not values:
+    values = []
+    for root, _, files in os.walk(result_dir):
+      for filename in files:
+        if filename != 'results-chart.json':
+          continue
+        full_path = os.path.join(root, filename)
+        values += parse_test_result_chart(full_path, opts.metric)
+
+  return passed, values
+
+
+def main(args=None):
+  common.init()
+  parser = create_argument_parser()
+  opts = parser.parse_args(args)
+  common.config_logging(opts)
+
+  if not cros_util.is_dut(opts.dut):
+    return FATAL
+
+  # Verify command line options.
+  if opts.metric:
+    if opts.old_value is None:
+      logger.error('--old_value is not provided')
+      return FATAL
+    if opts.new_value is None:
+      logger.error('--new_value is not provided')
+      return FATAL
+  else:
+    if opts.old_value is not None:
+      logger.error('--old_value is provided but --metric is not')
+      return FATAL
+    if opts.new_value is not None:
+      logger.error('--new_value is provided but --metric is not')
+      return FATAL
+
+  try:
+    result_dir = run_test(opts)
+  except subprocess.CalledProcessError:
+    logger.info('failed before test start; FATAL')
+    return FATAL
+
+  passed, values = gather_test_result(opts, result_dir)
+
+  if opts.metric:
+    if not passed:
+      logger.warning('test did not pass; SKIP')
+      return SKIP
+    if not values:
+      logger.warning('no values found; SKIP')
+      return SKIP
+
+    print('BISECT_RESULT_VALUES=', ' '.join(map(str, values)))
+    average = float(sum(values)) / len(values)
+    if average < (opts.old_value + opts.new_value) / 2:
+      logger.info('values=%s, average=%s; OLD', values, average)
+      return OLD
+    logger.info('values=%s, average=%s; NEW', values, average)
+    return NEW
+  else:
+    if passed:
+      logger.info('passed')
+      return OLD
+    logger.info('failed')
+    return NEW
+
+
+if __name__ == '__main__':
+  sys.exit(EXIT_CODE_MAP[main()])
