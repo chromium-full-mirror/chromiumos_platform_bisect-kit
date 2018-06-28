@@ -43,10 +43,10 @@ def create_argument_parser():
       default=configure.get('BOARD', ''),
       help='ChromeOS board name')
   parser.add_argument(
-      '--repo_dir',
+      '--chromeos_root',
       type=cli.argtype_dir_path,
-      metavar='REPO_DIR',
-      default=configure.get('REPO_DIR', ''),
+      metavar='CHROMEOS_ROOT',
+      default=configure.get('CHROMEOS_ROOT', ''),
       help='ChromeOS tree root (default: %(default)s)')
   parser.add_argument(
       '--clobber-stateful',
@@ -64,7 +64,7 @@ def create_argument_parser():
 
 def mark_as_stable(opts):
   cmd = ['chromite/bin/cros_list_overlays', '--all']
-  output = util.check_output(*cmd, cwd=opts.repo_dir)
+  output = util.check_output(*cmd, cwd=opts.chromeos_root)
   overlays = ':'.join(output.splitlines())
 
   cmd = [
@@ -75,7 +75,7 @@ def mark_as_stable(opts):
       '--all',
       'commit',
   ]  # yapf: disable
-  util.check_call(*cmd, cwd=opts.repo_dir)
+  util.check_call(*cmd, cwd=opts.chromeos_root)
 
 
 def cleanup(opts):
@@ -83,27 +83,27 @@ def cleanup(opts):
   #   - downgrade chroot version
   #   - portage upgrade for EAPI=6
   logger.info('clean up previous result of "mark as stable"')
-  repo_util.abandon(opts.repo_dir, 'stabilizing_branch')
+  repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
 
 
 def switch(opts):
   cleanup(opts)
 
-  config = dict(board=opts.board, repo_dir=opts.repo_dir)
+  config = dict(board=opts.board, chromeos_root=opts.chromeos_root)
   mm = cros_util.ChromeOSManifestManager(config)
-  dep = repo_util.DependencyManager(opts.repo_dir, mm)
+  dep = repo_util.DependencyManager(opts.chromeos_root, mm)
   dep.switch(opts.rev)
 
   logger.info('mark as stable')
   mark_as_stable(opts)
 
-  image_path = cros_util.build_image(opts.repo_dir, opts.board, opts.rev)
+  image_path = cros_util.build_image(opts.chromeos_root, opts.board, opts.rev)
 
   if opts.nodeploy:
     return
 
   cros_util.cros_flash(
-      opts.repo_dir,
+      opts.chromeos_root,
       opts.dut,
       opts.board,
       image_path,

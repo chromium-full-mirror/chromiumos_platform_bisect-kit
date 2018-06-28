@@ -6,7 +6,8 @@
 """ChromeOS bisector to bisect local build commits.
 
 Example:
-  $ ./bisect_cros_repo.py init --old rev1 --new rev2 --repo_dir ~/chromiumos
+  $ ./bisect_cros_repo.py init --old rev1 --new rev2 \
+      --chromeos_root ~/chromiumos
   $ ./bisect_cros_repo.py config switch ./switch_cros_localbuild.py
   $ ./bisect_cros_repo.py config eval ./eval-manually.sh
   $ ./bisect_cros_repo.py run
@@ -16,7 +17,7 @@ will be set:
   BOARD (e.g. samus),
   DUT (e.g. samus-dut),
   INTRA_REV (e.g. 9901.0.0,9902.0.0+3), and
-  REPO_DIR (e.g. ~/chromiumos).
+  CHROMEOS_ROOT (e.g. ~/chromiumos).
 """
 
 from __future__ import print_function
@@ -50,11 +51,11 @@ class ChromeOSRepoDomain(core.BisectDomain):
         default=configure.get('BOARD', ''),
         help='ChromeOS board name')
     parser.add_argument(
-        '--repo_dir',
-        metavar='REPO_DIR',
+        '--chromeos_root',
+        metavar='CHROMEOS_ROOT',
         type=cli.argtype_dir_path,
         required=True,
-        default=configure.get('REPO_DIR'),
+        default=configure.get('CHROMEOS_ROOT'),
         help='ChromeOS tree root')
 
   @staticmethod
@@ -78,12 +79,13 @@ class ChromeOSRepoDomain(core.BisectDomain):
       opts.new = cros_util.version_to_full(opts.board, opts.new)
 
     logger.info('Clean up previous result of "mark as stable"')
-    repo_util.abandon(opts.repo_dir, 'stabilizing_branch')
+    repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
 
-    config = dict(dut=opts.dut, board=opts.board, repo_dir=opts.repo_dir)
+    config = dict(
+        dut=opts.dut, board=opts.board, chromeos_root=opts.chromeos_root)
 
     manifest_manager = cros_util.ChromeOSManifestManager(config)
-    dependency_manager = repo_util.DependencyManager(opts.repo_dir,
+    dependency_manager = repo_util.DependencyManager(opts.chromeos_root,
                                                      manifest_manager)
     revlist = dependency_manager.get_revlist(opts.old, opts.new)
     return config, revlist
@@ -96,7 +98,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
       env['DUT'] = self.config['dut']
     if self.config['board']:
       env['BOARD'] = self.config['board']
-    env['REPO_DIR'] = self.config['repo_dir']
+    env['CHROMEOS_ROOT'] = self.config['chromeos_root']
     env['INTRA_REV'] = rev
 
   def view(self, old, new):
@@ -104,8 +106,8 @@ class ChromeOSRepoDomain(core.BisectDomain):
     print('new', new)
 
     manifest_manager = cros_util.ChromeOSManifestManager(self.config)
-    dependency_manager = repo_util.DependencyManager(self.config['repo_dir'],
-                                                     manifest_manager)
+    dependency_manager = repo_util.DependencyManager(
+        self.config['chromeos_root'], manifest_manager)
     dependency_manager.view_rev_diff(old, new)
 
 
