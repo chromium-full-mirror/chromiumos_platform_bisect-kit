@@ -41,7 +41,7 @@ def search_push_to_device_script_path(android_root):
   pathes.append('/google/data/ro/teams/arc++/push_to_device.py')
 
   for path in pathes:
-    if os.path.exists(path):
+    if os.path.exists(path) and os.access(path, os.X_OK):
       return path
   assert 0
 
@@ -58,6 +58,10 @@ def _push_to_device(dut, args, android_root, flavor):
     stderr_lines.append(line)
 
   if android_root and push_script.startswith(android_root):
+    # Build push_to_deivce's dependency. We have to build it explicitly because
+    # it's possible that no build is generated yet.
+    android_util.lunch(android_root, flavor, 'make', 'unsquashfs')
+
     # New version of push_to_device can run without lunch, but go with lunch is
     # easier for now and compatible with old versions.
     android_util.lunch(
