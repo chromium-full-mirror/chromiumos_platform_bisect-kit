@@ -133,4 +133,4 @@ class AndroidBuildIDDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLineInterface(AndroidBuildIDDomain).main()
+  cli.BisectorCommandLine(AndroidBuildIDDomain).main()

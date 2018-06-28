@@ -507,7 +507,7 @@ class BisectorCommandLine(object):
           inited=True,
           old=self.states.idx2rev(left),
           new=self.states.idx2rev(right),
-          estimated_noise=','.join(estimated_noise),
+          estimated_noise=estimated_noise,
           done=self.strategy.is_done())
     else:
       result = dict(inited=False)
