@@ -144,6 +144,52 @@ class TestGitOperation(unittest.TestCase):
     self.assertEqual(
         git_util.get_commit_hash(self.git_repo, tag_name), self.commits[2])
 
+  def test_get_rev_by_time(self):
+    # simple case
+    self.assertEqual(
+        git_util.get_rev_by_time(self.git_repo, '2017-01-03T12:00:00'),
+        self.commits[2])
+
+    # boundary case: equal timestamp
+    self.assertEqual(
+        git_util.get_rev_by_time(self.git_repo, '2017-01-03T00:00:00'),
+        self.commits[2])
+
+  def test_get_rev_by_time_merge(self):
+    # Generates following commit graph:
+    #  |
+    #  *  commit C (merge A B)  (2017-02-05)
+    #  |\
+    #  | *  commit B on branch foo (2017-02-02)
+    #  * |  commit A (2017-02-01)
+    #  |/
+    #  *  commits[4] (2017-01-05)
+    #  |
+    branch_foo = 'foo'
+    subprocess.check_call(['git', 'branch', branch_foo], cwd=self.git_repo)
+    commit_a = self.git.add_commit('2017-02-01T00:00:00', 'commit A', 'file2',
+                                   'commit A')
+    subprocess.check_call(['git', 'checkout', branch_foo], cwd=self.git_repo)
+    self.git.add_commit('2017-02-02T00:00:00', 'commit B', 'file', 'commit B')
+    subprocess.check_call(['git', 'checkout', 'master'], cwd=self.git_repo)
+    subprocess.check_call(
+        ['git', 'merge', branch_foo],
+        cwd=self.git_repo,
+        env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'))
+
+    commit_c = subprocess.check_output(
+        ['git', 'rev-parse', 'HEAD'], cwd=self.git_repo).strip()
+
+    # simple case
+    self.assertEqual(
+        git_util.get_rev_by_time(self.git_repo, '2017-02-10T00:00:00'),
+        commit_c)
+
+    # Not commit B because it is on different branch.
+    self.assertEqual(
+        git_util.get_rev_by_time(self.git_repo, '2017-02-03T00:00:00'),
+        commit_a)
+
 
 class TestGitUtil(unittest.TestCase):
   """Tests logic part of git_util module.

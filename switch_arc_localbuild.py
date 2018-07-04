@@ -10,6 +10,7 @@ import argparse
 import logging
 
 from bisect_kit import android_util
+from bisect_kit import codechange
 from bisect_kit import repo_util
 from bisect_kit import arc_util
 from bisect_kit import common
@@ -38,10 +39,15 @@ def create_argument_parser():
       help='Android build id, or bisecting intra version number')
   parser.add_argument(
       '--android_root',
-      type=cli.argtype_notempty,
+      type=cli.argtype_dir_path,
       metavar='ANDROID_ROOT',
       default=configure.get('ANDROID_ROOT', ''),
       help='Android tree root')
+  parser.add_argument(
+      '--android_repo_mirror_dir',
+      type=cli.argtype_dir_path,
+      default=configure.get('ANDROID_REPO_MIRROR_DIR', ''),
+      help='Android repo mirror path')
   parser.add_argument(
       '--flavor',
       metavar='ANDROID_FLAVOR',
@@ -53,10 +59,16 @@ def create_argument_parser():
 
 
 def switch(opts):
-  config = dict(android_root=opts.android_root, flavor=opts.flavor)
-  mm = android_util.AndroidManifestManager(config)
-  dep = repo_util.DependencyManager(opts.android_root, mm)
-  dep.switch(opts.rev)
+  config = dict(
+      android_root=opts.android_root,
+      flavor=opts.flavor,
+      android_repo_mirror_dir=opts.android_repo_mirror_dir)
+  spec_manager = android_util.AndroidSpecManager(config)
+  cache = repo_util.RepoMirror(opts.android_repo_mirror_dir)
+  code_manager = codechange.CodeManager(opts.android_root, spec_manager, cache)
+
+  logger.info('switch source code')
+  code_manager.switch(opts.rev)
 
   logger.info('build')
   # TODO(kcwu): use lower job count for non distributed compilation.

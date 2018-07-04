@@ -25,6 +25,7 @@ import logging
 from bisect_kit import android_util
 from bisect_kit import arc_util
 from bisect_kit import cli
+from bisect_kit import codechange
 from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_util
@@ -79,6 +80,12 @@ class AndroidRepoDomain(core.BisectDomain):
         default=configure.get('ANDROID_ROOT'),
         help='Android tree root')
     parser.add_argument(
+        '--android_repo_mirror_dir',
+        type=cli.argtype_dir_path,
+        required=True,
+        default=configure.get('ANDROID_REPO_MIRROR_DIR'),
+        help='Android repo mirror path')
+    parser.add_argument(
         '--branch',
         metavar='ANDROID_BRANCH',
         help='branch name like "git_mnc-dr-arc-dev"; '
@@ -121,19 +128,32 @@ class AndroidRepoDomain(core.BisectDomain):
     old = determine_android_build_id(opts, opts.old)
     new = determine_android_build_id(opts, opts.new)
 
+    if int(old) >= int(new):
+      raise Exception('bad bisect range (%s, %s)' % (old, new))
+
     config = dict(
         dut=opts.dut,
         android_root=opts.android_root,
+        android_repo_mirror_dir=opts.android_repo_mirror_dir,
         branch=opts.branch,
         flavor=opts.flavor,
         old=old,
         new=new)
 
-    manifest_manager = android_util.AndroidManifestManager(config)
-    dependency_manager = repo_util.DependencyManager(opts.android_root,
-                                                     manifest_manager)
-    revlist = dependency_manager.get_revlist(old, new)
+    spec_manager = android_util.AndroidSpecManager(config)
+    cache = repo_util.RepoMirror(opts.android_repo_mirror_dir)
 
+    # Make sure all repos in between are cached
+    float_specs = spec_manager.collect_float_spec(old, new)
+    for spec in reversed(float_specs):
+      spec_manager.parse_spec(spec)
+      if cache.are_spec_commits_available(spec):
+        continue
+      spec_manager.sync_disk_state(spec.name)
+
+    code_manager = codechange.CodeManager(opts.android_root, spec_manager,
+                                          cache)
+    revlist = code_manager.build_revlist(old, new)
     return config, revlist
 
   def __init__(self, config):
@@ -144,16 +164,31 @@ class AndroidRepoDomain(core.BisectDomain):
     env['ANDROID_ROOT'] = self.config['android_root']
     env['ANDROID_FLAVOR'] = self.config['flavor']
     env['ANDROID_BRANCH'] = self.config['branch']
+    env['ANDROID_REPO_MIRROR_DIR'] = self.config['android_repo_mirror_dir']
     env['INTRA_REV'] = rev
 
   def view(self, old, new):
     print('old', old)
     print('new', new)
 
-    manifest_manager = android_util.AndroidManifestManager(self.config)
-    dependency_manager = repo_util.DependencyManager(
-        self.config['android_root'], manifest_manager)
-    dependency_manager.view_rev_diff(old, new)
+    old_base, old_next, _ = codechange.parse_intra_rev(old)
+    new_base, new_next, _ = codechange.parse_intra_rev(new)
+    # Only print log url if the range is within two releases.
+    if old_next in (new_base, new_next):
+      url_template = (
+          'https://android-build.googleplex.com/'
+          'builds/{new}/branches/{branch}/targets/{flavor}/cls?end={old}')
+      print(url_template.format(
+          old=old_base,
+          new=new_next,
+          branch=self.config['branch'],
+          flavor=self.config['flavor']))
+
+    spec_manager = android_util.AndroidSpecManager(self.config)
+    cache = repo_util.RepoMirror(self.config['android_repo_mirror_dir'])
+    code_manager = codechange.CodeManager(self.config['android_root'],
+                                          spec_manager, cache)
+    code_manager.view_rev_diff(old, new)
 
 
 if __name__ == '__main__':

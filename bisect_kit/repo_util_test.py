@@ -71,5 +71,52 @@ class TestRepoOperation(unittest.TestCase):
     self.assertEqual(result.get('dir3/g3', 'not-exist'), 'not-exist')
 
 
+class TestRepoUtil(unittest.TestCase):
+  """Tests logic part of repo_util module."""
+
+  def test_parse_manifest_android(self):
+    """Test features used by android manifest."""
+    manifest_url = 'https://example.com/manifest'
+    result = repo_util.parse_manifest(r'''<?xml version="1.0" encoding="UTF-8"?>
+    <manifest>
+      <remote name="goog" fetch=".." />
+      <default revision="master" remote="goog" />
+      <project path="frameworks/av" name="platform/frameworks/av"
+               revision="foobar" />
+      <project path="frameworks/base" name="platform/frameworks/base" />
+      <project path="frameworks/foo" name="platform/frameworks/foo"
+               groups="notdefault" />
+    </manifest>
+    ''', manifest_url)
+
+    self.assertEqual(result['frameworks/av'].path, 'frameworks/av')
+    self.assertEqual(result['frameworks/av'].repo_url,
+                     'https://example.com/platform/frameworks/av')
+    self.assertEqual(result['frameworks/av'].at, 'foobar')
+
+    self.assertEqual(result['frameworks/base'].at, 'master')
+
+    self.assertNotIn('frameworks/foo', result)
+
+  def test_parse_manifest_bad(self):
+    manifest_url = 'https://example.com/manifest'
+
+    with self.assertRaises(ValueError):
+      repo_util.parse_manifest(r'''<?xml version="1.0" encoding="UTF-8"?>
+      <manifest>
+        <include name="file.xml" />
+      </manifest>
+      ''', manifest_url)
+
+    # Unknown remote.
+    with self.assertRaises(ValueError):
+      repo_util.parse_manifest(r'''<?xml version="1.0" encoding="UTF-8"?>
+      <manifest>
+        <project path="src/scripts" name="chromiumos/platform/crosutils"
+                 remote="goog" revision="foo" />
+      </manifest>
+      ''', manifest_url)
+
+
 if __name__ == '__main__':
   unittest.main()

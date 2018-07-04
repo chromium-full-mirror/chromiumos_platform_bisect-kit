@@ -387,12 +387,12 @@ def apply_actions(code_storage, action_groups, root_dir):
       commit_action.apply(root_dir)
 
   for i, action_group in enumerate(action_groups, 1):
-    for action in action_group:
+    for action in action_group.actions:
       if not isinstance(action, GitCheckoutCommit):
         break
     else:
       # If all actions are commits, defer them for batch processing.
-      for action in action_group:
+      for action in action_group.actions:
         commits[action.path] = (i, action)
       continue
 
@@ -778,7 +778,10 @@ class CodeManager(object):
       next_float = specs[i + 1]
       logger.debug('[%d], between %s (%s) and %s (%s)', i, prev_float.name,
                    prev_float.timestamp, next_float.name, next_float.timestamp)
-      actions += self.generate_actions_between_specs(prev_float, next_float)
+      for action in self.generate_actions_between_specs(prev_float, next_float):
+        if action.timestamp < fixed_specs[0].timestamp:
+          continue
+        actions.append(action)
     action_groups = self.reorder_actions(actions)
 
     spec = self.synthesize_fixed_spec(float_specs[0], fixed_specs[0].timestamp)

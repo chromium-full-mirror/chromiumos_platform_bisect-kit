@@ -12,12 +12,30 @@ from __future__ import print_function
 import logging
 import os
 import re
+import urlparse
 import xml.etree.ElementTree
 
+from bisect_kit import codechange
 from bisect_kit import git_util
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
+
+
+def get_manifest_url(repo_dir):
+  """Get manifest URL of repo project.
+
+  Args:
+    repo_dir: root directory of repo
+
+  Returns:
+    manifest URL.
+  """
+  manifest_dir = os.path.join(repo_dir, '.repo', 'manifests.git')
+  url = util.check_output(
+      'git', 'config', 'remote.origin.url', cwd=manifest_dir)
+  url = re.sub(r'^persistent-(https?://)', r'\1', url)
+  return url
 
 
 def init(repo_dir,
@@ -150,6 +168,48 @@ def parse_repo_set(repo_dir, manifest_name):
   return result
 
 
+def parse_manifest(content, manifest_url):
+  root = xml.etree.ElementTree.fromstring(content)
+  result = {}
+  default = root.find('default')
+  if default is None:
+    default = {}
+
+  remote_fetch_map = {}
+  for remote in root.findall('.//remote'):
+    name = remote.get('name')
+    fetch_url = urlparse.urljoin(manifest_url, remote.get('fetch'))
+    if urlparse.urlparse(fetch_url).path not in ('', '/'):
+      # TODO(kcwu): support remote url with sub folders
+      raise ValueError(
+          'only support git repo at root path of remote server: %s' % fetch_url)
+    remote_fetch_map[name] = fetch_url
+
+  include = root.find('include')
+  if include is not None:
+    # TODO(kcwu): support <include> for chromeos
+    raise ValueError('<include> is not supported')
+
+  for project in root.findall('.//project'):
+    if 'notdefault' in project.get('groups', ''):
+      continue
+    for subproject in project.findall('.//project'):
+      logger.warning('nested project %s.%s is not supported and ignored',
+                     project.get('name'), subproject.get('name'))
+
+    path = project.get('path', project.get('name'))  # default path is its name
+    revision = project.get('revision', default.get('revision'))
+
+    remote_name = project.get('remote', default.get('remote'))
+    if remote_name not in remote_fetch_map:
+      raise ValueError('unknown remote name=%s' % remote_name)
+    fetch_url = remote_fetch_map[remote_name]
+    repo_url = urlparse.urljoin(fetch_url, project.get('name'))
+
+    result[path] = codechange.PathSpec(path, repo_url, revision)
+  return result
+
+
 class DependencyManager(object):
   """Dependency manager."""
 
@@ -253,3 +313,21 @@ class DependencyManager(object):
             idx=i,
             timestamp=diff.timestamp,
             summary=diff.summary(self.repo_dir)))
+
+
+class RepoMirror(codechange.CodeStorage):
+  """Repo git mirror."""
+
+  def __init__(self, mirror_dir):
+    self.mirror_dir = mirror_dir
+
+  def _url_to_cache_dir(self, url):
+    # Here we assume remote fetch url is always at root of server url, so we can
+    # simply treat whole path as repo project name.
+    path = urlparse.urlparse(url).path
+    assert path[0] == '/'
+    return '%s.git' % path[1:]
+
+  def cached_git_root(self, repo_url):
+    cache_path = self._url_to_cache_dir(repo_url)
+    return os.path.join(self.mirror_dir, cache_path)

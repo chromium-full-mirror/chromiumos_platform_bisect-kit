@@ -16,8 +16,11 @@ from __future__ import print_function
 import json
 import logging
 import os
+import tempfile
 
 from bisect_kit import cli
+from bisect_kit import codechange
+from bisect_kit import git_util
 from bisect_kit import repo_util
 from bisect_kit import util
 
@@ -161,30 +164,90 @@ def fetch_manifest(android_root, flavor, build_id):
   return manifest_name
 
 
-class AndroidManifestManager(repo_util.ManifestManager):
-  """Manifest operations for Android repo"""
+def lookup_build_timestamp(flavor, build_id):
+  """Lookup timestamp of Android prebuilt.
+
+  Args:
+    flavor: Android build flavor
+    build_id: Android build id
+
+  Returns:
+    timestamp
+  """
+  tmp_fn = tempfile.mktemp()
+  try:
+    fetch_artifact(flavor, build_id, 'BUILD_INFO', tmp_fn)
+    data = json.load(open(tmp_fn))
+    return int(data['sync_start_time'])
+  finally:
+    if os.path.exists(tmp_fn):
+      os.unlink(tmp_fn)
+
+
+class AndroidSpecManager(codechange.SpecManager):
+  """Repo manifest related operations.
+
+  This class fetches and enumerates android manifest files, parses them,
+  and sync to disk state according to them.
+  """
 
   def __init__(self, config):
     self.config = config
-    self.flavor = config['flavor']
+    self.manifest_dir = os.path.join(self.config['android_root'], '.repo',
+                                     'manifests')
+
+  def collect_float_spec(self, old, new):
+    result = []
+    path = 'default.xml'
+
+    commits = []
+    old_timestamp = lookup_build_timestamp(self.config['flavor'], old)
+    new_timestamp = lookup_build_timestamp(self.config['flavor'], new)
+    for timestamp, git_rev in git_util.get_history(self.manifest_dir, path):
+      if timestamp < old_timestamp:
+        commits = []
+      commits.append((timestamp, git_rev))
+      if timestamp > new_timestamp:
+        break
+
+    for timestamp, git_rev in commits:
+      result.append(
+          codechange.Spec(codechange.SPEC_FLOAT, git_rev, timestamp, path))
+    return result
+
+  def collect_fixed_spec(self, old, new):
+    result = []
+    revlist = get_build_ids_between(self.config['branch'], int(old), int(new))
+    for rev in revlist:
+      manifest_name = fetch_manifest(self.config['android_root'],
+                                     self.config['flavor'], rev)
+      path = os.path.join(self.manifest_dir, manifest_name)
+      timestamp = lookup_build_timestamp(self.config['flavor'], rev)
+      result.append(
+          codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path))
+    return result
+
+  def _load_manifest_content(self, spec):
+    if spec.spec_type == codechange.SPEC_FIXED:
+      manifest_name = fetch_manifest(self.config['branch'],
+                                     self.config['flavor'], spec.name)
+      return open(os.path.join(self.manifest_dir, manifest_name)).read()
+    else:
+      return git_util.get_file_from_revision(self.manifest_dir, spec.name,
+                                             spec.path)
+
+  def parse_spec(self, spec):
+    logging.debug('parse_spec %s', spec.name)
+    manifest_content = self._load_manifest_content(spec)
+    manifest_url = repo_util.get_manifest_url(self.config['android_root'])
+    spec.entries = repo_util.parse_manifest(manifest_content, manifest_url)
+    if spec.spec_type == codechange.SPEC_FIXED:
+      assert spec.is_static()
 
   def sync_disk_state(self, rev):
-    manifest_name = self.fetch_manifest(rev)
+    manifest_name = fetch_manifest(self.config['android_root'],
+                                   self.config['flavor'], rev)
     repo_util.sync(
         self.config['android_root'],
         manifest_name=manifest_name,
         current_branch=True)
-
-  def fetch_git_repos(self, rev):
-    # TODO(kcwu): fetch git history but don't switch current disk state.
-    self.sync_disk_state(rev)
-
-  def enumerate_manifest(self, old, new):
-    revlist = get_build_ids_between(self.config['branch'], int(old), int(new))
-
-    assert revlist[0] == old
-    assert revlist[-1] == new
-    return revlist
-
-  def fetch_manifest(self, rev):
-    return fetch_manifest(self.config['android_root'], self.flavor, rev)

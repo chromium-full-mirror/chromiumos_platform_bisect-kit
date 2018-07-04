@@ -188,18 +188,20 @@ def get_rev_by_time(git_repo, timestamp, *args):
     timestamp: timestamp
     args: only the selected subset of history to query. If branch name is
         specified, only parent of the said branch is queried. If omitted, only
-        queries the parent of current working directory.
+        queries the parent of HEAD.
 
   Returns:
     git commit hash
   """
+  if not args:
+    args = ['HEAD']
   return util.check_output(
       'git',
-      'log',
+      'rev-list',
+      '--first-parent',
       '-1',
       '--before',
       str(timestamp),
-      '--format=%H',
       *args,
       cwd=git_repo).strip()
 
@@ -215,7 +217,7 @@ def get_history(git_repo, path, after=None):
   Yields:
     commit timestamp, git hash
   """
-  cmd = ['git', 'log', '--reverse', '--format=%ct %H']
+  cmd = ['git', 'log', '--reverse', '--first-parent', '--format=%ct %H']
   if after:
     cmd += ['--after', str(after)]
   cmd.append(path)
