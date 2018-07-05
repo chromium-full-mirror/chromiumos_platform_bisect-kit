@@ -626,7 +626,7 @@ class ChromeOSManifestManager(repo_util.ManifestManager):
     # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
     # manifest. 'repo sync -m' is not enough
     repo_util.init(
-        self.config['repo_dir'],
+        self.config['chromeos_root'],
         'https://chrome-internal.googlesource.com/chromeos/manifest-versions/',
         manifest_name=manifest_name,
         repo_url='https://chromium.googlesource.com/external/repo.git')
@@ -634,15 +634,15 @@ class ChromeOSManifestManager(repo_util.ManifestManager):
     # Note, don't sync with current_branch=True for chromeos. One of its
     # build steps (inside mark_as_stable) executes "git describe" which
     # needs git tag information.
-    repo_util.sync(self.config['repo_dir'])
+    repo_util.sync(self.config['chromeos_root'])
 
   def fetch_git_repos(self, rev):
     # Early return if necessary git history are already fetched.
     mf = self.fetch_manifest(rev)
-    repo_set = repo_util.parse_repo_set(self.config['repo_dir'], mf)
+    repo_set = repo_util.parse_repo_set(self.config['chromeos_root'], mf)
     all_have = True
     for path, git_rev in repo_set.items():
-      git_root = os.path.join(self.config['repo_dir'], path)
+      git_root = os.path.join(self.config['chromeos_root'], path)
       if not os.path.exists(git_root):
         all_have = False
         break
@@ -664,7 +664,7 @@ class ChromeOSManifestManager(repo_util.ManifestManager):
     # TODO(kcwu): fetch manifests but don't switch current disk state.
     self.sync_disk_state(new)
 
-    spec_dir = os.path.join(self.config['repo_dir'], '.repo', 'manifests',
+    spec_dir = os.path.join(self.config['chromeos_root'], '.repo', 'manifests',
                             'buildspecs')
     result = []
     for root, dirs, files in os.walk(spec_dir):
