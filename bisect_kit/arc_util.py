@@ -88,6 +88,7 @@ def push_prebuilt_to_device(dut, flavor, build_id, android_root=None):
   assert '-' in flavor
   product, variant = flavor.split('-')
   args = [
+      '--force',
       dut,
       '--use-prebuilt',
       '{product}/{variant}/{build_id}'.format(
@@ -105,7 +106,7 @@ def push_localbuild_to_device(android_root, dut, flavor):
     dut: address of DUT
     flavor: android build flavor
   """
-  _push_to_device(dut, [dut], android_root, flavor)
+  _push_to_device(dut, ['--force', dut], android_root, flavor)
 
 
 def get_build_prop(host):
