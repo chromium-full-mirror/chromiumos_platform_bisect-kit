@@ -52,6 +52,10 @@ VERSION_KEY_ANDROID_BUILD_ID = 'android_build_id'
 VERSION_KEY_ANDROID_BRANCH = 'android_branch'
 
 
+class NeedRecreateChrootException(Exception):
+  """Failed to build ChromeOS because of chroot mismatch or corruption"""
+
+
 def is_cros_short_version(s):
   """Determines if `s` is chromeos short version.
 
@@ -541,6 +545,7 @@ def cros_sdk(chromeos_root, *args, **kwargs):
     **kwargs:
       env: (dict) environment variables for the command
       stdin: standard input file handle for the command
+      stderr_callback: Callback function for stderr. Called once per line.
   """
   envs = []
   for k, v in kwargs.get('env', {}).items():
@@ -550,7 +555,11 @@ def cros_sdk(chromeos_root, *args, **kwargs):
   # Use --no-ns-pid to prevent cros_sdk change our pgid, otherwise subsequent
   # commands would be considered as background process.
   cmd = ['chromite/bin/cros_sdk', '--no-ns-pid'] + envs + ['--'] + list(args)
-  return util.check_output(*cmd, cwd=chromeos_root, stdin=kwargs.get('stdin'))
+  return util.check_output(
+      *cmd,
+      cwd=chromeos_root,
+      stdin=kwargs.get('stdin'),
+      stderr_callback=kwargs.get('stderr_callback'))
 
 
 def copy_into_chroot(chromeos_root, src, dst):
@@ -583,6 +592,28 @@ def exists_in_chroot(chromeos_root, path):
   return True
 
 
+def check_if_need_recreate_chroot(stdout, stderr):
+  """Analyze build log and determine if chroot should be recreated.
+
+  Args:
+    stdout: stdout output of build
+    stderr: stderr output of build
+
+  Returns:
+    the reason if chroot needs recreated; None otherwise
+  """
+  del stdout  # unused
+
+  if re.search(r"The current version of portage supports EAPI '\d+'. "
+               "You must upgrade", stderr):
+    return 'EAPI version mismatch'
+
+  if 'Chroot version is too new. Consider running cros_sdk --replace' in stderr:
+    return 'chroot version is too new'
+
+  return None
+
+
 def build_image(chromeos_root, board, rev):
   """Build ChromeOS image.
 
@@ -608,7 +639,25 @@ def build_image(chromeos_root, board, rev):
   copy_into_chroot(chromeos_root, os.path.join(dirname, '..', script_name),
                    script_name)
   cros_sdk(chromeos_root, 'chmod', '+x', script_name)
-  cros_sdk(chromeos_root, './%s' % script_name, board, image_name)
+
+  stderr_lines = []
+  try:
+    cros_sdk(
+        chromeos_root,
+        './%s' % script_name,
+        board,
+        image_name,
+        stderr_callback=stderr_lines.append)
+  except subprocess.CalledProcessError as e:
+    # Detect failures due to incompatibility between chroot and source tree. If
+    # so, notify the caller to recreate chroot and retry.
+    reason = check_if_need_recreate_chroot(e.output, ''.join(stderr_lines))
+    if reason:
+      raise NeedRecreateChrootException(reason)
+
+    # For other failures, don't know how to handle. Just bail out.
+    raise
+
   return image_path
 
 

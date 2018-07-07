@@ -8,6 +8,7 @@
 from __future__ import print_function
 import argparse
 import logging
+import os
 
 from bisect_kit import cli
 from bisect_kit import common
@@ -79,25 +80,43 @@ def mark_as_stable(opts):
 
 
 def cleanup(opts):
-  # TODO(kcwu): need to recreate chroot for some cases, such as
-  #   - downgrade chroot version
-  #   - portage upgrade for EAPI=6
   logger.info('clean up previous result of "mark as stable"')
   repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
+
+
+def build(opts):
+  # create chroot if necessary
+  if (not os.path.exists(os.path.join(opts.chromeos_root, 'chroot')) and
+      not os.path.exists(os.path.join(opts.chromeos_root, 'chroot.img'))):
+    util.check_output(
+        'chromite/bin/cros_sdk',
+        '--nouse-image',
+        '--create',
+        cwd=opts.chromeos_root)
+
+  logger.info('mark as stable')
+  mark_as_stable(opts)
+
+  logger.info('build image')
+  return cros_util.build_image(opts.chromeos_root, opts.board, opts.rev)
 
 
 def switch(opts):
   cleanup(opts)
 
+  logger.info('switch source code')
   config = dict(board=opts.board, chromeos_root=opts.chromeos_root)
   mm = cros_util.ChromeOSManifestManager(config)
   dep = repo_util.DependencyManager(opts.chromeos_root, mm)
   dep.switch(opts.rev)
 
-  logger.info('mark as stable')
-  mark_as_stable(opts)
-
-  image_path = cros_util.build_image(opts.chromeos_root, opts.board, opts.rev)
+  try:
+    image_path = build(opts)
+  except cros_util.NeedRecreateChrootException as e:
+    logger.warning('recreate chroot and retry again, reason: %s', e)
+    util.check_output(
+        'chromite/bin/cros_sdk', '--delete', cwd=opts.chromeos_root)
+    image_path = build(opts)
 
   if opts.nodeploy:
     return
