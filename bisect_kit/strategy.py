@@ -269,6 +269,9 @@ class NoisyBinarySearch(object):
       A string indicates eval result noise observation so far. See comments of
       __init__ for detail format.
     """
+    assert not self.oracle
+    if not self.prior_observation:
+      return None
     left_new, left_trial, right_new, right_trial = self._gather_noise_count()
     observation = []
     if (left_new, left_trial) != NOT_NOISY:
