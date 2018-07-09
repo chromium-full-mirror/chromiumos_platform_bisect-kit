@@ -306,7 +306,7 @@ class BisectorCommandLine(object):
         BisectorCommandLine(CustomDomain).main()
 
   where CustomDomain is a derived class of core.BisectDomain. See
-  bisect-list.py as example.
+  bisect_list.py as example.
 
   If you need to control the bisector using python code, the easier way is
   passing command line arguments to main() function. For example,

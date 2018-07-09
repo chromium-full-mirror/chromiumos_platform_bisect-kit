@@ -14,10 +14,10 @@ Example:
 
   Assume numbers less than your answer are considered as "old" and greater or
   equals to your answer are "new".
-    $ seq 1 99 | ./bisect-list.py init --old 1 --new 99 --noisy=old=1/5,new=4/5
-    $ ./bisect-list.py config switch /bin/true
-    $ ./bisect-list.py config eval ./eval-manually.sh
-    $ ./bisect-list.py run
+    $ seq 1 99 | ./bisect_list.py init --old 1 --new 99 --noisy=old=1/5,new=4/5
+    $ ./bisect_list.py config switch /bin/true
+    $ ./bisect_list.py config eval ./eval-manually.sh
+    $ ./bisect_list.py run
 
   If you don't lie, just omit --noisy argument.
 
