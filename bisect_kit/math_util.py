@@ -62,7 +62,7 @@ class EntropyStats(object):
     """Initializes EntropyStats.
 
     Args:
-        p: A list of probability value. Could be unnormalized.
+      p: A list of probability value. Could be unnormalized.
     """
     self.sum = sum(p)
     self.sum_log = sum(map(_xlogx, p))
