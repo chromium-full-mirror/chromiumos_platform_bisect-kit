@@ -10,6 +10,8 @@ import shutil
 import tempfile
 import unittest
 
+import mock
+
 from bisect_kit import repo_util
 from bisect_kit import git_util_test
 
@@ -63,21 +65,13 @@ class TestRepoOperation(unittest.TestCase):
     self.assertEqual(
         repo_util.get_current_branch(self.repo_dir), 'refs/heads/master')
 
-  def test_parse_repo(self):
-    repo_util.init(self.repo_dir, 'file://%s' % self.manifest_git.git_repo)
-    result = repo_util.parse_repo_set(self.repo_dir, 'default.xml')
-    self.assertEqual(result.get('dir1/g1', 'not-exist'), None)
-    self.assertEqual(result.get('dir2/g2'), self.git2.commits[1])
-    self.assertEqual(result.get('dir3/g3', 'not-exist'), 'not-exist')
 
-
-class TestRepoUtil(unittest.TestCase):
-  """Tests logic part of repo_util module."""
+class TestManifestParser(unittest.TestCase):
+  """Tests repo_util.ManifestParser."""
 
   def test_parse_manifest_android(self):
     """Test features used by android manifest."""
-    manifest_url = 'https://example.com/manifest'
-    result = repo_util.parse_manifest(r'''<?xml version="1.0" encoding="UTF-8"?>
+    manifest = r'''<?xml version="1.0" encoding="UTF-8"?>
     <manifest>
       <remote name="goog" fetch=".." />
       <default revision="master" remote="goog" />
@@ -87,7 +81,15 @@ class TestRepoUtil(unittest.TestCase):
       <project path="frameworks/foo" name="platform/frameworks/foo"
                groups="notdefault" />
     </manifest>
-    ''', manifest_url)
+    '''
+
+    manifest_url = 'https://example.com/manifest'
+    manifest_dir = '/dummy/path'  # doesn't matter since io mocked
+    with mock.patch(
+        'bisect_kit.repo_util.get_manifest_url', return_value=manifest_url):
+      p = repo_util.ManifestParser(manifest_dir)
+      root = p.parse_single_xml(manifest, allow_include=False)
+      result = p.process_parsed_result(root)
 
     self.assertEqual(result['frameworks/av'].path, 'frameworks/av')
     self.assertEqual(result['frameworks/av'].repo_url,
@@ -100,22 +102,32 @@ class TestRepoUtil(unittest.TestCase):
 
   def test_parse_manifest_bad(self):
     manifest_url = 'https://example.com/manifest'
+    manifest_dir = '/dummy/path'  # doesn't matter since io mocked
 
-    with self.assertRaises(ValueError):
-      repo_util.parse_manifest(r'''<?xml version="1.0" encoding="UTF-8"?>
-      <manifest>
-        <include name="file.xml" />
-      </manifest>
-      ''', manifest_url)
+    with mock.patch(
+        'bisect_kit.repo_util.get_manifest_url', return_value=manifest_url):
+      p = repo_util.ManifestParser(manifest_dir)
 
-    # Unknown remote.
-    with self.assertRaises(ValueError):
-      repo_util.parse_manifest(r'''<?xml version="1.0" encoding="UTF-8"?>
-      <manifest>
-        <project path="src/scripts" name="chromiumos/platform/crosutils"
-                 remote="goog" revision="foo" />
-      </manifest>
-      ''', manifest_url)
+      with self.assertRaises(ValueError):
+        root = p.parse_single_xml(
+            r'''<?xml version="1.0" encoding="UTF-8"?>
+            <manifest>
+              <include name="file.xml" />
+            </manifest>
+            ''',
+            allow_include=False)
+        p.process_parsed_result(root)
+
+      with self.assertRaises(ValueError):
+        root = p.parse_single_xml(
+            r'''<?xml version="1.0" encoding="UTF-8"?>
+            <manifest>
+              <project path="src/scripts" name="chromiumos/platform/crosutils"
+                       remote="goog" revision="foo" />
+            </manifest>
+            ''',
+            allow_include=False)
+        p.process_parsed_result(root)
 
 
 if __name__ == '__main__':

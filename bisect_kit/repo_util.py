@@ -22,16 +22,15 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 
-def get_manifest_url(repo_dir):
+def get_manifest_url(manifest_dir):
   """Get manifest URL of repo project.
 
   Args:
-    repo_dir: root directory of repo
+    manifest_dir: path of manifest directory
 
   Returns:
     manifest URL.
   """
-  manifest_dir = os.path.join(repo_dir, '.repo', 'manifests.git')
   url = util.check_output(
       'git', 'config', 'remote.origin.url', cwd=manifest_dir)
   url = re.sub(r'^persistent-(https?://)', r'\1', url)
@@ -42,7 +41,8 @@ def init(repo_dir,
          manifest_url,
          manifest_branch=None,
          manifest_name=None,
-         repo_url=None):
+         repo_url=None,
+         reference=None):
   """Repo init.
 
   Args:
@@ -51,6 +51,7 @@ def init(repo_dir,
     manifest_branch: manifest branch or revision
     manifest_name: initial manifest file name
     repo_url: repo repository location
+    reference: location of mirror directory
   """
   cmd = ['repo', 'init', '--manifest-url', manifest_url]
   if manifest_name:
@@ -59,6 +60,8 @@ def init(repo_dir,
     cmd += ['--manifest-branch', manifest_branch]
   if repo_url:
     cmd += ['--repo-url', repo_url]
+  if reference:
+    cmd += ['--reference', reference]
   util.check_call(*cmd, cwd=repo_dir)
 
 
@@ -116,203 +119,82 @@ def get_manifest_groups(repo_dir):
   return info(repo_dir, 'Manifest groups')
 
 
-class ManifestManager(object):
-  """Abstract class for manifest operations."""
+class ManifestParser(object):
+  """Enumerates historical manifest files and parses them."""
 
-  def sync_disk_state(self, rev):
-    """Switches disk state to given version.
+  def __init__(self, manifest_dir):
+    self.manifest_dir = manifest_dir
+    self.manifest_url = get_manifest_url(self.manifest_dir)
 
-    Args:
-      rev: revision
-    """
-    raise NotImplementedError
-
-  def enumerate_manifest(self, old, new):
-    """Enumerates major versions with manifest.
-
-    Args:
-      old: start version (inclusive)
-      new: last version (inclusive)
-
-    Returns:
-      list of major versions
-    """
-    raise NotImplementedError
-
-  def fetch_manifest(self, rev):
-    raise NotImplementedError
-
-
-def parse_repo_set(repo_dir, manifest_name):
-  """Parse repo manifest.
-
-  This will ignore 'notdefault' groups in the manifest.
-
-  Args:
-    repo_dir: root directory of repo
-    manifest_name: name of manifest, which also means a filename relative to
-        manifest directory
-
-  Returns:
-    (dict) parsed manifest, which is mapping from path to revisions
-  """
-  manifest_path = os.path.join(repo_dir, '.repo', 'manifests', manifest_name)
-  root = xml.etree.ElementTree.parse(manifest_path)
-  result = {}
-  for project in root.findall('.//project'):
-    if 'notdefault' in project.get('groups', ''):
-      continue
-    path = project.get('path', project.get('name'))  # default path is its name
-    rev = project.get('revision')
-    result[path] = rev
-  return result
-
-
-def parse_manifest(content, manifest_url):
-  root = xml.etree.ElementTree.fromstring(content)
-  result = {}
-  default = root.find('default')
-  if default is None:
-    default = {}
-
-  remote_fetch_map = {}
-  for remote in root.findall('.//remote'):
-    name = remote.get('name')
-    fetch_url = urlparse.urljoin(manifest_url, remote.get('fetch'))
-    if urlparse.urlparse(fetch_url).path not in ('', '/'):
-      # TODO(kcwu): support remote url with sub folders
+  def parse_single_xml(self, content, allow_include=False):
+    root = xml.etree.ElementTree.fromstring(content)
+    if not allow_include and root.find('include') is not None:
       raise ValueError(
-          'only support git repo at root path of remote server: %s' % fetch_url)
-    remote_fetch_map[name] = fetch_url
+          'Expects self-contained manifest. <include> is not allowed')
+    return root
 
-  include = root.find('include')
-  if include is not None:
-    # TODO(kcwu): support <include> for chromeos
-    raise ValueError('<include> is not supported')
+  def parse_xml_recursive(self, git_rev, path):
+    content = git_util.get_file_from_revision(self.manifest_dir, git_rev, path)
+    root = self.parse_single_xml(content, allow_include=True)
 
-  for project in root.findall('.//project'):
-    if 'notdefault' in project.get('groups', ''):
-      continue
-    for subproject in project.findall('.//project'):
-      logger.warning('nested project %s.%s is not supported and ignored',
-                     project.get('name'), subproject.get('name'))
+    result = xml.etree.ElementTree.Element('manifest')
+    for node in root:
+      if node.tag == 'include':
+        for subnode in self.parse_xml_recursive(git_rev, node.get('name')):
+          result.append(subnode)
+      else:
+        result.append(node)
+    return result
 
-    path = project.get('path', project.get('name'))  # default path is its name
-    revision = project.get('revision', default.get('revision'))
+  def process_parsed_result(self, root):
+    result = {}
+    default = root.find('default')
+    if default is None:
+      default = {}
 
-    remote_name = project.get('remote', default.get('remote'))
-    if remote_name not in remote_fetch_map:
-      raise ValueError('unknown remote name=%s' % remote_name)
-    fetch_url = remote_fetch_map[remote_name]
-    repo_url = urlparse.urljoin(fetch_url, project.get('name'))
+    remote_fetch_map = {}
+    for remote in root.findall('.//remote'):
+      name = remote.get('name')
+      fetch_url = urlparse.urljoin(self.manifest_url, remote.get('fetch'))
+      if urlparse.urlparse(fetch_url).path not in ('', '/'):
+        # TODO(kcwu): support remote url with sub folders
+        raise ValueError(
+            'only support git repo at root path of remote server: %s' %
+            fetch_url)
+      remote_fetch_map[name] = fetch_url
 
-    result[path] = codechange.PathSpec(path, repo_url, revision)
-  return result
+    assert root.find('include') is None
 
-
-class DependencyManager(object):
-  """Dependency manager."""
-
-  def __init__(self, repo_dir, manifest_manager):
-    self.repo_dir = repo_dir
-    self.manifest_manager = manifest_manager
-
-  @staticmethod
-  def _parse_rev(rev):
-    m = re.match(r'^([^,]+),([^,]+)\+(\d+)$', rev)
-    assert m
-    return m.group(1), m.group(2), int(m.group(3))
-
-  def get_revlist(self, old, new):
-    logger.info('get_revlist')
-    revlist = []
-    major_revs = self.manifest_manager.enumerate_manifest(old, new)
-    for i, major_rev in enumerate(major_revs):
-      revlist.append(major_rev)
-      if i + 1 == len(major_revs):
+    for project in root.findall('.//project'):
+      if 'notdefault' in project.get('groups', ''):
         continue
+      for subproject in project.findall('.//project'):
+        logger.warning('nested project %s.%s is not supported and ignored',
+                       project.get('name'), subproject.get('name'))
 
-      old_mf = self.manifest_manager.fetch_manifest(major_revs[i])
-      new_mf = self.manifest_manager.fetch_manifest(major_revs[i + 1])
-      old_set = parse_repo_set(self.repo_dir, old_mf)
-      new_set = parse_repo_set(self.repo_dir, new_mf)
+      # default path is its name
+      path = project.get('path', project.get('name'))
+      revision = project.get('revision', default.get('revision'))
 
-      self.manifest_manager.fetch_git_repos(major_revs[i + 1])
-      difflist = git_util.get_difflist_between_two_set(self.repo_dir, old_set,
-                                                       new_set)
-      # Theoretically, "old,new+N" equals to "new" if N=len(old diff). But it's
-      # not always true in practice because of racing and incorrect diff
-      # replay. So still add it.
-      for j, _diff in enumerate(difflist, 1):
-        rev = '%s,%s+%d' % (major_revs[i], major_revs[i + 1], j)
-        revlist.append(rev)
-    return revlist
+      remote_name = project.get('remote', default.get('remote'))
+      if remote_name not in remote_fetch_map:
+        raise ValueError('unknown remote name=%s' % remote_name)
+      fetch_url = remote_fetch_map.get(remote_name)
+      repo_url = urlparse.urljoin(fetch_url, project.get('name'))
 
-  def switch(self, rev):
-    if '+' in rev:
-      rev_old, rev_new, idx = self._parse_rev(rev)
+      result[path] = codechange.PathSpec(path, repo_url, revision)
+    return result
 
-      old_mf = self.manifest_manager.fetch_manifest(rev_old)
-      new_mf = self.manifest_manager.fetch_manifest(rev_new)
-      old_set = parse_repo_set(self.repo_dir, old_mf)
-      new_set = parse_repo_set(self.repo_dir, new_mf)
-      difflist = git_util.get_difflist_between_two_set(self.repo_dir, old_set,
-                                                       new_set)
-      assert 1 <= idx <= len(difflist)
-      difflist = difflist[:idx]
-    else:
-      rev_old = rev
-      old_mf = self.manifest_manager.fetch_manifest(rev_old)
-      difflist = []
+  def enumerate_manifest_commits(self, start_time, end_time, path):
 
-    self.manifest_manager.sync_disk_state(rev_old)
+    def parse_dependencies(path, content):
+      del path  # unused
+      root = self.parse_single_xml(content, allow_include=True)
+      for include in root.findall('.//include'):
+        yield include.get('name')
 
-    for i, diff in enumerate(difflist, 1):
-      logger.debug('[%d] applying "%s"', i, diff.summary(self.repo_dir))
-      diff.apply(self.repo_dir)
-    # TODO support <copyfile> and <linkfile> tags
-
-  def view_rev_diff(self, old, new):
-    if '+' in old:
-      old_base, old_next, old_idx = self._parse_rev(old)
-    else:
-      old_base, old_next, old_idx = old, None, 0
-
-    if '+' in new:
-      new_base, new_next, new_idx = self._parse_rev(new)
-    else:
-      new_base, new_next, new_idx = new, None, 0
-
-    major_revs = self.manifest_manager.enumerate_manifest(old_base, new_base)
-    if major_revs.index(old_base) + 1 == major_revs.index(new_base):
-      old_next = new_base
-      if new_idx == 0:
-        new_base = old_base
-        new_idx = -1
-    elif major_revs.index(old_base) == major_revs.index(new_base):
-      old_next = new_next
-
-    if old_base == new_base and old_next:
-      old_mf = self.manifest_manager.fetch_manifest(old_base)
-      new_mf = self.manifest_manager.fetch_manifest(old_next)
-      old_set = parse_repo_set(self.repo_dir, old_mf)
-      new_set = parse_repo_set(self.repo_dir, new_mf)
-      difflist = git_util.get_difflist_between_two_set(self.repo_dir, old_set,
-                                                       new_set)
-      if new_idx == -1:
-        new_idx = len(difflist)
-
-      for i in range(old_idx, new_idx + 1):
-        if i == 0:
-          print('{base}'.format(base=old_base))
-          continue
-        diff = difflist[i - 1]
-        print('{base},{next}+{idx} {timestamp} {summary}'.format(
-            base=old_base,
-            next=old_next,
-            idx=i,
-            timestamp=diff.timestamp,
-            summary=diff.summary(self.repo_dir)))
+    return git_util.get_history_recursively(self.manifest_dir, path, start_time,
+                                            end_time, parse_dependencies)
 
 
 class RepoMirror(codechange.CodeStorage):

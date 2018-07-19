@@ -10,12 +10,12 @@ import argparse
 import logging
 
 from bisect_kit import android_util
-from bisect_kit import codechange
-from bisect_kit import repo_util
 from bisect_kit import arc_util
+from bisect_kit import cli
+from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import configure
-from bisect_kit import cli
+from bisect_kit import repo_util
 
 logger = logging.getLogger(__name__)
 

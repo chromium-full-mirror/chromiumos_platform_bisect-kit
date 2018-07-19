@@ -24,10 +24,11 @@ from __future__ import print_function
 import logging
 
 from bisect_kit import cli
-from bisect_kit import cros_util
-from bisect_kit import repo_util
+from bisect_kit import codechange
 from bisect_kit import configure
 from bisect_kit import core
+from bisect_kit import cros_util
+from bisect_kit import repo_util
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT', ''),
+        default=configure.get('DUT'),
         help='DUT address')
     parser.add_argument(
         '--board',
@@ -57,6 +58,11 @@ class ChromeOSRepoDomain(core.BisectDomain):
         required=True,
         default=configure.get('CHROMEOS_ROOT'),
         help='ChromeOS tree root')
+    parser.add_argument(
+        '--chromeos_repo_mirror_dir',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROMEOS_REPO_MIRROR_DIR', ''),
+        help='ChromeOS repo mirror path')
 
   @staticmethod
   def init(opts):
@@ -82,12 +88,25 @@ class ChromeOSRepoDomain(core.BisectDomain):
     repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
 
     config = dict(
-        dut=opts.dut, board=opts.board, chromeos_root=opts.chromeos_root)
+        dut=opts.dut,
+        board=opts.board,
+        chromeos_root=opts.chromeos_root,
+        chromeos_repo_mirror_dir=opts.chromeos_repo_mirror_dir)
 
-    manifest_manager = cros_util.ChromeOSManifestManager(config)
-    dependency_manager = repo_util.DependencyManager(opts.chromeos_root,
-                                                     manifest_manager)
-    revlist = dependency_manager.get_revlist(opts.old, opts.new)
+    spec_manager = cros_util.ChromeOSSpecManager(config)
+    cache = repo_util.RepoMirror(opts.chromeos_repo_mirror_dir)
+
+    # Make sure all repos in between are cached
+    float_specs = spec_manager.collect_float_spec(opts.old, opts.new)
+    for spec in reversed(float_specs):
+      spec_manager.parse_spec(spec)
+      if cache.are_spec_commits_available(spec):
+        continue
+      spec_manager.sync_disk_state(spec.name)
+
+    code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager,
+                                          cache)
+    revlist = code_manager.build_revlist(opts.old, opts.new)
     return config, revlist
 
   def __init__(self, config):
@@ -99,16 +118,18 @@ class ChromeOSRepoDomain(core.BisectDomain):
     if self.config['board']:
       env['BOARD'] = self.config['board']
     env['CHROMEOS_ROOT'] = self.config['chromeos_root']
+    env['CHROMEOS_REPO_MIRROR_DIR'] = self.config['chromeos_repo_mirror_dir']
     env['INTRA_REV'] = rev
 
   def view(self, old, new):
     print('old', old)
     print('new', new)
 
-    manifest_manager = cros_util.ChromeOSManifestManager(self.config)
-    dependency_manager = repo_util.DependencyManager(
-        self.config['chromeos_root'], manifest_manager)
-    dependency_manager.view_rev_diff(old, new)
+    spec_manager = cros_util.ChromeOSSpecManager(self.config)
+    cache = repo_util.RepoMirror(self.config['chromeos_repo_mirror_dir'])
+    code_manager = codechange.CodeManager(self.config['chromeos_root'],
+                                          spec_manager, cache)
+    code_manager.view_rev_diff(old, new)
 
 
 if __name__ == '__main__':

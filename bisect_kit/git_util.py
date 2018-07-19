@@ -150,18 +150,19 @@ def get_commit_hash(git_repo, rev):
   return git_rev
 
 
-def get_commit_time(git_repo, rev):
+def get_commit_time(git_repo, rev, path):
   """Get git commit timestamp.
 
   Args:
     git_repo: path of git repo
-    rev: git commit id
+    rev: git commit id, branch name, tag name, or other git object
+    path: path, relative to git_repo
 
   Returns:
     timestamp (int)
   """
   line = util.check_output(
-      'git', 'log', '-1', '--format=%ct', rev, cwd=git_repo)
+      'git', 'log', '-1', '--format=%ct', rev, '--', path, cwd=git_repo)
   return int(line)
 
 
@@ -180,101 +181,182 @@ def get_file_from_revision(git_repo, rev, path):
       'git', 'show', '%s:%s' % (rev, path), cwd=git_repo, log_output=False)
 
 
-def get_rev_by_time(git_repo, timestamp, *args):
+def list_dir_from_revision(git_repo, rev, path):
+  """Lists entries of directory of given revision.
+
+  Args:
+    git_repo: path of git repo
+    rev: git commit id
+    path: directory path, relative to git root
+
+  Returns:
+    list of names
+
+  Raises:
+    subprocess.CalledProcessError: if `path` doesn't exists in `rev`
+  """
+  return util.check_output(
+      'git',
+      'ls-tree',
+      '--name-only',
+      '%s:%s' % (rev, path),
+      cwd=git_repo,
+      log_output=False).splitlines()
+
+
+def get_rev_by_time(git_repo, timestamp, path=None, *args):
   """Query commit of given time.
 
   Args:
     git_repo: path of git repo.
     timestamp: timestamp
+    path: only query history of path, relative to git_repo
     args: only the selected subset of history to query. If branch name is
         specified, only parent of the said branch is queried. If omitted, only
         queries the parent of HEAD.
 
   Returns:
-    git commit hash
+    git commit hash. None if path didn't exist at the given time.
   """
   if not args:
     args = ['HEAD']
-  return util.check_output(
+
+  cmd = [
       'git',
       'rev-list',
       '--first-parent',
       '-1',
       '--before',
       str(timestamp),
-      *args,
-      cwd=git_repo).strip()
+  ] + list(args)
+  if path:
+    cmd += ['--', path]
+
+  result = util.check_output(*cmd, cwd=git_repo).strip()
+  return result or None
 
 
-def get_history(git_repo, path, after=None):
+def get_history(git_repo, path, after=None, before=None, padding=False):
   """Get commit history of given path.
+
+  `after` and `before` could be outside of lifetime of `path`. `padding` is
+  used to control what to return for such cases.
 
   Args:
     git_repo: path of git repo.
     path: path to query, relative to git_repo
-    after: limit history after given time
+    after: limit history after given time (inclusive)
+    before: limit history before given time (inclusive)
+    padding: If True, pads returned result with dummy record at exact 'after'
+        and 'before' time, if 'path' existed at that time. Otherwise, only
+        returns real commits.
 
-  Yields:
-    commit timestamp, git hash
+  Returns:
+    List of (timestamp, git hash); They are all events when `path` was added,
+    removed, modified, and start and end time if `padding` is true.
+
+    For each pair, at `timestamp`, the repo state is `git hash`. In other
+    words, `timestamp` is not necessary the commit time of `git hash` for the
+    padded entries.
   """
   cmd = ['git', 'log', '--reverse', '--first-parent', '--format=%ct %H']
   if after:
     cmd += ['--after', str(after)]
-  cmd.append(path)
+  if before:
+    cmd += ['--before', str(before)]
+  # '--' is necessary otherwise if `path` is removed in current revision, git
+  # will complain it's an ambiguous argument which may be path or something
+  # else (like git branch name, tag name, etc.)
+  cmd += ['--', path]
+
+  result = []
   for line in util.check_output(*cmd, cwd=git_repo).splitlines():
     commit_time, git_rev = line.split()
-    yield int(commit_time), git_rev
+    result.append((int(commit_time), git_rev))
+
+  if padding:
+    assert before or after, "padding=True make no sense if they are both None"
+    if before is not None and get_rev_by_time(git_repo, before, path):
+      before = int(before)
+      if not result or result[-1][0] != before:
+        git_rev = get_rev_by_time(git_repo, before)
+        assert git_rev
+        result.append((before, git_rev))
+    if after is not None and get_rev_by_time(git_repo, after, path):
+      after = int(after)
+      if not result or result[0][0] != after:
+        git_rev = get_rev_by_time(git_repo, after)
+        assert git_rev
+        result.insert(0, (after, git_rev))
+
+  return result
 
 
-class Diff(object):
-  """Class to describe the difference between git commits.
+def get_history_recursively(git_repo, path, after, before, parser_callback):
+  """Get commit history of given path and its dependencies.
 
-  Attributes:
-    timestamp: commit timestamp
-    path: git repo path relative to project root
-    action: action to make the diff, possible value: CHECKOUT_TO, ADD, REMOVE.
-    git_rev: git commit hash
+  In comparison to get_history(), get_history_recursively also takes
+  dependencies into consideration. For example, if file A referenced file B,
+  get_history_recursively(A) will return commits of B in addition to A. This
+  applies recursively, so commits of C will be included if file B referenced
+  file C, and so on.
+
+  This function is file type neutral. `parser_callback(filename, content)` will
+  be invoked to parse file content and should return list of filename of
+  dependencies.
+
+  Args:
+    git_repo: path of git repo
+    path: path to query, relative to git_repo
+    after: limit history after given time (inclusive)
+    before: limit history before given time (inclusive)
+    parser_callback: callback to parse file content. See above comment.
+
+  Returns:
+    list of (commit timestamp, git hash)
   """
-  CHECKOUT_TO = 'checkout_to'
-  ADD = 'add'
-  REMOVE = 'remove'
+  history = get_history(
+      git_repo, path, after=after, before=before, padding=True)
 
-  def __init__(self, timestamp, path, action, git_rev=None):
-    self.timestamp = timestamp
-    self.path = path
-    self.action = action
-    self.git_rev = git_rev
+  # Collect include information of each commit.
+  includes = {}
+  for commit_time, git_rev in history:
+    content = get_file_from_revision(git_repo, git_rev, path)
+    for include_name in parser_callback(path, content):
+      if include_name not in includes:
+        includes[include_name] = set()
+      includes[include_name].add(git_rev)
 
-  def apply(self, base_dir):
-    """Applies the diff on disk.
+  # Analyze the start time and end time of each include.
+  dependencies = []
+  for include in includes:
+    appeared = None
+    for commit_time, git_rev in history:
+      if git_rev in includes[include]:
+        if not appeared:
+          appeared = commit_time
+      else:
+        if appeared:
+          dependencies.append((include, appeared, commit_time))
+          appeared = None
 
-    Args:
-      base_dir: the project root where self.path is relative to
-    """
-    assert self.path
-    git_repo = os.path.join(base_dir, self.path)
-    if self.action == Diff.CHECKOUT_TO:
-      checkout_version(git_repo, self.git_rev)
-      return
-    if self.action in ['add', 'remove']:
-      raise NotImplementedError
-    assert 0
+    if appeared is not None:
+      dependencies.append((include, appeared, before))
 
-  def summary(self, base_dir):
-    """Summary string of this diff.
+  # Recursion and merge.
+  result = list(history)
+  for include, appeared, disappeared in dependencies:
+    result += get_history_recursively(git_repo, include, appeared, disappeared,
+                                      parser_callback)
 
-    Args:
-      base_dir: the project root where self.path is relative to
-    """
-    if self.action == Diff.CHECKOUT_TO:
-      git_repo = os.path.join(base_dir, self.path)
-      summary = get_commit_log(git_repo, self.git_rev).splitlines()[0]
-      return '%s %s %r' % (self.git_rev[:10], self.path, summary)
-    return '%s %s' % (self.action, self.path)
+  # Sort and dedup.
+  result2 = []
+  for x in sorted(result):
+    if result2 and result2[-1] == x:
+      continue
+    result2.append(x)
 
-  def __eq__(self, rhs):
-    return (self.timestamp == rhs.timestamp and self.path == rhs.path and
-            self.action == rhs.action and self.git_rev == rhs.git_rev)
+  return result2
 
 
 def list_commits_between_commits(git_repo, old, new):
@@ -323,61 +405,3 @@ def list_commits_between_commits(git_repo, old, new):
     logger.warning('%d timestamps adjusted', adjusted)
 
   return commits
-
-
-def get_difflist_between_two_commit(base_dir, path, old, new):
-  """Get difflist between (old, new].
-
-  Args:
-    base_dir: the project root
-    path: the path relative to the project root
-    old: old commit hash (exclusive)
-    new: new commit hash (inclusive)
-
-  Returns:
-    list of Diff objects
-  """
-  git_repo = os.path.join(base_dir, path)
-  difflist = []
-  for timestamp, git_rev in list_commits_between_commits(git_repo, old, new):
-    difflist.append(Diff(timestamp, path, Diff.CHECKOUT_TO, git_rev))
-  return difflist
-
-
-def get_difflist_between_two_set(base_dir, old_set, new_set):
-  result = []
-  for path in set(old_set) | set(new_set):
-    git_repo = os.path.join(base_dir, path)
-    if path in old_set and path in new_set:
-      old = old_set[path]
-      new = new_set[path]
-      if old == new:
-        # nochange, do nothing
-        pass
-      elif is_ancestor_commit(git_repo, old, new):
-        # normal case
-        for diff in get_difflist_between_two_commit(base_dir, path, old, new):
-          result.append(diff)
-      else:
-        # maybe switch branch?
-        # TODO(kcwu): handle discontinuous properly (crbug.com/827092)
-        logger.warning(
-            'Warning: dependency "%s" discontinuous. Not supported yet', path)
-        return []
-    elif path in old_set:
-      # remove dependency
-      # TODO(kcwu): handle removal properly (crbug.com/827092)
-      logger.warning('Warning: dependency "%s" was removed. Not supported yet',
-                     path)
-      return []
-    else:
-      assert path in new_set
-      # add dependency
-      # TODO(kcwu): handle addition properly (crbug.com/827092)
-      logger.warning('Warning: dependency "%s" was added. Not supported yet',
-                     path)
-      return []
-
-  result.sort(key=lambda diff: (diff.timestamp, diff.path))
-
-  return result

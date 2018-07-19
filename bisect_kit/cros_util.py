@@ -21,6 +21,7 @@ import subprocess
 import time
 
 from bisect_kit import cli
+from bisect_kit import codechange
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import git_util
@@ -751,91 +752,139 @@ def get_autotest_test_info(autotest_dir, test_name):
   return None
 
 
-class ChromeOSManifestManager(repo_util.ManifestManager):
-  """Manifest operations for chromeos repo"""
+class ChromeOSSpecManager(codechange.SpecManager):
+  """Repo manifest related operations.
+
+  This class enumerates chromeos manifest files, parses them,
+  and sync to disk state according to them.
+  """
 
   def __init__(self, config):
     self.config = config
+    self.manifest_dir = os.path.join(self.config['chromeos_root'], '.repo',
+                                     'manifests')
+    self.historical_manifest_git_dir = os.path.join(
+        self.config['chromeos_repo_mirror_dir'],
+        'chromeos/manifest-versions.git')
+    if not os.path.exists(self.historical_manifest_git_dir):
+      raise core.ExecutionFatalError(
+          'Manifest snapshots should be cloned into %s' %
+          self.historical_manifest_git_dir)
 
-  def _query_manifest_name(self, rev):
+  def lookup_build_timestamp(self, rev):
     assert is_cros_full_version(rev)
+
     milestone, short_version = version_split(rev)
-    manifest_name = os.path.join('buildspecs', milestone,
-                                 '%s.xml' % short_version)
-    return manifest_name
+    path = os.path.join('buildspecs', milestone, short_version + '.xml')
+    try:
+      timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
+                                           'refs/heads/master', path)
+    except ValueError:
+      raise core.ExecutionFatalError('%s does not have %s' %
+                                     (self.historical_manifest_git_dir, path))
+    return timestamp
 
-  def sync_disk_state(self, rev):
-    manifest_name = self._query_manifest_name(rev)
+  def collect_float_spec(self, old, new):
+    old_timestamp = self.lookup_build_timestamp(old)
+    new_timestamp = self.lookup_build_timestamp(new)
 
-    # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
-    # manifest. 'repo sync -m' is not enough
-    repo_util.init(
-        self.config['chromeos_root'],
-        'https://chrome-internal.googlesource.com/chromeos/manifest-versions/',
-        manifest_name=manifest_name,
-        repo_url='https://chromium.googlesource.com/external/repo.git')
+    path = os.path.join(self.manifest_dir, 'default.xml')
+    if not os.path.islink(path) or os.readlink(path) != 'full.xml':
+      raise Exception('default.xml not symlink to full.xml is not supported')
 
-    # Note, don't sync with current_branch=True for chromeos. One of its
-    # build steps (inside mark_as_stable) executes "git describe" which
-    # needs git tag information.
-    repo_util.sync(self.config['chromeos_root'])
+    result = []
+    path = 'full.xml'
+    parser = repo_util.ManifestParser(self.manifest_dir)
+    for timestamp, git_rev in parser.enumerate_manifest_commits(
+        old_timestamp, new_timestamp, path):
+      result.append(
+          codechange.Spec(codechange.SPEC_FLOAT, git_rev, timestamp, path))
+    return result
 
-  def fetch_git_repos(self, rev):
-    # Early return if necessary git history are already fetched.
-    mf = self.fetch_manifest(rev)
-    repo_set = repo_util.parse_repo_set(self.config['chromeos_root'], mf)
-    all_have = True
-    for path, git_rev in repo_set.items():
-      git_root = os.path.join(self.config['chromeos_root'], path)
-      if not os.path.exists(git_root):
-        all_have = False
-        break
-      if not git_util.is_containing_commit(git_root, git_rev):
-        all_have = False
-        break
-    if all_have:
-      return
-
-    # TODO(kcwu): fetch git history but don't switch current disk state.
-    self.sync_disk_state(rev)
-
-  def enumerate_manifest(self, old, new):
+  def collect_fixed_spec(self, old, new):
     assert is_cros_full_version(old)
     assert is_cros_full_version(new)
     old_milestone, old_short_version = version_split(old)
     new_milestone, new_short_version = version_split(new)
 
-    # TODO(kcwu): fetch manifests but don't switch current disk state.
-    self.sync_disk_state(new)
-
-    spec_dir = os.path.join(self.config['chromeos_root'], '.repo', 'manifests',
-                            'buildspecs')
     result = []
-    for root, dirs, files in os.walk(spec_dir):
-      dirs[:] = [
-          dn for dn in dirs if dn.isdigit() and
-          int(old_milestone) <= int(dn) <= int(new_milestone)
-      ]
+    for milestone in git_util.list_dir_from_revision(
+        self.historical_manifest_git_dir, 'refs/heads/master', 'buildspecs'):
+      if not milestone.isdigit():
+        continue
+      if not int(old_milestone) <= int(milestone) <= int(new_milestone):
+        continue
+
+      files = git_util.list_dir_from_revision(self.historical_manifest_git_dir,
+                                              'refs/heads/master',
+                                              os.path.join(
+                                                  'buildspecs', milestone))
 
       for fn in files:
+        path = os.path.join('buildspecs', milestone, fn)
         short_version, ext = os.path.splitext(fn)
         if ext != '.xml':
           continue
-        milestone = os.path.basename(root)
         if (util.is_version_lesseq(old_short_version, short_version) and
             util.is_version_lesseq(short_version, new_short_version) and
             util.is_direct_relative_version(short_version, new_short_version)):
-          result.append(make_cros_full_version(milestone, short_version))
+          rev = make_cros_full_version(milestone, short_version)
+          timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
+                                               'refs/heads/master', path)
+          result.append(
+              codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path))
 
-    def version_key_func(full_version):
-      _milestone, short_version = version_split(full_version)
+    def version_key_func(spec):
+      _milestone, short_version = version_split(spec.name)
       return util.version_key_func(short_version)
 
     result.sort(key=version_key_func)
-    assert result[0] == old
-    assert result[-1] == new
+    assert result[0].name == old
+    assert result[-1].name == new
     return result
 
-  def fetch_manifest(self, rev):
-    # The manifest is already synced, no need to fetch.
-    return self._query_manifest_name(rev)
+  def get_manifest(self, rev):
+    assert is_cros_full_version(rev)
+    milestone, short_version = version_split(rev)
+    path = os.path.join('buildspecs', milestone, '%s.xml' % short_version)
+    manifest = git_util.get_file_from_revision(self.historical_manifest_git_dir,
+                                               'refs/heads/master', path)
+
+    manifest_name = 'manifest_%s.xml' % rev
+    manifest_path = os.path.join(self.manifest_dir, manifest_name)
+    with open(manifest_path, 'w') as f:
+      f.write(manifest)
+
+    return manifest_name
+
+  def parse_spec(self, spec):
+    parser = repo_util.ManifestParser(self.manifest_dir)
+    if spec.spec_type == codechange.SPEC_FIXED:
+      manifest_name = self.get_manifest(spec.name)
+      manifest_path = os.path.join(self.manifest_dir, manifest_name)
+      content = open(manifest_path).read()
+      root = parser.parse_single_xml(content, allow_include=False)
+    else:
+      root = parser.parse_xml_recursive(spec.name, spec.path)
+
+    spec.entries = parser.process_parsed_result(root)
+    if spec.spec_type == codechange.SPEC_FIXED:
+      assert spec.is_static()
+
+  def sync_disk_state(self, rev):
+    manifest_name = self.get_manifest(rev)
+
+    # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
+    # manifest. 'repo sync -m' is not enough
+    repo_util.init(
+        self.config['chromeos_root'],
+        'https://chrome-internal.googlesource.com/chromeos/manifest-internal',
+        manifest_name=manifest_name,
+        repo_url='https://chromium.googlesource.com/external/repo.git',
+        reference=self.config['chromeos_repo_mirror_dir'],
+    )
+
+    # Note, don't sync with current_branch=True for chromeos. One of its
+    # build steps (inside mark_as_stable) executes "git describe" which
+    # needs git tag information.
+    repo_util.sync(self.config['chromeos_root'])

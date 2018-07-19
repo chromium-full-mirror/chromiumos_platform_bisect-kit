@@ -333,7 +333,7 @@ class ChromeSpecManager(codechange.SpecManager):
     for rev in self.enumerate_ancestor(new):
       if util.is_version_lesseq(old, rev):
         path = os.path.join('releases', rev, 'DEPS')
-        timestamp = git_util.get_commit_time(self.spec_dir, path)
+        timestamp = git_util.get_commit_time(self.spec_dir, 'HEAD', path)
         result.append(
             codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path))
 

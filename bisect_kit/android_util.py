@@ -239,8 +239,9 @@ class AndroidSpecManager(codechange.SpecManager):
   def parse_spec(self, spec):
     logging.debug('parse_spec %s', spec.name)
     manifest_content = self._load_manifest_content(spec)
-    manifest_url = repo_util.get_manifest_url(self.config['android_root'])
-    spec.entries = repo_util.parse_manifest(manifest_content, manifest_url)
+    parser = repo_util.ManifestParser(self.manifest_dir)
+    root = parser.parse_single_xml(manifest_content, allow_include=False)
+    spec.entries = parser.process_parsed_result(root)
     if spec.spec_type == codechange.SPEC_FIXED:
       assert spec.is_static()
 

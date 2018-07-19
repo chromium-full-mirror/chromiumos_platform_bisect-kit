@@ -492,16 +492,16 @@ class CodeStorage(object):
     Args:
       spec: Spec object
       path: local path relative to project root
-      timestamp:
+      timestamp: timestamp
 
     Returns:
       The commit hash of given time. If there are commits with the given
       timestamp, returns the last commit.
     """
     git_root = self.cached_git_root(spec[path].repo_url)
-    # spec[path].at is remote reference name. Since git_root is a mirror, it's
-    # no need to convert the name.
-    return git_util.get_rev_by_time(git_root, timestamp, spec[path].at)
+    # spec[path].at is remote reference name. Since git_root is a mirror (not
+    # a local checkout), there is no need to convert the name.
+    return git_util.get_rev_by_time(git_root, timestamp, None, spec[path].at)
 
   def get_actions_between_two_commit(self, spec, path, old, new):
     git_root = self.cached_git_root(spec[path].repo_url)
@@ -704,7 +704,7 @@ class CodeManager(object):
           '%s (%s) matched earlier spec at %s instead of %s, racing? offset %d',
           target.name, target.timestamp, specs[index].timestamp,
           specs[ideal_index].timestamp,
-          specs[ideal_index].timestamp - target.timestamp)
+          specs[index].timestamp - target.timestamp)
     if index > ideal_index:
       logger.warning(
           'spec committed at %d matched later commit at %d. bad server clock?',
@@ -762,7 +762,9 @@ class CodeManager(object):
 
     # step 1, find all float and fixed specs in the given range.
     fixed_specs = self.spec_manager.collect_fixed_spec(old, new)
+    assert fixed_specs
     float_specs = self.spec_manager.collect_float_spec(old, new)
+    assert float_specs
     while float_specs[-1].timestamp > fixed_specs[-1].timestamp:
       float_specs.pop()
     assert float_specs

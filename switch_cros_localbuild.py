@@ -11,6 +11,7 @@ import logging
 import os
 
 from bisect_kit import cli
+from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cros_util
@@ -49,6 +50,11 @@ def create_argument_parser():
       metavar='CHROMEOS_ROOT',
       default=configure.get('CHROMEOS_ROOT', ''),
       help='ChromeOS tree root (default: %(default)s)')
+  parser.add_argument(
+      '--chromeos_repo_mirror_dir',
+      type=cli.argtype_dir_path,
+      default=configure.get('CHROMEOS_REPO_MIRROR_DIR', ''),
+      help='ChromeOS repo mirror path')
   parser.add_argument(
       '--clobber-stateful',
       action='store_true',
@@ -105,10 +111,14 @@ def switch(opts):
   cleanup(opts)
 
   logger.info('switch source code')
-  config = dict(board=opts.board, chromeos_root=opts.chromeos_root)
-  mm = cros_util.ChromeOSManifestManager(config)
-  dep = repo_util.DependencyManager(opts.chromeos_root, mm)
-  dep.switch(opts.rev)
+  config = dict(
+      board=opts.board,
+      chromeos_root=opts.chromeos_root,
+      chromeos_repo_mirror_dir=opts.chromeos_repo_mirror_dir)
+  spec_manager = cros_util.ChromeOSSpecManager(config)
+  cache = repo_util.RepoMirror(opts.chromeos_repo_mirror_dir)
+  code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager, cache)
+  code_manager.switch(opts.rev)
 
   try:
     image_path = build(opts)
