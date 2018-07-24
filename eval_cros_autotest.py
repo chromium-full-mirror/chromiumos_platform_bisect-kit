@@ -7,7 +7,7 @@
 
 Note that by default 'test_that' will install dependency packages of autotest
 only once. For example, if you overwrote chrome's unittest binary, your new
-binary will be persistant across autotest runs. Add --reinstall if you want
+binary will be persistent across autotest runs. Add --reinstall if you want
 clean autotest install.
 """
 from __future__ import print_function
@@ -174,7 +174,7 @@ def run_test(opts):
   args = get_additional_test_args(opts.test_name)
   if opts.args:
     if args:
-      logger.info('default test_that args `%s` is overriden by '
+      logger.info('default test_that args `%s` is overridden by '
                   'command line option `%s`', args, opts.args)
     cmd += ['--args', opts.args]
   elif args:

@@ -6,7 +6,7 @@
 """Diagnose ChromeOS autotest regressions.
 
 This is integrated bisection utility. Given ChromeOS, Chrome, Android source
-tree, and necessary parameters, this script can determine which componenets to
+tree, and necessary parameters, this script can determine which components to
 bisect, and hopefully output the culprit CL of regression.
 
 Sometimes the script failed to figure out the final CL for various reasons, it

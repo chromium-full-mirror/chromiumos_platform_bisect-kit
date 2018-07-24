@@ -52,7 +52,7 @@ def create_argument_parser():
       '--default_chromeos_root',
       type=cli.argtype_dir_path,
       default=configure.get('DEFAULT_CHROMEOS_ROOT',
-                            os.path.expanduser('~/chromiunos')),
+                            os.path.expanduser('~/chromiumos')),
       help='Default chromeos tree to run "cros flash" (default: %(default)s)')
 
   return parser
