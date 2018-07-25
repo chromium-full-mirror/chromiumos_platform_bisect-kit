@@ -17,7 +17,7 @@ out_dir=out_${SDK_BOARD}/Release
 # versions.
 ./buildtools/linux64/gn gen $out_dir --args="$GN_ARGS"
 
-./third_party/depot_tools/ninja -C $out_dir -j3000 -l 100 $TARGETS
+./third_party/depot_tools/autoninja -C $out_dir $TARGETS
 
 for TARGET in $TARGETS; do
     case "$TARGET" in
