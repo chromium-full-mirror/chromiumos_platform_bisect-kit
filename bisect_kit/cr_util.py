@@ -290,8 +290,8 @@ class ChromeSpecManager(codechange.SpecManager):
     # channels). Commit 3395#5 and its successor should be excluded if we want
     # to get all patches between 3359#1 and 3360#2.
     result = []
-    for i in range(len(commits_by_branch)):
-      for timestamp, path, git_rev in commits_by_branch[i]:
+    for i, commits in enumerate(commits_by_branch):
+      for timestamp, path, git_rev in commits:
         if i + 1 == len(
             commits_by_branch) or timestamp < commits_by_branch[i + 1][0][0]:
           result.append(
@@ -343,10 +343,12 @@ class ChromeSpecManager(codechange.SpecManager):
 
   def _load_deps_content(self, spec):
     if spec.spec_type == codechange.SPEC_FIXED:
-      return git_util.get_file_from_revision(self.spec_dir, 'HEAD', spec.path)
+      content = git_util.get_file_from_revision(self.spec_dir, 'HEAD',
+                                                spec.path)
     else:
-      return git_util.get_file_from_revision(self.spec_dir, spec.name,
-                                             spec.path)
+      content = git_util.get_file_from_revision(self.spec_dir, spec.name,
+                                                spec.path)
+    return content
 
   def _custom_vars(self, spec):
     # build bot has ever defined some custom variables to override default
@@ -357,10 +359,10 @@ class ChromeSpecManager(codechange.SpecManager):
     custom_vars = {}
     if spec.spec_type == codechange.SPEC_FLOAT:
       branch = int(spec.path.split(os.sep)[1])
-      if (3282 == branch and spec.timestamp >= 1517533911 or  # M64
-          3325 == branch and spec.timestamp >= 1517537488 or  # M56
+      if (branch == 3282 and spec.timestamp >= 1517533911 or  # M64
+          branch == 3325 and spec.timestamp >= 1517537488 or  # M56
           3337 <= branch <= 3344 and spec.timestamp >= 1517544491 or  # M66
-          3360 <= branch):  # M67+
+          branch >= 3360):  # M67+
         custom_vars['checkout_src_internal'] = True
 
     return custom_vars

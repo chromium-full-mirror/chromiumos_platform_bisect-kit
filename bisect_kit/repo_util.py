@@ -106,7 +106,8 @@ def info(repo_dir, query):
     key, value = map(str.strip, line.split(':'))
     if key == query:
       return value
-  assert 0
+
+  return None
 
 
 def get_current_branch(repo_dir):

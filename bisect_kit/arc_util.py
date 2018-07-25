@@ -24,7 +24,7 @@ def search_push_to_device_script_path(android_root):
         global script.
 
   Returns:
-    the path of push_to_device.py
+    the path of push_to_device.py; None if not found
   """
   # push_to_device.py has ever moved.
   paths = []
@@ -43,7 +43,8 @@ def search_push_to_device_script_path(android_root):
   for path in paths:
     if os.path.exists(path) and os.access(path, os.X_OK):
       return path
-  assert 0
+
+  return None
 
 
 def _push_to_device(dut, args, android_root, flavor):
@@ -51,6 +52,7 @@ def _push_to_device(dut, args, android_root, flavor):
   boot_id = cros_util.query_dut_boot_id(dut)
 
   push_script = search_push_to_device_script_path(android_root)
+  assert push_script
   cmd = [push_script] + args
   stderr_lines = []
 

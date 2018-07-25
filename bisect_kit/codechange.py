@@ -67,10 +67,10 @@ def parse_intra_rev(rev):
     number and returns (rev, rev, 0).
   """
   m = re.match(_re_intra_rev, rev)
-  if m:
-    return m.group(1), m.group(2), int(m.group(3))
-  else:
+  if not m:
     return rev, rev, 0
+
+  return m.group(1), m.group(2), int(m.group(3))
 
 
 def argtype_intra_rev(argtype):
@@ -269,7 +269,9 @@ def unserialize_action(data):
                        ], 'unknown action class: %s' % class_name
   for cls in classes:
     if class_name == cls.__name__:
-      return cls(**values)
+      action = cls(**values)
+      break
+  return action
 
 
 class ActionGroup(object):
@@ -360,9 +362,6 @@ class GitAddRepo(Action):
 
 class GitRemoveRepo(Action):
   """Describes a git repo remove action."""
-
-  def __init__(self, timestamp, path):
-    super(GitRemoveRepo, self).__init__(timestamp, path)
 
   def apply(self, root_dir):
     assert self.path
@@ -501,7 +500,7 @@ class CodeStorage(object):
     git_root = self.cached_git_root(spec[path].repo_url)
     # spec[path].at is remote reference name. Since git_root is a mirror (not
     # a local checkout), there is no need to convert the name.
-    return git_util.get_rev_by_time(git_root, timestamp, None, spec[path].at)
+    return git_util.get_rev_by_time(git_root, timestamp, branch=spec[path].at)
 
   def get_actions_between_two_commit(self, spec, path, old, new):
     git_root = self.cached_git_root(spec[path].repo_url)

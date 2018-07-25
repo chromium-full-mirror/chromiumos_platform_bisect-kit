@@ -204,22 +204,20 @@ def list_dir_from_revision(git_repo, rev, path):
       log_output=False).splitlines()
 
 
-def get_rev_by_time(git_repo, timestamp, path=None, *args):
+def get_rev_by_time(git_repo, timestamp, path=None, branch='HEAD'):
   """Query commit of given time.
 
   Args:
     git_repo: path of git repo.
     timestamp: timestamp
     path: only query history of path, relative to git_repo
-    args: only the selected subset of history to query. If branch name is
+    branch: only the selected subset of history to query. If branch name is
         specified, only parent of the said branch is queried. If omitted, only
         queries the parent of HEAD.
 
   Returns:
     git commit hash. None if path didn't exist at the given time.
   """
-  if not args:
-    args = ['HEAD']
 
   cmd = [
       'git',
@@ -228,7 +226,8 @@ def get_rev_by_time(git_repo, timestamp, path=None, *args):
       '-1',
       '--before',
       str(timestamp),
-  ] + list(args)
+      branch,
+  ]
   if path:
     cmd += ['--', path]
 
@@ -276,13 +275,13 @@ def get_history(git_repo, path, after=None, before=None, padding=False):
 
   if padding:
     assert before or after, "padding=True make no sense if they are both None"
-    if before is not None and get_rev_by_time(git_repo, before, path):
+    if before is not None and get_rev_by_time(git_repo, before, path=path):
       before = int(before)
       if not result or result[-1][0] != before:
         git_rev = get_rev_by_time(git_repo, before)
         assert git_rev
         result.append((before, git_rev))
-    if after is not None and get_rev_by_time(git_repo, after, path):
+    if after is not None and get_rev_by_time(git_repo, after, path=path):
       after = int(after)
       if not result or result[0][0] != after:
         git_rev = get_rev_by_time(git_repo, after)

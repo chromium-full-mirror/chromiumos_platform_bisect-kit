@@ -231,10 +231,11 @@ class AndroidSpecManager(codechange.SpecManager):
     if spec.spec_type == codechange.SPEC_FIXED:
       manifest_name = fetch_manifest(self.config['branch'],
                                      self.config['flavor'], spec.name)
-      return open(os.path.join(self.manifest_dir, manifest_name)).read()
+      content = open(os.path.join(self.manifest_dir, manifest_name)).read()
     else:
-      return git_util.get_file_from_revision(self.manifest_dir, spec.name,
-                                             spec.path)
+      content = git_util.get_file_from_revision(self.manifest_dir, spec.name,
+                                                spec.path)
+    return content
 
   def parse_spec(self, spec):
     logging.debug('parse_spec %s', spec.name)
