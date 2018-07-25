@@ -69,6 +69,11 @@ def create_argument_parser():
       default=configure.get('CHROMEOS_ROOT'),
       help='ChromeOS tree root')
   group.add_argument(
+      '--chromeos_repo_mirror_dir',
+      type=cli.argtype_dir_path,
+      default=configure.get('CHROMEOS_REPO_MIRROR_DIR', ''),
+      help='ChromeOS repo mirror path')
+  group.add_argument(
       '--android_root',
       metavar='ANDROID_ROOT',
       type=cli.argtype_dir_path,
@@ -88,6 +93,13 @@ def create_argument_parser():
       required=True,
       default=configure.get('CHROME_ROOT'),
       help='Chrome tree root')
+  group.add_argument(
+      '--gclient_cache_dir',
+      required=True,
+      metavar='GCLIENT_CACHE_DIR',
+      type=cli.argtype_dir_path,
+      default=configure.get('GCLIENT_CACHE_DIR'),
+      help='gclient cache dir')
   group.add_argument(
       '--old',
       type=cros_util.argtype_cros_version,
@@ -274,9 +286,9 @@ def main(args=None):
     common_eval_cmd.append(opts.dut)
 
     diagnoser = diagnoser_cros.CrosDiagnoser(
-        opts.session, opts.chromeos_root, opts.android_root,
-        opts.android_repo_mirror_dir, opts.chrome_root, opts.board, opts.noisy,
-        opts.dut)
+        opts.session, opts.chromeos_root, opts.chromeos_repo_mirror_dir,
+        opts.android_root, opts.android_repo_mirror_dir, opts.chrome_root,
+        opts.gclient_cache_dir, opts.board, opts.noisy, opts.dut)
 
     eval_cmd = common_eval_cmd + ['--prebuilt', '--reinstall']
     # Do not specify version for autotest prebuilt switching here. The trick is

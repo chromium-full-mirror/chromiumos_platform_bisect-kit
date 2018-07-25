@@ -6,7 +6,9 @@
 """Android bisector to bisect local build commits.
 
 Example:
-  $ ./bisect_android_repo.py init --old rev1 --new rev2 --android_root ~/android
+  $ ./bisect_android_repo.py init --old rev1 --new rev2 \\
+      --android_root ~/android \\
+      --android_repo_mirror_dir $ANDROID_REPO_MIRROR_DIR
   $ ./bisect_android_repo.py config switch ./switch_arc_localbuild.py
   $ ./bisect_android_repo.py config eval ./eval-manually.sh
   $ ./bisect_android_repo.py run

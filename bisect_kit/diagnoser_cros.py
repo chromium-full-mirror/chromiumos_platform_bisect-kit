@@ -46,13 +46,16 @@ def need_android_bisect(old_info, new_info):
 class CrosDiagnoser(object):
   """Integrated bisectors API for ChromeOS regression analysis."""
 
-  def __init__(self, session, chromeos_root, android_root,
-               android_repo_mirror_dir, chrome_root, board, noisy, dut):
+  def __init__(self, session, chromeos_root, chromeos_repo_mirror_dir,
+               android_root, android_repo_mirror_dir, chrome_root,
+               gclient_cache_dir, board, noisy, dut):
     self.session = session
     self.chromeos_root = chromeos_root
+    self.chromeos_repo_mirror_dir = chromeos_repo_mirror_dir
     self.android_root = android_root
     self.android_repo_mirror_dir = android_repo_mirror_dir
     self.chrome_root = chrome_root
+    self.gclient_cache_dir = gclient_cache_dir
     self.board = board
     self.noisy = noisy
     self.dut = dut
@@ -229,7 +232,10 @@ class CrosDiagnoser(object):
       bisector.init_if_necessary(
           self.old_info['cr_version'],
           self.new_info['cr_version'],
-          init_args=['--chrome_root', self.chrome_root],
+          init_args=[
+              '--chrome_root', self.chrome_root, '--gclient_cache_dir',
+              self.gclient_cache_dir
+          ],
           switch_cmd=switch_cmd,
           eval_cmd=eval_cmd,
           noisy=self.noisy)
@@ -266,7 +272,10 @@ class CrosDiagnoser(object):
     bisector.init_if_necessary(
         self.cros_old,
         self.cros_new,
-        init_args=['--dut', self.dut, '--chromeos_root', self.chromeos_root],
+        init_args=[
+            '--dut', self.dut, '--chromeos_root', self.chromeos_root,
+            '--chromeos_repo_mirror_dir', self.chromeos_repo_mirror_dir
+        ],
         switch_cmd=['./switch_cros_localbuild.py'],
         eval_cmd=eval_cmd,
         noisy=self.noisy)

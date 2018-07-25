@@ -6,8 +6,9 @@
 """ChromeOS bisector to bisect local build commits.
 
 Example:
-  $ ./bisect_cros_repo.py init --old rev1 --new rev2 \
-      --chromeos_root ~/chromiumos
+  $ ./bisect_cros_repo.py init --old rev1 --new rev2 \\
+      --chromeos_root ~/chromiumos \\
+      --chromeos_repo_mirror_dir $CHROMEOS_REPO_MIRROR_DIR
   $ ./bisect_cros_repo.py config switch ./switch_cros_localbuild.py
   $ ./bisect_cros_repo.py config eval ./eval-manually.sh
   $ ./bisect_cros_repo.py run
