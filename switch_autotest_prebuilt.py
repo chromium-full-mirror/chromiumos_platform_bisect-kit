@@ -89,8 +89,8 @@ def switch(autotest_dir, board, version, test_name):
   # Need to extract the control file if the target is a client site test.
   if test_name:
     test_name = test_name.split('.')[0]
-    client_tarball = os.path.join(autotest_dir, 'packages',
-                                  'test-%s.tar.bz2' % test_name)
+    client_tarball = os.path.abspath(
+        os.path.join(autotest_dir, 'packages', 'test-%s.tar.bz2' % test_name))
     if os.path.exists(client_tarball):
       client_test_dir = os.path.join(autotest_dir, 'client', 'site_tests',
                                      test_name)
