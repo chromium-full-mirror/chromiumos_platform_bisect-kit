@@ -628,7 +628,7 @@ def build_image(chromeos_root, board, rev):
   """
 
   # If the given version is already built, reuse it.
-  image_name = 'bisect-%s' % rev
+  image_name = 'bisect-%s' % rev.replace('/', '_')
   image_path = os.path.join('../build/images', board, image_name,
                             'chromiumos_test_image.bin')
   if exists_in_chroot(chromeos_root, image_path):
