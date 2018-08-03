@@ -292,20 +292,28 @@ class ActionGroup(object):
     self.actions.append(action)
 
   def serialize(self):
-    return (self.timestamp, self.name, [a.serialize() for a in self.actions])
+    return dict(
+        timestamp=self.timestamp,
+        name=self.name,
+        comment=self.comment,
+        actions=[a.serialize() for a in self.actions])
 
   def summary(self, code_storage):
     if self.comment:
       return self.comment
-    # TODO(kcwu): support multiple Actions
-    assert len(self.actions) == 1
-    return self.actions[0].summary(code_storage)
+    assert self.actions
+    if len(self.actions) > 1:
+      # TODO(kcwu): show details for multiple Actions
+      return '(%d actions)' % len(self.actions)
+    else:
+      return self.actions[0].summary(code_storage)
 
   @staticmethod
   def unserialize(data):
-    ag = ActionGroup(data[0])
-    ag.name = data[1]
-    for x in data[2]:
+    ag = ActionGroup(data['timestamp'])
+    ag.name = data['name']
+    ag.comment = data['comment']
+    for x in data['actions']:
       ag.add(unserialize_action(x))
     return ag
 
