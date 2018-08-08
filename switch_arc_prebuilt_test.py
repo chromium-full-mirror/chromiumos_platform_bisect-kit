@@ -32,12 +32,7 @@ class TestSwitchArcPrebuilt(unittest.TestCase):
     }
 
     switch_arc_prebuilt.main(['--android_root', android_root, dut, bid])
-    push_prebuilt_to_device.assert_called_with(
-        dut, flavor, bid, android_root=android_root)
-
-    switch_arc_prebuilt.main([dut, bid])
-    push_prebuilt_to_device.assert_called_with(
-        dut, flavor, bid, android_root=None)
+    push_prebuilt_to_device.assert_called_with(android_root, dut, flavor, bid)
 
 
 if __name__ == '__main__':
