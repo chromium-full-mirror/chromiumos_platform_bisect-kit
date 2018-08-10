@@ -120,7 +120,7 @@ def parse_test_result_chart(json_path, metric):
   data = json.load(open(json_path))
   if metric not in data:
     logger.error('metric "%s" not in %s', metric, json_path)
-    return None
+    return []
 
   summary = data[metric]['summary']
   if 'values' in summary:
@@ -238,6 +238,9 @@ def main(args=None):
     result_dir = run_test(opts)
   except subprocess.CalledProcessError:
     logger.info('failed before test start; FATAL')
+    return FATAL
+
+  if result_dir is None:
     return FATAL
 
   passed, values = gather_test_result(opts, result_dir)
