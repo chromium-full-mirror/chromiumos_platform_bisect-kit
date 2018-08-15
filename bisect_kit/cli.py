@@ -81,7 +81,7 @@ def argtype_multiplexer(*args):
   This function takes a list of argtypes or regex patterns and creates a new
   function matching them. Moreover, it gives error message with examples.
 
-  Example:
+  Examples:
     >>> argtype = argtype_multiplexer(argtype_int, r'^r\d+$')
     >>> argtype('123')
     123
@@ -119,7 +119,7 @@ def argtype_multiplexer(*args):
 def argtype_multiplier(argtype):
   """A new argtype that supports multiplier suffix of the given argtype.
 
-  Example:
+  Examples:
     Supports the given argtype accepting "foo" as argument, this function
     generates a new argtype function which accepts argument like "foo*3".
 
