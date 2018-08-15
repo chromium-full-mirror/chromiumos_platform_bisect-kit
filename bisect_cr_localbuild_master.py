@@ -92,7 +92,7 @@ def verify_gclient_dep(chrome_root):
   exec open(os.path.join(chrome_root, '.gclient')) in context
   for solution in context['solutions']:
     if solution['name'] == 'src':
-      return solution['deps_file'] == '.DEPS.git'
+      return 'deps_file' not in solution or solution['deps_file'] == '.DEPS.git'
   return False
 
 
