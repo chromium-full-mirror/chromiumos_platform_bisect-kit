@@ -213,7 +213,8 @@ def build_and_deploy(chrome_src, board, dut, targets):
   env['DUT'] = dut
   # This work around http://crbug.com/658104, which depot_tool can't find GN
   # path correctly.
-  env['CHROMIUM_BUILDTOOLS_PATH'] = os.path.join(chrome_src, 'buildtools')
+  env['CHROMIUM_BUILDTOOLS_PATH'] = os.path.abspath(
+      os.path.join(chrome_src, 'buildtools'))
 
   simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
 
@@ -408,6 +409,11 @@ class ChromeSpecManager(codechange.SpecManager):
         'https://chrome-internal.googlesource.com/a/chrome/tools/buildspec.git',
         deps_file=deps_file,
         cache_dir=self.config['gclient_cache_dir'])
+
+    # 'target_os' is mandatory for chromeos build, but 'gclient config' doesn't
+    # recognize it. Here add it to .gclient file explicitly.
+    with open(os.path.join(self.config['chrome_root'], '.gclient'), 'a') as f:
+      f.write('target_os = ["chromeos"]\n')
 
     gclient_util.sync(
         self.config['chrome_root'], with_branch_heads=True, with_tags=True)
