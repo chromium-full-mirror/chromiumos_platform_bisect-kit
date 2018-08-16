@@ -646,7 +646,6 @@ class BisectorCommandLine(object):
     common.add_common_arguments(parser)
     parser.add_argument(
         '--session_base',
-        type=argtype_dir_path,
         default=configure.get('SESSION_BASE', DEFAULT_SESSION_BASE),
         help='Directory to store sessions (default: %(default)r)')
     parser.add_argument(
