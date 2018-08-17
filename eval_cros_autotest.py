@@ -197,7 +197,7 @@ def gather_test_result(opts, result_dir):
   result_log = open(result_log_path).read()
 
   passed, values = parse_test_report_log(result_log, opts.metric)
-  if passed and not values:
+  if opts.metric and passed and not values:
     values = []
     for root, _, files in os.walk(result_dir):
       for filename in files:
