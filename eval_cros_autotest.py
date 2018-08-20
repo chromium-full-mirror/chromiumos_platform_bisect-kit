@@ -237,8 +237,14 @@ def main(args=None):
   try:
     result_dir = run_test(opts)
   except subprocess.CalledProcessError:
-    logger.info('failed before test start; FATAL')
-    return FATAL
+    # TODO(kcwu): analyze fail reason from log and abort if they are real fatal
+    # cases.
+    if opts.metric:
+      logger.info('failed before test start; SKIP')
+      return SKIP
+    else:
+      logger.info('failed before test start; NEW')
+      return NEW
 
   if result_dir is None:
     return FATAL
