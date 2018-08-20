@@ -255,7 +255,7 @@ def main(args=None):
 
     print('BISECT_RESULT_VALUES=', ' '.join(map(str, values)))
     average = float(sum(values)) / len(values)
-    if average < (opts.old_value + opts.new_value) / 2:
+    if abs(average - opts.old_value) < abs(average - opts.new_value):
       logger.info('values=%s, average=%s; OLD', values, average)
       return OLD
     logger.info('values=%s, average=%s; NEW', values, average)
