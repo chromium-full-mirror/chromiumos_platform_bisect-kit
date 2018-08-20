@@ -143,7 +143,10 @@ class ChromeOSVersionDomain(core.BisectDomain):
     env['CROS_VERSION'] = full_version
 
   def view(self, old, new):
-    print('https://crosland.corp.google.com/log/%s..%s' % (old, new))
+    old_short = cros_util.version_to_short(old)
+    new_short = cros_util.version_to_short(new)
+    print('https://crosland.corp.google.com/log/%s..%s' % (old_short,
+                                                           new_short))
 
 
 if __name__ == '__main__':
