@@ -6,8 +6,9 @@
 
 from __future__ import print_function
 import logging
-import re
 import os
+import re
+import subprocess
 
 from bisect_kit import android_util
 from bisect_kit import cros_util
@@ -51,8 +52,14 @@ def _push_to_device(dut, args, android_root, flavor):
 
   # Build push_to_device's dependency. We have to build it explicitly because
   # it's possible that no build is generated yet.
-  android_util.lunch(android_root, flavor, 'make', 'unsquashfs',
-                     'simg2img_host', 'mksquashfs', 'secilc')
+  # push_to_device.zip is valid since 2018-06.
+  try:
+    android_util.lunch(android_root, flavor, 'make', 'push_to_device.zip')
+  except subprocess.CalledProcessError:
+    # TODO(kcwu): remove this and build only push_to_device.zip once we don't
+    #             care 2018-06 and earlier versions.
+    android_util.lunch(android_root, flavor, 'make', 'unsquashfs',
+                       'simg2img_host', 'mksquashfs', 'secilc')
 
   # New version of push_to_device can run without lunch, but go with lunch is
   # easier for now and compatible with old versions.
