@@ -603,14 +603,16 @@ def check_if_need_recreate_chroot(stdout, stderr):
   Returns:
     the reason if chroot needs recreated; None otherwise
   """
-  del stdout  # unused
-
   if re.search(r"The current version of portage supports EAPI '\d+'. "
                "You must upgrade", stderr):
     return 'EAPI version mismatch'
 
   if 'Chroot version is too new. Consider running cros_sdk --replace' in stderr:
     return 'chroot version is too new'
+
+  # https://groups.google.com/a/chromium.org/forum/#!msg/chromium-os-dev/uzwT5APspB4/NFakFyCIDwAJ
+  if "undefined reference to 'std::__1::basic_string" in stdout:
+    return 'might be due to compiler change'
 
   return None
 
