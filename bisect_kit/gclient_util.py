@@ -7,6 +7,7 @@
 from __future__ import print_function
 import logging
 import os
+import sys
 import urlparse
 
 from bisect_kit import codechange
@@ -51,6 +52,20 @@ def sync(gclient_dir, with_branch_heads=False, with_tags=False, jobs=8):
   util.check_call(*cmd, cwd=gclient_dir)
 
 
+# Copied from depot_tools' gclient.py
+_PLATFORM_MAPPING = {
+    'cygwin': 'win',
+    'darwin': 'mac',
+    'linux2': 'linux',
+    'win32': 'win',
+    'aix6': 'aix',
+}
+
+
+def _detect_host_os():
+  return _PLATFORM_MAPPING[sys.platform]
+
+
 def _eval_condition(condition, dep_vars, custom_vars):
   """Evaluate condition for DEPS parsing.
 
@@ -79,6 +94,7 @@ def _eval_condition(condition, dep_vars, custom_vars):
       'checkout_s390': False,
       'checkout_x64': True,
       'checkout_x86': False,
+      'host_os': _detect_host_os(),
       'False': False,
       'None': None,
       'True': True,
