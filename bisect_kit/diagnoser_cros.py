@@ -86,7 +86,7 @@ class CrosDiagnoser(object):
     bisector.init_if_necessary(
         old,
         new,
-        init_args=['--dut', self.dut],
+        init_args=['--dut', self.dut, '--board', self.board],
         switch_cmd=['./switch_cros_prebuilt.py'],
         eval_cmd=eval_cmd,
         noisy=self.noisy)
@@ -273,8 +273,9 @@ class CrosDiagnoser(object):
         self.cros_old,
         self.cros_new,
         init_args=[
-            '--dut', self.dut, '--chromeos_root', self.chromeos_root,
-            '--chromeos_repo_mirror_dir', self.chromeos_repo_mirror_dir
+            '--dut', self.dut, '--board', self.board, '--chromeos_root',
+            self.chromeos_root, '--chromeos_repo_mirror_dir',
+            self.chromeos_repo_mirror_dir
         ],
         switch_cmd=['./switch_cros_localbuild.py'],
         eval_cmd=eval_cmd,
