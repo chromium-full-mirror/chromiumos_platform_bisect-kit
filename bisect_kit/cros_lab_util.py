@@ -164,6 +164,8 @@ def dut_manager(dut, allocator):
     host = allocator()
     if not host:
       yield None
+      return
+
     try:
       # Append (partial) domain name of the lab
       yield host + '.cros'
