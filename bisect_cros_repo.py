@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 class ChromeOSRepoDomain(core.BisectDomain):
   """BisectDomain for ChromeOS code changes."""
   revtype = staticmethod(cros_util.argtype_cros_version)
+  intra_revtype = staticmethod(
+      codechange.argtype_intra_rev(cros_util.argtype_cros_version))
   help = globals()['__doc__']
 
   @staticmethod

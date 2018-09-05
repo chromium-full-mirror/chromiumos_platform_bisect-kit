@@ -22,11 +22,6 @@ from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
-revtype = cli.argtype_multiplexer(cr_util.argtype_chrome_version,
-                                  cros_util.argtype_cros_version,
-                                  codechange.argtype_intra_rev(
-                                      cr_util.argtype_chrome_version))
-
 
 def guess_chrome_version(opts, rev):
   if cros_util.is_cros_version(rev):
@@ -39,7 +34,11 @@ def guess_chrome_version(opts, rev):
 
 class ChromeSrcDomain(core.BisectDomain):
   """BisectDomain for Chrome branched tree"""
-  revtype = staticmethod(revtype)
+  revtype = staticmethod(
+      cli.argtype_multiplexer(cr_util.argtype_chrome_version,
+                              cros_util.argtype_cros_version))
+  intra_revtype = staticmethod(
+      codechange.argtype_intra_rev(cr_util.argtype_chrome_version))
   help = globals()['__doc__']
 
   @staticmethod

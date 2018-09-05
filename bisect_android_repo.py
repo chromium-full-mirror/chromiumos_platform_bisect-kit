@@ -64,6 +64,8 @@ class AndroidRepoDomain(core.BisectDomain):
   revtype = staticmethod(
       cli.argtype_multiplexer(cros_util.argtype_cros_version,
                               android_util.argtype_android_build_id))
+  intra_revtype = staticmethod(
+      codechange.argtype_intra_rev(android_util.argtype_android_build_id))
   help = globals()['__doc__']
 
   @staticmethod

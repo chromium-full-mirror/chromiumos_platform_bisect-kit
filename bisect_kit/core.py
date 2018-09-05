@@ -222,7 +222,7 @@ class BisectDomain(object):
 
   @staticmethod
   def revtype(rev):
-    """Validates version string.
+    """Validates version string of two ends of bisect range.
 
     Args:
       rev: a version string from command line argument.
@@ -236,6 +236,28 @@ class BisectDomain(object):
       argparse.ArgumentTypeError:
         Indicates rev is invalid (with additional message.)
     """
+
+  @classmethod
+  def intra_revtype(cls, intra_rev):
+    """Validates intra version string within bisect range.
+
+    'rev' means the version string of two ends of bisect range. 'intra_rev'
+    means other versions within the bisect range. intra_revtype equals to
+    revtype by default.
+
+    Args:
+      intra_rev: a version string from command line argument.
+
+    Returns:
+      The original or normalized version string if it is valid.
+
+    Raises:
+      TypeError or ValueError:
+        Indicates rev is invalid.
+      argparse.ArgumentTypeError:
+        Indicates rev is invalid (with additional message.)
+    """
+    return cls.revtype(intra_rev)
 
   @staticmethod
   def add_init_arguments(parser):

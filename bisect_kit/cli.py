@@ -544,7 +544,7 @@ class BisectorCommandLine(object):
       idx = self.strategy.next_idx()
       rev = self.states.idx2rev(idx)
     else:
-      rev = self.domain_cls.revtype(opts.rev)
+      rev = self.domain_cls.intra_revtype(opts.rev)
     assert rev
 
     logger.info('switch to %s', rev)
@@ -733,7 +733,7 @@ class BisectorCommandLine(object):
     parser_run.add_argument(
         'revs',
         nargs='*',
-        type=self.domain_cls.revtype,
+        type=self.domain_cls.intra_revtype,
         help='revs to switch+eval; '
         'default is calculating automatically and run until done')
     parser_run.set_defaults(func=self.cmd_run)
@@ -741,25 +741,31 @@ class BisectorCommandLine(object):
     parser_switch = subparsers.add_parser(
         'switch', help='Switch to given rev without eval')
     parser_switch.add_argument(
-        'rev', type=argtype_multiplexer(self.domain_cls.revtype, 'next'))
+        'rev', type=argtype_multiplexer(self.domain_cls.intra_revtype, 'next'))
     parser_switch.set_defaults(func=self.cmd_switch)
 
     parser_old = subparsers.add_parser(
         'old', help='Tells bisect engine the said revs have "old" behavior')
     parser_old.add_argument(
-        'revs', nargs='+', type=argtype_multiplier(self.domain_cls.revtype))
+        'revs',
+        nargs='+',
+        type=argtype_multiplier(self.domain_cls.intra_revtype))
     parser_old.set_defaults(func=self.cmd_old)
 
     parser_new = subparsers.add_parser(
         'new', help='Tells bisect engine the said revs have "new" behavior')
     parser_new.add_argument(
-        'revs', nargs='+', type=argtype_multiplier(self.domain_cls.revtype))
+        'revs',
+        nargs='+',
+        type=argtype_multiplier(self.domain_cls.intra_revtype))
     parser_new.set_defaults(func=self.cmd_new)
 
     parser_skip = subparsers.add_parser(
         'skip', help='Tells bisect engine the said revs have "skip" behavior')
     parser_skip.add_argument(
-        'revs', nargs='+', type=argtype_multiplier(self.domain_cls.revtype))
+        'revs',
+        nargs='+',
+        type=argtype_multiplier(self.domain_cls.intra_revtype))
     parser_skip.set_defaults(func=self.cmd_skip)
 
     parser_view = subparsers.add_parser(
