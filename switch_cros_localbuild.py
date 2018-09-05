@@ -65,7 +65,11 @@ def create_argument_parser():
       action='store_false',
       help="Don't disable rootfs verification after update is completed")
   parser.add_argument(
-      '--nodeploy', action='store_true', help='Build only; do not deploy')
+      '--nobuild',
+      action='store_true',
+      help='Sync source code only; do not build; imply --nodeploy')
+  parser.add_argument(
+      '--nodeploy', action='store_true', help='Do not deploy after build')
   return parser
 
 
@@ -119,6 +123,9 @@ def switch(opts):
   cache = repo_util.RepoMirror(opts.chromeos_repo_mirror_dir)
   code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager, cache)
   code_manager.switch(opts.rev)
+
+  if opts.nobuild:
+    return
 
   try:
     image_path = build(opts)

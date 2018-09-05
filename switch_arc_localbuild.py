@@ -54,7 +54,11 @@ def create_argument_parser():
       default=configure.get('ANDROID_FLAVOR'),
       help='example: cheets_x86-user')
   parser.add_argument(
-      '--nodeploy', action='store_true', help='Build only; do not deploy')
+      '--nobuild',
+      action='store_true',
+      help='Sync source code only; do not build; imply --nodeploy')
+  parser.add_argument(
+      '--nodeploy', action='store_true', help='Do not deploy after build')
   return parser
 
 
@@ -69,6 +73,9 @@ def switch(opts):
 
   logger.info('switch source code')
   code_manager.switch(opts.rev)
+
+  if opts.nobuild:
+    return
 
   logger.info('build')
   # TODO(kcwu): use lower job count for non distributed compilation.

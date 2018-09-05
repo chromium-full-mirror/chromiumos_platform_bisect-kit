@@ -19,6 +19,10 @@ out_dir=out_${SDK_BOARD}/Release
 
 ./third_party/depot_tools/autoninja -C $out_dir $TARGETS
 
+if [ -n "$NO_DEPLOY" ]; then
+    exit 0
+fi
+
 for TARGET in $TARGETS; do
     case "$TARGET" in
         chrome_sandbox|nacl_helper)

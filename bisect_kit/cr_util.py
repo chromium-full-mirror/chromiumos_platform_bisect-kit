@@ -193,7 +193,7 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
   util.check_call(*cmd, cwd=chrome_src, env=env)
 
 
-def build_and_deploy(chrome_src, board, dut, targets):
+def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
   """Build and deploy Chrome binaries to ChromeOS DUT
 
   Args:
@@ -201,6 +201,7 @@ def build_and_deploy(chrome_src, board, dut, targets):
     board: ChromeOS board name
     dut: DUT address
     targets: ninja targets. Default to build chrome.
+    nodeploy: if True, only build, do not deploy
   """
   # The main steps are written in the helper shell script because it is
   # expected to be often local hacked by users.
@@ -215,6 +216,9 @@ def build_and_deploy(chrome_src, board, dut, targets):
   # path correctly.
   env['CHROMIUM_BUILDTOOLS_PATH'] = os.path.abspath(
       os.path.join(chrome_src, 'buildtools'))
+
+  if nodeploy:
+    env['NO_DEPLOY'] = '1'
 
   simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
 

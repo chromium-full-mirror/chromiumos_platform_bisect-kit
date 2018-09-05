@@ -75,6 +75,12 @@ def create_argument_parser():
       help='Binary to build and deploy, like unittest or fuzzers. '
       'Example value: "video_decode_accelerator_unittest". '
       'This option could be specified multiple times.')
+  parser.add_argument(
+      '--nobuild',
+      action='store_true',
+      help='Sync source code only; do not build; imply --nodeploy')
+  parser.add_argument(
+      '--nodeploy', action='store_true', help='Do not deploy after build')
   return parser
 
 
@@ -101,13 +107,20 @@ def main(args=None):
   logger.info('switch source code')
   code_manager.switch(rev)
 
+  if opts.nobuild:
+    return
+
   if not opts.target:
     opts.target = ['chrome', 'chrome_sandbox', 'nacl_helper']
 
-  # TODO(kcwu): make the action configurable, e.g. sync without build, build
-  # without deploy, and apply local patch.
+  # TODO(kcwu): support local patch.
   logger.info('build and deploy')
-  cr_util.build_and_deploy(opts.chrome_src, opts.board, opts.dut, opts.target)
+  cr_util.build_and_deploy(
+      opts.chrome_src,
+      opts.board,
+      opts.dut,
+      opts.target,
+      nodeploy=opts.nodeploy)
 
 
 if __name__ == '__main__':

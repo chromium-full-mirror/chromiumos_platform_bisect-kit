@@ -63,6 +63,12 @@ def create_argument_parser():
       help='Binary to build and deploy, like unittest or fuzzers. '
       'Example value: "video_decode_accelerator_unittest". '
       'This option could be specified multiple times.')
+  parser.add_argument(
+      '--nobuild',
+      action='store_true',
+      help='Sync source code only; do not build; imply --nodeploy')
+  parser.add_argument(
+      '--nodeploy', action='store_true', help='Do not deploy after build')
 
   return parser
 
@@ -85,12 +91,19 @@ def main(args=None):
   git_util.checkout_version(opts.chrome_src, rev)
   gclient_util.sync(opts.chrome_src)
 
+  if opts.nobuild:
+    return
+
   if not opts.target:
     opts.target = ['chrome', 'chrome_sandbox', 'nacl_helper']
 
-  # TODO(kcwu): make the action configurable, e.g. sync without build, build
-  # without deploy, and apply local patch.
-  cr_util.build_and_deploy(opts.chrome_src, opts.board, opts.dut, opts.target)
+  # TODO(kcwu): support local patch.
+  cr_util.build_and_deploy(
+      opts.chrome_src,
+      opts.board,
+      opts.dut,
+      opts.target,
+      nodeploy=opts.nodeploy)
 
 
 if __name__ == '__main__':
