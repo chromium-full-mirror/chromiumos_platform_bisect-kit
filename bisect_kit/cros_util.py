@@ -416,7 +416,7 @@ def cros_flash(chromeos_root,
   # entered a bad state.
   reboot(host)
 
-  args = ['--no-ping', host, image_path]
+  args = ['--no-ping', '--send-payload-in-parallel', host, image_path]
   if clobber_stateful:
     args.append('--clobber-stateful')
   if disable_rootfs_verification:
