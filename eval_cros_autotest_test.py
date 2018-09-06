@@ -25,6 +25,20 @@ class TestEvalCrosAutotest(unittest.TestCase):
     self.assertEqual(
         eval_cros_autotest.parse_test_report_log(result, None), (True, None))
 
+  def test_parse_test_result_chart(self):
+    json_path = testing.get_testdata_path('results-chart.telemetry.json')
+    self.assertEqual(
+        len(
+            eval_cros_autotest.parse_test_result_chart(
+                json_path, 'frame_time_discrepancy')), 2)
+
+    json_path = testing.get_testdata_path(
+        'results-chart.autotest-without-graph.json')
+    self.assertEqual(
+        len(
+            eval_cros_autotest.parse_test_result_chart(
+                json_path, 'boot_progress_start')), 10)
+
 
 if __name__ == '__main__':
   unittest.main()

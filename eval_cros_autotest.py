@@ -118,11 +118,24 @@ def parse_test_report_log(result_log, metric):
 
 def parse_test_result_chart(json_path, metric):
   data = json.load(open(json_path))
-  if metric not in data:
+
+  # format 1, telemetry
+  if 'charts' in data:
+    summary = data['charts'][metric]['summary']
+
+  # format 2, autotest without graph
+  elif metric in data:
+    summary = data[metric]['summary']
+
+  # format 3, autotest with graph
+  elif metric.count('.') == 1:
+    name, subname = metric.split('.')
+    summary = data[name][subname]
+
+  else:
     logger.error('metric "%s" not in %s', metric, json_path)
     return []
 
-  summary = data[metric]['summary']
   if 'values' in summary:
     return summary['values']
   return [summary['value']]
