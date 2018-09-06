@@ -163,6 +163,10 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('run')
     self.assertEqual(bisector.strategy.get_best_guess(), 7)
 
+    with mock.patch('sys.stdout', new_callable=StringIO.StringIO):
+      # Only make sure no exceptions. No output verification.
+      bisector.main('log')
+
   def test_switch_fail(self):
     bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=20', '--old=3', '--new=15')

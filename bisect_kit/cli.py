@@ -516,12 +516,13 @@ class BisectorCommandLine(object):
   def cmd_log(self, _opts):
     """Prints what has been done so far."""
     for entry in self.states.data['history']:
-      print('{datetime}, {rev} {status_time} {values} {comment_display}'.format(
-          datetime=datetime.datetime.fromtimestamp(entry['time']),
-          status_time=entry['status'] + ('*%d' % entry['times']
-                                         if entry['times'] > 1 else ''),
-          comment_display=entry['comment'] or '',
-          **entry))
+      print('{datetime}, {rev} {status} {values} {comment}'.format(
+          datetime=datetime.datetime.fromtimestamp(entry['timestamp']),
+          rev=entry['rev'],
+          status=entry['status'] + ('*%d' % entry['times']
+                                    if entry.get('times', 1) > 1 else ''),
+          values=entry.get('values', ''),
+          comment=entry.get('comment', '')))
 
   def cmd_next(self, _opts):
     """Prints next suggested rev to bisect."""
