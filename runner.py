@@ -298,15 +298,16 @@ def main(args=None):
     runtime.append(t1 - t0)
 
     counter[status] += 1
-    logger.info('%(ith)d/%(num)d old=%(old)d, new=%(new)d, skip=%(skip)d;'
-                ' avg time=%(avgtime).2f',
-                dict(
-                    ith=i + 1,
-                    num=opts.repeat,
-                    old=counter[OLD],
-                    new=counter[NEW],
-                    skip=counter[SKIP],
-                    avgtime=float(sum(runtime)) / len(runtime)))
+    logger.info(
+        '%(ith)d/%(num)d old=%(old)d, new=%(new)d, skip=%(skip)d;'
+        ' avg time=%(avgtime).2f',
+        dict(
+            ith=i + 1,
+            num=opts.repeat,
+            old=counter[OLD],
+            new=counter[NEW],
+            skip=counter[SKIP],
+            avgtime=float(sum(runtime)) / len(runtime)))
 
     if status == SKIP:
       continue

@@ -600,8 +600,8 @@ class BisectorCommandLine(object):
     if opts.key in ['switch', 'eval']:
       result = check_executable(opts.value[0])
       if result:
-        raise core.ExecutionFatalError('%s config %s: %s' % (sys.argv[0],
-                                                             opts.key, result))
+        raise core.ExecutionFatalError(
+            '%s config %s: %s' % (sys.argv[0], opts.key, result))
 
       self.states.config[opts.key] = opts.value
 
@@ -624,8 +624,8 @@ class BisectorCommandLine(object):
       self.states.config[opts.key] = opts.value[0]
 
     else:
-      raise core.ExecutionFatalError('%s config: unknown key: %r' %
-                                     (sys.argv[0], opts.key))
+      raise core.ExecutionFatalError(
+          '%s config: unknown key: %r' % (sys.argv[0], opts.key))
 
     self.states.save()
 

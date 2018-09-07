@@ -187,8 +187,9 @@ def run_test(opts):
   args = get_additional_test_args(opts.test_name)
   if opts.args:
     if args:
-      logger.info('default test_that args `%s` is overridden by '
-                  'command line option `%s`', args, opts.args)
+      logger.info(
+          'default test_that args `%s` is overridden by '
+          'command line option `%s`', args, opts.args)
     cmd += ['--args', opts.args]
   elif args:
     cmd += ['--args', args]

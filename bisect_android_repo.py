@@ -121,9 +121,10 @@ class AndroidRepoDomain(core.BisectDomain):
       version = cros_util.query_dut_short_version(opts.dut)
       if not cros_util.is_cros_short_version(version):
         base = '.'.join(version.split('.')[:-1] + ['0'])
-        logger.info('ChromeOS version of DUT (%s) is local build, '
-                    'use its base version %s to determine Android branch',
-                    version, base)
+        logger.info(
+            'ChromeOS version of DUT (%s) is local build, '
+            'use its base version %s to determine Android branch', version,
+            base)
         version = base
       opts.branch = cros_util.query_android_branch(opts.board, version)
       logger.debug('branch=%s', opts.branch)

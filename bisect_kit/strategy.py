@@ -251,13 +251,14 @@ class NoisyBinarySearch(object):
       old_p, new_p = 0, 1
 
     if 0 < old_p < 1.0 - self.confidence:
-      logger.warning('Confidence value (%r) is too low to detect '
-                     'old candidates with new behavior (p=%r)', self.confidence,
-                     old_p)
+      logger.warning(
+          'Confidence value (%r) is too low to detect '
+          'old candidates with new behavior (p=%r)', self.confidence, old_p)
     if self.confidence < new_p < 1.0:
-      logger.warning('Confidence value (%r) is too low to detect '
-                     'new candidates with old behavior (p=%r)', self.confidence,
-                     1.0 - new_p)
+      logger.warning(
+          'Confidence value (%r) is too low to detect '
+          'new candidates with old behavior (p=%r)', self.confidence,
+          1.0 - new_p)
     return old_p, new_p
 
   def get_noise_observation(self):

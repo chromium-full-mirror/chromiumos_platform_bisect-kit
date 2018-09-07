@@ -132,9 +132,9 @@ class ChromeSrcDomain(core.BisectDomain):
           break
       else:
         raise Exception('Unable to find their common ancestor')
-      logger.warning('Assume their lowest common ancestor, %s,'
-                     'still have expected old behavior as %s',
-                     lowest_common_ancestor, old)
+      logger.warning(
+          'Assume their lowest common ancestor, %s,'
+          'still have expected old behavior as %s', lowest_common_ancestor, old)
       config['old'] = old = lowest_common_ancestor
 
     code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)

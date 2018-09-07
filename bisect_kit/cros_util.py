@@ -603,8 +603,9 @@ def check_if_need_recreate_chroot(stdout, stderr):
   Returns:
     the reason if chroot needs recreated; None otherwise
   """
-  if re.search(r"The current version of portage supports EAPI '\d+'. "
-               "You must upgrade", stderr):
+  if re.search(
+      r"The current version of portage supports EAPI '\d+'. "
+      "You must upgrade", stderr):
     return 'EAPI version mismatch'
 
   if 'Chroot version is too new. Consider running cros_sdk --replace' in stderr:
@@ -782,8 +783,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
       timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
                                            'refs/heads/master', path)
     except ValueError:
-      raise core.ExecutionFatalError('%s does not have %s' %
-                                     (self.historical_manifest_git_dir, path))
+      raise core.ExecutionFatalError(
+          '%s does not have %s' % (self.historical_manifest_git_dir, path))
     return timestamp
 
   def collect_float_spec(self, old, new):
@@ -817,10 +818,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
       if not int(old_milestone) <= int(milestone) <= int(new_milestone):
         continue
 
-      files = git_util.list_dir_from_revision(self.historical_manifest_git_dir,
-                                              'refs/heads/master',
-                                              os.path.join(
-                                                  'buildspecs', milestone))
+      files = git_util.list_dir_from_revision(
+          self.historical_manifest_git_dir, 'refs/heads/master',
+          os.path.join('buildspecs', milestone))
 
       for fn in files:
         path = os.path.join('buildspecs', milestone, fn)
