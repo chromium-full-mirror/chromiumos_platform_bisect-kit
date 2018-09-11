@@ -214,3 +214,30 @@ class RepoMirror(codechange.CodeStorage):
   def cached_git_root(self, repo_url):
     cache_path = self._url_to_cache_dir(repo_url)
     return os.path.join(self.mirror_dir, cache_path)
+
+  def _load_project_list(self, project_root):
+    repo_project_list = os.path.join(project_root, '.repo', 'project.list')
+    return open(repo_project_list).readlines()
+
+  def _save_project_list(self, project_root, lines):
+    repo_project_list = os.path.join(project_root, '.repo', 'project.list')
+    with open(repo_project_list, 'w') as f:
+      f.write(''.join(sorted(lines)))
+
+  def add_to_project_list(self, project_root, path, repo_url):
+    lines = self._load_project_list(project_root)
+
+    line = path + '\n'
+    if line not in lines:
+      lines.append(line)
+
+    self._save_project_list(project_root, lines)
+
+  def remove_from_project_list(self, project_root, path):
+    lines = self._load_project_list(project_root)
+
+    line = path + '\n'
+    if line in lines:
+      lines.remove(line)
+
+    self._save_project_list(project_root, lines)

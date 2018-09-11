@@ -50,6 +50,15 @@ def is_git_root(path):
   return os.path.exists(os.path.join(path, '.git'))
 
 
+def clone(git_repo, repo_url, reference=None):
+  if not os.path.exists(git_repo):
+    os.makedirs(git_repo)
+  cmd = ['git', 'clone', repo_url, '.']
+  if reference:
+    cmd += ['--reference', reference]
+  util.check_call(*cmd, cwd=git_repo)
+
+
 def checkout_version(git_repo, rev):
   """git checkout.
 

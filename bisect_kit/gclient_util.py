@@ -7,6 +7,7 @@
 from __future__ import print_function
 import logging
 import os
+import pprint
 import sys
 import urlparse
 
@@ -201,3 +202,33 @@ class GclientCache(codechange.CodeStorage):
   def cached_git_root(self, repo_url):
     cache_path = self._url_to_cache_dir(repo_url)
     return os.path.join(self.cache_dir, cache_path)
+
+  def _load_project_list(self, project_root):
+    repo_project_list = os.path.join(project_root, '.gclient_entries')
+    scope = {}
+    exec open(repo_project_list) in scope  # pylint: disable=exec-used
+    return scope.get('entries', {})
+
+  def _save_project_list(self, project_root, projects):
+    repo_project_list = os.path.join(project_root, '.gclient_entries')
+    content = 'entries = {\n'
+    for item in sorted(projects.items()):
+      content += '  %s: %s,\n' % map(pprint.pformat, item)
+    content += '}\n'
+    with open(repo_project_list, 'w') as f:
+      f.write(content)
+
+  def add_to_project_list(self, project_root, path, repo_url):
+    projects = self._load_project_list(project_root)
+
+    projects[path] = repo_url
+
+    self._save_project_list(project_root, projects)
+
+  def remove_from_project_list(self, project_root, path):
+    projects = self._load_project_list(project_root)
+
+    if path in projects:
+      del projects[path]
+
+    self._save_project_list(project_root, projects)

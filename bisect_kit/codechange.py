@@ -249,7 +249,7 @@ class Action(object):
     self.timestamp = timestamp
     self.path = path
 
-  def apply(self, _root_dir):
+  def apply(self, _code_storage, _root_dir):
     raise NotImplementedError
 
   def summary(self, _code_storage):
@@ -317,9 +317,9 @@ class ActionGroup(object):
       ag.add(unserialize_action(x))
     return ag
 
-  def apply(self, root_dir):
+  def apply(self, code_storage, root_dir):
     for action in self.actions:
-      action.apply(root_dir)
+      action.apply(code_storage, root_dir)
 
 
 class GitCheckoutCommit(Action):
@@ -335,7 +335,8 @@ class GitCheckoutCommit(Action):
     self.repo_url = repo_url
     self.rev = rev
 
-  def apply(self, root_dir):
+  def apply(self, code_storage, root_dir):
+    del code_storage  # unused
     git_repo = os.path.join(root_dir, self.path)
     assert git_util.is_git_root(git_repo)
     git_util.checkout_version(git_repo, self.rev)
@@ -359,10 +360,15 @@ class GitAddRepo(Action):
     self.repo_url = repo_url
     self.rev = rev
 
-  def apply(self, root_dir):
+  def apply(self, code_storage, root_dir):
     git_repo = os.path.join(root_dir, self.path)
-    assert os.path.exists(git_repo)
-    assert git_util.is_git_root(git_repo)
+    assert not os.path.exists(git_repo)
+
+    reference = code_storage.cached_git_root(self.repo_url)
+    git_util.clone(git_repo, self.repo_url, reference=reference)
+    git_util.checkout_version(git_repo, self.rev)
+
+    code_storage.add_to_project_list(root_dir, self.path, self.repo_url)
 
   def summary(self, _code_storage):
     return 'add repo %s from %s@%s' % (self.path, self.repo_url, self.rev[:10])
@@ -371,12 +377,13 @@ class GitAddRepo(Action):
 class GitRemoveRepo(Action):
   """Describes a git repo remove action."""
 
-  def apply(self, root_dir):
+  def apply(self, code_storage, root_dir):
     assert self.path
     git_repo = os.path.join(root_dir, self.path)
     assert git_util.is_git_root(git_repo)
-    assert 0
     shutil.rmtree(git_repo)
+
+    code_storage.remove_from_project_list(root_dir, self.path)
 
   def summary(self, _code_storage):
     return 'remove repo %s' % self.path
@@ -391,7 +398,7 @@ def apply_actions(code_storage, action_groups, root_dir):
   def batch_apply(commits):
     for i, commit_action in sorted(commits.values()):
       logger.debug('[%d] applying "%r"', i, commit_action.summary(code_storage))
-      commit_action.apply(root_dir)
+      commit_action.apply(code_storage, root_dir)
 
   for i, action_group in enumerate(action_groups, 1):
     for action in action_group.actions:
@@ -405,7 +412,7 @@ def apply_actions(code_storage, action_groups, root_dir):
 
     batch_apply(commits)
     commits = {}
-    action.apply(root_dir)
+    action.apply(code_storage, root_dir)
 
   batch_apply(commits)
 
@@ -476,6 +483,12 @@ class CodeStorage(object):
     Returns:
       path of cache folder
     """
+    raise NotImplementedError
+
+  def add_to_project_list(self, project_root, path, repo_url):
+    raise NotImplementedError
+
+  def remove_from_project_list(self, project_root, path):
     raise NotImplementedError
 
   def is_ancestor_commit(self, spec, path, old, new):
