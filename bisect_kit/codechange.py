@@ -521,7 +521,7 @@ class CodeStorage(object):
     git_root = self.cached_git_root(spec[path].repo_url)
     # spec[path].at is remote reference name. Since git_root is a mirror (not
     # a local checkout), there is no need to convert the name.
-    return git_util.get_rev_by_time(git_root, timestamp, branch=spec[path].at)
+    return git_util.get_rev_by_time(git_root, timestamp, spec[path].at)
 
   def get_actions_between_two_commit(self, spec, path, old, new):
     git_root = self.cached_git_root(spec[path].repo_url)
@@ -711,10 +711,15 @@ class CodeManager(object):
 
     scores = []
     for i in compatible_candidates:
-      scores.append((specs[i].similar_score(target), i))
+      # Tie-break: prefer earlier timestamp and smaller difference.
+      if specs[i].timestamp <= target.timestamp:
+        timediff = 0, target.timestamp - specs[i].timestamp
+      else:
+        timediff = 1, specs[i].timestamp - target.timestamp
+      scores.append((specs[i].similar_score(target), timediff, i))
     scores.sort()
 
-    score, index = scores[0]
+    score, _, index = scores[0]
     if score != 0:
       logger.warning('not exactly match (score=%s): %s', score, target.name)
       target.diff(specs[index])

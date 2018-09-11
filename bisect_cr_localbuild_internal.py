@@ -26,8 +26,11 @@ logger = logging.getLogger(__name__)
 def guess_chrome_version(opts, rev):
   if cros_util.is_cros_version(rev):
     assert opts.board, 'need to specify BOARD for cros version'
-    rev = cros_util.query_chrome_version(opts.board, rev)
-    assert cr_util.is_chrome_version(rev)
+    chrome_version = cros_util.query_chrome_version(opts.board, rev)
+    assert cr_util.is_chrome_version(chrome_version)
+    logger.info('Converted given CrOS version %s to Chrome version %s', rev,
+                chrome_version)
+    rev = chrome_version
 
   return rev
 
@@ -113,15 +116,6 @@ class ChromeSrcDomain(core.BisectDomain):
       if not os.path.exists(path):
         raise Exception("%s doesn't exist" % path)
 
-    # Make sure all repos in between are cached
-    float_specs = spec_manager.collect_float_spec(old, new)
-    for spec in reversed(float_specs):
-      spec_manager.parse_spec(spec)
-      if cache.are_spec_commits_available(spec):
-        continue
-      branch = spec.path.split(os.sep)[-2]
-      spec_manager.sync_to_branch_rev(branch, spec.name)
-
     if not util.is_direct_relative_version(old, new):
       logger.warning('old=%s is not parent of new=%s', old, new)
       old_ancestor = spec_manager.enumerate_ancestor(old)
@@ -137,6 +131,7 @@ class ChromeSrcDomain(core.BisectDomain):
           'still have expected old behavior as %s', lowest_common_ancestor, old)
       config['old'] = old = lowest_common_ancestor
 
+    # TODO(kcwu): verify full git history is available.
     code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
     revlist = code_manager.build_revlist(old, new)
 

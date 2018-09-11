@@ -9,11 +9,14 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
+import textwrap
 import urllib2
 
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import core
 from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import util
@@ -233,92 +236,106 @@ class ChromeSpecManager(codechange.SpecManager):
   def __init__(self, config):
     self.config = config
     self.spec_dir = os.path.join(config['chrome_root'], 'buildspec')
+    self.chrome_src = os.path.join(config['chrome_root'], 'src')
 
-  def _get_branches(self, old_branch, new_branch):
-    """Gets branches between given range.
+  def lookup_build_timestamp(self, rev):
+    assert is_chrome_version(rev)
+
+    path = os.path.join('releases', rev, 'DEPS')
+    try:
+      timestamp = git_util.get_commit_time(self.spec_dir, 'origin/master', path)
+    except ValueError:
+      raise core.ExecutionFatalError(
+          '%s does not have %s' % (self.spec_dir, path))
+    return timestamp
+
+  def _generate_meta_deps(self, rev):
+    """Synthesize branch DEPS with continuous history.
+
+    Although chrome uses DEPS in its tree as source of truth, we need to use
+    DEPS in buildspec in order to match the release DEPS files. However,
+    branches/xx/DEPS is created during branching and it doesn't contain history
+    before branching point (which conceptually refers to chrome master branch).
+
+    This function synthesizes a new DEPS with full history including branch
+    DEPS history and earlier history.
 
     Args:
-      old_branch: start branch (inclusive)
-      new_branch: end branch (inclusive)
+      rev:
 
     Returns:
-      list of branches
+      path to the synthesized repo
     """
-    branches_dir = os.path.join(self.spec_dir, 'branches')
-    result = []
-    for branch in os.listdir(branches_dir):
-      if not branch.isdigit():
-        continue
-      if int(old_branch) <= int(branch) <= int(new_branch):
-        result.append(branch)
-    return sorted(result, key=int)
+    meta_dir = os.path.join(self.config['chrome_root'], 'meta-deps')
+    if os.path.exists(meta_dir):
+      shutil.rmtree(meta_dir)
+    git_util.init(meta_dir)
+
+    # 1. Create initial commit with DEPS file referring to master.
+    init_timestamp = '2018-01-01T00:00:00'
+    meta_deps = textwrap.dedent('''
+    vars = {
+      "checkout_src_internal": True,
+    }
+
+    deps = {
+      "src": "https://chromium.googlesource.com/a/chromium/src.git@master",
+      "tools_internal": "https://chrome-internal.googlesource.com/a/chrome/tools/build/internal.DEPS.git@master",
+    }
+
+    recursedeps = [
+      "src",
+      "tools_internal",
+    ]
+    ''')
+    git_util.commit_file(
+        meta_dir, 'DEPS', 'initial DEPS', meta_deps, commit_time=init_timestamp)
+
+    # 2. Copy history from buildspec branch DEPS file.
+    # TODO(kcwu): support branch of branch
+    branch = extract_branch_from_version(rev)
+    branch_path = os.path.join('branches', branch, 'DEPS')
+    for timestamp, git_hash in git_util.get_history(self.spec_dir, branch_path):
+      message = 'copy of %s' % git_hash
+      content = git_util.get_file_from_revision(self.spec_dir, git_hash,
+                                                branch_path)
+      git_util.commit_file(
+          meta_dir, 'DEPS', message, content, commit_time=timestamp)
+
+    return meta_dir
 
   def collect_float_spec(self, old, new):
-    old_branch = extract_branch_from_version(old)
-    new_branch = extract_branch_from_version(new)
+    logger.info('collect_float_spec')
+    old_timestamp = self.lookup_build_timestamp(old)
+    new_timestamp = self.lookup_build_timestamp(new)
 
-    # commits_by_branch[i][j] is a commit. commits_by_branch[i][*] are commits
-    # of the same branch.
-    commits_by_branch = []
+    # Workaround for racing between DEPS file and other commits.
+    # The steps for branching and releasing on a buildbot:
+    #  1. sync code
+    #  2. commit branch DEPS file
+    #  3. flatten the dependency and commit the generated release DEPS file
+    # What lookup_build_timestamp() returns is the commit time of step 3. The
+    # content of the DEPS file recorded the tree snapshot of step 1. However,
+    # there might be some commits arriving between step 1 and step 3. In order
+    # to reconstruct complete commit history, we actually need to figure out
+    # timestamp of step 1, which is non-trivial.
+    # Here, we just assume buildbot can finish these steps in one hour. It's
+    # harmless to have old_timestamp slightly earlier than the actual time.
+    old_timestamp -= 3600
 
-    # 'git log <path>' is slow for huge repo because git will search back the
-    # whole history to find commits. We can use restrict git search range to
-    # speed up. For example, we can run `git log --after=last_branch_time
-    # branches/3360/DEPS` if we know branches/3359/DEPS is branched at
-    # time=last_branch_time since 3360 must be branched after 3359.
-    last_branch_time = None
+    meta_dir = self._generate_meta_deps(new)
 
-    for branch in self._get_branches(old_branch, new_branch):
-      # TODO(kcwu): investigate what happened for branch 3351
-      if branch in ['3351']:
-        continue
-      path = os.path.join('branches', branch, 'DEPS')
-      commits = []
-      for timestamp, git_rev in git_util.get_history(
-          self.spec_dir, path, after=last_branch_time):
-        commits.append((timestamp, path, git_rev))
-      commits_by_branch.append(commits)
-      last_branch_time = commits[0][0]
-
-    # Excludes revisions committed after next branch branched.
-    #
-    # For example, assume we want to collect spec between 3359 and 3360 branch
-    # and the following is the commit history of branches 3359 and 3360. Here
-    # 3359#4 means the 4th revision of buildspec/branches/3359/DEPS.
-    #
-    #   3359#1 -> .. -> 3359#4 -> 3359#5 -> ... > 3359#17 -> ...
-    #                     |
-    #                     +--> 3360#1 -> 3360#2 -> ...
-    #
-    # As this graph, 3360 is branched at the time of 3359#4. After 3360 is
-    # branched, 3359 is still changing (i.e. updates for beta and stable
-    # channels). Commit 3395#5 and its successor should be excluded if we want
-    # to get all patches between 3359#1 and 3360#2.
     result = []
-    for i, commits in enumerate(commits_by_branch):
-      for timestamp, path, git_rev in commits:
-        if i + 1 == len(
-            commits_by_branch) or timestamp < commits_by_branch[i + 1][0][0]:
-          result.append(
-              codechange.Spec(codechange.SPEC_FLOAT, git_rev, timestamp, path))
+    code_storage = gclient_util.GclientCache(self.config['gclient_cache_dir'])
+    parser = gclient_util.DepsParser(self.config['chrome_root'], code_storage)
+    path = os.path.join(meta_dir, 'DEPS')
 
-    # Hack to exclude bad DEPS files.
-    # TODO(kcwu): handle DEPS syntax error automatically
-    bad_spec = set([
-        # branches/3058/DEPS syntax error
-        '6d5af773ff11573c2e16957dc6d0cc451f4b6ad4',
-        # branches/3337/DEPS incorrect condition
-        'd29971dc0059c2ad681f43feba84b071b4ae0365',
-        '0b87411f83c4e85dd87a11797c1b83ec1f2b9970',
-        # branches/3359/DEPS syntax error
-        'fd0589643594b7b6807f15ecf3b34bc9694be2e5',
-        'a65608f3e9e2cabe649cf6056d9817a0caa0893f',
-        # branches/3439/DEPS was reverted manually
-        'eb3a002e54d85828a052cce874dd48345db10329',
-        '366f5f88f2fe3bea3c2c321098adca5e8e64c381',
-    ])
-    result = [spec for spec in result if spec.name not in bad_spec]
-
+    logger.info('start enumerate_path_specs')
+    for timestamp, path_specs in parser.enumerate_path_specs(
+        old_timestamp, new_timestamp, meta_dir):
+      spec = codechange.Spec(codechange.SPEC_FLOAT, '(n/a)', timestamp, path)
+      spec.entries = path_specs
+      result.append(spec)
     return result
 
   def enumerate_ancestor(self, new):
@@ -333,6 +350,7 @@ class ChromeSpecManager(codechange.SpecManager):
     return result
 
   def collect_fixed_spec(self, old, new):
+    logger.info('collect_fixed_spec')
     assert util.is_direct_relative_version(old, new)
     result = []
     for rev in self.enumerate_ancestor(new):
@@ -346,59 +364,52 @@ class ChromeSpecManager(codechange.SpecManager):
     assert result[-1].name == new, '%s != %s' % (result[-1].name, new)
     return result
 
-  def _load_deps_content(self, spec):
-    if spec.spec_type == codechange.SPEC_FIXED:
-      content = git_util.get_file_from_revision(self.spec_dir, 'HEAD',
-                                                spec.path)
-    else:
-      content = git_util.get_file_from_revision(self.spec_dir, spec.name,
-                                                spec.path)
-    return content
-
-  def _custom_vars(self, spec):
-    # build bot has ever defined some custom variables to override default
-    # behavior. They are shown as "custom_var override" in release DEPS files.
-    # Unfortunately, they are not version controlled by buildspec repository.
-    # Here hard coded this dirty history (estimated) in order to replicate
-    # snapshots of branch DEPS.
-    custom_vars = {}
-    if spec.spec_type == codechange.SPEC_FLOAT:
-      branch = int(spec.path.split(os.sep)[1])
-      if (branch == 3282 and spec.timestamp >= 1517533911 or  # M64
-          branch == 3325 and spec.timestamp >= 1517537488 or  # M56
-          3337 <= branch <= 3344 and spec.timestamp >= 1517544491 or  # M66
-          branch >= 3360):  # M67+
-        custom_vars['checkout_src_internal'] = True
-
-    return custom_vars
-
   def parse_spec(self, spec):
     logging.debug('parse_spec %s', spec.name)
-    deps_content = self._load_deps_content(spec)
-    custom_vars = self._custom_vars(spec)
-    spec.entries = gclient_util.parse_deps(deps_content, custom_vars)
-    if spec.spec_type == codechange.SPEC_FIXED:
-      assert spec.is_static()
 
-  def _checkout_branch_deps(self, branch, git_rev):
-    """Save branch DEPS commit as a file.
+    if spec.spec_type == codechange.SPEC_FLOAT:
+      # Already parsed during collect_float_spec().
+      # Fully parsing during collect_float_spec() is more efficient than
+      # calling parsing here because we lost knowledge of commit ordering here
+      # and calling get_rev_by_time() is very slow.
+      assert spec.entries
+      return
 
-    Args:
-      branch: (str) chrome branch number
-      git_rev: git commit id
+    code_storage = gclient_util.GclientCache(self.config['gclient_cache_dir'])
+    parser = gclient_util.DepsParser(self.config['chrome_root'], code_storage)
 
-    Returns:
-      DEPS file path, relative to buildspec/ folder
-    """
-    deps_file = 'branches/%s/DEPS' % branch
-    if git_rev:
-      spec_dir = os.path.join(self.config['chrome_root'], 'buildspec')
-      content = git_util.get_file_from_revision(spec_dir, git_rev, deps_file)
-      tmp_fn = '%s@%s' % (deps_file, git_rev)
-      with open(os.path.join(spec_dir, tmp_fn), 'w') as f:
-        f.write(content)
-      deps_file = tmp_fn
-    return deps_file
+    git_rev = git_util.get_rev_by_time(
+        self.spec_dir, spec.timestamp, 'origin/master', path=spec.path)
+    content = git_util.get_file_from_revision(self.spec_dir, git_rev, spec.path)
+    deps = parser.parse_single_deps(content)
+    assert not deps.recursedeps
+
+    path_specs = {}
+    for path, dep in deps.entries.items():
+      path_specs[path] = dep.as_path_spec()
+    spec.entries = path_specs
+
+    # Additional dependency fix.
+    # DEPS files are maintained in the same tree as code, so releasing DEPS
+    # will add one more commit. Because we want to match release DEPS against
+    # branch commit history, we need to recover the code state before DEPS
+    # commit.
+    # To be more specific, chrome-release-bot@ creates and updates new DEPS
+    # file to src/ and some internal repos every releases. Here we check the
+    # dependency state of all subprojects and use their parent commit if it is
+    # committed by release bot.
+    for path_spec in spec.entries.values():
+      git_repo = code_storage.cached_git_root(path_spec.repo_url)
+      while True:
+        metadata = git_util.get_commit_metadata(git_repo, path_spec.at)
+        if 'parent' not in metadata:
+          break
+        if 'chrome-release-bot@chromium.org' not in metadata['committer']:
+          break
+
+        path_spec.at = metadata['parent'][0]
+
+    assert spec.is_static()
 
   def _gclient_sync_depfile(self, deps_file):
     """Gclient sync with given DEPS file.
@@ -412,6 +423,7 @@ class ChromeSpecManager(codechange.SpecManager):
         url=
         'https://chrome-internal.googlesource.com/a/chrome/tools/buildspec.git',
         deps_file=deps_file,
+        custom_var='checkout_src_internal=True',
         cache_dir=self.config['gclient_cache_dir'])
 
     # 'target_os' is mandatory for chromeos build, but 'gclient config' doesn't
@@ -450,14 +462,3 @@ class ChromeSpecManager(codechange.SpecManager):
       DEPS file path, relative to buildspec/ folder
     """
     return 'releases/%s/DEPS' % rev
-
-  def sync_to_branch_rev(self, branch, rev):
-    """Switch source tree to given branch time.
-
-    Args:
-      branch: (str) chrome branch number
-      rev: git commit id of branch commit
-    """
-    branch_deps_file = self._checkout_branch_deps(branch, rev)
-    logger.info('sync %s', branch_deps_file)
-    self._gclient_sync_depfile(branch_deps_file)

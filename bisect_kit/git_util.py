@@ -69,6 +69,57 @@ def checkout_version(git_repo, rev):
   util.check_call('git', 'checkout', '-q', '-f', rev, cwd=git_repo)
 
 
+def init(git_repo):
+  """git init.
+
+  git_repo and its parent directories will be created if they don't exist.
+
+  Args:
+    git_repo: path of git repo.
+  """
+  if not os.path.exists(git_repo):
+    os.makedirs(git_repo)
+
+  util.check_call('git', 'init', '-q', cwd=git_repo)
+
+
+def commit_file(git_repo,
+                path,
+                message,
+                content,
+                commit_time=None,
+                author_time=None):
+  """Commit a file.
+
+  Args:
+    git_repo: path of git repo
+    path: file path, relative to git_repo
+    message: commit message
+    content: file content
+    commit_time: commit timestamp
+    author_time: author timestamp
+  """
+  if author_time is None:
+    author_time = commit_time
+
+  env = {}
+  if author_time:
+    env['GIT_AUTHOR_DATE'] = str(author_time)
+  if commit_time:
+    env['GIT_COMMITTER_DATE'] = str(commit_time)
+
+  full_path = os.path.join(git_repo, path)
+  dirname = os.path.dirname(full_path)
+  if not os.path.exists(dirname):
+    os.makedirs(dirname)
+  with open(full_path, 'w') as f:
+    f.write(content)
+
+  util.check_call('git', 'add', path, cwd=git_repo)
+  util.check_call(
+      'git', 'commit', '-q', '-m', message, path, cwd=git_repo, env=env)
+
+
 def is_containing_commit(git_repo, rev):
   """Determines given commit exists.
 
@@ -108,6 +159,47 @@ def is_ancestor_commit(git_repo, old, new):
       '-1',
       '%s..%s' % (old, new),
       cwd=git_repo) != ''
+
+
+def get_commit_metadata(git_repo, rev):
+  """Get metadata of given commit.
+
+  Args:
+    git_repo: path of git repo.
+    rev: git commit revision in query.
+
+  Returns:
+    dict of metadata, including (if available):
+      tree: hash of git tree object
+      parent: list of parent commits; this field is unavailable for the very
+          first commit of git repo.
+      author: name and email of author
+      author_time: author timestamp (without timezone information)
+      committer: name and email of committer
+      committer_time: commit timestamp (without timezone information)
+      message: commit message text
+  """
+  meta = {}
+  data = util.check_output(
+      'git', 'cat-file', '-p', rev, cwd=git_repo, log_output=False)
+  header, meta['message'] = data.split('\n\n', 1)
+  for line in header.splitlines():
+    m = re.match(r'^tree (\w+)', line)
+    if m:
+      meta['tree'] = m.group(1)
+      continue
+
+    m = re.match(r'^parent (\w+)', line)
+    if m:
+      meta['parent'] = line.split()[1:]
+      continue
+
+    m = re.match(r'^(author|committer) (.*) (\d+) (\S+)$', line)
+    if m:
+      meta[m.group(1)] = m.group(2)
+      meta['%s_time' % m.group(1)] = int(m.group(3))
+      continue
+  return meta
 
 
 def get_revlist(git_repo, old, new):
@@ -213,20 +305,21 @@ def list_dir_from_revision(git_repo, rev, path):
       log_output=False).splitlines()
 
 
-def get_rev_by_time(git_repo, timestamp, path=None, branch='HEAD'):
+def get_rev_by_time(git_repo, timestamp, branch, path=None):
   """Query commit of given time.
 
   Args:
     git_repo: path of git repo.
     timestamp: timestamp
+    branch: only query parent of the `branch`. If branch=None, it means 'HEAD'
+        (current branch, usually).
     path: only query history of path, relative to git_repo
-    branch: only the selected subset of history to query. If branch name is
-        specified, only parent of the said branch is queried. If omitted, only
-        queries the parent of HEAD.
 
   Returns:
     git commit hash. None if path didn't exist at the given time.
   """
+  if not branch:
+    branch = 'HEAD'
 
   cmd = [
       'git',
@@ -244,7 +337,12 @@ def get_rev_by_time(git_repo, timestamp, path=None, branch='HEAD'):
   return result or None
 
 
-def get_history(git_repo, path, after=None, before=None, padding=False):
+def get_history(git_repo,
+                path,
+                branch=None,
+                after=None,
+                before=None,
+                padding=False):
   """Get commit history of given path.
 
   `after` and `before` could be outside of lifetime of `path`. `padding` is
@@ -253,6 +351,7 @@ def get_history(git_repo, path, after=None, before=None, padding=False):
   Args:
     git_repo: path of git repo.
     path: path to query, relative to git_repo
+    branch: branch name or ref name
     after: limit history after given time (inclusive)
     before: limit history before given time (inclusive)
     padding: If True, pads returned result with dummy record at exact 'after'
@@ -272,6 +371,9 @@ def get_history(git_repo, path, after=None, before=None, padding=False):
     cmd += ['--after', str(after)]
   if before:
     cmd += ['--before', str(before)]
+  if branch:
+    assert not is_git_rev(branch)
+    cmd += [branch]
   # '--' is necessary otherwise if `path` is removed in current revision, git
   # will complain it's an ambiguous argument which may be path or something
   # else (like git branch name, tag name, etc.)
@@ -284,16 +386,18 @@ def get_history(git_repo, path, after=None, before=None, padding=False):
 
   if padding:
     assert before or after, "padding=True make no sense if they are both None"
-    if before is not None and get_rev_by_time(git_repo, before, path=path):
+    if before is not None and get_rev_by_time(
+        git_repo, before, branch, path=path):
       before = int(before)
       if not result or result[-1][0] != before:
-        git_rev = get_rev_by_time(git_repo, before)
+        git_rev = get_rev_by_time(git_repo, before, branch)
         assert git_rev
         result.append((before, git_rev))
-    if after is not None and get_rev_by_time(git_repo, after, path=path):
+    if after is not None and get_rev_by_time(
+        git_repo, after, branch, path=path):
       after = int(after)
       if not result or result[0][0] != after:
-        git_rev = get_rev_by_time(git_repo, after)
+        git_rev = get_rev_by_time(git_repo, after, branch)
         assert git_rev
         result.insert(0, (after, git_rev))
 

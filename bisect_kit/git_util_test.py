@@ -106,6 +106,18 @@ class TestGitOperation(unittest.TestCase):
   def tearDown(self):
     shutil.rmtree(self.git_repo)
 
+  def test_git_init(self):
+    # reinit existing git folder
+    self.assertTrue(git_util.is_git_root(self.git_repo))
+    git_util.init(self.git_repo)
+    self.assertTrue(git_util.is_git_root(self.git_repo))
+
+    # init on not existing path
+    shutil.rmtree(self.git_repo)
+    self.assertFalse(os.path.exists(self.git_repo))
+    git_util.init(self.git_repo)
+    self.assertTrue(git_util.is_git_root(self.git_repo))
+
   def test_is_containing_commit(self):
     self.assertTrue(
         git_util.is_containing_commit(self.git_repo, self.commits[0]))
@@ -130,6 +142,14 @@ class TestGitOperation(unittest.TestCase):
     self.assertFalse(
         git_util.is_ancestor_commit(self.git_repo, self.commits[2],
                                     self.commits[0]))
+
+  def test_get_commit_metadata(self):
+    self.assertNotIn(
+        'parent', git_util.get_commit_metadata(self.git_repo, self.commits[0]))
+
+    self.assertEqual(
+        git_util.get_commit_metadata(self.git_repo, self.commits[1])['parent'],
+        [self.commits[0]])
 
   def test_get_revlist(self):
     self.assertEqual(
@@ -205,12 +225,12 @@ class TestGitOperation(unittest.TestCase):
   def test_get_rev_by_time(self):
     # simple case
     self.assertEqual(
-        git_util.get_rev_by_time(self.git_repo, '2017-01-03T12:00:00'),
+        git_util.get_rev_by_time(self.git_repo, '2017-01-03T12:00:00', None),
         self.commits[2])
 
     # boundary case: equal timestamp
     self.assertEqual(
-        git_util.get_rev_by_time(self.git_repo, '2017-01-03T00:00:00'),
+        git_util.get_rev_by_time(self.git_repo, '2017-01-03T00:00:00', None),
         self.commits[2])
 
   def test_get_rev_by_time_merge(self):
@@ -241,12 +261,12 @@ class TestGitOperation(unittest.TestCase):
 
     # simple case
     self.assertEqual(
-        git_util.get_rev_by_time(self.git_repo, '2017-02-10T00:00:00'),
+        git_util.get_rev_by_time(self.git_repo, '2017-02-10T00:00:00', None),
         commit_c)
 
     # Not commit B because it is on different branch.
     self.assertEqual(
-        git_util.get_rev_by_time(self.git_repo, '2017-02-03T00:00:00'),
+        git_util.get_rev_by_time(self.git_repo, '2017-02-03T00:00:00', None),
         commit_a)
 
   def test_get_history(self):
