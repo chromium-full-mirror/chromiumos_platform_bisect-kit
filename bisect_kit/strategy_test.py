@@ -121,6 +121,33 @@ class TestNoisyBinarySearch(unittest.TestCase):
 
     self.assertEqual(bsearch.get_noise_observation(), 'old=2/34,new=50/53')
 
+  def test_next_idx_arithmetic_error(self):
+    # Larger `n` may produce larger arithmetic error. For example,
+    #   n=1e3 could lead to call math.log(-1e-14).
+    #   n=1e6 could lead to call math.log(-1e-11).
+    #   n=1e7 could lead to call math.log(-1e-10).
+    # Here we only test n=1000 because
+    #   - we often run bisect with candidates of the same order of magnitude.
+    #   - larger n is too slow as unittest.
+    n = 1000
+    rev_info = []
+    for i in range(n):
+      rev_info.append(core.RevInfo(str(i)))
+
+    bsearch = strategy.NoisyBinarySearch(rev_info, oracle=(0.01, 1))
+    rev_info[n - 1]['new'] += 1
+    rev_info[0]['old'] += 1
+    bsearch.rebuild()
+
+    rng = random.Random(0)
+    for _ in range(10):
+      idx = rng.randint(1, n - 2)
+      rev_info[idx]['skip'] += 1
+      bsearch.update(idx, 'skip')
+
+      # Should not raise ValueError (math domain error).
+      bsearch.next_idx()
+
   def test_rebuild_skip(self):
     bsearch = strategy.NoisyBinarySearch(self.rev_info, oracle=(0, 0.9))
     self.rev_info[0]['old'] += 1

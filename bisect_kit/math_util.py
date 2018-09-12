@@ -11,16 +11,18 @@ import math
 import sys
 
 
-def _log(x):
+def log(x):
   """Wrapper of log(x) handling zero and negative value."""
   # Due to arithmetic error, x may become tiny negative.
-  if abs(x) < 1e-15:
+  # -1e-10 is not enough, see strategy_test.test_next_idx_arithmetic_error for
+  # detail.
+  if 0 >= x > -1e-9:
     return 0.0
   return math.log(x)
 
 
 def _xlogx(x):
-  return x * _log(x)
+  return x * log(x)
 
 
 def least(values):
@@ -71,7 +73,7 @@ class EntropyStats(object):
     """Returns cross entropy."""
     if self.sum == 0:
       return 0
-    return _log(self.sum) - self.sum_log / self.sum
+    return log(self.sum) - self.sum_log / self.sum
 
   def replace(self, old, new):
     """Replaces one random variable in the collection with another.

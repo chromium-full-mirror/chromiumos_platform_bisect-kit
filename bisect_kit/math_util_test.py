@@ -18,6 +18,18 @@ from bisect_kit.math_util import ExtendedFloat
 class TestMathUtil(unittest.TestCase):
   """Test math functions"""
 
+  def test_log(self):
+    # Normal case.
+    self.assertAlmostEqual(math_util.log(math.e ** 10), math.log(math.e ** 10))
+
+    # Special case for zero and tiny negative.
+    self.assertAlmostEqual(math_util.log(0), 0)
+    self.assertAlmostEqual(math_util.log(-1e-10), 0)
+
+    # Still raise exception for unexpected non-tiny negative.
+    with self.assertRaises(ValueError):
+      math_util.log(-1)
+
   def test_least(self):
     self.assertEqual(math_util.least([0.1, 0.2, 0.3]), 0.1)
     self.assertEqual(math_util.least([0.0, 0.2, 0.3]), 0.2)
