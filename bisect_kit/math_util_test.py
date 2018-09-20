@@ -20,7 +20,7 @@ class TestMathUtil(unittest.TestCase):
 
   def test_log(self):
     # Normal case.
-    self.assertAlmostEqual(math_util.log(math.e ** 10), math.log(math.e ** 10))
+    self.assertAlmostEqual(math_util.log(math.e**10), math.log(math.e**10))
 
     # Special case for zero and tiny negative.
     self.assertAlmostEqual(math_util.log(0), 0)
