@@ -22,6 +22,7 @@ from bisect_kit import configure
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_SESSION_BASE = 'bisect.sessions'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
 
@@ -43,8 +44,8 @@ def config_logging(opts):
 
   if opts.log_file is None:
     if getattr(opts, 'session', None):
-      assert hasattr(opts, 'session_base')
-      session_dir = os.path.join(opts.session_base, opts.session)
+      session_base = getattr(opts, 'session_base', DEFAULT_SESSION_BASE)
+      session_dir = os.path.join(session_base, opts.session)
       opts.log_file = os.path.join(session_dir, DEFAULT_LOG_FILENAME)
       if not os.path.exists(session_dir):
         os.makedirs(session_dir)

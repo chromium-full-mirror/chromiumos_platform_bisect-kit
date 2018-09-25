@@ -21,7 +21,12 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 
-def config(gclient_dir, url, cache_dir=None, deps_file=None, custom_var=None):
+def config(gclient_dir,
+           url=None,
+           cache_dir=None,
+           deps_file=None,
+           custom_var=None,
+           spec=None):
   """Simply wrapper of `gclient config`.
 
   Args:
@@ -30,6 +35,7 @@ def config(gclient_dir, url, cache_dir=None, deps_file=None, custom_var=None):
     cache_dir: gclient's git cache folder
     deps_file: override the default DEPS file name
     custom_var: custom variables
+    spec: content of gclient file
   """
   cmd = ['gclient', 'config']
   if deps_file:
@@ -38,7 +44,10 @@ def config(gclient_dir, url, cache_dir=None, deps_file=None, custom_var=None):
     cmd += ['--cache-dir', cache_dir]
   if custom_var:
     cmd += ['--custom-var', custom_var]
-  cmd.append(url)
+  if spec:
+    cmd += ['--spec', spec]
+  if url:
+    cmd.append(url)
 
   util.check_call(*cmd, cwd=gclient_dir)
 

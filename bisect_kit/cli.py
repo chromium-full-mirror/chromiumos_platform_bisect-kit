@@ -22,7 +22,6 @@ from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SESSION_BASE = 'bisect.sessions'
 DEFAULT_SESSION_NAME = 'default'
 DEFAULT_CONFIDENCE = 0.999
 
@@ -578,7 +577,7 @@ class BisectorCommandLine(object):
     if not session:
       session = DEFAULT_SESSION_NAME
     if not session_base:
-      session_base = configure.get('SESSION_BASE', DEFAULT_SESSION_BASE)
+      session_base = configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE)
 
     session_file = os.path.join(session_base, session, self.domain_cls.__name__)
 
@@ -647,7 +646,7 @@ class BisectorCommandLine(object):
     common.add_common_arguments(parser)
     parser.add_argument(
         '--session_base',
-        default=configure.get('SESSION_BASE', DEFAULT_SESSION_BASE),
+        default=configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE),
         help='Directory to store sessions (default: %(default)r)')
     parser.add_argument(
         '--session',

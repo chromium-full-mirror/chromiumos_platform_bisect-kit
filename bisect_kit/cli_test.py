@@ -130,7 +130,7 @@ class TestBisectorCommandLine(unittest.TestCase):
 
   def setUp(self):
     self.session_base = tempfile.mkdtemp()
-    self.patcher = mock.patch.object(cli, 'DEFAULT_SESSION_BASE',
+    self.patcher = mock.patch.object(common, 'DEFAULT_SESSION_BASE',
                                      self.session_base)
     self.patcher.start()
 

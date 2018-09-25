@@ -37,12 +37,30 @@ def get_manifest_url(manifest_dir):
   return url
 
 
+def find_repo_root(path):
+  """Find the root path of a repo project
+
+  Args:
+    path: path
+
+  Returns:
+    project root if path is inside a repo project; otherwise None
+  """
+  path = os.path.abspath(path)
+  while not os.path.exists(os.path.join(path, '.repo')):
+    if path == '/':
+      return None
+    path = os.path.dirname(path)
+  return path
+
+
 def init(repo_dir,
          manifest_url,
          manifest_branch=None,
          manifest_name=None,
          repo_url=None,
-         reference=None):
+         reference=None,
+         mirror=False):
   """Repo init.
 
   Args:
@@ -52,7 +70,13 @@ def init(repo_dir,
     manifest_name: initial manifest file name
     repo_url: repo repository location
     reference: location of mirror directory
+    mirror: indicates repo mirror
   """
+  root = find_repo_root(repo_dir)
+  if root and root != repo_dir:
+    raise Exception(
+        '%s should not be inside another repo project at %s' % (repo_dir, root))
+
   cmd = ['repo', 'init', '--manifest-url', manifest_url]
   if manifest_name:
     cmd += ['--manifest-name', manifest_name]
@@ -62,6 +86,8 @@ def init(repo_dir,
     cmd += ['--repo-url', repo_url]
   if reference:
     cmd += ['--reference', reference]
+  if mirror:
+    cmd.append('--mirror')
   util.check_call(*cmd, cwd=repo_dir)
 
 
