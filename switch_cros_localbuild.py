@@ -99,10 +99,7 @@ def build(opts):
   if (not os.path.exists(os.path.join(opts.chromeos_root, 'chroot')) and
       not os.path.exists(os.path.join(opts.chromeos_root, 'chroot.img'))):
     util.check_output(
-        'chromite/bin/cros_sdk',
-        '--nouse-image',
-        '--create',
-        cwd=opts.chromeos_root)
+        'chromite/bin/cros_sdk', '--create', cwd=opts.chromeos_root)
 
   logger.info('mark as stable')
   mark_as_stable(opts)
