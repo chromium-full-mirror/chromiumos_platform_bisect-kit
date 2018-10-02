@@ -25,6 +25,7 @@ from bisect_kit import codechange
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import git_util
+from bisect_kit import locking
 from bisect_kit import repo_util
 from bisect_kit import util
 
@@ -646,12 +647,13 @@ def build_image(chromeos_root, board, rev):
 
   stderr_lines = []
   try:
-    cros_sdk(
-        chromeos_root,
-        './%s' % script_name,
-        board,
-        image_name,
-        stderr_callback=stderr_lines.append)
+    with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
+      cros_sdk(
+          chromeos_root,
+          './%s' % script_name,
+          board,
+          image_name,
+          stderr_callback=stderr_lines.append)
   except subprocess.CalledProcessError as e:
     # Detect failures due to incompatibility between chroot and source tree. If
     # so, notify the caller to recreate chroot and retry.

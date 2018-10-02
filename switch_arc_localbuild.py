@@ -15,6 +15,7 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import locking
 from bisect_kit import repo_util
 
 logger = logging.getLogger(__name__)
@@ -79,7 +80,8 @@ def switch(opts):
 
   logger.info('build')
   # TODO(kcwu): use lower job count for non distributed compilation.
-  android_util.lunch(opts.android_root, opts.flavor, 'm', '-j1000')
+  with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
+    android_util.lunch(opts.android_root, opts.flavor, 'm', '-j1000')
 
   if not opts.nodeploy:
     logger.info('deploy')

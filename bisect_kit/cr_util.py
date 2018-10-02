@@ -19,6 +19,7 @@ from bisect_kit import codechange
 from bisect_kit import core
 from bisect_kit import gclient_util
 from bisect_kit import git_util
+from bisect_kit import locking
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -223,7 +224,8 @@ def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
   if nodeploy:
     env['NO_DEPLOY'] = '1'
 
-  simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
+  with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
+    simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
 
 
 class ChromeSpecManager(codechange.SpecManager):
