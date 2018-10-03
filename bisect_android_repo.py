@@ -8,7 +8,7 @@
 Example:
   $ ./bisect_android_repo.py init --old rev1 --new rev2 \\
       --android_root ~/android \\
-      --android_repo_mirror_dir $ANDROID_REPO_MIRROR_DIR
+      --android_mirror $ANDROID_MIRROR
   $ ./bisect_android_repo.py config switch ./switch_arc_localbuild.py
   $ ./bisect_android_repo.py config eval ./eval-manually.sh
   $ ./bisect_android_repo.py run
@@ -84,10 +84,10 @@ class AndroidRepoDomain(core.BisectDomain):
         default=configure.get('ANDROID_ROOT'),
         help='Android tree root')
     parser.add_argument(
-        '--android_repo_mirror_dir',
+        '--android_mirror',
         type=cli.argtype_dir_path,
         required=True,
-        default=configure.get('ANDROID_REPO_MIRROR_DIR'),
+        default=configure.get('ANDROID_MIRROR'),
         help='Android repo mirror path')
     parser.add_argument(
         '--branch',
@@ -139,14 +139,14 @@ class AndroidRepoDomain(core.BisectDomain):
     config = dict(
         dut=opts.dut,
         android_root=opts.android_root,
-        android_repo_mirror_dir=opts.android_repo_mirror_dir,
+        android_mirror=opts.android_mirror,
         branch=opts.branch,
         flavor=opts.flavor,
         old=old,
         new=new)
 
     spec_manager = android_util.AndroidSpecManager(config)
-    cache = repo_util.RepoMirror(opts.android_repo_mirror_dir)
+    cache = repo_util.RepoMirror(opts.android_mirror)
 
     # Make sure all repos in between are cached
     float_specs = spec_manager.collect_float_spec(old, new)
@@ -169,7 +169,7 @@ class AndroidRepoDomain(core.BisectDomain):
     env['ANDROID_ROOT'] = self.config['android_root']
     env['ANDROID_FLAVOR'] = self.config['flavor']
     env['ANDROID_BRANCH'] = self.config['branch']
-    env['ANDROID_REPO_MIRROR_DIR'] = self.config['android_repo_mirror_dir']
+    env['ANDROID_MIRROR'] = self.config['android_mirror']
     env['INTRA_REV'] = rev
 
   def view(self, old, new):
@@ -190,7 +190,7 @@ class AndroidRepoDomain(core.BisectDomain):
           flavor=self.config['flavor']))
 
     spec_manager = android_util.AndroidSpecManager(self.config)
-    cache = repo_util.RepoMirror(self.config['android_repo_mirror_dir'])
+    cache = repo_util.RepoMirror(self.config['android_mirror'])
     code_manager = codechange.CodeManager(self.config['android_root'],
                                           spec_manager, cache)
     code_manager.view_rev_diff(old, new)

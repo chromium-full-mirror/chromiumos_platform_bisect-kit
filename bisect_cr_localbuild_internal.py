@@ -54,11 +54,11 @@ class ChromeSrcDomain(core.BisectDomain):
         default=configure.get('CHROME_ROOT'),
         help='Root of chrome source tree, like ~/chromium')
     parser.add_argument(
-        '--gclient_cache_dir',
+        '--chrome_mirror',
         required=True,
-        metavar='GCLIENT_CACHE_DIR',
+        metavar='CHROME_MIRROR',
         type=cli.argtype_dir_path,
-        default=configure.get('GCLIENT_CACHE_DIR'),
+        default=configure.get('CHROME_MIRROR'),
         help='gclient cache dir')
 
     # Only used for Chrome on ChromeOS.
@@ -99,10 +99,10 @@ class ChromeSrcDomain(core.BisectDomain):
         new=new,
         board=opts.board,
         dut=opts.dut,
-        gclient_cache_dir=opts.gclient_cache_dir)
+        chrome_mirror=opts.chrome_mirror)
 
     spec_manager = cr_util.ChromeSpecManager(config)
-    cache = gclient_util.GclientCache(opts.gclient_cache_dir)
+    cache = gclient_util.GclientCache(opts.chrome_mirror)
 
     # Initial sync to get all buildspecs.
     release_deps_file = cr_util.ChromeSpecManager.get_release_deps(new)
@@ -142,7 +142,7 @@ class ChromeSrcDomain(core.BisectDomain):
 
   def setenv(self, env, rev):
     env['CHROME_ROOT'] = self.config['chrome_root']
-    env['GCLIENT_CACHE_DIR'] = self.config['gclient_cache_dir']
+    env['CHROME_MIRROR'] = self.config['chrome_mirror']
     env['REV'] = rev
 
     if self.config['board']:
@@ -167,7 +167,7 @@ class ChromeSrcDomain(core.BisectDomain):
       if new_base != new_next and old_next != new_next:
         print(log_url % (new_base, new_next))
 
-    cache = gclient_util.GclientCache(self.config['gclient_cache_dir'])
+    cache = gclient_util.GclientCache(self.config['chrome_mirror'])
     spec_manager = cr_util.ChromeSpecManager(self.config)
     code_manager = codechange.CodeManager(self.config['chrome_root'],
                                           spec_manager, cache)

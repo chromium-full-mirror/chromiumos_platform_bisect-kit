@@ -45,9 +45,9 @@ def create_argument_parser():
       default=configure.get('ANDROID_ROOT', ''),
       help='Android tree root')
   parser.add_argument(
-      '--android_repo_mirror_dir',
+      '--android_mirror',
       type=cli.argtype_dir_path,
-      default=configure.get('ANDROID_REPO_MIRROR_DIR', ''),
+      default=configure.get('ANDROID_MIRROR', ''),
       help='Android repo mirror path')
   parser.add_argument(
       '--flavor',
@@ -67,9 +67,9 @@ def switch(opts):
   config = dict(
       android_root=opts.android_root,
       flavor=opts.flavor,
-      android_repo_mirror_dir=opts.android_repo_mirror_dir)
+      android_mirror=opts.android_mirror)
   spec_manager = android_util.AndroidSpecManager(config)
-  cache = repo_util.RepoMirror(opts.android_repo_mirror_dir)
+  cache = repo_util.RepoMirror(opts.android_mirror)
   code_manager = codechange.CodeManager(opts.android_root, spec_manager, cache)
 
   logger.info('switch source code')

@@ -64,10 +64,10 @@ def create_argument_parser():
       default=configure.get('CHROME_ROOT', ''),
       help='Root of Chrome source tree, like ~/chromium')
   parser.add_argument(
-      '--gclient_cache_dir',
-      metavar='GCLIENT_CACHE_DIR',
+      '--chrome_mirror',
+      metavar='CHROME_MIRROR',
       type=cli.argtype_dir_path,
-      default=configure.get('GCLIENT_CACHE_DIR', ''),
+      default=configure.get('CHROME_MIRROR', ''),
       help='gclient cache dir')
   parser.add_argument(
       '--target',
@@ -97,10 +97,9 @@ def main(args=None):
   assert os.path.exists(opts.chrome_src)
 
   rev = bisect_cr_localbuild_internal.guess_chrome_version(opts, opts.rev)
-  config = dict(
-      chrome_root=opts.chrome_root, gclient_cache_dir=opts.gclient_cache_dir)
+  config = dict(chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror)
 
-  cache = gclient_util.GclientCache(opts.gclient_cache_dir)
+  cache = gclient_util.GclientCache(opts.chrome_mirror)
   spec_manager = cr_util.ChromeSpecManager(config)
   code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
 

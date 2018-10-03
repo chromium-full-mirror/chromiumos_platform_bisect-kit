@@ -328,7 +328,7 @@ class ChromeSpecManager(codechange.SpecManager):
     meta_dir = self._generate_meta_deps(new)
 
     result = []
-    code_storage = gclient_util.GclientCache(self.config['gclient_cache_dir'])
+    code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
     parser = gclient_util.DepsParser(self.config['chrome_root'], code_storage)
     path = os.path.join(meta_dir, 'DEPS')
 
@@ -377,7 +377,7 @@ class ChromeSpecManager(codechange.SpecManager):
       assert spec.entries
       return
 
-    code_storage = gclient_util.GclientCache(self.config['gclient_cache_dir'])
+    code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
     parser = gclient_util.DepsParser(self.config['chrome_root'], code_storage)
 
     git_rev = git_util.get_rev_by_time(
@@ -426,7 +426,7 @@ class ChromeSpecManager(codechange.SpecManager):
         'https://chrome-internal.googlesource.com/a/chrome/tools/buildspec.git',
         deps_file=deps_file,
         custom_var='checkout_src_internal=True',
-        cache_dir=self.config['gclient_cache_dir'])
+        cache_dir=self.config['chrome_mirror'])
 
     # 'target_os' is mandatory for chromeos build, but 'gclient config' doesn't
     # recognize it. Here add it to .gclient file explicitly.

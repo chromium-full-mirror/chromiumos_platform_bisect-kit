@@ -8,7 +8,7 @@
 Example:
   $ ./bisect_cros_repo.py init --old rev1 --new rev2 \\
       --chromeos_root ~/chromiumos \\
-      --chromeos_repo_mirror_dir $CHROMEOS_REPO_MIRROR_DIR
+      --chromeos_mirror $CHROMEOS_MIRROR
   $ ./bisect_cros_repo.py config switch ./switch_cros_localbuild.py
   $ ./bisect_cros_repo.py config eval ./eval-manually.sh
   $ ./bisect_cros_repo.py run
@@ -62,9 +62,9 @@ class ChromeOSRepoDomain(core.BisectDomain):
         default=configure.get('CHROMEOS_ROOT'),
         help='ChromeOS tree root')
     parser.add_argument(
-        '--chromeos_repo_mirror_dir',
+        '--chromeos_mirror',
         type=cli.argtype_dir_path,
-        default=configure.get('CHROMEOS_REPO_MIRROR_DIR', ''),
+        default=configure.get('CHROMEOS_MIRROR', ''),
         help='ChromeOS repo mirror path')
 
   @staticmethod
@@ -94,10 +94,10 @@ class ChromeOSRepoDomain(core.BisectDomain):
         dut=opts.dut,
         board=opts.board,
         chromeos_root=opts.chromeos_root,
-        chromeos_repo_mirror_dir=opts.chromeos_repo_mirror_dir)
+        chromeos_mirror=opts.chromeos_mirror)
 
     spec_manager = cros_util.ChromeOSSpecManager(config)
-    cache = repo_util.RepoMirror(opts.chromeos_repo_mirror_dir)
+    cache = repo_util.RepoMirror(opts.chromeos_mirror)
 
     # Make sure all repos in between are cached
     float_specs = spec_manager.collect_float_spec(opts.old, opts.new)
@@ -121,7 +121,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
     if self.config['board']:
       env['BOARD'] = self.config['board']
     env['CHROMEOS_ROOT'] = self.config['chromeos_root']
-    env['CHROMEOS_REPO_MIRROR_DIR'] = self.config['chromeos_repo_mirror_dir']
+    env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
     env['INTRA_REV'] = rev
 
   def view(self, old, new):
@@ -129,7 +129,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
     print('new', new)
 
     spec_manager = cros_util.ChromeOSSpecManager(self.config)
-    cache = repo_util.RepoMirror(self.config['chromeos_repo_mirror_dir'])
+    cache = repo_util.RepoMirror(self.config['chromeos_mirror'])
     code_manager = codechange.CodeManager(self.config['chromeos_root'],
                                           spec_manager, cache)
     code_manager.view_rev_diff(old, new)

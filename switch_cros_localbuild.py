@@ -51,9 +51,9 @@ def create_argument_parser():
       default=configure.get('CHROMEOS_ROOT', ''),
       help='ChromeOS tree root (default: %(default)s)')
   parser.add_argument(
-      '--chromeos_repo_mirror_dir',
+      '--chromeos_mirror',
       type=cli.argtype_dir_path,
-      default=configure.get('CHROMEOS_REPO_MIRROR_DIR', ''),
+      default=configure.get('CHROMEOS_MIRROR', ''),
       help='ChromeOS repo mirror path')
   parser.add_argument(
       '--clobber-stateful',
@@ -115,9 +115,9 @@ def switch(opts):
   config = dict(
       board=opts.board,
       chromeos_root=opts.chromeos_root,
-      chromeos_repo_mirror_dir=opts.chromeos_repo_mirror_dir)
+      chromeos_mirror=opts.chromeos_mirror)
   spec_manager = cros_util.ChromeOSSpecManager(config)
-  cache = repo_util.RepoMirror(opts.chromeos_repo_mirror_dir)
+  cache = repo_util.RepoMirror(opts.chromeos_mirror)
   code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager, cache)
   code_manager.switch(opts.rev)
 

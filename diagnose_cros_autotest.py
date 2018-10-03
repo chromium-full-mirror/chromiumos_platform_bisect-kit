@@ -27,6 +27,7 @@ from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import util
+import setup_cros_bisect
 
 logger = logging.getLogger(__name__)
 
@@ -60,46 +61,60 @@ def create_argument_parser():
   parser.add_argument('--session_base', default='bisect.sessions')
   parser.add_argument('--session', help='Session name', required=True)
 
-  group = parser.add_argument_group(title='Essential options')
+  group = parser.add_argument_group(
+      title='Source tree path options',
+      description='''
+      Specify the paths of chromeos/chrome/android mirror and checkout. They
+      have the same default values as setup_cros_bisect.py, so usually you can
+      omit them and it just works.
+      ''')
+  group.add_argument(
+      '--mirror_base',
+      metavar='MIRROR_BASE',
+      default=configure.get('MIRROR_BASE',
+                            setup_cros_bisect.DEFAULT_MIRROR_BASE),
+      help='Directory for mirrors (default: %(default)s)')
+  group.add_argument(
+      '--work_base',
+      metavar='WORK_BASE',
+      default=configure.get('WORK_BASE', setup_cros_bisect.DEFAULT_WORK_BASE),
+      help='Directory for bisection working directories (default: %(default)s)')
   group.add_argument(
       '--chromeos_root',
       metavar='CHROMEOS_ROOT',
       type=cli.argtype_dir_path,
-      required=True,
       default=configure.get('CHROMEOS_ROOT'),
       help='ChromeOS tree root')
   group.add_argument(
-      '--chromeos_repo_mirror_dir',
+      '--chromeos_mirror',
       type=cli.argtype_dir_path,
-      default=configure.get('CHROMEOS_REPO_MIRROR_DIR', ''),
+      default=configure.get('CHROMEOS_MIRROR'),
       help='ChromeOS repo mirror path')
   group.add_argument(
       '--android_root',
       metavar='ANDROID_ROOT',
       type=cli.argtype_dir_path,
-      required=True,
       default=configure.get('ANDROID_ROOT'),
       help='Android tree root')
   group.add_argument(
-      '--android_repo_mirror_dir',
+      '--android_mirror',
       type=cli.argtype_dir_path,
-      required=True,
-      default=configure.get('ANDROID_REPO_MIRROR_DIR'),
+      default=configure.get('ANDROID_MIRROR'),
       help='Android repo mirror path')
   group.add_argument(
       '--chrome_root',
       metavar='CHROME_ROOT',
       type=cli.argtype_dir_path,
-      required=True,
       default=configure.get('CHROME_ROOT'),
       help='Chrome tree root')
   group.add_argument(
-      '--gclient_cache_dir',
-      required=True,
-      metavar='GCLIENT_CACHE_DIR',
+      '--chrome_mirror',
+      metavar='CHROME_MIRROR',
       type=cli.argtype_dir_path,
-      default=configure.get('GCLIENT_CACHE_DIR'),
-      help='gclient cache dir')
+      default=configure.get('CHROME_MIRROR'),
+      help="chrome's gclient cache dir")
+
+  group = parser.add_argument_group(title='Essential options')
   group.add_argument(
       '--old',
       type=cros_util.argtype_cros_version,
@@ -111,6 +126,13 @@ def create_argument_parser():
       required=True,
       help='ChromeOS version with new behavior')
   group.add_argument('test_name', help='Test name')
+
+  group = parser.add_argument_group(title='Options for benchmark test')
+  group.add_argument('--metric', help='Metric name of benchmark test')
+  group.add_argument(
+      '--old_value', type=float, help='For benchmark test, old value of metric')
+  group.add_argument(
+      '--new_value', type=float, help='For benchmark test, new value of metric')
 
   group = parser.add_argument_group(title='DUT allocation options')
   group.add_argument(
@@ -127,13 +149,6 @@ def create_argument_parser():
       '--sku',
       metavar='SKU',
       help='SKU criteria if DUT is auto allocated from the lab')
-
-  group = parser.add_argument_group(title='Options for benchmark test')
-  group.add_argument('--metric', help='Metric name of benchmark test')
-  group.add_argument(
-      '--old_value', type=float, help='For benchmark test, old value of metric')
-  group.add_argument(
-      '--new_value', type=float, help='For benchmark test, new value of metric')
 
   group = parser.add_argument_group(title='Options passed to test_that')
   group.add_argument(
@@ -209,7 +224,20 @@ def determine_chrome_binaries(opts):
   return chrome_binaries
 
 
-def check_options(opts, parser):
+def check_options(opts, parser, path_factory):
+  if not opts.chromeos_mirror:
+    opts.chromeos_mirror = path_factory.get_chromeos_mirror()
+    logger.info('chromeos_mirror = %s', opts.chromeos_mirror)
+  if not opts.chromeos_root:
+    opts.chromeos_root = path_factory.get_chromeos_tree()
+    logger.info('chromeos_root = %s', opts.chromeos_root)
+  if not opts.chrome_mirror:
+    opts.chrome_mirror = path_factory.get_chrome_cache()
+    logger.info('chrome_mirror = %s', opts.chrome_mirror)
+  if not opts.chrome_root:
+    opts.chrome_root = path_factory.get_chrome_tree()
+    logger.info('chrome_root = %s', opts.chrome_root)
+
   if opts.dut == cros_lab_util.LAB_DUT:
     session_dir = os.path.join(opts.session_base, opts.session)
     # 1 is log file
@@ -246,7 +274,9 @@ def main(args=None):
   parser = create_argument_parser()
   opts = parser.parse_args(args)
   common.config_logging(opts)
-  check_options(opts, parser)
+  path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+      opts.mirror_base, opts.work_base, opts.session)
+  check_options(opts, parser, path_factory)
 
   # prebuilt version will be specified later.
   common_switch_cmd = [
@@ -286,9 +316,9 @@ def main(args=None):
     common_eval_cmd.append(opts.dut)
 
     diagnoser = diagnoser_cros.CrosDiagnoser(
-        opts.session, opts.chromeos_root, opts.chromeos_repo_mirror_dir,
-        opts.android_root, opts.android_repo_mirror_dir, opts.chrome_root,
-        opts.gclient_cache_dir, opts.board, opts.noisy, opts.dut)
+        opts.session, path_factory, opts.chromeos_root, opts.chromeos_mirror,
+        opts.android_root, opts.android_mirror, opts.chrome_root,
+        opts.chrome_mirror, opts.board, opts.noisy, opts.dut)
 
     eval_cmd = common_eval_cmd + ['--prebuilt', '--reinstall']
     # Do not specify version for autotest prebuilt switching here. The trick is

@@ -46,16 +46,17 @@ def need_android_bisect(old_info, new_info):
 class CrosDiagnoser(object):
   """Integrated bisectors API for ChromeOS regression analysis."""
 
-  def __init__(self, session, chromeos_root, chromeos_repo_mirror_dir,
-               android_root, android_repo_mirror_dir, chrome_root,
-               gclient_cache_dir, board, noisy, dut):
+  def __init__(self, session, path_factory, chromeos_root, chromeos_mirror,
+               android_root, android_mirror, chrome_root, chrome_mirror, board,
+               noisy, dut):
     self.session = session
+    self.path_factory = path_factory
     self.chromeos_root = chromeos_root
-    self.chromeos_repo_mirror_dir = chromeos_repo_mirror_dir
+    self.chromeos_mirror = chromeos_mirror
     self.android_root = android_root
-    self.android_repo_mirror_dir = android_repo_mirror_dir
+    self.android_mirror = android_mirror
     self.chrome_root = chrome_root
-    self.gclient_cache_dir = gclient_cache_dir
+    self.chrome_mirror = chrome_mirror
     self.board = board
     self.noisy = noisy
     self.dut = dut
@@ -140,6 +141,15 @@ class CrosDiagnoser(object):
     if not need_android_bisect(self.old_info, self.new_info):
       return None
 
+    # TODO(kcwu): what if the branch name does not have 'git_' prefix
+    git_branch = self.old_info['android_branch'].replace('git_', '')
+    if not self.android_mirror:
+      self.android_mirror = self.path_factory.get_android_mirror(git_branch)
+      logger.info('android_mirror = %s', self.android_mirror)
+    if not self.android_root:
+      self.android_root = self.path_factory.get_android_tree(git_branch)
+      logger.info('android_root = %s', self.android_root)
+
     logger.info('bisect android prebuilt')
     session = '%s/%s' % (self.session, self.cros_old)
     bisector = wrapper.BisectorWrapper('bisect_android_build_id', session)
@@ -183,7 +193,7 @@ class CrosDiagnoser(object):
           android_new,
           init_args=[
               '--dut', self.dut, '--android_root', self.android_root,
-              '--android_repo_mirror_dir', self.android_repo_mirror_dir
+              '--android_mirror', self.android_mirror
           ],
           switch_cmd=['./switch_arc_localbuild.py'],
           eval_cmd=eval_cmd,
@@ -233,8 +243,8 @@ class CrosDiagnoser(object):
           self.old_info['cr_version'],
           self.new_info['cr_version'],
           init_args=[
-              '--chrome_root', self.chrome_root, '--gclient_cache_dir',
-              self.gclient_cache_dir
+              '--chrome_root', self.chrome_root, '--chrome_mirror',
+              self.chrome_mirror
           ],
           switch_cmd=switch_cmd,
           eval_cmd=eval_cmd,
@@ -274,8 +284,7 @@ class CrosDiagnoser(object):
         self.cros_new,
         init_args=[
             '--dut', self.dut, '--board', self.board, '--chromeos_root',
-            self.chromeos_root, '--chromeos_repo_mirror_dir',
-            self.chromeos_repo_mirror_dir
+            self.chromeos_root, '--chromeos_mirror', self.chromeos_mirror
         ],
         switch_cmd=['./switch_cros_localbuild.py'],
         eval_cmd=eval_cmd,

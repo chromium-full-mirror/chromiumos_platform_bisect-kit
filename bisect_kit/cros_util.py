@@ -769,8 +769,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
     self.manifest_dir = os.path.join(self.config['chromeos_root'], '.repo',
                                      'manifests')
     self.historical_manifest_git_dir = os.path.join(
-        self.config['chromeos_repo_mirror_dir'],
-        'chromeos/manifest-versions.git')
+        self.config['chromeos_mirror'], 'chromeos/manifest-versions.git')
     if not os.path.exists(self.historical_manifest_git_dir):
       raise core.ExecutionFatalError(
           'Manifest snapshots should be cloned into %s' %
@@ -885,7 +884,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         'https://chrome-internal.googlesource.com/chromeos/manifest-internal',
         manifest_name=manifest_name,
         repo_url='https://chromium.googlesource.com/external/repo.git',
-        reference=self.config['chromeos_repo_mirror_dir'],
+        reference=self.config['chromeos_mirror'],
     )
 
     # Note, don't sync with current_branch=True for chromeos. One of its
