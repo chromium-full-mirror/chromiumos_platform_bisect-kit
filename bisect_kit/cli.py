@@ -584,7 +584,7 @@ class BisectorCommandLine(object):
     if self.states:
       assert self.states.session_file == session_file
     else:
-      self.states = core.States(session_file)
+      self.states = core.BisectStates(session_file)
 
   def cmd_config(self, opts):
     """Configures additional setting.

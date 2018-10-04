@@ -69,9 +69,10 @@ class RevInfo(object):
 
 
 class States(object):
-  """Bisection states.
+  """Base class for serializing program state to disk.
 
-  After instantiation, it needs to be init() or load().
+  After instantiation, set_data() or load() should be invoked before access
+  state values.
   """
 
   def __init__(self, session_file):
@@ -85,10 +86,63 @@ class States(object):
 
     # Persistent data (dict). This is the canonical source of data. All other
     # fields are derived from this one. The whole dict will be serialized as
-    # json to session file. See comments in init() for sub-fields inside
-    # self.data.
+    # json to session file. Semantic of sub-fields are defined by subclasses.
     # Before initialization, its value is None.
     self.data = None
+
+  def reset(self):
+    """Resets state and deletes saved file."""
+    self.data = None
+    os.unlink(self.session_file)
+
+  def set_data(self, data):
+    """Sets state dict data.
+
+    Subclass may override this method for post-processing.
+
+    Args:
+      data: program state data (dict)
+    """
+    self.data = data
+
+  def load(self):
+    """Loads saved data from file.
+
+    Returns:
+      True if loaded successfully.
+    """
+    if not os.path.exists(self.session_file):
+      return False
+    self.set_data(json.load(file(self.session_file)))
+    return True
+
+  def save(self):
+    dirname = os.path.dirname(self.session_file)
+    if not os.path.exists(dirname):
+      os.makedirs(dirname)
+
+    tmp_fn = tempfile.mktemp()
+    with file(tmp_fn, 'w') as f:
+      f.write(json.dumps(self.data, indent=4, sort_keys=True))
+    # Move is an atomic operation, so the session file won't be corrupted due
+    # to program terminated by any reason.
+    shutil.move(tmp_fn, self.session_file)
+
+
+class BisectStates(States):
+  """Bisection states.
+
+  After instantiation, init() or load() should be invoked before access state
+  values.
+  """
+
+  def __init__(self, session_file):
+    """Initializes BisectStates.
+
+    Args:
+      session_file: path of session file.
+    """
+    super(BisectStates, self).__init__(session_file)
 
     # Mapping of rev to idx; constructed from data['revlist'].
     self.rev_index = {}
@@ -117,22 +171,23 @@ class States(object):
     # optimization if evaluator is much faster than switcher.
     stats = dict(switch_count=0, eval_count=0, switch_time=0, eval_time=0)
 
-    self.data = dict(
-        # Bisection configurations (dict), values are determined by cmd_init
-        # and each domain's init functions. There will be 'old' and 'new' at
-        # least.
-        config=config,
-        # List of bisect candidates (version numbers).
-        revlist=revlist,
-        # What have been done so far. Each entry contains at least timestamp,
-        # rev, and result.
-        history=[],
-        # Statistics values, see above.
-        stats=stats)
+    self.set_data(
+        dict(
+            # Bisection configurations (dict), values are determined by cmd_init
+            # and each domain's init functions. There will be 'old' and 'new' at
+            # least.
+            config=config,
+            # List of bisect candidates (version numbers).
+            revlist=revlist,
+            # What have been done so far. Each entry contains at least
+            # timestamp, rev, and result.
+            history=[],
+            # Statistics values, see above.
+            stats=stats))
 
-    self._post_data_init()
+  def set_data(self, data):
+    super(BisectStates, self).set_data(data)
 
-  def _post_data_init(self):
     self.rev_info = []
     self.rev_index = {}
 
@@ -145,11 +200,6 @@ class States(object):
       self.rev_info[idx][entry['status']] += entry.get('times', 1)
       self.rev_info[idx].values += entry.get('values', [])
 
-  def reset(self):
-    """Resets state and deletes saved file."""
-    self.init({}, [])
-    os.unlink(self.session_file)
-
   def get(self, idx):
     """Get rev info by index.
 
@@ -157,31 +207,6 @@ class States(object):
       idx: index of rev
     """
     return self.rev_info[idx]
-
-  def load(self):
-    """Loads saved data from file.
-
-    Returns:
-      True if loaded successfully.
-    """
-    if not os.path.exists(self.session_file):
-      return False
-    self.data = json.load(file(self.session_file))
-
-    self._post_data_init()
-    return True
-
-  def save(self):
-    dirname = os.path.dirname(self.session_file)
-    if not os.path.exists(dirname):
-      os.makedirs(dirname)
-
-    tmp_fn = tempfile.mktemp()
-    with file(tmp_fn, 'w') as f:
-      f.write(json.dumps(self.data, indent=4, sort_keys=True))
-    # Move is an atomic operation, so the session file won't be corrupted due
-    # to program terminated by any reason.
-    shutil.move(tmp_fn, self.session_file)
 
   def idx2rev(self, idx):
     return self.rev_info[idx].rev
