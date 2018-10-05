@@ -99,6 +99,9 @@ def cleanup_repo_generated_files(repo_dir, manifest_name='default.xml'):
     manifest_name: filename of manifest
   """
   manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
+  manifest_path = os.path.join(manifest_dir, manifest_name)
+  if os.path.islink(manifest_path):
+    manifest_name = os.readlink(manifest_path)
   parser = ManifestParser(manifest_dir)
   manifest = parser.parse_xml_recursive('HEAD', manifest_name)
 
