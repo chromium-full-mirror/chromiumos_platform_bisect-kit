@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Module to manipulate machines in chromeos test lab."""
 from __future__ import print_function
+import collections
 import contextlib
 import errno
 import logging
@@ -133,14 +134,27 @@ def allocate_host(reason, board=None, sku=None, extra_labels=None):
   if extra_labels:
     labels += extra_labels
 
-  hosts = list_host(labels=labels, locked=False, statuses=['Ready'])
+  hosts = list_host(labels=labels)
   if not hosts:
-    logger.error('no hosts meet requirements')
+    logger.error('no hosts meet requirements: %s', labels)
     return None
-  dut = hosts.popitem()[1]
 
-  lock_host(dut['Host'], reason)
-  return dut['Host']
+  target_host = None
+  status_counter = collections.Counter()
+  for host, info in hosts.items():
+    if info.get('Locked') == 'True':
+      status_counter['Locked'] += 1
+    else:
+      status_counter[info['Status']] += 1
+      if info['Status'] == 'Ready':
+        target_host = host
+  logger.info('host status: %s', status_counter)
+  if not target_host:
+    logger.error('no unlocked hosts are in Ready state')
+    return None
+
+  lock_host(target_host, reason)
+  return target_host
 
 
 @contextlib.contextmanager
