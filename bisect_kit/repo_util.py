@@ -294,6 +294,12 @@ class RepoMirror(codechange.CodeStorage):
 
   def cached_git_root(self, repo_url):
     cache_path = self._url_to_cache_dir(repo_url)
+
+    # The location of chromeos manifest-internal repo mirror is irregular
+    # (http://crbug.com/895957). This is a workaround.
+    if cache_path == 'chromeos/manifest-internal.git':
+      cache_path = 'manifest-internal.git'
+
     return os.path.join(self.mirror_dir, cache_path)
 
   def _load_project_list(self, project_root):
