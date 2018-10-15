@@ -26,7 +26,9 @@ import argparse
 import csv
 import logging
 import os
+import time
 import urllib2
+import urlparse
 
 from bisect_kit import common
 from bisect_kit import configure
@@ -104,6 +106,37 @@ def snapshot_or_copytree(src, dst):
     util.check_call('cp', '-a', src, dst)
 
 
+def collect_removed_manifest_repos(repo_dir, last_sync_time):
+  manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
+
+  manifest_path = 'default.xml'
+  manifest_full_path = os.path.join(manifest_dir, manifest_path)
+  # hack for chromeos symlink
+  if os.path.islink(manifest_full_path):
+    manifest_path = os.readlink(manifest_full_path)
+
+  parser = repo_util.ManifestParser(manifest_dir)
+  latest = None
+  removed = {}
+  for _, git_rev in reversed(
+      parser.enumerate_manifest_commits(last_sync_time, None, manifest_path)):
+    root = parser.parse_xml_recursive(git_rev, manifest_path)
+    entries = parser.process_parsed_result(root)
+    if latest is None:
+      assert entries is not None
+      latest = entries
+      continue
+
+    for path, path_spec in entries.items():
+      if path in latest:
+        continue
+      if path in removed:
+        continue
+      removed[path] = path_spec
+
+  return removed
+
+
 def setup_chromeos_repos(opts, path_factory):
   chromeos_mirror = path_factory.get_chromeos_mirror()
   chromeos_tree = path_factory.get_chromeos_tree()
@@ -151,12 +184,57 @@ def setup_chromeos_repos(opts, path_factory):
   repo_util.sync(chromeos_tree)
 
 
+def read_last_sync_time(repo_dir):
+  timestamp_path = os.path.join(repo_dir, 'last_sync_time')
+  if os.path.exists(timestamp_path):
+    with open(timestamp_path) as f:
+      return int(f.read())
+  else:
+    # 4 months should be enough for most bisect cases.
+    return int(time.time()) - 86400 * 120
+
+
+def write_sync_time(repo_dir, sync_time):
+  timestamp_path = os.path.join(repo_dir, 'last_sync_time')
+  with open(timestamp_path, 'w') as f:
+    f.write('%d\n' % sync_time)
+
+
+def write_extra_manifest_to_mirror(repo_dir, removed):
+  local_manifest_dir = os.path.join(repo_dir, '.repo', 'local_manifests')
+  if not os.path.exists(local_manifest_dir):
+    os.mkdir(local_manifest_dir)
+  with open(os.path.join(local_manifest_dir, 'deleted-repos.xml'), 'w') as f:
+    f.write('''<?xml version="1.0" encoding="UTF-8"?>\n<manifest>\n''')
+    remotes = {}
+    for path_spec in removed.values():
+      scheme, netloc, remote_path = urlparse.urlsplit(path_spec.repo_url)[:3]
+      assert remote_path[0] == '/'
+      remote_path = remote_path[1:]
+      if (scheme, netloc) not in remotes:
+        remote_name = 'remote_for_deleted_repo_%s' % (scheme + netloc)
+        remotes[scheme, netloc] = remote_name
+        f.write('''  <remote name="%s" fetch="%s" />\n''' %
+                (remote_name, '%s://%s' % (scheme, netloc)))
+      f.write('''  <project name="%s" path="%s" remote="%s"/>\n''' %
+              (remote_path, path_spec.path, remotes[scheme, netloc]))
+    f.write('''</manifest>\n''')
+
+
 def sync_chromeos_code(opts, path_factory):
   del opts  # unused
 
-  logger.info('repo sync for chromeos mirror')
+  start_sync_time = int(time.time())
   chromeos_mirror = path_factory.get_chromeos_mirror()
+
+  last_sync_time = read_last_sync_time(chromeos_mirror)
+  removed = collect_removed_manifest_repos(chromeos_mirror, last_sync_time)
+  write_extra_manifest_to_mirror(chromeos_mirror, removed)
+  logger.info('since last sync, %d repo got removed', len(removed))
+
+  logger.info('repo sync for chromeos mirror')
   repo_util.sync(chromeos_mirror)
+  write_sync_time(chromeos_mirror, start_sync_time)
 
   logger.info('repo sync for chromeos tree')
   chromeos_tree = path_factory.get_chromeos_tree()
@@ -272,11 +350,18 @@ def setup_android_repos(opts, path_factory, branch):
 
 def sync_android_code(opts, path_factory, branch):
   del opts  # unused
+  start_sync_time = int(time.time())
   android_mirror = path_factory.get_android_mirror(branch)
   android_tree = path_factory.get_android_tree(branch)
 
+  last_sync_time = read_last_sync_time(android_mirror)
+  removed = collect_removed_manifest_repos(android_mirror, last_sync_time)
+  write_extra_manifest_to_mirror(android_mirror, removed)
+  logger.info('since last sync, %d repo got removed', len(removed))
+
   logger.info('repo sync for android mirror branch=%s', branch)
   repo_util.sync(android_mirror, current_branch=True)
+  write_sync_time(android_mirror, start_sync_time)
 
   logger.info('repo sync for android tree branch=%s', branch)
   repo_util.sync(android_tree, current_branch=True)
