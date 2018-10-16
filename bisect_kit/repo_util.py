@@ -33,7 +33,6 @@ def get_manifest_url(manifest_dir):
   """
   url = util.check_output(
       'git', 'config', 'remote.origin.url', cwd=manifest_dir)
-  url = re.sub(r'^persistent-(https?://)', r'\1', url)
   return url
 
 
@@ -187,6 +186,21 @@ def get_manifest_groups(repo_dir):
   return info(repo_dir, 'Manifest groups')
 
 
+def _urljoin(base, url):
+  # urlparse.urljoin doesn't recognize "persistent-https://" protocol.
+  # Following hack replaces "persistent-https" by obsolete protocol "gopher"
+  # before urlparse.urljoin and replaces back after urlparse.urljoin calls.
+  dummy_scheme = 'gopher://'
+  new_scheme = 'persistent-https://'
+  assert not base.startswith(dummy_scheme)
+  assert not url.startswith(dummy_scheme)
+  base = re.sub('^' + new_scheme, dummy_scheme, base)
+  url = re.sub('^' + new_scheme, dummy_scheme, url)
+  result = urlparse.urljoin(base, url)
+  result = re.sub('^' + dummy_scheme, new_scheme, result)
+  return result
+
+
 class ManifestParser(object):
   """Enumerates historical manifest files and parses them."""
 
@@ -223,7 +237,7 @@ class ManifestParser(object):
     remote_fetch_map = {}
     for remote in root.findall('.//remote'):
       name = remote.get('name')
-      fetch_url = urlparse.urljoin(self.manifest_url, remote.get('fetch'))
+      fetch_url = _urljoin(self.manifest_url, remote.get('fetch'))
       if urlparse.urlparse(fetch_url).path not in ('', '/'):
         # TODO(kcwu): support remote url with sub folders
         raise ValueError(
@@ -248,7 +262,7 @@ class ManifestParser(object):
       if remote_name not in remote_fetch_map:
         raise ValueError('unknown remote name=%s' % remote_name)
       fetch_url = remote_fetch_map.get(remote_name)
-      repo_url = urlparse.urljoin(fetch_url, project.get('name'))
+      repo_url = _urljoin(fetch_url, project.get('name'))
 
       result[path] = codechange.PathSpec(path, repo_url, revision)
     return result
