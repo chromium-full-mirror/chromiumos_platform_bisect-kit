@@ -12,6 +12,12 @@ import errno
 
 logger = logging.getLogger(__name__)
 
+# Lock file to prevent multiple bisect instances sync code at the same time.
+# Each bisection's workdir is supposed only used by one bisector and no need to
+# lock. However the code mirror is shared and need lock to protect.
+# Relative to mirror root.
+LOCK_FILE_FOR_MIRROR_SYNC = '.bisect-kit.sync.lock'
+
 LOCK_FILE_FOR_BUILD = '/var/lock/bisect-kit.build'
 
 

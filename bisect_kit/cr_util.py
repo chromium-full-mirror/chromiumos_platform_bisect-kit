@@ -434,7 +434,10 @@ class ChromeSpecManager(codechange.SpecManager):
       f.write('target_os = ["chromeos"]\n')
 
     gclient_util.sync(
-        self.config['chrome_root'], with_branch_heads=True, with_tags=True)
+        self.config['chrome_root'],
+        with_branch_heads=True,
+        with_tags=True,
+        ignore_locks=True)
 
   def sync_to_release(self, rev):
     """Switch source tree to given release version.
@@ -448,7 +451,11 @@ class ChromeSpecManager(codechange.SpecManager):
       # Give hint that first time sync is very slow.
       logger.info(
           'gclient sync --with_branch_heads, may need more than half hours')
-    self._gclient_sync_depfile(release_deps_file)
+
+    with locking.lock_file(
+        os.path.join(self.config['chrome_mirror'],
+                     locking.LOCK_FILE_FOR_MIRROR_SYNC)):
+      self._gclient_sync_depfile(release_deps_file)
 
   def sync_disk_state(self, rev):
     self.sync_to_release(rev)

@@ -34,6 +34,7 @@ from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import gclient_util
 from bisect_kit import git_util
+from bisect_kit import locking
 from bisect_kit import repo_util
 from bisect_kit import util
 
@@ -181,8 +182,10 @@ def setup_chromeos_repos(opts, path_factory):
       repo_url=repo_url,
       reference=chromeos_mirror)
 
-  logger.info('repo sync for chromeos mirror (this takes hours; be patient)')
-  repo_util.sync(chromeos_mirror)
+  with locking.lock_file(
+      os.path.join(chromeos_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
+    logger.info('repo sync for chromeos mirror (this takes hours; be patient)')
+    repo_util.sync(chromeos_mirror)
 
   logger.info('repo sync for chromeos tree')
   repo_util.sync(chromeos_tree)
@@ -289,29 +292,32 @@ target_os = ['chromeos']
 cache_dir = %r
 ''' % (latest_branch, chrome_cache)
 
-  logger.info('gclient config for chrome')
-  gclient_util.config(chrome_tree, spec=spec)
+  with locking.lock_file(
+      os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
+    logger.info('gclient config for chrome')
+    gclient_util.config(chrome_tree, spec=spec)
 
-  is_first_sync = not os.listdir(chrome_cache)
-  if is_first_sync:
-    logger.info('gclient sync for chrome (this takes hours; be patient)')
-  else:
-    logger.info('gclient sync for chrome')
-  gclient_util.sync(chrome_tree, with_branch_heads=True, with_tags=True)
+    is_first_sync = not os.listdir(chrome_cache)
+    if is_first_sync:
+      logger.info('gclient sync for chrome (this takes hours; be patient)')
+    else:
+      logger.info('gclient sync for chrome')
+    gclient_util.sync(
+        chrome_tree, with_branch_heads=True, with_tags=True, ignore_locks=True)
 
-  # It's possible that some repos are removed from latest branch and thus their
-  # commit history is not fetched in recent gclient sync. So we call 'git
-  # fetch' for all existing git mirrors.
-  # TODO(kcwu): only sync repos not in DEPS files of latest branch
-  logger.info('additional sync for chrome mirror')
-  for git_repo_name in os.listdir(chrome_cache):
-    # another gclient is running or leftover of previous run; skip
-    if git_repo_name.startswith('_cache_tmp'):
-      continue
-    git_repo = os.path.join(chrome_cache, git_repo_name)
-    if not git_util.is_git_rev(git_repo):
-      continue
-    util.check_call('git', 'fetch', cwd=git_repo)
+    # It's possible that some repos are removed from latest branch and thus
+    # their commit history is not fetched in recent gclient sync. So we call
+    # 'git fetch' for all existing git mirrors.
+    # TODO(kcwu): only sync repos not in DEPS files of latest branch
+    logger.info('additional sync for chrome mirror')
+    for git_repo_name in os.listdir(chrome_cache):
+      # another gclient is running or leftover of previous run; skip
+      if git_repo_name.startswith('_cache_tmp'):
+        continue
+      git_repo = os.path.join(chrome_cache, git_repo_name)
+      if not git_util.is_git_rev(git_repo):
+        continue
+      util.check_call('git', 'fetch', cwd=git_repo)
 
 
 def sync_chrome_code(opts, path_factory):
@@ -363,14 +369,16 @@ def sync_android_code(opts, path_factory, branch):
   android_mirror = path_factory.get_android_mirror(branch)
   android_tree = path_factory.get_android_tree(branch)
 
-  logger.info('repo sync for android mirror branch=%s', branch)
-  # Android usually big jump between milestone releases and add/delete lots of
-  # repos when switch releases. Because it's infeasible to bisect between such
-  # big jump, the deleted repo is useless. In order to save disk, do not sync
-  # repos deleted in other branches.
-  generate_extra_manifest_for_deleted_repo(android_mirror, only_branch=branch)
-  repo_util.sync(android_mirror, current_branch=True)
-  write_sync_time(android_mirror, start_sync_time)
+  with locking.lock_file(
+      os.path.join(android_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
+    logger.info('repo sync for android mirror branch=%s', branch)
+    # Android usually big jump between milestone releases and add/delete lots of
+    # repos when switch releases. Because it's infeasible to bisect between such
+    # big jump, the deleted repo is useless. In order to save disk, do not sync
+    # repos deleted in other branches.
+    generate_extra_manifest_for_deleted_repo(android_mirror, only_branch=branch)
+    repo_util.sync(android_mirror, current_branch=True)
+    write_sync_time(android_mirror, start_sync_time)
 
   logger.info('repo sync for android tree branch=%s', branch)
   repo_util.sync(android_tree, current_branch=True)
