@@ -55,126 +55,23 @@ CHROME_BINARIES_OF_TEST = {
 }
 
 
-def create_argument_parser():
-  parser = argparse.ArgumentParser()
-  common.add_common_arguments(parser)
-  parser.add_argument('--session_base', default='bisect.sessions')
-  parser.add_argument('--session', help='Session name', required=True)
+class DiagnoseStates(core.States):
+  """Diagnose states."""
 
-  group = parser.add_argument_group(
-      title='Source tree path options',
-      description='''
-      Specify the paths of chromeos/chrome/android mirror and checkout. They
-      have the same default values as setup_cros_bisect.py, so usually you can
-      omit them and it just works.
-      ''')
-  group.add_argument(
-      '--mirror_base',
-      metavar='MIRROR_BASE',
-      default=configure.get('MIRROR_BASE',
-                            setup_cros_bisect.DEFAULT_MIRROR_BASE),
-      help='Directory for mirrors (default: %(default)s)')
-  group.add_argument(
-      '--work_base',
-      metavar='WORK_BASE',
-      default=configure.get('WORK_BASE', setup_cros_bisect.DEFAULT_WORK_BASE),
-      help='Directory for bisection working directories (default: %(default)s)')
-  group.add_argument(
-      '--chromeos_root',
-      metavar='CHROMEOS_ROOT',
-      type=cli.argtype_dir_path,
-      default=configure.get('CHROMEOS_ROOT'),
-      help='ChromeOS tree root')
-  group.add_argument(
-      '--chromeos_mirror',
-      type=cli.argtype_dir_path,
-      default=configure.get('CHROMEOS_MIRROR'),
-      help='ChromeOS repo mirror path')
-  group.add_argument(
-      '--android_root',
-      metavar='ANDROID_ROOT',
-      type=cli.argtype_dir_path,
-      default=configure.get('ANDROID_ROOT'),
-      help='Android tree root')
-  group.add_argument(
-      '--android_mirror',
-      type=cli.argtype_dir_path,
-      default=configure.get('ANDROID_MIRROR'),
-      help='Android repo mirror path')
-  group.add_argument(
-      '--chrome_root',
-      metavar='CHROME_ROOT',
-      type=cli.argtype_dir_path,
-      default=configure.get('CHROME_ROOT'),
-      help='Chrome tree root')
-  group.add_argument(
-      '--chrome_mirror',
-      metavar='CHROME_MIRROR',
-      type=cli.argtype_dir_path,
-      default=configure.get('CHROME_MIRROR'),
-      help="chrome's gclient cache dir")
+  def init(self, config):
+    self.set_data(dict(config=config))
 
-  group = parser.add_argument_group(title='Essential options')
-  group.add_argument(
-      '--old',
-      type=cros_util.argtype_cros_version,
-      required=True,
-      help='ChromeOS version with old behavior')
-  group.add_argument(
-      '--new',
-      type=cros_util.argtype_cros_version,
-      required=True,
-      help='ChromeOS version with new behavior')
-  group.add_argument('test_name', help='Test name')
-
-  group = parser.add_argument_group(title='Options for benchmark test')
-  group.add_argument('--metric', help='Metric name of benchmark test')
-  group.add_argument(
-      '--old_value', type=float, help='For benchmark test, old value of metric')
-  group.add_argument(
-      '--new_value', type=float, help='For benchmark test, new value of metric')
-
-  group = parser.add_argument_group(title='DUT allocation options')
-  group.add_argument(
-      'dut',
-      metavar='DUT',
-      help='Address of DUT (Device Under Test). If "%s", DUT will be '
-      'automatically allocated from the lab' % cros_lab_util.LAB_DUT)
-  group.add_argument(
-      '--board',
-      metavar='BOARD',
-      default=configure.get('BOARD'),
-      help='ChromeOS board name')
-  group.add_argument(
-      '--sku',
-      metavar='SKU',
-      help='SKU criteria if DUT is auto allocated from the lab')
-
-  group = parser.add_argument_group(title='Options passed to test_that')
-  group.add_argument(
-      '--args',
-      help='Extra args passed to "test_that --args"; Overrides the default')
-
-  group = parser.add_argument_group(title='Bisect behavior options')
-  group.add_argument(
-      '--noisy',
-      help='Enable noisy binary search. Example value: "old=1/10,new=2/3"')
-  group.add_argument(
-      '--always_reflash',
-      action='store_true',
-      help='Do not trust ChromeOS version number of DUT and always reflash. '
-      'This is usually only needed when resume because previous bisect was '
-      'interrupted and the DUT may be in an unexpected state')
-
-  return parser
+  @property
+  def config(self):
+    return self.data['config']
 
 
-def grab_dut(opts):
+def grab_dut(config):
   # Assume "DEPENDENCIES" is identical between the period of
   # `old` and `new` version.
-  autotest_dir = os.path.join(opts.chromeos_root,
+  autotest_dir = os.path.join(config['chromeos_root'],
                               cros_util.prebuilt_autotest_dir)
-  info = cros_util.get_autotest_test_info(autotest_dir, opts.test_name)
+  info = cros_util.get_autotest_test_info(autotest_dir, config['test_name'])
   assert info
 
   extra_labels = []
@@ -186,8 +83,9 @@ def grab_dut(opts):
       continue
     extra_labels.append(label)
 
-  reason = 'bisect-kit: %s' % opts.session
-  host = cros_lab_util.allocate_host(reason, opts.board, opts.sku, extra_labels)
+  reason = 'bisect-kit: %s' % config['session']
+  host = cros_lab_util.allocate_host(reason, config['board'], config['sku'],
+                                     extra_labels)
   if not host:
     logger.error('unable to allocate dut')
     return None
@@ -206,147 +104,338 @@ def may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
   return False
 
 
-def determine_chrome_binaries(opts):
+def determine_chrome_binaries(chromeos_root, test_name):
   chrome_binaries = None
   for name_pattern, binaries in CHROME_BINARIES_OF_TEST.items():
-    if fnmatch.fnmatch(opts.test_name, name_pattern):
+    if fnmatch.fnmatch(test_name, name_pattern):
       chrome_binaries = binaries
       break
 
-  autotest_dir = os.path.join(opts.chromeos_root,
-                              cros_util.prebuilt_autotest_dir)
+  autotest_dir = os.path.join(chromeos_root, cros_util.prebuilt_autotest_dir)
   if chrome_binaries:
     logger.info('This test depends on chrome binary: %s', chrome_binaries)
-  elif may_depend_on_extra_chrome_binaries(autotest_dir, opts.test_name):
+  elif may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
     logger.warning(
         '%s code used ChromeBinaryTest but the binary is unknown; '
-        'please update CHROME_BINARIES_OF_TEST table', opts.test_name)
+        'please update CHROME_BINARIES_OF_TEST table', test_name)
   return chrome_binaries
 
 
-def check_options(opts, parser, path_factory):
-  if not opts.chromeos_mirror:
-    opts.chromeos_mirror = path_factory.get_chromeos_mirror()
-    logger.info('chromeos_mirror = %s', opts.chromeos_mirror)
-  if not opts.chromeos_root:
-    opts.chromeos_root = path_factory.get_chromeos_tree()
-    logger.info('chromeos_root = %s', opts.chromeos_root)
-  if not opts.chrome_mirror:
-    opts.chrome_mirror = path_factory.get_chrome_cache()
-    logger.info('chrome_mirror = %s', opts.chrome_mirror)
-  if not opts.chrome_root:
-    opts.chrome_root = path_factory.get_chrome_tree()
-    logger.info('chrome_root = %s', opts.chrome_root)
+class DiagnoseCommandLine(object):
+  """Diagnose command line interface."""
 
-  if opts.dut == cros_lab_util.LAB_DUT:
-    session_dir = os.path.join(opts.session_base, opts.session)
-    # 1 is log file
-    if os.path.exists(session_dir) and len(os.listdir(session_dir)) > 1:
-      parser.error('Do not resume if the DUT is dynamically allocated; '
-                   '%s is not empty' % session_dir)
+  def __init__(self):
+    common.init()
+    self.argument_parser = self.create_argument_parser()
+    self.states = None
 
-  if not opts.board:
-    if opts.dut == cros_lab_util.LAB_DUT:
-      parser.error(
-          '--board need to be specified if DUT is "%s"' % cros_lab_util.LAB_DUT)
+  @property
+  def config(self):
+    return self.states.config
+
+  def check_options(self, opts, path_factory):
+    if not opts.chromeos_mirror:
+      opts.chromeos_mirror = path_factory.get_chromeos_mirror()
+      logger.info('chromeos_mirror = %s', opts.chromeos_mirror)
+    if not opts.chromeos_root:
+      opts.chromeos_root = path_factory.get_chromeos_tree()
+      logger.info('chromeos_root = %s', opts.chromeos_root)
+    if not opts.chrome_mirror:
+      opts.chrome_mirror = path_factory.get_chrome_cache()
+      logger.info('chrome_mirror = %s', opts.chrome_mirror)
+    if not opts.chrome_root:
+      opts.chrome_root = path_factory.get_chrome_tree()
+      logger.info('chrome_root = %s', opts.chrome_root)
+
+    if not opts.board:
+      if opts.dut == cros_lab_util.LAB_DUT:
+        self.argument_parser.error('--board need to be specified if DUT is "%s"'
+                                   % cros_lab_util.LAB_DUT)
+      else:
+        opts.board = cros_util.query_dut_board(opts.dut)
+
+    if cros_util.is_cros_short_version(opts.old):
+      opts.old = cros_util.version_to_full(opts.board, opts.old)
+    if cros_util.is_cros_short_version(opts.new):
+      opts.new = cros_util.version_to_full(opts.board, opts.new)
+
+    if opts.metric:
+      if opts.old_value is None:
+        self.argument_parser.error('--old_value is not provided')
+      if opts.new_value is None:
+        self.argument_parser.error('--new_value is not provided')
     else:
-      opts.board = cros_util.query_dut_board(opts.dut)
+      if opts.old_value is not None:
+        self.argument_parser.error(
+            '--old_value is provided but --metric is not')
+      if opts.new_value is not None:
+        self.argument_parser.error(
+            '--new_value is provided but --metric is not')
 
-  if cros_util.is_cros_short_version(opts.old):
-    opts.old = cros_util.version_to_full(opts.board, opts.old)
-  if cros_util.is_cros_short_version(opts.new):
-    opts.new = cros_util.version_to_full(opts.board, opts.new)
+  def cmd_init(self, opts):
+    path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+        opts.mirror_base, opts.work_base, opts.session)
+    self.check_options(opts, path_factory)
 
-  if opts.metric:
-    if opts.old_value is None:
-      parser.error('--old_value is not provided')
-    if opts.new_value is None:
-      parser.error('--new_value is not provided')
-  else:
-    if opts.old_value is not None:
-      parser.error('--old_value is provided but --metric is not')
-    if opts.new_value is not None:
-      parser.error('--new_value is provided but --metric is not')
+    config = dict(
+        session=opts.session,
+        mirror_base=opts.mirror_base,
+        work_base=opts.work_base,
+        chromeos_root=opts.chromeos_root,
+        chromeos_mirror=opts.chromeos_mirror,
+        chrome_root=opts.chrome_root,
+        chrome_mirror=opts.chrome_mirror,
+        android_root=opts.android_root,
+        android_mirror=opts.android_mirror,
+        old=opts.old,
+        new=opts.new,
+        test_name=opts.test_name,
+        metric=opts.metric,
+        board=opts.board,
+        sku=opts.sku,
+        old_value=opts.old_value,
+        new_value=opts.new_value,
+        dut=opts.dut,
+        noisy=opts.noisy,
+        test_that_args=opts.args,
+        always_reflash=opts.always_reflash,
+    )
 
+    self.states.init(config)
 
-def main(args=None):
-  common.init()
-  parser = create_argument_parser()
-  opts = parser.parse_args(args)
-  common.config_logging(opts)
-  path_factory = setup_cros_bisect.DefaultProjectPathFactory(
-      opts.mirror_base, opts.work_base, opts.session)
-  check_options(opts, parser, path_factory)
+    # Unpack old autotest prebuilt, assume following information don't change
+    # between versions:
+    #  - what chrome binaries to run
+    #  - dependency labels for DUT allocation
+    common_switch_cmd, _common_eval_cmd = self._build_cmds()
+    util.check_call(*(common_switch_cmd + [self.config['old']]))
 
-  # prebuilt version will be specified later.
-  common_switch_cmd = [
-      './switch_autotest_prebuilt.py',
-      '--chromeos_root', opts.chromeos_root,
-      '--test_name', opts.test_name,
-      '--board', opts.board,
-  ]  # yapf: disable
+    self.states.save()
 
-  common_eval_cmd = [
-      './eval_cros_autotest.py',
-      '--chromeos_root', opts.chromeos_root,
-      '--test_name', opts.test_name,
-  ]  # yapf: disable
-  if opts.metric:
-    common_eval_cmd += [
-        '--metric', opts.metric,
-        '--old_value', str(opts.old_value),
-        '--new_value', str(opts.new_value),
+  def _build_cmds(self):
+    # prebuilt version will be specified later.
+    common_switch_cmd = [
+        './switch_autotest_prebuilt.py',
+        '--chromeos_root', self.config['chromeos_root'],
+        '--test_name', self.config['test_name'],
+        '--board', self.config['board'],
     ]  # yapf: disable
-  if opts.args:
-    common_eval_cmd += ['--args', opts.args]
 
-  # Unpack old autotest prebuilt, assume following information don't change
-  # between versions:
-  #  - what chrome binaries to run
-  #  - dependency labels for DUT allocation
-  util.check_call(*(common_switch_cmd + [opts.old]))
+    common_eval_cmd = [
+        './eval_cros_autotest.py',
+        '--chromeos_root', self.config['chromeos_root'],
+        '--test_name', self.config['test_name'],
+    ]  # yapf: disable
+    if self.config['metric']:
+      common_eval_cmd += [
+          '--metric', self.config['metric'],
+          '--old_value', str(self.config['old_value']),
+          '--new_value', str(self.config['new_value']),
+      ]  # yapf: disable
+    if self.config['test_that_args']:
+      common_eval_cmd += ['--args', self.config['test_that_args']]
+    return common_switch_cmd, common_eval_cmd
 
-  chrome_binaries = determine_chrome_binaries(opts)
+  def cmd_run(self, opts):
+    del opts  # unused
 
-  with cros_lab_util.dut_manager(opts.dut, lambda: grab_dut(opts)) as dut:
-    if not dut:
-      raise core.ExecutionFatalError('unable to allocate DUT')
-    assert cros_util.is_dut(dut)
-    opts.dut = dut
-    common_eval_cmd.append(opts.dut)
+    self.states.load()
 
-    diagnoser = diagnoser_cros.CrosDiagnoser(
-        opts.session, path_factory, opts.chromeos_root, opts.chromeos_mirror,
-        opts.android_root, opts.android_mirror, opts.chrome_root,
-        opts.chrome_mirror, opts.board, opts.noisy, opts.dut)
+    if (self.config['dut'] == cros_lab_util.LAB_DUT and
+        self.config.get('allocated_dut')):
+      self.argument_parser.error(
+          'do not resume if the dut is dynamically allocated')
 
-    eval_cmd = common_eval_cmd + ['--prebuilt', '--reinstall']
-    # Do not specify version for autotest prebuilt switching here. The trick is
-    # that version number is obtained via bisector's environment variable
-    # CROS_VERSION.
-    extra_switch_cmd = common_switch_cmd
-    if not diagnoser.narrow_down_chromeos_prebuilt(
-        opts.old, opts.new, eval_cmd, extra_switch_cmd=extra_switch_cmd):
-      return
+    path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+        self.config['mirror_base'], self.config['work_base'],
+        self.config['session'])
+    common_switch_cmd, common_eval_cmd = self._build_cmds()
 
-    diagnoser.switch_chromeos_to_old(force=opts.always_reflash)
-    util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
-    util.check_call('ssh', opts.dut, 'rm', '-rf', '/usr/local/autotest')
+    chrome_binaries = determine_chrome_binaries(self.config['chromeos_root'],
+                                                self.config['test_name'])
 
-    if diagnoser.narrow_down_android(eval_cmd) is not None:
-      return
-    # Assume it's ok to leave random version of android prebuilt on DUT.
+    with cros_lab_util.dut_manager(self.config['dut'],
+                                   lambda: grab_dut(self.config)) as dut:
+      if not dut:
+        raise core.ExecutionFatalError('unable to allocate DUT')
+      assert cros_util.is_dut(dut)
+      self.config['allocated_dut'] = dut
+      self.states.save()
+      common_eval_cmd.append(dut)
 
-    # Don't --reinstall to keep chrome binaries override.
-    eval_cmd = common_eval_cmd + ['--prebuilt']
-    if diagnoser.narrow_down_chrome(
-        eval_cmd, chrome_binaries=chrome_binaries) is not None:
-      return
+      diagnoser = diagnoser_cros.CrosDiagnoser(
+          self.config['session'], path_factory, self.config['chromeos_root'],
+          self.config['chromeos_mirror'], self.config['android_root'],
+          self.config['android_mirror'], self.config['chrome_root'],
+          self.config['chrome_mirror'], self.config['board'],
+          self.config['noisy'], dut)
 
-    eval_cmd = common_eval_cmd + ['--reinstall']
-    if diagnoser.narrow_down_chromeos_localbuild(eval_cmd):
-      logger.info('%s done', __file__)
+      eval_cmd = common_eval_cmd + ['--prebuilt', '--reinstall']
+      # Do not specify version for autotest prebuilt switching here. The trick
+      # is that version number is obtained via bisector's environment variable
+      # CROS_VERSION.
+      extra_switch_cmd = common_switch_cmd
+      if not diagnoser.narrow_down_chromeos_prebuilt(
+          self.config['old'],
+          self.config['new'],
+          eval_cmd,
+          extra_switch_cmd=extra_switch_cmd):
+        return
+
+      diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
+      util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
+      util.check_call('ssh', dut, 'rm', '-rf', '/usr/local/autotest')
+
+      if diagnoser.narrow_down_android(eval_cmd) is not None:
+        return
+      # Assume it's ok to leave random version of android prebuilt on DUT.
+
+      # Don't --reinstall to keep chrome binaries override.
+      eval_cmd = common_eval_cmd + ['--prebuilt']
+      if diagnoser.narrow_down_chrome(
+          eval_cmd, chrome_binaries=chrome_binaries) is not None:
+        return
+
+      eval_cmd = common_eval_cmd + ['--reinstall']
+      if diagnoser.narrow_down_chromeos_localbuild(eval_cmd):
+        logger.info('%s done', __file__)
+
+  def create_argument_parser(self):
+    parser = argparse.ArgumentParser()
+    common.add_common_arguments(parser)
+    parser.add_argument('--session_base', default='bisect.sessions')
+    parser.add_argument('--session', help='Session name', required=True)
+    subparsers = parser.add_subparsers(
+        dest='command', title='commands', metavar='<command>')
+
+    parser_init = subparsers.add_parser('init', help='Initialize')
+    group = parser_init.add_argument_group(
+        title='Source tree path options',
+        description='''
+        Specify the paths of chromeos/chrome/android mirror and checkout. They
+        have the same default values as setup_cros_bisect.py, so usually you can
+        omit them and it just works.
+        ''')
+    group.add_argument(
+        '--mirror_base',
+        metavar='MIRROR_BASE',
+        default=configure.get('MIRROR_BASE',
+                              setup_cros_bisect.DEFAULT_MIRROR_BASE),
+        help='Directory for mirrors (default: %(default)s)')
+    group.add_argument(
+        '--work_base',
+        metavar='WORK_BASE',
+        default=configure.get('WORK_BASE', setup_cros_bisect.DEFAULT_WORK_BASE),
+        help='Directory for bisection working directories '
+        '(default: %(default)s)')
+    group.add_argument(
+        '--chromeos_root',
+        metavar='CHROMEOS_ROOT',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROMEOS_ROOT'),
+        help='ChromeOS tree root')
+    group.add_argument(
+        '--chromeos_mirror',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROMEOS_MIRROR'),
+        help='ChromeOS repo mirror path')
+    group.add_argument(
+        '--android_root',
+        metavar='ANDROID_ROOT',
+        type=cli.argtype_dir_path,
+        default=configure.get('ANDROID_ROOT'),
+        help='Android tree root')
+    group.add_argument(
+        '--android_mirror',
+        type=cli.argtype_dir_path,
+        default=configure.get('ANDROID_MIRROR'),
+        help='Android repo mirror path')
+    group.add_argument(
+        '--chrome_root',
+        metavar='CHROME_ROOT',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROME_ROOT'),
+        help='Chrome tree root')
+    group.add_argument(
+        '--chrome_mirror',
+        metavar='CHROME_MIRROR',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROME_MIRROR'),
+        help="chrome's gclient cache dir")
+
+    group = parser_init.add_argument_group(title='Essential options')
+    group.add_argument(
+        '--old',
+        type=cros_util.argtype_cros_version,
+        required=True,
+        help='ChromeOS version with old behavior')
+    group.add_argument(
+        '--new',
+        type=cros_util.argtype_cros_version,
+        required=True,
+        help='ChromeOS version with new behavior')
+    group.add_argument('--test_name', required=True, help='Test name')
+
+    group = parser_init.add_argument_group(title='Options for benchmark test')
+    group.add_argument('--metric', help='Metric name of benchmark test')
+    group.add_argument(
+        '--old_value',
+        type=float,
+        help='For benchmark test, old value of metric')
+    group.add_argument(
+        '--new_value',
+        type=float,
+        help='For benchmark test, new value of metric')
+
+    group = parser_init.add_argument_group(title='DUT allocation options')
+    group.add_argument(
+        '--dut',
+        metavar='DUT',
+        required=True,
+        help='Address of DUT (Device Under Test). If "%s", DUT will be '
+        'automatically allocated from the lab' % cros_lab_util.LAB_DUT)
+    group.add_argument(
+        '--board',
+        metavar='BOARD',
+        default=configure.get('BOARD'),
+        help='ChromeOS board name')
+    group.add_argument(
+        '--sku',
+        metavar='SKU',
+        help='SKU criteria if DUT is auto allocated from the lab')
+
+    group = parser_init.add_argument_group(title='Options passed to test_that')
+    group.add_argument(
+        '--args',
+        help='Extra args passed to "test_that --args"; Overrides the default')
+
+    group = parser_init.add_argument_group(title='Bisect behavior options')
+    group.add_argument(
+        '--noisy',
+        help='Enable noisy binary search. Example value: "old=1/10,new=2/3"')
+    group.add_argument(
+        '--always_reflash',
+        action='store_true',
+        help='Do not trust ChromeOS version number of DUT and always reflash. '
+        'This is usually only needed when resume because previous bisect was '
+        'interrupted and the DUT may be in an unexpected state')
+    parser_init.set_defaults(func=self.cmd_init)
+
+    parser_run = subparsers.add_parser('run', help='Start auto bisection')
+    parser_run.set_defaults(func=self.cmd_run)
+
+    return parser
+
+  def main(self, args=None):
+    opts = self.argument_parser.parse_args(args)
+    common.config_logging(opts)
+
+    session_base = configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE)
+    session_file = os.path.join(session_base, opts.session,
+                                self.__class__.__name__)
+    self.states = DiagnoseStates(session_file)
+    opts.func(opts)
 
 
 if __name__ == '__main__':
-  main()
+  DiagnoseCommandLine().main()
