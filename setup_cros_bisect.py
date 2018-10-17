@@ -108,6 +108,7 @@ def snapshot_or_copytree(src, dst):
 
 def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
   manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
+  util.check_call('git', 'fetch', cwd=manifest_dir)
 
   manifest_path = 'default.xml'
   manifest_full_path = os.path.join(manifest_dir, manifest_path)
