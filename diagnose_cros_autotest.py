@@ -84,7 +84,7 @@ def grab_dut(config):
     extra_labels.append(label)
 
   reason = 'bisect-kit: %s' % config['session']
-  host = cros_lab_util.allocate_host(reason, config['board'], config['sku'],
+  host = cros_lab_util.allocate_host(reason, config['model'], config['sku'],
                                      extra_labels)
   if not host:
     logger.error('unable to allocate dut')
@@ -147,11 +147,18 @@ class DiagnoseCommandLine(object):
       opts.chrome_root = path_factory.get_chrome_tree()
       logger.info('chrome_root = %s', opts.chrome_root)
 
-    if not opts.board:
-      if opts.dut == cros_lab_util.LAB_DUT:
+    if opts.dut == cros_lab_util.LAB_DUT:
+      if not opts.model and not opts.sku:
+        self.argument_parser.error(
+            'either --model or --sku need to be specified if DUT is "%s"' %
+            cros_lab_util.LAB_DUT)
+      # Board name cannot be deduced from auto allocated devices because they
+      # may be provisioned with image of unexpected board.
+      if not opts.board:
         self.argument_parser.error('--board need to be specified if DUT is "%s"'
                                    % cros_lab_util.LAB_DUT)
-      else:
+    else:
+      if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)
 
     if cros_util.is_cros_short_version(opts.old):
@@ -187,15 +194,16 @@ class DiagnoseCommandLine(object):
         chrome_mirror=opts.chrome_mirror,
         android_root=opts.android_root,
         android_mirror=opts.android_mirror,
+        dut=opts.dut,
+        model=opts.model,
+        sku=opts.sku,
+        board=opts.board,
         old=opts.old,
         new=opts.new,
         test_name=opts.test_name,
         metric=opts.metric,
-        board=opts.board,
-        sku=opts.sku,
         old_value=opts.old_value,
         new_value=opts.new_value,
-        dut=opts.dut,
         noisy=opts.noisy,
         test_that_args=opts.args,
         always_reflash=opts.always_reflash,
@@ -363,7 +371,28 @@ class DiagnoseCommandLine(object):
         default=configure.get('CHROME_MIRROR'),
         help="chrome's gclient cache dir")
 
+    group = parser_init.add_argument_group(title='DUT allocation options')
+    group.add_argument(
+        '--dut',
+        metavar='DUT',
+        required=True,
+        help='Address of DUT (Device Under Test). If "%s", DUT will be '
+        'automatically allocated from the lab' % cros_lab_util.LAB_DUT)
+    group.add_argument(
+        '--model',
+        metavar='MODEL',
+        help='"model" criteria if DUT is auto allocated from the lab')
+    group.add_argument(
+        '--sku',
+        metavar='SKU',
+        help='"sku" criteria if DUT is auto allocated from the lab')
+
     group = parser_init.add_argument_group(title='Essential options')
+    group.add_argument(
+        '--board',
+        metavar='BOARD',
+        default=configure.get('BOARD'),
+        help='ChromeOS board name; auto detected if DUT is not auto allocated')
     group.add_argument(
         '--old',
         type=cros_util.argtype_cros_version,
@@ -386,23 +415,6 @@ class DiagnoseCommandLine(object):
         '--new_value',
         type=float,
         help='For benchmark test, new value of metric')
-
-    group = parser_init.add_argument_group(title='DUT allocation options')
-    group.add_argument(
-        '--dut',
-        metavar='DUT',
-        required=True,
-        help='Address of DUT (Device Under Test). If "%s", DUT will be '
-        'automatically allocated from the lab' % cros_lab_util.LAB_DUT)
-    group.add_argument(
-        '--board',
-        metavar='BOARD',
-        default=configure.get('BOARD'),
-        help='ChromeOS board name')
-    group.add_argument(
-        '--sku',
-        metavar='SKU',
-        help='SKU criteria if DUT is auto allocated from the lab')
 
     group = parser_init.add_argument_group(title='Options passed to test_that')
     group.add_argument(

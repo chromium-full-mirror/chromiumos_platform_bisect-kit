@@ -111,25 +111,23 @@ def unlock_host(host):
   atest_cmd('host', 'mod', '--unlock', host)
 
 
-def allocate_host(reason, board=None, sku=None, extra_labels=None):
+def allocate_host(reason, model=None, sku=None, extra_labels=None):
   """Allocates a host from the lab for bisect.
 
   Args:
     reason: lock reason
-    board: allocation criteria: chromeos board name;
-        not used if `sku` is not None.
-    sku: allocation criteria: machine sku; `sku` will override `board`.
+    model: allocation criteria: chromeos device model name
+    sku: allocation criteria: device sku
     extra_labels: more allocation criteria on labels
 
   Returns:
     host name in the lab; None if failed.
   """
   labels = ['pool:suites']
+  if model:
+    labels.append('model:' + model)
   if sku:
     labels.append('sku:' + sku)
-  else:
-    assert board
-    labels.append('board:' + board)
 
   if extra_labels:
     labels += extra_labels
