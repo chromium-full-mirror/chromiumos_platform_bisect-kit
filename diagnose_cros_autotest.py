@@ -74,18 +74,27 @@ def grab_dut(config):
   info = cros_util.get_autotest_test_info(autotest_dir, config['test_name'])
   assert info
 
-  extra_labels = []
-  dependencies = info.variables.get('DEPENDENCIES', '')
-  for label in dependencies.split(','):
-    label = label.strip()
-    # Skip non-machine labels
-    if label in ['cleanup-reboot']:
-      continue
-    extra_labels.append(label)
-
   reason = 'bisect-kit: %s' % config['session']
-  host = cros_lab_util.allocate_host(reason, config['model'], config['sku'],
-                                     extra_labels)
+  if config.get('allocated_dut'):
+    host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
+    logger.info('try to allocate the same host (%s) as last run', host_name)
+    host = cros_lab_util.allocate_host(reason, host=host_name)
+  else:
+    extra_labels = []
+    dependencies = info.variables.get('DEPENDENCIES', '')
+    for label in dependencies.split(','):
+      label = label.strip()
+      # Skip non-machine labels
+      if label in ['cleanup-reboot']:
+        continue
+      extra_labels.append(label)
+
+    host = cros_lab_util.allocate_host(
+        reason,
+        model=config['model'],
+        sku=config['sku'],
+        extra_labels=extra_labels)
+
   if not host:
     logger.error('unable to allocate dut')
     return None
@@ -248,11 +257,6 @@ class DiagnoseCommandLine(object):
     del opts  # unused
 
     self.states.load()
-
-    if (self.config['dut'] == cros_lab_util.LAB_DUT and
-        self.config.get('allocated_dut')):
-      self.argument_parser.error(
-          'do not resume if the dut is dynamically allocated')
 
     path_factory = setup_cros_bisect.DefaultProjectPathFactory(
         self.config['mirror_base'], self.config['work_base'],

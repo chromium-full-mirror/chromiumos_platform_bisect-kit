@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 LAB_DUT = ':lab:'
 
 
+def dut_host_name(dut):
+  """Converts DUT address to host name.
+
+  Args:
+    dut: DUT address; assume the address is returned from this module
+  """
+  assert dut.endswith('.cros')
+  return dut[:-5]
+
+
 def atest_cmd(topic, action, *args):
   """Wrapper of autotest cli 'atest'.
 
@@ -111,11 +121,12 @@ def unlock_host(host):
   atest_cmd('host', 'mod', '--unlock', host)
 
 
-def allocate_host(reason, model=None, sku=None, extra_labels=None):
+def allocate_host(reason, host=None, model=None, sku=None, extra_labels=None):
   """Allocates a host from the lab for bisect.
 
   Args:
     reason: lock reason
+    host: allocation criteria: host name
     model: allocation criteria: chromeos device model name
     sku: allocation criteria: device sku
     extra_labels: more allocation criteria on labels
@@ -123,19 +134,23 @@ def allocate_host(reason, model=None, sku=None, extra_labels=None):
   Returns:
     host name in the lab; None if failed.
   """
-  labels = ['pool:suites']
-  if model:
-    labels.append('model:' + model)
-  if sku:
-    labels.append('sku:' + sku)
+  if host:
+    hosts = list_host(host=host)
+    assert hosts
+  else:
+    labels = ['pool:suites']
+    if model:
+      labels.append('model:' + model)
+    if sku:
+      labels.append('sku:' + sku)
 
-  if extra_labels:
-    labels += extra_labels
+    if extra_labels:
+      labels += extra_labels
 
-  hosts = list_host(labels=labels)
-  if not hosts:
-    logger.error('no hosts meet requirements: %s', labels)
-    return None
+    hosts = list_host(labels=labels)
+    if not hosts:
+      logger.error('no hosts meet requirements: %s', labels)
+      return None
 
   target_host = None
   status_counter = collections.Counter()
