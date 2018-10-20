@@ -222,17 +222,17 @@ class TimeSeriesTree(object):
 
   # TODO(kcwu): refactor git_util.get_history_recursively() to reuse this class.
 
-  def __init__(self, parent_deps, name, start_time, end_time):
+  def __init__(self, parent_deps, entry, start_time, end_time):
     """TimeSeriesTree constructor.
 
     Args:
       parent_deps: parent DEPS of the given period. None if this is tree root.
-      name: project name
+      entry: project entry
       start_time: start time
       end_time: end time
     """
     self.parent_deps = parent_deps
-    self.name = name
+    self.entry = entry
     self.snapshots = {}
     self.start_time = start_time
     self.end_time = end_time
@@ -242,28 +242,29 @@ class TimeSeriesTree(object):
     self.alive_children = {}
 
     # All historical children (TimeSeriesTree object) between start_time and
-    # end_time. It's possible that children with the same name appear more than
+    # end_time. It's possible that children with the same entry appear more than
     # once in this list because they are removed and added back to the DEPS
     # file.
     self.subtrees = []
 
-  def subtree_eq(self, deps_a, deps_b, child_name):
+  def subtree_eq(self, deps_a, deps_b, child_entry):
     """Compares subtree of two Deps.
 
     Args:
       deps_a: Deps object
       deps_b: Deps object
-      child_name: the subtree to compare
+      child_entry: the subtree to compare
 
     Returns:
       True if the said subtree of these two Deps equal
     """
     # Need to compare variables because they may influence subtree parsing
     # behavior
-    return (deps_a.entries[child_name] == deps_b.entries[child_name] and
+    path = child_entry[0]
+    return (deps_a.entries[path] == deps_b.entries[path] and
             deps_a.variables == deps_b.variables)
 
-  def add_snapshot(self, timestamp, deps, children_names):
+  def add_snapshot(self, timestamp, deps, children_entries):
     """Adds parsed DEPS result and children.
 
     For example, if a given DEPS file has N revisions between start_time and
@@ -273,42 +274,42 @@ class TimeSeriesTree(object):
     Args:
       timestamp: timestamp of `deps`
       deps: Deps object
-      children_names: list of names of deps' children
+      children_entries: list of names of deps' children
     """
     assert timestamp not in self.snapshots
     self.snapshots[timestamp] = deps
 
-    for child_name in set(self.alive_children.keys() + children_names):
-      # `child_name` is added at `timestamp`
-      if child_name not in self.alive_children:
-        self.alive_children[child_name] = timestamp, deps
+    for child_entry in set(self.alive_children.keys() + children_entries):
+      # `child_entry` is added at `timestamp`
+      if child_entry not in self.alive_children:
+        self.alive_children[child_entry] = timestamp, deps
 
-      # `child_name` is removed at `timestamp`
-      elif child_name not in children_names:
+      # `child_entry` is removed at `timestamp`
+      elif child_entry not in children_entries:
         self.subtrees.append(
-            TimeSeriesTree(self.alive_children[child_name][1], child_name,
-                           self.alive_children[child_name][0], timestamp))
-        del self.alive_children[child_name]
+            TimeSeriesTree(self.alive_children[child_entry][1], child_entry,
+                           self.alive_children[child_entry][0], timestamp))
+        del self.alive_children[child_entry]
 
-      # `child_name` is alive before and after `timestamp`
+      # `child_entry` is alive before and after `timestamp`
       else:
-        last_deps = self.alive_children[child_name][1]
-        if not self.subtree_eq(last_deps, deps, child_name):
+        last_deps = self.alive_children[child_entry][1]
+        if not self.subtree_eq(last_deps, deps, child_entry):
           self.subtrees.append(
-              TimeSeriesTree(last_deps, child_name,
-                             self.alive_children[child_name][0], timestamp))
-          self.alive_children[child_name] = timestamp, deps
+              TimeSeriesTree(last_deps, child_entry,
+                             self.alive_children[child_entry][0], timestamp))
+          self.alive_children[child_entry] = timestamp, deps
 
   def no_more_snapshot(self, deps):
     """Indicates all snapshots are added.
 
     add_snapshot() should not be invoked after no_more_snapshot().
     """
-    for child_name, (timestamp, deps) in self.alive_children.items():
+    for child_entry, (timestamp, deps) in self.alive_children.items():
       if timestamp == self.end_time:
         continue
       self.subtrees.append(
-          TimeSeriesTree(deps, child_name, timestamp, self.end_time))
+          TimeSeriesTree(deps, child_entry, timestamp, self.end_time))
     self.alive_children = None
 
   def events(self):
@@ -329,11 +330,11 @@ class TimeSeriesTree(object):
 
     last_deps = None
     for timestamp, deps in self.snapshots.items():
-      result.append((timestamp, self.name, deps, False))
+      result.append((timestamp, self.entry, deps, False))
       last_deps = deps
 
     assert last_deps
-    result.append((self.end_time, self.name, last_deps, True))
+    result.append((self.end_time, self.entry, last_deps, True))
 
     for subtree in self.subtrees:
       for event in subtree.events():
@@ -359,12 +360,12 @@ class TimeSeriesTree(object):
       # i.e. modification, so use counter to track.
       end_counter = collections.Counter()
 
-      for timestamp, name, deps, end in events:
-        forest[name] = deps
+      for timestamp, entry, deps, end in events:
+        forest[entry] = deps
         if end:
-          end_counter[name] += 1
+          end_counter[entry] += 1
         else:
-          end_counter[name] -= 1
+          end_counter[entry] -= 1
 
       # Merge Deps at time `timestamp` into single path_specs.
       path_specs = {}
@@ -375,10 +376,10 @@ class TimeSeriesTree(object):
       yield timestamp, path_specs
 
       # Remove deps which are removed at this timestamp.
-      for name, count in end_counter.items():
-        assert -1 <= count <= 1, (timestamp, name)
+      for entry, count in end_counter.items():
+        assert -1 <= count <= 1, (timestamp, entry)
         if count == 1:
-          del forest[name]
+          del forest[entry]
 
 
 class DepsParser(object):
@@ -441,13 +442,19 @@ class DepsParser(object):
       deps.entries[path] = dep
 
     recursedeps = []
-    for path in local_scope.get('recursedeps', []):
-      assert isinstance(path, str)
+    for recurse_entry in local_scope.get('recursedeps', []):
+      # Normalize entries.
+      if isinstance(recurse_entry, tuple):
+        path, deps_file = recurse_entry
+      else:
+        assert isinstance(path, str)
+        path, deps_file = recurse_entry, 'DEPS'
+
       if local_scope.get('use_relative_paths', False):
         path = os.path.join(parent_path, path)
       path = path.format(**deps.variables)
       if path in deps.entries:
-        recursedeps.append(path)
+        recursedeps.append((path, deps_file))
     deps.recursedeps = recursedeps
 
     return deps
@@ -515,7 +522,7 @@ class DepsParser(object):
     tstree.no_more_snapshot(deps)
 
     for subtree in tstree.subtrees:
-      path = subtree.name
+      path, deps_file = subtree.entry
       path_spec = subtree.parent_deps.entries[path].as_path_spec()
       self.construct_deps_tree(
           subtree,
@@ -524,7 +531,8 @@ class DepsParser(object):
           subtree.start_time,
           subtree.end_time,
           parent_vars=subtree.parent_deps.variables,
-          parent_path=path)
+          parent_path=path,
+          deps_file=deps_file)
 
   def enumerate_path_specs(self, start_time, end_time, path):
     tstree = TimeSeriesTree(None, path, start_time, end_time)
