@@ -66,7 +66,7 @@ def sync(gclient_dir,
     ignore_locks: bypass gclient's lock
     jobs: how many workers running in parallel
   """
-  cmd = ['gclient', 'sync', '--jobs', str(jobs)]
+  cmd = ['gclient', 'sync', '--jobs', str(jobs), '--delete_unversioned_trees']
   if with_branch_heads:
     cmd.append('--with_branch_heads')
   if with_tags:
@@ -560,7 +560,8 @@ class GclientCache(codechange.CodeStorage):
     repo_project_list = os.path.join(project_root, '.gclient_entries')
     content = 'entries = {\n'
     for item in sorted(projects.items()):
-      content += '  %s: %s,\n' % map(pprint.pformat, item)
+      path, repo_url = map(pprint.pformat, item)
+      content += '  %s: %s,\n' % (path, repo_url)
     content += '}\n'
     with open(repo_project_list, 'w') as f:
       f.write(content)
