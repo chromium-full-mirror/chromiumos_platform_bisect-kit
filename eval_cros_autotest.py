@@ -100,11 +100,10 @@ def parse_test_report_log(result_log, metric):
       values: captured metric values; None if test failed or metric is None
   """
   m = re.search(r'Total PASS: (\d+)/(\d+)', result_log)
-  if not m or m.group(1) != m.group(2):
-    return False, None
+  passed = (m and m.group(1) == m.group(2))
 
   if not metric:
-    return True, None
+    return passed, None
 
   values = []
   for line in result_log.splitlines():
@@ -113,7 +112,7 @@ def parse_test_report_log(result_log, metric):
       continue
     if m.group(2) == metric:
       values.append(float(m.group(3)))
-  return True, values
+  return passed, values
 
 
 def parse_test_result_chart(json_path, metric):
@@ -194,7 +193,10 @@ def run_test(opts):
   elif args:
     cmd += ['--args', args]
 
-  output = cros_util.cros_sdk(opts.chromeos_root, *cmd)
+  try:
+    output = cros_util.cros_sdk(opts.chromeos_root, *cmd)
+  except subprocess.CalledProcessError as e:
+    output = e.output
 
   m = re.search(r'Finished running tests. Results can be found in (\S+)',
                 output)
@@ -211,7 +213,7 @@ def gather_test_result(opts, result_dir):
   result_log = open(result_log_path).read()
 
   passed, values = parse_test_report_log(result_log, opts.metric)
-  if opts.metric and passed and not values:
+  if opts.metric and not values:
     values = []
     for root, _, files in os.walk(result_dir):
       for filename in files:
@@ -253,27 +255,13 @@ def main(args=None):
   # TODO(kcwu): fix crbug/899490
   cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'net-misc/openssh')
 
-  try:
-    result_dir = run_test(opts)
-  except subprocess.CalledProcessError:
-    # TODO(kcwu): analyze fail reason from log and abort if they are real fatal
-    # cases.
-    if opts.metric:
-      logger.info('failed before test start; SKIP')
-      return SKIP
-    else:
-      logger.info('failed before test start; NEW')
-      return NEW
-
-  if result_dir is None:
+  result_dir = run_test(opts)
+  if not result_dir:
     return FATAL
 
   passed, values = gather_test_result(opts, result_dir)
 
   if opts.metric:
-    if not passed:
-      logger.warning('test did not pass; SKIP')
-      return SKIP
     if not values:
       logger.warning('no values found; SKIP')
       return SKIP
