@@ -248,6 +248,11 @@ def main(args=None):
       logger.error('--new_value is provided but --metric is not')
       return FATAL
 
+  # Some versions of ChromeOS SDK is broken and ship bad 'ssh' executable. This
+  # works around the issue before we fixed the issue.
+  # TODO(kcwu): fix crbug/899490
+  cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'net-misc/openssh')
+
   try:
     result_dir = run_test(opts)
   except subprocess.CalledProcessError:
