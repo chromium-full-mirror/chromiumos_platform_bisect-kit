@@ -396,7 +396,7 @@ class BisectorCommandLine(object):
 
     return 'eval', status, values
 
-  def _next_idx_iter(self, opts):
+  def _next_idx_iter(self, opts, force):
     if opts.revs:
       for rev in opts.revs:
         idx = self.states.rev2idx(rev)
@@ -405,11 +405,12 @@ class BisectorCommandLine(object):
         if opts.once:
           break
     else:
-      while not self.strategy.is_done():
+      while force or not self.strategy.is_done():
         idx = self.strategy.next_idx()
         rev = self.states.idx2rev(idx)
         logger.info('try idx=%d rev=%s', idx, rev)
         yield idx, rev
+        force = False
         if opts.once:
           break
 
@@ -430,22 +431,23 @@ class BisectorCommandLine(object):
     self.strategy.rebuild()
 
     prev_rev = None
-    for idx, rev in self._next_idx_iter(opts):
-      # Bail out if bisection range is unlikely true in order to prevent
-      # wasting time. This is necessary because some configurations (say,
-      # confidence) may be changed before cmd_run() and thus the bisection
-      # range becomes not acceptable.
-      self.strategy.check_verification_range()
+    force = opts.force
+    for idx, rev in self._next_idx_iter(opts, force):
+      if not force:
+        # Bail out if bisection range is unlikely true in order to prevent
+        # wasting time. This is necessary because some configurations (say,
+        # confidence) may be changed before cmd_run() and thus the bisection
+        # range becomes not acceptable.
+        self.strategy.check_verification_range()
 
       step, status, values = self._switch_and_eval(rev, prev_rev=prev_rev)
       logger.info('rev=%s => status %s', rev, status)
+      force = False
 
       self._add_status(rev, status, values=values)
-      # Bail out if bisection range is unlikely true. Don't save.
-      # The last failing results are likely something wrong in bisection setup,
-      # bisector, and/or evaluator. The benefits of not saving the last failing
-      # results, are that users can just resume bisector directly without needs
-      # of erasing bad results after they fixed the problems.
+      self.states.save()
+
+      # Bail out if bisection range is unlikely true.
       self.strategy.check_verification_range()
 
       if status == 'skip':
@@ -454,8 +456,6 @@ class BisectorCommandLine(object):
         if current_state['skip'] > (
             current_state['old'] + current_state['new'] + 1) * 5:
           raise core.ExecutionFatalError('too much "skip" for rev=%r' % rev)
-
-      self.states.save()
 
       self.strategy.show_summary()
 
@@ -730,6 +730,10 @@ class BisectorCommandLine(object):
         '''))
     parser_run.add_argument(
         '-1', '--once', action='store_true', help='Only run one step')
+    parser_run.add_argument(
+        '--force',
+        action='store_true',
+        help="Run at least once even it's already done")
     parser_run.add_argument(
         'revs',
         nargs='*',
