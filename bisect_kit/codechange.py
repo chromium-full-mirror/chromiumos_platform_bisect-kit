@@ -884,30 +884,26 @@ class CodeManager(object):
 
     return result
 
-  def view_rev_diff(self, old, new):
-    old_base, _, _ = parse_intra_rev(old)
-    _, new_next, _ = parse_intra_rev(new)
-    assert old_base != new_next
+  def view_rev_diff(self, revlist, old, new):
+    assert old in revlist
+    assert new in revlist
+    loaded_action_groups = None
+    old_idx = revlist.index(old)
+    new_idx = revlist.index(new)
 
-    revlist = []
-    rev_summary = {}
-    fixed_specs = self.spec_manager.collect_fixed_spec(old_base, new_next)
-    for i, spec in enumerate(fixed_specs[:-1]):
-      action_groups = self.load_action_groups_between_releases(
-          fixed_specs[i].name, fixed_specs[i + 1].name)
-      revlist.append(spec.name)
-      rev_summary[spec.name] = ''
-      for action_group in action_groups:
-        revlist.append(action_group.name)
-        rev_summary[action_group.name] = action_group.summary(self.code_storage)
-
-    revlist.append(fixed_specs[-1].name)
-    rev_summary[fixed_specs[-1].name] = ''
-
-    old_index = revlist.index(old)
-    new_index = revlist.index(new)
-    for rev in revlist[old_index:new_index + 1]:
-      logger.info('%s %s', rev, rev_summary[rev])
+    for i, rev in enumerate(revlist[old_idx:new_idx + 1], old_idx):
+      rev_old, rev_new, index = parse_intra_rev(rev)
+      if rev_old == rev_new:
+        logger.info('[%d] %s', i, rev)
+      else:
+        if loaded_action_groups != (rev_old, rev_new):
+          action_groups = self.load_action_groups_between_releases(
+              rev_old, rev_new)
+          loaded_action_groups = (rev_old, rev_new)
+        # Indexes inside intra_rev are 1 based.
+        action_group = action_groups[index - 1]
+        summary = action_group.summary(self.code_storage)
+        logger.info('[%d] %s %s', i, rev, summary)
 
   def switch(self, rev):
     # easy case

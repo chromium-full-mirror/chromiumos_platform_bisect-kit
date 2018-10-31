@@ -113,7 +113,7 @@ class AndroidBuildIDDomain(core.BisectDomain):
     if self.config.get('android_root'):
       env['ANDROID_ROOT'] = self.config['android_root']
 
-  def view(self, old, new):
+  def view(self, revlist, old, new):
     url_template = (
         'https://android-build.googleplex.com/'
         'builds/{new}/branches/{branch}/targets/{flavor}/cls?end={old}')

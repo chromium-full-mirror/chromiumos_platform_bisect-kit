@@ -150,7 +150,7 @@ class ChromeSrcDomain(core.BisectDomain):
     if self.config['dut']:
       env['DUT'] = self.config['dut']
 
-  def view(self, old, new):
+  def view(self, revlist, old, new):
     print('old', old)
     print('new', new)
 
@@ -171,7 +171,7 @@ class ChromeSrcDomain(core.BisectDomain):
     spec_manager = cr_util.ChromeSpecManager(self.config)
     code_manager = codechange.CodeManager(self.config['chrome_root'],
                                           spec_manager, cache)
-    code_manager.view_rev_diff(old, new)
+    code_manager.view_rev_diff(revlist, old, new)
 
 
 if __name__ == '__main__':

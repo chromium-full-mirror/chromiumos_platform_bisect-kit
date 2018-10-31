@@ -55,7 +55,7 @@ class ListDomain(core.BisectDomain):
   def setenv(self, env, rev):
     pass
 
-  def view(self, old, new):
+  def view(self, revlist, old, new):
     logger.info('[%s] is old', old)
     logger.info('[%s] is new', new)
 

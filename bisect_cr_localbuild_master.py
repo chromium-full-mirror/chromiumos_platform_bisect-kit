@@ -170,7 +170,7 @@ class ChromeSrcMasterDomain(core.BisectDomain):
     if self.config['dut']:
       env['DUT'] = self.config['dut']
 
-  def view(self, old, new):
+  def view(self, revlist, old, new):
     url = ('https://chromium.googlesource.com/'
            'chromium/src/+log/{old}..{new}?pretty=fuller&n=10000').format(
                old=old[:12], new=new[:12])

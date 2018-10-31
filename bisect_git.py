@@ -49,7 +49,7 @@ class GitDomain(core.BisectDomain):
     env['GIT_REPO'] = self.config['git_repo']
     env['GIT_REV'] = rev
 
-  def view(self, old, new):
+  def view(self, revlist, old, new):
     print('git log %s..%s' % (old, new))
 
 

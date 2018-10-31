@@ -124,7 +124,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
     env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
     env['INTRA_REV'] = rev
 
-  def view(self, old, new):
+  def view(self, revlist, old, new):
     print('old', old)
     print('new', new)
 
@@ -132,7 +132,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
     cache = repo_util.RepoMirror(self.config['chromeos_mirror'])
     code_manager = codechange.CodeManager(self.config['chromeos_root'],
                                           spec_manager, cache)
-    code_manager.view_rev_diff(old, new)
+    code_manager.view_rev_diff(revlist, old, new)
 
 
 if __name__ == '__main__':

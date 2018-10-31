@@ -476,7 +476,8 @@ class BisectorCommandLine(object):
     self.strategy.rebuild()
     self.strategy.show_summary(more=opts.more)
     left, right = self.strategy.get_range()
-    self.domain.view(self.states.idx2rev(left), self.states.idx2rev(right))
+    self.domain.view(self.states.data['revlist'], self.states.idx2rev(left),
+                     self.states.idx2rev(right))
 
   def current_status(self, session=None, session_base=None):
     """Gets current bisect status.
