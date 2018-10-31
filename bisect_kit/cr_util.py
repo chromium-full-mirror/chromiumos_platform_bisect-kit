@@ -321,9 +321,10 @@ class ChromeSpecManager(codechange.SpecManager):
     # there might be some commits arriving between step 1 and step 3. In order
     # to reconstruct complete commit history, we actually need to figure out
     # timestamp of step 1, which is non-trivial.
-    # Here, we just assume buildbot can finish these steps in one hour. It's
+    # Here, we just assume buildbot can finish these steps in one day. It's
     # harmless to have old_timestamp slightly earlier than the actual time.
-    old_timestamp -= 3600
+    # See crbug.com/900514 for a real case. 16 hours threshold is not enough.
+    old_timestamp -= 86400  # 1 day
 
     meta_dir = self._generate_meta_deps(new)
 
