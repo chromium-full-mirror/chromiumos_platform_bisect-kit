@@ -251,8 +251,9 @@ class TestGitOperation(unittest.TestCase):
     self.git.add_commit('2017-02-02T00:00:00', 'commit B',
                         self.git.default_filename, 'commit B')
     subprocess.check_call(['git', 'checkout', 'master'], cwd=self.git_repo)
+    # --no-edit: git may complain EDITOR is unset
     subprocess.check_call(
-        ['git', 'merge', branch_foo],
+        ['git', 'merge', '--no-edit', branch_foo],
         cwd=self.git_repo,
         env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'))
 
