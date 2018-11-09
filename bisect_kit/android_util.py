@@ -20,6 +20,7 @@ import tempfile
 
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import repo_util
 from bisect_kit import util
@@ -62,9 +63,9 @@ def fetch_android_build_data(url):
   import urllib2
   try:
     return urllib2.urlopen(url).read()
-  except urllib2.URLError:
+  except urllib2.URLError as e:
     logger.exception('failed to fetch "%s"', url)
-    raise
+    raise errors.ExternalError(str(e))
 
 
 def is_good_build(branch, flavor, build_id):

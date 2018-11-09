@@ -12,8 +12,9 @@ import unittest
 
 import mock
 
-from bisect_kit import repo_util
+from bisect_kit import errors
 from bisect_kit import git_util_test
+from bisect_kit import repo_util
 
 
 class TestRepoOperation(unittest.TestCase):
@@ -108,7 +109,7 @@ class TestManifestParser(unittest.TestCase):
         'bisect_kit.repo_util.get_manifest_url', return_value=manifest_url):
       p = repo_util.ManifestParser(manifest_dir)
 
-      with self.assertRaises(ValueError):
+      with self.assertRaises(errors.InternalError):
         root = p.parse_single_xml(
             r'''<?xml version="1.0" encoding="UTF-8"?>
             <manifest>
@@ -118,7 +119,7 @@ class TestManifestParser(unittest.TestCase):
             allow_include=False)
         p.process_parsed_result(root)
 
-      with self.assertRaises(ValueError):
+      with self.assertRaises(errors.InternalError):
         root = p.parse_single_xml(
             r'''<?xml version="1.0" encoding="UTF-8"?>
             <manifest>

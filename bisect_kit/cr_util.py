@@ -16,7 +16,7 @@ import urllib2
 
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import core
+from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import locking
@@ -84,7 +84,7 @@ def query_commit_position(chrome_src, git_rev):
     m = re.match(r'refs/branch-heads/(\d+)@\{#(\d+)\}', position)
     if m:
       return m.group(1), m.group(2)
-    raise ValueError('Unrecognized commit position: ' + position)
+    raise errors.InternalError('Unrecognized commit position: ' + position)
 
   m = re.search(r'git-svn-id: (\S+)', msg)
   if m:
@@ -96,9 +96,10 @@ def query_commit_position(chrome_src, git_rev):
                  position)
     if m:
       return m.group(1), m.group(2)
-    raise ValueError('Unrecognized svn-id: ' + position)
+    raise errors.InternalError('Unrecognized svn-id: ' + position)
 
-  raise ValueError('Unable to recognize commit position from ' + git_rev)
+  raise errors.InternalError('Unable to recognize commit position from ' +
+                             git_rev)
 
 
 def query_git_rev_by_commit_position(chrome_src, branch, commit_position):
@@ -115,8 +116,7 @@ def query_git_rev_by_commit_position(chrome_src, branch, commit_position):
     git commit id
 
   Raises:
-    core.ExecutionFatalError: unable to find commits with given
-        commit_position.
+    ValueError: unable to find commits with given commit_position.
   """
   if branch == 'master':
     ref_path = 'refs/heads/master'
@@ -247,8 +247,7 @@ class ChromeSpecManager(codechange.SpecManager):
     try:
       timestamp = git_util.get_commit_time(self.spec_dir, 'origin/master', path)
     except ValueError:
-      raise core.ExecutionFatalError(
-          '%s does not have %s' % (self.spec_dir, path))
+      raise errors.InternalError('%s does not have %s' % (self.spec_dir, path))
     return timestamp
 
   def _generate_meta_deps(self, rev):

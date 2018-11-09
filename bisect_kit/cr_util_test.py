@@ -10,6 +10,7 @@ import unittest
 import mock
 
 from bisect_kit import cr_util
+from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import testing
 
@@ -59,7 +60,7 @@ class TestCrUtil(unittest.TestCase):
 
     # fail
     with mock.patch.object(git_util, 'get_commit_log', return_value='foo'):
-      with self.assertRaises(ValueError):
+      with self.assertRaises(errors.InternalError):
         cr_util.query_commit_position(chrome_src, git_rev)
 
 

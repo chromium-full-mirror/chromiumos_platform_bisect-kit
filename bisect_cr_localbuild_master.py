@@ -37,6 +37,7 @@ from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import cr_util
+from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import util
 
@@ -62,8 +63,9 @@ def guess_git_rev(opts, rev):
   """
   if cros_util.is_cros_version(rev):
     if not opts.board and not opts.dut:
-      raise core.ExecutionFatalError('You specified ChromeOS version number, '
-                                     'thus either DUT or BOARD is required')
+      raise errors.ArgumentError(
+          '--dut and --board', 'You specified ChromeOS version number, '
+          'thus either DUT or BOARD is required')
     assert opts.board
     chrome_version = cros_util.query_chrome_version(opts.board, rev)
     assert cr_util.is_chrome_version(chrome_version)
@@ -128,7 +130,8 @@ class ChromeSrcMasterDomain(core.BisectDomain):
   def init(opts):
     chrome_src = os.path.join(opts.chrome_root, 'src')
     if not os.path.exists(chrome_src):
-      raise core.ExecutionFatalError("chrome src directory doesn't exist")
+      raise errors.ArgumentError('--chrome_src',
+                                 "chrome src directory doesn't exist")
 
     if opts.dut:
       assert cros_util.is_dut(opts.dut)

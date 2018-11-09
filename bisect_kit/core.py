@@ -15,31 +15,6 @@ import time
 logger = logging.getLogger(__name__)
 
 
-class VerificationFailed(Exception):
-  """Verification of bisect range failed."""
-
-  def __init__(self, rev, expect, actual, bad_times=1):
-    self.rev = rev
-    self.expect = expect
-    self.actual = actual
-    self.bad_times = bad_times
-
-    msg = 'rev=%s expect "%s" but got "%s"' % (self.rev, self.expect,
-                                               self.actual)
-    if self.bad_times > 1:
-      msg += ' %d times' % self.bad_times
-    super(VerificationFailed, self).__init__(msg)
-
-
-class ExecutionFatalError(Exception):
-  """Fatal error and bisect should not continue.
-
-  Either:
-    - Switch or eval commands return fatal exit code, or
-    - Critical errors happened in bisect script itself.
-  """
-
-
 class RevInfo(object):
   """Aggregated evaluation result of one revision.
 

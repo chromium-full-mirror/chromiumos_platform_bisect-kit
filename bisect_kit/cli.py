@@ -10,13 +10,13 @@ import datetime
 import logging
 import os
 import re
-import sys
 import textwrap
 import time
 
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import core
+from bisect_kit import errors
 from bisect_kit import strategy
 from bisect_kit import util
 
@@ -174,7 +174,7 @@ def _collect_bisect_result_values(values, line):
     try:
       values.extend(map(float, m.group(1).split()))
     except ValueError:
-      raise core.ExecutionFatalError(
+      raise errors.InternalError(
           'BISECT_RESULT_VALUES should be list of floats: %r' % m.group(1))
 
 
@@ -236,7 +236,7 @@ def do_evaluate(evaluate_cmd, domain, rev):
       values are additional collected values, like performance score.
 
   Raises:
-    core.ExecutionFatalError if evaluator returned fatal error code.
+    errors.ExecutionFatalError if evaluator returned fatal error code.
   """
   env = os.environ.copy()
   env['BISECT_REV'] = rev
@@ -249,7 +249,7 @@ def do_evaluate(evaluate_cmd, domain, rev):
       stdout_callback=lambda line: _collect_bisect_result_values(values, line))
   returncode = p.wait()
   if returncode < 0 or returncode > 125:
-    raise core.ExecutionFatalError(str(returncode))
+    raise errors.ExecutionFatalError('eval failed: %s' % returncode)
 
   if returncode == 0:
     return 'old', values
@@ -281,7 +281,7 @@ def do_switch(switch_cmd, domain, rev):
     None if switch successfully, 'skip' otherwise.
 
   Raises:
-    core.ExecutionFatalError if switcher returned fatal error code.
+    errors.ExecutionFatalError if switcher returned fatal error code.
   """
   env = os.environ.copy()
   env['BISECT_REV'] = rev
@@ -289,7 +289,7 @@ def do_switch(switch_cmd, domain, rev):
 
   returncode = util.call(*switch_cmd, env=env)
   if returncode < 0 or returncode > 125:
-    raise core.ExecutionFatalError(str(returncode))
+    raise errors.ExecutionFatalError('switch failed: %s' % returncode)
 
   if returncode != 0:
     return 'skip'
@@ -420,10 +420,10 @@ class BisectorCommandLine(object):
     See run command's help message for more detail.
 
     Raises:
-      core.VerificationFailed: The bisection range cannot be verified. We
+      errors.VerificationFailed: The bisection range is verified false. We
           expect 'old' at the first rev and 'new' at last rev.
-      core.ExecutionFatalError: Fatal error, bisector stop.
-      strategy.WrongAssumption: Eval results contradicted.
+      errors.UnableToProceed: Too many errors to narrow down further the
+          bisection range.
     """
     assert self.config.get('switch')
     assert self.config.get('eval')
@@ -455,7 +455,7 @@ class BisectorCommandLine(object):
         # Bail out if 'skip' too much times. Don't save.
         if current_state['skip'] > (
             current_state['old'] + current_state['new'] + 1) * 5:
-          raise core.ExecutionFatalError('too much "skip" for rev=%r' % rev)
+          raise errors.UnableToProceed('too much "skip" for rev=%r' % rev)
 
       self.strategy.show_summary()
 
@@ -601,32 +601,31 @@ class BisectorCommandLine(object):
     if opts.key in ['switch', 'eval']:
       result = check_executable(opts.value[0])
       if result:
-        raise core.ExecutionFatalError(
-            '%s config %s: %s' % (sys.argv[0], opts.key, result))
+        raise errors.ArgumentError('%s command' % opts.key, result)
 
       self.states.config[opts.key] = opts.value
 
     elif opts.key == 'confidence':
       if len(opts.value) != 1:
-        raise core.ExecutionFatalError(
-            '%s config %s: expected 1 value, %d values given' %
-            (sys.argv[0], opts.key, len(opts.value)))
+        raise errors.ArgumentError(
+            'confidence value',
+            'expected 1 value, %d values given' % len(opts.value))
       try:
         self.states.config[opts.key] = float(opts.value[0])
       except ValueError:
-        raise core.ExecutionFatalError('%s config %s: invalid float value: %r' %
-                                       (sys.argv[0], opts.key, opts.value[0]))
+        raise errors.ArgumentError('confidence value',
+                                   'invalid float value: %r' % opts.value[0])
 
     elif opts.key == 'noisy':
       if len(opts.value) != 1:
-        raise core.ExecutionFatalError(
-            '%s config %s: expected 1 value, %d values given' %
-            (sys.argv[0], opts.key, len(opts.value)))
+        raise errors.ArgumentError(
+            'noisy value',
+            'expected 1 value, %d values given' % len(opts.value))
       self.states.config[opts.key] = opts.value[0]
 
     else:
-      raise core.ExecutionFatalError(
-          '%s config: unknown key: %r' % (sys.argv[0], opts.key))
+      # unreachable
+      assert 0
 
     self.states.save()
 

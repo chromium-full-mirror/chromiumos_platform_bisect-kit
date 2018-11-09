@@ -10,6 +10,7 @@ import random
 import unittest
 
 from bisect_kit import core
+from bisect_kit import errors
 from bisect_kit import strategy
 
 
@@ -59,7 +60,7 @@ class TestNoisyBinarySearch(unittest.TestCase):
   def test_calculate_probs_wrong_assumption(self):
     self.rev_info[30]['new'] += 1
     self.rev_info[40]['old'] += 1
-    with self.assertRaises(strategy.WrongAssumption):
+    with self.assertRaises(errors.WrongAssumption):
       strategy.NoisyBinarySearch._calculate_probs(0.0, 1.0, self.rev_info,
                                                   self.init_prob)
 

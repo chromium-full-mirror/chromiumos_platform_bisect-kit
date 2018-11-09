@@ -29,6 +29,7 @@ from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ class ChromeOSVersionDomain(core.BisectDomain):
   @staticmethod
   def init(opts):
     if not opts.dut and not opts.board:
-      raise core.ExecutionFatalError('Neither --dut nor --board is specified')
+      raise errors.ArgumentError('--dut and --board', 'Neither is specified')
     if opts.dut:
       assert cros_util.is_dut(opts.dut)
     if not opts.board:

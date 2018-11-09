@@ -17,6 +17,7 @@ from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import cr_util
+from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import util
 
@@ -78,20 +79,27 @@ class ChromeSrcDomain(core.BisectDomain):
   def init(opts):
     chrome_src = os.path.join(opts.chrome_root, 'src')
     if not os.path.exists(chrome_src):
-      raise core.ExecutionFatalError("chrome src directory doesn't exist")
+      raise errors.ArgumentError('--chrome_root',
+                                 "chrome src directory doesn't exist")
 
     if opts.dut:
-      assert cros_util.is_dut(opts.dut)
+      if not cros_util.is_dut(opts.dut):
+        raise errors.ArgumentError('--dut', 'invalid DUT or unable to connect')
+
       if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)
 
     old = guess_chrome_version(opts, opts.old)
     new = guess_chrome_version(opts, opts.new)
-    assert old != new
+    if old == new:
+      raise errors.ArgumentError(
+          '--old and --new', 'start and end of chrome versions are identical')
 
     if not util.is_version_lesseq(old, new):
-      logger.error('old=%s is newer than new=%s !?', old, new)
-      raise Exception
+      raise errors.ArgumentError(
+          '--old and --new',
+          'start chrome version (%s) is newer than end version (%s)' % (old,
+                                                                        new))
 
     config = dict(
         chrome_root=opts.chrome_root,
@@ -114,7 +122,7 @@ class ChromeSrcDomain(core.BisectDomain):
       release_deps_file = cr_util.ChromeSpecManager.get_release_deps(rev)
       path = os.path.join(opts.chrome_root, 'buildspec', release_deps_file)
       if not os.path.exists(path):
-        raise Exception("%s doesn't exist" % path)
+        raise errors.InternalError("%s doesn't exist" % path)
 
     if not util.is_direct_relative_version(old, new):
       logger.warning('old=%s is not parent of new=%s', old, new)
@@ -125,7 +133,8 @@ class ChromeSrcDomain(core.BisectDomain):
           lowest_common_ancestor = rev
           break
       else:
-        raise Exception('Unable to find their common ancestor')
+        raise errors.InternalError(
+            'Unable to find their common ancestor: %s, %s' % (old, new))
       logger.warning(
           'Assume their lowest common ancestor, %s,'
           'still have expected old behavior as %s', lowest_common_ancestor, old)

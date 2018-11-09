@@ -17,6 +17,7 @@ from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import common
 from bisect_kit import core
+from bisect_kit import errors
 
 
 class TestCli(unittest.TestCase):
@@ -79,7 +80,7 @@ class TestCli(unittest.TestCase):
     cli._collect_bisect_result_values(values, 'BISECT_RESULT_VALUES=5\n')
     self.assertEqual(values, [1, 2, 5])
 
-    with self.assertRaises(core.ExecutionFatalError):
+    with self.assertRaises(errors.InternalError):
       cli._collect_bisect_result_values(values, 'BISECT_RESULT_VALUES=hello\n')
 
   def test_check_executable(self):
@@ -144,7 +145,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('init', '--num=10', '--old=0', '--new=9')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'true')
-    with self.assertRaises(core.VerificationFailed):
+    with self.assertRaises(errors.VerificationFailed):
       bisector.main('run')
 
   def test_run_false(self):
@@ -152,7 +153,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('init', '--num=10', '--old=0', '--new=9')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
-    with self.assertRaises(core.VerificationFailed):
+    with self.assertRaises(errors.VerificationFailed):
       bisector.main('run')
 
   def test_simple(self):
@@ -172,7 +173,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('init', '--num=20', '--old=3', '--new=15')
     bisector.main('config', 'switch', 'false')
     bisector.main('config', 'eval', 'sh', '-c', '[ "$BISECT_REV" -lt 7 ]')
-    with self.assertRaises(core.ExecutionFatalError):
+    with self.assertRaises(errors.UnableToProceed):
       bisector.main('run')
 
   def test_run_classic(self):
@@ -289,9 +290,9 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('init', '--num=100', '--old=10', '--new=90',
                   '--confidence=0.75')
 
-    with self.assertRaises(core.ExecutionFatalError):
+    with self.assertRaises(errors.ArgumentError):
       bisector.main('config', 'confidence', 'foo')
-    with self.assertRaises(core.ExecutionFatalError):
+    with self.assertRaises(errors.ArgumentError):
       bisector.main('config', 'confidence', '0.9', '0.8')
 
     self.assertEqual(bisector.states.config['confidence'], 0.75)
@@ -303,7 +304,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('init', '--num=100', '--old=10', '--new=90',
                   '--noisy=new=9/10')
 
-    with self.assertRaises(core.ExecutionFatalError):
+    with self.assertRaises(errors.ArgumentError):
       bisector.main('config', 'noisy', 'hello', 'world')
 
     self.assertEqual(bisector.states.config['noisy'], 'new=9/10')

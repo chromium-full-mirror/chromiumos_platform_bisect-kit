@@ -31,6 +31,7 @@ from bisect_kit import codechange
 from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import repo_util
 
 logger = logging.getLogger(__name__)
@@ -134,7 +135,8 @@ class AndroidRepoDomain(core.BisectDomain):
     new = determine_android_build_id(opts, opts.new)
 
     if int(old) >= int(new):
-      raise Exception('bad bisect range (%s, %s)' % (old, new))
+      raise errors.ArgumentError('--old and --new',
+                                 'bad bisect range (%s, %s)' % (old, new))
 
     config = dict(
         dut=opts.dut,

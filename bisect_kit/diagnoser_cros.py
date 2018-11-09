@@ -7,10 +7,10 @@ from __future__ import print_function
 import logging
 import os
 
+from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import util
 from bisect_kit import wrapper
-from bisect_kit import cros_util
-from bisect_kit import core
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ class CrosDiagnoser(object):
     try:
       self.cros_old, self.cros_new, self.noisy = bisector.narrow_down()
       logger.info('result %s %s %s', self.cros_old, self.cros_new, self.noisy)
-    except core.VerificationFailed:
+    except errors.VerificationFailed:
       return False
     except Exception:
       logger.exception('exception in bisect_cros_version')
@@ -181,13 +181,11 @@ class CrosDiagnoser(object):
 
       android_old, android_new, self.noisy = bisector.narrow_down()
       logger.info('result %s %s %s', android_old, android_new, self.noisy)
-    except core.VerificationFailed as e:
-      # if expect=old but failed, this is serious error
-      if e.expect == 'old':
-        logger.exception('expect old android has old behavior but failed')
-        return False
-      assert e.expect == 'new'
-      logger.info('verify failed, culprit is not in android')
+    except errors.VerifyOldFailed:
+      logger.fatal('expect old android has old behavior but failed')
+      return False
+    except errors.VerifyNewFailed:
+      logger.info('unable to reproduce, culprit is not in android')
       return None
     except Exception:
       logger.exception('exception in bisect_android_build_id')
@@ -211,7 +209,7 @@ class CrosDiagnoser(object):
 
       android_old, android_new, self.noisy = bisector.narrow_down()
       logger.info('result %s %s %s', android_old, android_new, self.noisy)
-    except core.VerificationFailed:
+    except errors.VerificationFailed:
       return False
     except Exception:
       logger.exception('exception in bisect_android_repo')
@@ -262,12 +260,11 @@ class CrosDiagnoser(object):
 
       chrome_old, chrome_new, self.noisy = bisector.narrow_down()
       logger.info('result %s %s %s', chrome_old, chrome_new, self.noisy)
-    except core.VerificationFailed as e:
-      # if expect=old but failed, this is serious error
-      if e.expect == 'old':
-        logger.exception('expect old chrome has old behavior but failed')
-        return False
-      logger.info('verify failed, culprit is not in chrome')
+    except errors.VerifyOldFailed:
+      logger.exception('expect old chrome has old behavior but failed')
+      return False
+    except errors.VerifyNewFailed:
+      logger.info('unable to reproduce, culprit is not in chrome')
       return None
     except Exception:
       logger.exception('exception in bisect_cr_localbuild_internal')
@@ -302,7 +299,7 @@ class CrosDiagnoser(object):
 
     try:
       bisector.narrow_down()
-    except core.VerificationFailed:
+    except errors.VerificationFailed:
       return False
     except Exception:
       logger.exception('exception in bisect_cros_repo')

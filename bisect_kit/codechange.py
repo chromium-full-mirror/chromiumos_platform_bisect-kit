@@ -19,6 +19,7 @@ import re
 import shutil
 
 from bisect_kit import cli
+from bisect_kit import errors
 from bisect_kit import git_util
 
 logger = logging.getLogger(__name__)
@@ -876,7 +877,8 @@ class CodeManager(object):
     cache_dir = os.path.join(self.root_dir, _DIFF_CACHE_DIR)
     cache_filename = os.path.join(cache_dir, '%s,%s.json' % (old, new))
     if not os.path.exists(cache_filename):
-      raise Exception('cached revlist not found: %s' % cache_filename)
+      raise errors.InternalError(
+          'cached revlist not found: %s' % cache_filename)
 
     result = []
     for data in json.load(file(cache_filename)):

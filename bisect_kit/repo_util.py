@@ -16,6 +16,7 @@ import urlparse
 import xml.etree.ElementTree
 
 from bisect_kit import codechange
+from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import util
 
@@ -73,7 +74,7 @@ def init(repo_dir,
   """
   root = find_repo_root(repo_dir)
   if root and root != repo_dir:
-    raise Exception(
+    raise errors.ExternalError(
         '%s should not be inside another repo project at %s' % (repo_dir, root))
 
   cmd = ['repo', 'init', '--manifest-url', manifest_url]
@@ -211,7 +212,7 @@ class ManifestParser(object):
   def parse_single_xml(self, content, allow_include=False):
     root = xml.etree.ElementTree.fromstring(content)
     if not allow_include and root.find('include') is not None:
-      raise ValueError(
+      raise errors.InternalError(
           'Expects self-contained manifest. <include> is not allowed')
     return root
 
@@ -240,7 +241,7 @@ class ManifestParser(object):
       fetch_url = _urljoin(self.manifest_url, remote.get('fetch'))
       if urlparse.urlparse(fetch_url).path not in ('', '/'):
         # TODO(kcwu): support remote url with sub folders
-        raise ValueError(
+        raise errors.InternalError(
             'only support git repo at root path of remote server: %s' %
             fetch_url)
       remote_fetch_map[name] = fetch_url
@@ -260,7 +261,7 @@ class ManifestParser(object):
 
       remote_name = project.get('remote', default.get('remote'))
       if remote_name not in remote_fetch_map:
-        raise ValueError('unknown remote name=%s' % remote_name)
+        raise errors.InternalError('unknown remote name=%s' % remote_name)
       fetch_url = remote_fetch_map.get(remote_name)
       repo_url = _urljoin(fetch_url, project.get('name'))
 

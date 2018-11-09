@@ -22,8 +22,8 @@ import time
 
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import core
 from bisect_kit import cr_util
+from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import locking
 from bisect_kit import repo_util
@@ -114,13 +114,13 @@ def query_dut_lsb_release(host):
     dict for keys and values of /etc/lsb-release.
 
   Raises:
-    core.ExecutionFatalError: cannot connect to host or lsb-release file
+    errors.ExecutionFatalError: cannot connect to host or lsb-release file
         doesn't exist
   """
   try:
     output = util.check_output('ssh', host, 'cat', '/etc/lsb-release')
   except subprocess.CalledProcessError:
-    raise core.ExecutionFatalError('cannot connect to DUT or not a DUT')
+    raise errors.ExternalError('cannot connect to DUT or not a DUT')
   return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
 
 
@@ -199,7 +199,7 @@ def wait_reboot_done(host, boot_id):
       logger.debug('reboot not ready? sleep wait 1 sec')
       time.sleep(1)
 
-  raise core.ExecutionFatalError('reboot failed?')
+  raise errors.ExternalError('reboot failed?')
 
 
 def gsutil(*args, **kwargs):
@@ -215,7 +215,7 @@ def gsutil(*args, **kwargs):
     stdout of gsutil
 
   Raises:
-    core.ExecutionFatalError: gsutil failed to run
+    errors.InternalError: gsutil failed to run
     subprocess.CalledProcessError: command failed
   """
   stderr_lines = []
@@ -225,7 +225,7 @@ def gsutil(*args, **kwargs):
   except subprocess.CalledProcessError as e:
     stderr = ''.join(stderr_lines)
     if re.search(r'ServiceException:.* does not have .*access', stderr):
-      raise core.ExecutionFatalError(
+      raise errors.ExternalError(
           'gsutil failed due to permission. ' +
           'Run "%s config" and follow its instruction. ' % gsutil_bin +
           'Fill any string if it asks for project-id')
@@ -234,7 +234,7 @@ def gsutil(*args, **kwargs):
     raise
   except OSError as e:
     if e.errno == errno.ENOENT:
-      raise core.ExecutionFatalError(
+      raise errors.ExternalError(
           'Unable to run %s. gsutil is not installed or not in PATH?' %
           gsutil_bin)
     raise
@@ -771,9 +771,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
     self.historical_manifest_git_dir = os.path.join(
         self.config['chromeos_mirror'], 'chromeos/manifest-versions.git')
     if not os.path.exists(self.historical_manifest_git_dir):
-      raise core.ExecutionFatalError(
-          'Manifest snapshots should be cloned into %s' %
-          self.historical_manifest_git_dir)
+      raise errors.InternalError('Manifest snapshots should be cloned into %s' %
+                                 self.historical_manifest_git_dir)
 
   def lookup_build_timestamp(self, rev):
     assert is_cros_full_version(rev)
@@ -784,7 +783,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
       timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
                                            'refs/heads/master', path)
     except ValueError:
-      raise core.ExecutionFatalError(
+      raise errors.InternalError(
           '%s does not have %s' % (self.historical_manifest_git_dir, path))
     return timestamp
 
@@ -794,7 +793,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
 
     path = os.path.join(self.manifest_dir, 'default.xml')
     if not os.path.islink(path) or os.readlink(path) != 'full.xml':
-      raise Exception('default.xml not symlink to full.xml is not supported')
+      raise errors.InternalError(
+          'default.xml not symlink to full.xml is not supported')
 
     result = []
     path = 'full.xml'

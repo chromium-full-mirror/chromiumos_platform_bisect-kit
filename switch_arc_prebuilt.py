@@ -20,8 +20,8 @@ from bisect_kit import arc_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
-from bisect_kit import core
 from bisect_kit import cros_util
+from bisect_kit import errors
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ def main(args=None):
   if str(opts.build_id) in arc_version:
     logger.info('updated to "%s", done', arc_version)
   else:
-    raise core.ExecutionFatalError(
+    raise errors.ExecutionFatalError(
         'arc version is expected matching "%s" but actual "%s"' %
         (opts.build_id, arc_version))
 

@@ -10,7 +10,7 @@ import math
 import re
 import sys
 
-from bisect_kit import core
+from bisect_kit import errors
 from bisect_kit import math_util
 
 logger = logging.getLogger(__name__)
@@ -21,20 +21,6 @@ SKIP_FOREVER = 2
 
 # Constant that denotes version is known not noisy.
 NOT_NOISY = (None, None)
-
-
-class WrongAssumption(Exception):
-  """Wrong assumption.
-
-  For non-noisy binary search, the assumption is all versions with old behavior
-  occurs before all versions with new behavior. But the eval result contracted
-  this ordering assumption.
-
-  p.s. This only happens (could be detected) if users marked versions 'old' and
-  'new' manually.
-
-  Suggestion: try noisy search instead (--noisy).
-  """
 
 
 # Old version of pylint may give false-positive warning.
@@ -426,7 +412,7 @@ class NoisyBinarySearch(object):
 
     if old_p == 0 and new_p == 1:
       if sum_prob == 0:
-        raise WrongAssumption(
+        raise errors.WrongAssumption(
             'Test results conflict with assumption, try --noisy')
     else:
       assert sum_prob > 0
@@ -597,22 +583,22 @@ class NoisyBinarySearch(object):
     bisection if the probability is too low.
 
     Raises:
-      core.VerificationFailed: Bisection range is not verified and false events
-          occur too many times.
+      errors.VerificationFailed: Bisection range is not verified and false
+          events occur too many times.
     """
     if self.rev_info[self.old_idx]['old'] == 0:
       # P(try N times and old behavior occurs 0 times)
       p = self.old_p**self.rev_info[self.old_idx]['new']
       if p < 1.0 - self.verify_confidence:
-        raise core.VerificationFailed(self.rev_info[self.old_idx].rev, 'old',
-                                      'new', self.rev_info[self.old_idx]['new'])
+        raise errors.VerifyOldFailed(self.rev_info[self.old_idx].rev,
+                                     self.rev_info[self.old_idx]['new'])
 
     if self.rev_info[self.new_idx]['new'] == 0:
       # P(try N times and new behavior occurs 0 times)
       p = (1 - self.new_p)**self.rev_info[self.new_idx]['old']
       if p < 1.0 - self.verify_confidence:
-        raise core.VerificationFailed(self.rev_info[self.new_idx].rev, 'new',
-                                      'old', self.rev_info[self.new_idx]['old'])
+        raise errors.VerifyNewFailed(self.rev_info[self.new_idx].rev,
+                                     self.rev_info[self.new_idx]['old'])
 
   def show_summary(self, more=False):
     """Shows top ranked candidates.

@@ -16,6 +16,7 @@ from __future__ import print_function
 
 from bisect_kit import cli
 from bisect_kit import core
+from bisect_kit import errors
 from bisect_kit import git_util
 
 
@@ -34,9 +35,12 @@ class GitDomain(core.BisectDomain):
 
   @staticmethod
   def init(opts):
-    for rev in (opts.old, opts.new):
-      if not git_util.is_containing_commit(opts.git_repo, rev):
-        raise ValueError('rev=%s is not in git_repo=%r' % (rev, opts.git_repo))
+    if not git_util.is_containing_commit(opts.git_repo, opts.old):
+      raise errors.ArgumentError(
+          '--old', '%s is not in git_repo=%r' % (opts.old, opts.git_repo))
+    if not git_util.is_containing_commit(opts.git_repo, opts.new):
+      raise errors.ArgumentError(
+          '--new', '%s is not in git_repo=%r' % (opts.new, opts.git_repo))
 
     config = dict(git_repo=opts.git_repo)
     revlist = git_util.get_revlist(opts.git_repo, opts.old, opts.new)

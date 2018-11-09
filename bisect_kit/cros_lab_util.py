@@ -9,6 +9,7 @@ import contextlib
 import errno
 import logging
 
+from bisect_kit import errors
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -40,10 +41,10 @@ def atest_cmd(topic, action, *args):
   """
   try:
     return util.check_output('atest', topic, action, *args)
-  except OSError, e:
+  except OSError as e:
     if e.errno == errno.ENOENT:
       logger.error('"atest" not installed? see go/lab-tools for setup steps')
-    raise
+    raise errors.ExternalError(str(e))
 
 
 def list_host(host=None, labels=None, statuses=None, locked=None):
