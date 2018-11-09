@@ -5,6 +5,7 @@
 """Diagnose ChromeOS regressions on top of subcomponent bisectors."""
 from __future__ import print_function
 import logging
+import os
 
 from bisect_kit import util
 from bisect_kit import wrapper
@@ -149,6 +150,13 @@ class CrosDiagnoser(object):
     if not self.android_root:
       self.android_root = self.path_factory.get_android_tree(git_branch)
       logger.info('android_root = %s', self.android_root)
+
+    if not os.path.exists(self.android_mirror):
+      logger.info('android_mirror does not exist; skip android bisect')
+      return None
+    if not os.path.exists(self.android_root):
+      logger.info('android_root does not exist; skip android bisect')
+      return None
 
     logger.info('bisect android prebuilt')
     session = '%s/%s' % (self.session, self.cros_old)
