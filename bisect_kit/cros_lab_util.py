@@ -104,12 +104,19 @@ def lock_host(host, reason):
   Args:
     host: host name
     reason: lock reason
+
+  Returns:
+    host info of locked host
   """
   atest_cmd('host', 'mod', '--lock', '--lock_reason', reason, host)
 
-  # make sure it's locked by me
   hosts = list_host(host=host)
-  assert hosts[host]['Lock Reason'] == reason
+  info = hosts[host]
+
+  # make sure it's locked by me
+  assert info['Lock Reason'] == reason
+
+  return info
 
 
 def unlock_host(host):
@@ -166,7 +173,12 @@ def allocate_host(reason, host=None, model=None, sku=None, extra_labels=None):
     logger.error('no unlocked hosts are in Ready state')
     return None
 
-  lock_host(target_host, reason)
+  info = lock_host(target_host, reason)
+  if info['Status'] != 'Ready':
+    unlock_host(target_host)
+    raise Exception(
+        'unexpected host status=%s, a race condition?' % info['Status'])
+
   return target_host
 
 
