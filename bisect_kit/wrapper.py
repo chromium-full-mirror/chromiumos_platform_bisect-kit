@@ -7,6 +7,8 @@ from __future__ import print_function
 import importlib
 import logging
 import subprocess
+import sys
+import StringIO
 
 from bisect_kit import cli
 from bisect_kit import core
@@ -31,12 +33,19 @@ class BisectorWrapper(object):
         break
     assert self.domain_cls
 
-  def call(self, *args):
+  def call(self, *args, **kwargs):
     bisector = cli.BisectorCommandLine(self.domain_cls)
     full_args = self.args + list(args)
     logger.debug('call %s: %s', self.name, full_args)
-    bisector.main(*full_args, prog=self.name)
-    return bisector
+    stdout_bak = sys.stdout
+    try:
+      if kwargs.get('capture_output'):
+        sys.stdout = fake_stdout = StringIO.StringIO()
+      bisector.main(*full_args, prog=self.name)
+    finally:
+      sys.stdout = stdout_bak
+    if kwargs.get('capture_output'):
+      return fake_stdout.getvalue()
 
   def current_status(self):
     bisector = cli.BisectorCommandLine(self.domain_cls)
@@ -68,14 +77,33 @@ class BisectorWrapper(object):
     self.switch_cmds.append(cmd)
     self._set_switch_commands()
 
-  def narrow_down(self):
+  def narrow_down(self, states, desc):
+    states.add_history('bisect', desc, bisector=self.name, session=self.session)
     status = self.current_status()
     logger.info('%s old=%s, new=%s, done=%s', self.name, status['old'],
                 status['new'], status['done'])
-    self.call('run')
-    status = self.current_status()
-    logger.info('%s old=%s, new=%s, done=%s', self.name, status['old'],
-                status['new'], status['done'])
-    self.call('view')
+    try:
+      self.call('run')
+    except Exception:
+      # If bisector failed after bisect range verified, we can continue with
+      # knowledge of the partial results. For example,
+      #  - ChromeOS prebuilt bisector may cut down half the bisect range and
+      #    failed. Although it didn't find the narrowest range, we can still
+      #    continue to bisect Android and Chrome using the new range.
+      #  - If Android prebuilt bisection failed after verification, although
+      #    the range may not shrink, it indicates the culprit is inside Android
+      #    and we should continue bisect Android localbuild.
+      status = self.current_status()
+      if status['verified']:
+        logger.exception(
+            'got exception; still can continue with partial results')
+      else:
+        raise
+    else:
+      status = self.current_status()
 
+    logger.info('%s result old=%s, new=%s, noisy=%s, done=%s', self.name,
+                status['old'], status['new'], status['estimated_noise'],
+                status['done'])
+    self.call('view')
     return status['old'], status['new'], status['estimated_noise']

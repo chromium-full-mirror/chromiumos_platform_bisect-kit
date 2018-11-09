@@ -171,6 +171,8 @@ class BisectStates(States):
       self.rev_index[rev] = i
 
     for entry in self.data['history']:
+      if entry.get('event', 'sample') != 'sample':
+        continue
       idx = self.rev2idx(entry['rev'])
       self.rev_info[idx][entry['status']] += entry.get('times', 1)
       self.rev_info[idx].values += entry.get('values', [])
@@ -189,19 +191,22 @@ class BisectStates(States):
   def rev2idx(self, rev):
     return self.rev_index[rev]
 
-  def add_status(self, idx, status, values=None, times=1, comment=''):
+  def add_history(self, event, **kwargs):
+    entry = dict(event=event, timestamp=time.time(), **kwargs)
+    self.data['history'].append(entry)
+
+  def add_sample(self, idx, status, values=None, times=1, comment=''):
     self.rev_info[idx][status] += times
     if values:
       self.rev_info[idx].append_values(values)
-    entry = dict(
-        timestamp=int(time.time()), rev=self.idx2rev(idx), status=status)
+    entry = dict(rev=self.idx2rev(idx), status=status)
     if times > 1:
       entry['times'] = times
     if comment:
       entry['comment'] = comment
     if values:
       entry['values'] = values
-    self.data['history'].append(entry)
+    self.add_history('sample', **entry)
 
 
 class BisectDomain(object):

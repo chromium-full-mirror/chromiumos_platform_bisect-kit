@@ -7,6 +7,7 @@
 from __future__ import print_function
 import argparse
 import datetime
+import json
 import logging
 import os
 import re
@@ -326,9 +327,9 @@ class BisectorCommandLine(object):
   def config(self):
     return self.states.config
 
-  def _add_status(self, rev, status, **kwargs):
+  def _add_sample(self, rev, status, **kwargs):
     idx = self.states.rev2idx(rev)
-    self.states.add_status(idx, status, **kwargs)
+    self.states.add_sample(idx, status, **kwargs)
     self.strategy.update(idx, status)
 
   def cmd_reset(self, _opts):
@@ -425,49 +426,69 @@ class BisectorCommandLine(object):
       errors.UnableToProceed: Too many errors to narrow down further the
           bisection range.
     """
-    assert self.config.get('switch')
-    assert self.config.get('eval')
+    # Set dummy values in case exception raised before loop.
+    idx, rev = -1, None
+    try:
+      assert self.config.get('switch')
+      assert self.config.get('eval')
+      self.strategy.rebuild()
 
-    self.strategy.rebuild()
+      prev_rev = None
+      force = opts.force
+      for idx, rev in self._next_idx_iter(opts, force):
+        if not force:
+          # Bail out if bisection range is unlikely true in order to prevent
+          # wasting time. This is necessary because some configurations (say,
+          # confidence) may be changed before cmd_run() and thus the bisection
+          # range becomes not acceptable.
+          self.strategy.check_verification_range()
 
-    prev_rev = None
-    force = opts.force
-    for idx, rev in self._next_idx_iter(opts, force):
-      if not force:
-        # Bail out if bisection range is unlikely true in order to prevent
-        # wasting time. This is necessary because some configurations (say,
-        # confidence) may be changed before cmd_run() and thus the bisection
-        # range becomes not acceptable.
+        step, status, values = self._switch_and_eval(rev, prev_rev=prev_rev)
+        logger.info('rev=%s => status %s', rev, status)
+        force = False
+
+        self._add_sample(rev, status, values=values)
+        self.states.save()
+
+        # Bail out if bisection range is unlikely true.
         self.strategy.check_verification_range()
 
-      step, status, values = self._switch_and_eval(rev, prev_rev=prev_rev)
-      logger.info('rev=%s => status %s', rev, status)
-      force = False
+        if status == 'skip':
+          current_state = self.states.get(idx)
+          if current_state['skip'] > (
+              current_state['old'] + current_state['new'] + 1) * 5:
+            message = 'too much "skip" for rev=%r' % rev
+            raise errors.UnableToProceed(message)
 
-      self._add_status(rev, status, values=values)
+        self.strategy.show_summary()
+
+        if step == 'switch' and status == 'skip':
+          # Previous switch failed and thus the current version is unknown. Set
+          # it None, so next switch operation won't be bypassed (due to
+          # optimization).
+          prev_rev = None
+        else:
+          prev_rev = rev
+
+      logger.info('done')
+      old_idx, new_idx = self.strategy.get_range()
+      self.states.add_history('done')
       self.states.save()
-
-      # Bail out if bisection range is unlikely true.
-      self.strategy.check_verification_range()
-
-      if status == 'skip':
-        current_state = self.states.get(idx)
-        # Bail out if 'skip' too much times. Don't save.
-        if current_state['skip'] > (
-            current_state['old'] + current_state['new'] + 1) * 5:
-          raise errors.UnableToProceed('too much "skip" for rev=%r' % rev)
-
-      self.strategy.show_summary()
-
-      if step == 'switch' and status == 'skip':
-        # Previous switch failed and thus the current version is unknown. Set
-        # it None, so next switch operation won't be bypassed (due to
-        # optimization).
-        prev_rev = None
-      else:
-        prev_rev = rev
-
-    logger.info('done')
+    except Exception as e:
+      exception_name = e.__class__.__name__
+      self.states.add_history(
+          'failed', text='%s: %s' % (exception_name, e), index=idx, rev=rev)
+      self.states.save()
+      raise
+    finally:
+      if rev:
+        # progress so far
+        old_idx, new_idx = self.strategy.get_range()
+        self.states.add_history(
+            'range',
+            old=self.states.idx2rev(old_idx),
+            new=self.states.idx2rev(new_idx))
+        self.states.save()
 
   def cmd_view(self, opts):
     """Shows current progress and candidates."""
@@ -488,6 +509,7 @@ class BisectorCommandLine(object):
             invoked). If not, below items are omitted.
         old: Start of current estimated range.
         new: End of current estimated range.
+        verified: The bisect range is already verified.
         estimated_noise: New estimated noise.
         done: True if bisection is done, otherwise False.
     """
@@ -507,22 +529,39 @@ class BisectorCommandLine(object):
           inited=True,
           old=self.states.idx2rev(left),
           new=self.states.idx2rev(right),
+          verified=self.strategy.is_range_verified(),
           estimated_noise=estimated_noise,
           done=self.strategy.is_done())
     else:
       result = dict(inited=False)
     return result
 
-  def cmd_log(self, _opts):
+  def cmd_log(self, opts):
     """Prints what has been done so far."""
+    history = []
     for entry in self.states.data['history']:
-      print('{datetime}, {rev} {status} {values} {comment}'.format(
-          datetime=datetime.datetime.fromtimestamp(entry['timestamp']),
-          rev=entry['rev'],
-          status=entry['status'] + ('*%d' % entry['times']
-                                    if entry.get('times', 1) > 1 else ''),
-          values=entry.get('values', ''),
-          comment=entry.get('comment', '')))
+      if opts.before and entry['timestamp'] >= opts.before:
+        continue
+      if opts.after and entry['timestamp'] <= opts.after:
+        continue
+      history.append(entry)
+
+    if opts.json:
+      print(json.dumps(history, indent=2))
+      return
+
+    for entry in history:
+      entry_time = datetime.datetime.fromtimestamp(int(entry['timestamp']))
+      if entry.get('event', 'sample') == 'sample':
+        print('{datetime} {rev} {status} {values} {comment}'.format(
+            datetime=entry_time,
+            rev=entry['rev'],
+            status=entry['status'] + ('*%d' % entry['times']
+                                      if entry.get('times', 1) > 1 else ''),
+            values=entry.get('values', ''),
+            comment=entry.get('comment', '')))
+      else:
+        print('%s %r' % (entry_time, entry))
 
   def cmd_next(self, _opts):
     """Prints next suggested rev to bisect."""
@@ -556,7 +595,7 @@ class BisectorCommandLine(object):
   def _add_revs_status_helper(self, revs, status):
     self.strategy.rebuild()
     for rev, times in revs:
-      self._add_status(rev, status, times=times, comment='manual')
+      self._add_sample(rev, status, times=times, comment='manual')
     self.states.save()
 
   def cmd_new(self, opts):
@@ -779,6 +818,10 @@ class BisectorCommandLine(object):
 
     parser_log = subparsers.add_parser(
         'log', help='Prints what has been done so far')
+    parser_log.add_argument('--before', type=float)
+    parser_log.add_argument('--after', type=float)
+    parser_log.add_argument(
+        '--json', action='store_true', help='Machine readable output')
     parser_log.set_defaults(func=self.cmd_log)
 
     parser_next = subparsers.add_parser(

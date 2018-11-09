@@ -87,7 +87,7 @@ class InternalError(Exception):
 
 
 class ExternalError(Exception):
-  """Errors in external dependnecy.
+  """Errors in external dependency.
 
   Like configuration errors, network errors, DUT issues, etc.
   """

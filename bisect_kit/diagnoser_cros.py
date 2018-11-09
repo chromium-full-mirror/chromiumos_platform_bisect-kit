@@ -4,15 +4,35 @@
 # found in the LICENSE file.
 """Diagnose ChromeOS regressions on top of subcomponent bisectors."""
 from __future__ import print_function
+import datetime
+import json
 import logging
 import os
+import time
 
+from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
 from bisect_kit import wrapper
 
 logger = logging.getLogger(__name__)
+
+
+class DiagnoseStates(core.States):
+  """Diagnose states."""
+
+  def init(self, config):
+    self.set_data(dict(config=config, history=[]))
+
+  @property
+  def config(self):
+    return self.data['config']
+
+  def add_history(self, event, text, **kwargs):
+    entry = dict(timestamp=time.time(), event=event, text=text, **kwargs)
+    self.data['history'].append(entry)
+    self.save()
 
 
 def need_android_bisect(old_info, new_info):
@@ -47,9 +67,10 @@ def need_android_bisect(old_info, new_info):
 class CrosDiagnoser(object):
   """Integrated bisectors API for ChromeOS regression analysis."""
 
-  def __init__(self, session, path_factory, chromeos_root, chromeos_mirror,
-               android_root, android_mirror, chrome_root, chrome_mirror, board,
-               noisy, dut):
+  def __init__(self, states, session, path_factory, chromeos_root,
+               chromeos_mirror, android_root, android_mirror, chrome_root,
+               chrome_mirror, board, noisy, dut):
+    self.states = states
     self.session = session
     self.path_factory = path_factory
     self.chromeos_root = chromeos_root
@@ -79,10 +100,6 @@ class CrosDiagnoser(object):
       new: new ChromeOS version
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch chromeos version
-
-    Returns:
-      True: bisect done successfully
-      False: failed
     """
     bisector = wrapper.BisectorWrapper('bisect_cros_version', self.session)
     bisector.init_if_necessary(
@@ -95,14 +112,8 @@ class CrosDiagnoser(object):
     if extra_switch_cmd:
       bisector.append_switch_command(extra_switch_cmd)
 
-    try:
-      self.cros_old, self.cros_new, self.noisy = bisector.narrow_down()
-      logger.info('result %s %s %s', self.cros_old, self.cros_new, self.noisy)
-    except errors.VerificationFailed:
-      return False
-    except Exception:
-      logger.exception('exception in bisect_cros_version')
-      return False
+    self.cros_old, self.cros_new, self.noisy = bisector.narrow_down(
+        self.states, 'bisect chromeos prebuilt')
 
     self.old_info = cros_util.version_info(self.board, self.cros_old)
     self.new_info = cros_util.version_info(self.board, self.cros_new)
@@ -112,7 +123,6 @@ class CrosDiagnoser(object):
     logger.info('new: cros %s, chrome %s, android %s',
                 self.new_info['cros_full_version'], self.new_info['cr_version'],
                 self.new_info.get('android_build_id'))
-    return True
 
   def switch_chromeos_to_old(self, force=False):
     """Switch ChromeOS version to old prebuilt.
@@ -130,20 +140,22 @@ class CrosDiagnoser(object):
   def narrow_down_android(self, eval_cmd, extra_switch_cmd=None):
     """Bisect with Android prebuilt and localbuild.
 
+    It's known that the version of ChromeOS has old behavior.
+
     Args:
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch android version
 
     Returns:
-      True: bisect done successfully
-      False: failed
-      None: unable to bisect this component
+      True: culprit is inside Android
+      False: culprit is not inside Android or unable to bisect
     """
     if not need_android_bisect(self.old_info, self.new_info):
-      return None
+      return False
 
     # TODO(kcwu): what if the branch name does not have 'git_' prefix
-    git_branch = self.old_info['android_branch'].replace('git_', '')
+    assert self.old_info['android_branch'].startswith('git_')
+    git_branch = self.old_info['android_branch'][4:]
     if not self.android_mirror:
       self.android_mirror = self.path_factory.get_android_mirror(git_branch)
       logger.info('android_mirror = %s', self.android_mirror)
@@ -179,16 +191,13 @@ class CrosDiagnoser(object):
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
 
-      android_old, android_new, self.noisy = bisector.narrow_down()
-      logger.info('result %s %s %s', android_old, android_new, self.noisy)
+      android_old, android_new, self.noisy = bisector.narrow_down(
+          self.states, 'bisect android prebuilt')
     except errors.VerifyOldFailed:
       logger.fatal('expect old android has old behavior but failed')
-      return False
+      raise
     except errors.VerifyNewFailed:
       logger.info('unable to reproduce, culprit is not in android')
-      return None
-    except Exception:
-      logger.exception('exception in bisect_android_build_id')
       return False
 
     logger.info('bisect android local build')
@@ -207,13 +216,11 @@ class CrosDiagnoser(object):
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
 
-      android_old, android_new, self.noisy = bisector.narrow_down()
-      logger.info('result %s %s %s', android_old, android_new, self.noisy)
+      android_old, android_new, self.noisy = bisector.narrow_down(
+          self.states, 'bisect android local build')
     except errors.VerificationFailed:
-      return False
-    except Exception:
-      logger.exception('exception in bisect_android_repo')
-      return False
+      logger.fatal('verified with android prebuilt but failed with local build')
+      raise
     return True
 
   def narrow_down_chrome(self,
@@ -222,6 +229,8 @@ class CrosDiagnoser(object):
                          chrome_binaries=None):
     """Bisect with Chrome localbuild.
 
+    It's known that the version of ChromeOS has old behavior.
+
     Args:
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch chrome version
@@ -229,13 +238,12 @@ class CrosDiagnoser(object):
           default is chrome.
 
     Returns:
-      True: bisect done successfully
-      False: failed
-      None: unable to bisect this component
+      True: culprit is inside Chrome
+      False: culprit is not inside Chrome or unable to bisect
     """
     if self.old_info['cr_version'] == self.new_info['cr_version']:
       logger.info('chrome version identical')
-      return None
+      return False
 
     logger.info('bisect chrome local build')
     session = '%s/%s' % (self.session, self.cros_old)
@@ -258,16 +266,9 @@ class CrosDiagnoser(object):
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
 
-      chrome_old, chrome_new, self.noisy = bisector.narrow_down()
-      logger.info('result %s %s %s', chrome_old, chrome_new, self.noisy)
-    except errors.VerifyOldFailed:
-      logger.exception('expect old chrome has old behavior but failed')
-      return False
+      bisector.narrow_down(self.states, 'bisect chrome local build')
     except errors.VerifyNewFailed:
       logger.info('unable to reproduce, culprit is not in chrome')
-      return None
-    except Exception:
-      logger.exception('exception in bisect_cr_localbuild_internal')
       return False
     return True
 
@@ -277,11 +278,6 @@ class CrosDiagnoser(object):
     Args:
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch ChromeOS version
-
-    Returns:
-      True: bisect done successfully
-      False: failed
-      None: unable to bisect this component
     """
     bisector = wrapper.BisectorWrapper('bisect_cros_repo', self.session)
     bisector.init_if_necessary(
@@ -297,11 +293,32 @@ class CrosDiagnoser(object):
     if extra_switch_cmd:
       bisector.append_switch_command(extra_switch_cmd)
 
-    try:
-      bisector.narrow_down()
-    except errors.VerificationFailed:
-      return False
-    except Exception:
-      logger.exception('exception in bisect_cros_repo')
-      return False
-    return True
+    bisector.narrow_down(self.states, 'bisect chromeos local build')
+
+  def cmd_log(self, json_output=False):
+    result = []
+    history = self.states.data['history']
+    for i, entry in enumerate(history):
+      if json_output:
+        entry = entry.copy()
+        result.append(entry)
+      else:
+        entry_time = datetime.datetime.fromtimestamp(int(entry['timestamp']))
+        print(entry_time, entry['text'])
+
+      # Special case, combine bisector log nestedly.
+      if entry.get('event') == 'bisect':
+        bisector = wrapper.BisectorWrapper(entry['bisector'], entry['session'])
+        cmd = ['log', '--after', str(entry['timestamp'])]
+        if len(history) > i + 1:
+          cmd += ['--before', str(history[i + 1]['timestamp'])]
+
+        if json_output:
+          cmd.append('--json')
+          output = bisector.call(*cmd, capture_output=True)
+          entry['log'] = json.loads(output)
+        else:
+          bisector.call(*cmd)
+
+    if json_output:
+      print(json.dumps(result, indent=2))

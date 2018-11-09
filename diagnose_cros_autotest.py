@@ -22,7 +22,6 @@ import os
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
-from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
@@ -54,17 +53,6 @@ CHROME_BINARIES_OF_TEST = {
     'video_VideoDecodeAccelerator*': ['video_decode_accelerator_unittest'],
     'video_VideoEncodeAccelerator*': ['video_encode_accelerator_unittest'],
 }
-
-
-class DiagnoseStates(core.States):
-  """Diagnose states."""
-
-  def init(self, config):
-    self.set_data(dict(config=config))
-
-  @property
-  def config(self):
-    return self.data['config']
 
 
 def grab_dut(config):
@@ -259,59 +247,92 @@ class DiagnoseCommandLine(object):
 
     self.states.load()
 
+    try:
+      path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+          self.config['mirror_base'], self.config['work_base'],
+          self.config['session'])
+      common_switch_cmd, common_eval_cmd = self._build_cmds()
+
+      chrome_binaries = determine_chrome_binaries(self.config['chromeos_root'],
+                                                  self.config['test_name'])
+
+      with cros_lab_util.dut_manager(self.config['dut'],
+                                     lambda: grab_dut(self.config)) as dut:
+        if not dut:
+          raise errors.NoDutAvailable('unable to allocate DUT')
+        assert cros_util.is_dut(dut)
+        if self.config['dut'] == cros_lab_util.LAB_DUT:
+          self.config['allocated_dut'] = dut
+          self.states.save()
+        common_eval_cmd.append(dut)
+
+        diagnoser = diagnoser_cros.CrosDiagnoser(
+            self.states, self.config['session'], path_factory,
+            self.config['chromeos_root'], self.config['chromeos_mirror'],
+            self.config['android_root'], self.config['android_mirror'],
+            self.config['chrome_root'], self.config['chrome_mirror'],
+            self.config['board'], self.config['noisy'], dut)
+
+        eval_cmd = common_eval_cmd + ['--prebuilt', '--reinstall']
+        # Do not specify version for autotest prebuilt switching here. The trick
+        # is that version number is obtained via bisector's environment variable
+        # CROS_VERSION.
+        extra_switch_cmd = common_switch_cmd
+        diagnoser.narrow_down_chromeos_prebuilt(
+            self.config['old'],
+            self.config['new'],
+            eval_cmd,
+            extra_switch_cmd=extra_switch_cmd)
+
+        diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
+        util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
+        util.check_call('ssh', dut, 'rm', '-rf', '/usr/local/autotest')
+
+        try:
+          if diagnoser.narrow_down_android(eval_cmd):
+            return
+        except errors.VerificationFailed:
+          raise
+        except Exception:
+          logger.exception('exception in android bisector before verification; '
+                           'assume culprit is not inside android and continue')
+        # Assume it's ok to leave random version of android prebuilt on DUT.
+
+        # Don't --reinstall to keep chrome binaries override.
+        eval_cmd = common_eval_cmd + ['--prebuilt']
+        try:
+          if diagnoser.narrow_down_chrome(
+              eval_cmd, chrome_binaries=chrome_binaries) is not None:
+            return
+        except errors.VerifyOldFailed:
+          logger.fatal('expect old chrome has old behavior but failed')
+          raise
+        except Exception:
+          logger.exception('exception in chrome bisector before verification; '
+                           'assume culprit is not inside chrome and continue')
+
+        eval_cmd = common_eval_cmd + ['--reinstall']
+        diagnoser.narrow_down_chromeos_localbuild(eval_cmd)
+        logger.info('%s done', __file__)
+    except Exception as e:
+      logger.exception('got exception; stop')
+      exception_name = e.__class__.__name__
+      self.states.add_history(
+          'failed', '%s: %s' % (exception_name, e), exception=exception_name)
+
+  def cmd_log(self, opts):
+    self.states.load()
     path_factory = setup_cros_bisect.DefaultProjectPathFactory(
         self.config['mirror_base'], self.config['work_base'],
         self.config['session'])
-    common_switch_cmd, common_eval_cmd = self._build_cmds()
+    diagnoser = diagnoser_cros.CrosDiagnoser(
+        self.states, self.config['session'], path_factory,
+        self.config['chromeos_root'], self.config['chromeos_mirror'],
+        self.config['android_root'], self.config['android_mirror'],
+        self.config['chrome_root'], self.config['chrome_mirror'],
+        self.config['board'], self.config['noisy'], None)
 
-    chrome_binaries = determine_chrome_binaries(self.config['chromeos_root'],
-                                                self.config['test_name'])
-
-    with cros_lab_util.dut_manager(self.config['dut'],
-                                   lambda: grab_dut(self.config)) as dut:
-      if not dut:
-        raise errors.NoDutAvailable('unable to allocate DUT')
-      assert cros_util.is_dut(dut)
-      self.config['allocated_dut'] = dut
-      self.states.save()
-      common_eval_cmd.append(dut)
-
-      diagnoser = diagnoser_cros.CrosDiagnoser(
-          self.config['session'], path_factory, self.config['chromeos_root'],
-          self.config['chromeos_mirror'], self.config['android_root'],
-          self.config['android_mirror'], self.config['chrome_root'],
-          self.config['chrome_mirror'], self.config['board'],
-          self.config['noisy'], dut)
-
-      eval_cmd = common_eval_cmd + ['--prebuilt', '--reinstall']
-      # Do not specify version for autotest prebuilt switching here. The trick
-      # is that version number is obtained via bisector's environment variable
-      # CROS_VERSION.
-      extra_switch_cmd = common_switch_cmd
-      if not diagnoser.narrow_down_chromeos_prebuilt(
-          self.config['old'],
-          self.config['new'],
-          eval_cmd,
-          extra_switch_cmd=extra_switch_cmd):
-        return
-
-      diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
-      util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
-      util.check_call('ssh', dut, 'rm', '-rf', '/usr/local/autotest')
-
-      if diagnoser.narrow_down_android(eval_cmd) is not None:
-        return
-      # Assume it's ok to leave random version of android prebuilt on DUT.
-
-      # Don't --reinstall to keep chrome binaries override.
-      eval_cmd = common_eval_cmd + ['--prebuilt']
-      if diagnoser.narrow_down_chrome(
-          eval_cmd, chrome_binaries=chrome_binaries) is not None:
-        return
-
-      eval_cmd = common_eval_cmd + ['--reinstall']
-      if diagnoser.narrow_down_chromeos_localbuild(eval_cmd):
-        logger.info('%s done', __file__)
+    diagnoser.cmd_log(opts.json)
 
   def create_argument_parser(self):
     parser = argparse.ArgumentParser()
@@ -441,6 +462,12 @@ class DiagnoseCommandLine(object):
     parser_run = subparsers.add_parser('run', help='Start auto bisection')
     parser_run.set_defaults(func=self.cmd_run)
 
+    parser_log = subparsers.add_parser(
+        'log', help='Prints what has been done so far')
+    parser_log.add_argument(
+        '--json', action='store_true', help='Machine readable output')
+    parser_log.set_defaults(func=self.cmd_log)
+
     return parser
 
   def main(self, args=None):
@@ -450,7 +477,7 @@ class DiagnoseCommandLine(object):
     session_base = configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE)
     session_file = os.path.join(session_base, opts.session,
                                 self.__class__.__name__)
-    self.states = DiagnoseStates(session_file)
+    self.states = diagnoser_cros.DiagnoseStates(session_file)
     opts.func(opts)
 
 

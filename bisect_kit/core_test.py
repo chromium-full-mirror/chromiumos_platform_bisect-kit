@@ -28,19 +28,19 @@ class TestBisectStates(unittest.TestCase):
     self.assertEqual(states.idx2rev(1), 'b')
     self.assertEqual(states.rev2idx('b'), 1)
 
-    states.add_status(1, 'old', times=5)
+    states.add_sample(1, 'old', times=5)
     self.assertEqual(states.get(1)['old'], 5)
 
-    states.add_status(1, 'old', comment='foobar')
+    states.add_sample(1, 'old', comment='foobar')
     self.assertEqual(states.get(1)['old'], 6)
 
   def test_save_and_load(self):
     states = core.BisectStates(self.session_file)
     revlist = map(str, range(10))
     states.init({}, revlist)
-    states.add_status(1, 'old')
-    states.add_status(1, 'old')
-    states.add_status(5, 'new')
+    states.add_sample(1, 'old')
+    states.add_sample(1, 'old')
+    states.add_sample(5, 'new')
     states.config['foo'] = 'bar'
     states.save()
 
