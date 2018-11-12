@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 
 from bisect_kit import cli
 from bisect_kit import errors
@@ -344,7 +345,12 @@ class GitCheckoutCommit(Action):
 
   def summary(self, code_storage):
     git_root = code_storage.cached_git_root(self.repo_url)
-    summary = git_util.get_commit_log(git_root, self.rev).splitlines()[0]
+    try:
+      summary = git_util.get_commit_log(git_root, self.rev).splitlines()[0]
+    except subprocess.CalledProcessError:
+      logger.warning('failed to get commit log of %s at %s', self.rev[:10],
+                     git_root)
+      summary = '(unknown)'
     return 'commit %s %s %r' % (self.rev[:10], self.path, summary)
 
 
