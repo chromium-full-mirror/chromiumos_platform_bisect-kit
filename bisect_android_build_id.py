@@ -113,23 +113,33 @@ class AndroidBuildIDDomain(core.BisectDomain):
     if self.config.get('android_root'):
       env['ANDROID_ROOT'] = self.config['android_root']
 
-  def view(self, revlist, old, new):
-    url_template = (
-        'https://android-build.googleplex.com/'
-        'builds/{new}/branches/{branch}/targets/{flavor}/cls?end={old}')
-    print(url_template.format(
-        old=old,
-        new=new,
-        branch=self.config['branch'],
-        flavor=self.config['flavor']))
-    print('Minus')
-    print(url_template.format(
-        old=old,
-        new=old,
-        branch=self.config['branch'],
-        flavor=self.config['flavor']))
-    print('because this diff viewer is inclusive: '
-          'including changes in %s, which is old' % old)
+  def fill_candidate_summary(self, summary, interesting_indexes):
+    old, new = summary['current_range']
+    url_template = ('https://android-build.googleplex.com/'
+                    'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
+                        self.config['branch'], self.config['flavor'])
+    summary.update({
+        'link_note':
+            'Because the diff viewer is inclusive, you need to ignore changes '
+            'from starting version by yourself (b/118564983)',
+        'links': {
+            'change_list': url_template.format(old=old, new=new),
+            'minus': url_template.format(old=old, new=old),
+        },
+    })
+
+    for i in interesting_indexes:
+      if i == 0:
+        continue
+      rev_info = summary['rev_info'][i]
+      rev_info.update({
+          'actions': [{
+              'link':
+                  url_template.format(
+                      old=summary['rev_info'][i - 1]['rev'],
+                      new=rev_info['rev']),
+          }],
+      })
 
 
 if __name__ == '__main__':

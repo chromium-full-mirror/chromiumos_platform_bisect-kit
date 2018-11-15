@@ -5,11 +5,14 @@
 """Test bisect_git script."""
 
 from __future__ import print_function
+import shutil
+import tempfile
 import unittest
 
 import mock
 
 from bisect_kit import cli
+from bisect_kit import git_util_test
 import bisect_git
 
 
@@ -18,9 +21,12 @@ class TestGitDomain(unittest.TestCase):
   """Test GitDomain class."""
 
   def setUp(self):
-    # All git operations should have been mocked, nobody will access this path
-    # on disk.
-    self.git_repo = '/non/existing/git/repo/path'
+    self.git_repo = tempfile.mkdtemp()
+    self.git = git_util_test.GitOperation(self.git_repo)
+    self.git.init()
+
+  def tearDown(self):
+    shutil.rmtree(self.git_repo)
 
   def test_basic(self):
     """Tests basic functionality."""
@@ -40,13 +46,12 @@ class TestGitDomain(unittest.TestCase):
       self.assertEqual(new, fake_commits[-1])
       return fake_commits
 
-    with mock.patch('bisect_kit.cli.argtype_dir_path', lambda x: x):
-      with mock.patch.multiple(
-          'bisect_kit.git_util',
-          is_containing_commit=is_containing_commit,
-          get_revlist=get_revlist):
-        bisector.main('init', '--old', old, '--new', new, '--git_repo',
-                      self.git_repo)
+    with mock.patch.multiple(
+        'bisect_kit.git_util',
+        is_containing_commit=is_containing_commit,
+        get_revlist=get_revlist):
+      bisector.main('init', '--old', old, '--new', new, '--git_repo',
+                    self.git_repo)
 
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'true')

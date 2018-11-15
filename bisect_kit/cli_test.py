@@ -14,8 +14,8 @@ import StringIO
 import mock
 
 from bisect_kit import cli
-from bisect_kit import configure
 from bisect_kit import common
+from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import errors
 
@@ -281,9 +281,9 @@ class TestBisectorCommandLine(unittest.TestCase):
   def test_cmd_view(self):
     bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=100', '--old=10', '--new=90')
-    with mock.patch.object(DummyDomain, 'view') as mock_view:
+    with mock.patch.object(DummyDomain, 'fill_candidate_summary') as mock_view:
       bisector.main('view')
-      mock_view.assert_called_with(map(str, range(100)), '10', '90')
+      mock_view.assert_called()
 
   def test_cmd_config_confidence(self):
     bisector = cli.BisectorCommandLine(DummyDomain)

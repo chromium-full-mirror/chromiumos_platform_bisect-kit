@@ -36,6 +36,15 @@ def guess_chrome_version(opts, rev):
   return rev
 
 
+def generate_action_link(action):
+  if action['action_type'] == 'commit':
+    repo_url = action['repo_url']
+    # normalize
+    if repo_url == 'https://chromium.googlesource.com/a/chromium/src.git':
+      repo_url = 'https://chromium.googlesource.com/chromium/src.git'
+    action['link'] = repo_url + '/+/' + action['rev']
+
+
 class ChromeSrcDomain(core.BisectDomain):
   """BisectDomain for Chrome branched tree"""
   revtype = staticmethod(
@@ -159,28 +168,33 @@ class ChromeSrcDomain(core.BisectDomain):
     if self.config['dut']:
       env['DUT'] = self.config['dut']
 
-  def view(self, revlist, old, new):
-    print('old', old)
-    print('new', new)
+  def fill_candidate_summary(self, summary, interesting_indexes):
+    old, new = summary['current_range']
+    old_base, _, _ = codechange.parse_intra_rev(old)
+    _, new_next, _ = codechange.parse_intra_rev(new)
 
-    old_base, old_next, _ = codechange.parse_intra_rev(old)
-    new_base, new_next, _ = codechange.parse_intra_rev(new)
-    # Only print log url if the range is within two releases.
-    if old_next in (new_base, new_next):
-      log_url = ('https://chromium.googlesource.com/chromium/src/+log/%s..%s'
-                 '?pretty=fuller&n=10000')
-      print('Be careful the following url only lists chrome src/ commits. For '
-            'example, commits inside v8 and third party repos are not listed.')
-      if old_base != old_next:
-        print(log_url % (old_base, old_next))
-      if new_base != new_next and old_next != new_next:
-        print(log_url % (new_base, new_next))
+    log_url = (
+        'https://chromium.googlesource.com/chromium/src/+log/%s..%s?n=10000' %
+        (old_base, new_next))
+    summary.update({
+        'links_note':
+            'The link of change list only lists chrome src/ commits. For '
+            'example, commits inside v8 and third party repos are not listed.',
+        'links': {
+            'change_list': log_url,
+            'fuller': log_url + '&pretty=fuller',
+        },
+    })
 
     cache = gclient_util.GclientCache(self.config['chrome_mirror'])
     spec_manager = cr_util.ChromeSpecManager(self.config)
     code_manager = codechange.CodeManager(self.config['chrome_root'],
                                           spec_manager, cache)
-    code_manager.view_rev_diff(revlist, old, new)
+    for i in interesting_indexes:
+      rev_info = summary['rev_info'][i]
+      rev_info.update(code_manager.get_rev_detail(rev_info['rev']))
+      for action in rev_info.get('actions', []):
+        generate_action_link(action)
 
 
 if __name__ == '__main__':

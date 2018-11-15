@@ -5,10 +5,10 @@
 """Test bisect_cr_localbuild_master script."""
 
 from __future__ import print_function
-import unittest
+import os
 import shutil
 import tempfile
-import os
+import unittest
 
 from bisect_kit import testing
 

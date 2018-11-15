@@ -491,14 +491,81 @@ class BisectorCommandLine(object):
         self.states.save()
 
   def cmd_view(self, opts):
-    """Shows current progress and candidates."""
+    """Shows remaining candidates."""
     self.strategy.rebuild()
     # Rebuild twice in order to re-estimate noise.
     self.strategy.rebuild()
-    self.strategy.show_summary(more=opts.more)
-    left, right = self.strategy.get_range()
-    self.domain.view(self.states.data['revlist'], self.states.idx2rev(left),
-                     self.states.idx2rev(right))
+
+    old_idx, new_idx = self.strategy.get_range()
+    old, new = map(self.states.idx2rev, [old_idx, new_idx])
+    highlight_old_idx, highlight_new_idx = self.strategy.get_range(
+        self.strategy.confidence / 10.0)
+    summary = {
+        'rev_info': [vars(info).copy() for info in self.states.rev_info],
+        'current_range': (old, new),
+        'highlight_range':
+            map(self.states.idx2rev, [highlight_old_idx, highlight_new_idx]),
+        'prob':
+            self.strategy.prob,
+        'remaining_steps':
+            self.strategy.remaining_steps(),
+    }
+
+    if opts.verbose or opts.json:
+      interesting_indexes = set(range(len(summary['rev_info'])))
+    else:
+      interesting_indexes = set([old_idx, new_idx])
+      for i, p in enumerate(self.strategy.prob):
+        if p > 0.05:
+          interesting_indexes.add(i)
+
+    self.domain.fill_candidate_summary(summary, interesting_indexes)
+
+    if opts.json:
+      print(json.dumps(summary, indent=2, sort_keys=True))
+    else:
+      self.show_summary(summary, interesting_indexes, verbose=opts.verbose)
+
+  def show_summary(self, summary, interesting_indexes, verbose=False):
+    old, new = summary['current_range']
+    old_idx, new_idx = map(self.states.data['revlist'].index, [old, new])
+
+    if 'links_note' in summary:
+      print(summary['links_note'])
+    for key, link in summary.get('links', {}).items():
+      print('%s: %s' % (key, link))
+
+    print('Range: (%s, %s], %s revs left' % (old, new, (new_idx - old_idx)))
+    if 'remaining_steps' in summary:
+      print('(roughly %d steps)' % summary['remaining_steps'])
+
+    for i, rev_info in enumerate(summary['rev_info']):
+      if (not verbose and not old_idx <= i <= new_idx and
+          not rev_info['result_counter']):
+        continue
+
+      detail = []
+      if self.strategy.is_noisy():
+        detail.append('%.4f%%' % summary['prob'][i] * 100)
+      if rev_info['result_counter']:
+        detail.append(str(rev_info['result_counter']))
+      values = sorted(rev_info['values'])
+      if len(values) == 1:
+        detail.append('%.3f' % values[0])
+      elif len(values) > 1:
+        detail.append('n=%d,avg=%.3f,median=%.3f,min=%.3f,max=%.3f' %
+                      (len(values), sum(values) / len(values),
+                       values[len(values) // 2], values[0], values[-1]))
+
+      print('[%d] %s\t%s' % (i, rev_info['rev'], ' '.join(detail)))
+      if i in interesting_indexes:
+        if 'comment' in rev_info:
+          print('\t%s' % rev_info['comment'])
+        for action in rev_info.get('actions', []):
+          if 'text' in action:
+            print('\t%s' % action['text'])
+          if 'link' in action:
+            print('\t%s' % action['link'])
 
   def current_status(self, session=None, session_base=None):
     """Gets current bisect status.
@@ -813,7 +880,8 @@ class BisectorCommandLine(object):
 
     parser_view = subparsers.add_parser(
         'view', help='Shows current progress and candidates')
-    parser_view.add_argument('--more', action='store_true')
+    parser_view.add_argument('--verbose', '-v', action='store_true')
+    parser_view.add_argument('--json', action='store_true')
     parser_view.set_defaults(func=self.cmd_view)
 
     parser_log = subparsers.add_parser(

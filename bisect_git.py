@@ -13,11 +13,15 @@ Example:
 """
 
 from __future__ import print_function
+import logging
+import subprocess
 
 from bisect_kit import cli
 from bisect_kit import core
 from bisect_kit import errors
 from bisect_kit import git_util
+
+logger = logging.getLogger(__name__)
 
 
 class GitDomain(core.BisectDomain):
@@ -53,8 +57,23 @@ class GitDomain(core.BisectDomain):
     env['GIT_REPO'] = self.config['git_repo']
     env['GIT_REV'] = rev
 
-  def view(self, revlist, old, new):
-    print('git log %s..%s' % (old, new))
+  def fill_candidate_summary(self, summary, interesting_indexes):
+    for i in interesting_indexes:
+      rev_info = summary['rev_info'][i]
+      rev = rev_info['rev']
+      try:
+        commit_summary = git_util.get_commit_log(self.config['git_repo'],
+                                                 rev).splitlines()[0]
+      except subprocess.CalledProcessError:
+        logger.warning('failed to get commit log of %s at %s', rev[:10],
+                       self.config['git_repo'])
+        commit_summary = '(unknown)'
+      text = 'commit %s %r' % (rev[:10], commit_summary)
+      rev_info.update({
+          'actions': [{
+              'text': text,
+          }],
+      })
 
 
 if __name__ == '__main__':

@@ -660,6 +660,14 @@ class NoisyBinarySearch(object):
         logger.info('[%d] %s; %s %s %s', i, self.rev_info[i].rev,
                     self.rev_info[i].result_counter, value_display, note)
 
+  def remaining_steps(self):
+    # TODO(kcwu): estimate remaining steps for noisy case
+    if self.is_noisy():
+      return None
+
+    left, right = self.get_range()
+    return math.ceil(math.log(right - left) / math.log(2))
+
   def is_done(self):
     """If we have an answer with high confidence."""
     if not self.is_range_verified():

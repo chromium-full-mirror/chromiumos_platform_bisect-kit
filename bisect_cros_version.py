@@ -22,8 +22,8 @@ will be set:
 """
 
 from __future__ import print_function
-import re
 import logging
+import re
 
 from bisect_kit import cli
 from bisect_kit import configure
@@ -143,11 +143,25 @@ class ChromeOSVersionDomain(core.BisectDomain):
     env['CROS_FULL_VERSION'] = full_version
     env['CROS_VERSION'] = full_version
 
-  def view(self, revlist, old, new):
+  def fill_candidate_summary(self, summary, interesting_indexes):
+    old, new = summary['current_range']
     old_short = cros_util.version_to_short(old)
     new_short = cros_util.version_to_short(new)
-    print(
-        'https://crosland.corp.google.com/log/%s..%s' % (old_short, new_short))
+    url_template = 'https://crosland.corp.google.com/log/%s..%s'
+    summary['links'] = {
+        'change_list': url_template % (old_short, new_short),
+    }
+
+    for i in interesting_indexes:
+      if i == 0:
+        continue
+      rev_info = summary['rev_info'][i]
+      old_short = cros_util.version_to_short(summary['rev_info'][i - 1]['rev'])
+      new_short = cros_util.version_to_short(rev_info['rev'])
+      link = url_template % (old_short, new_short)
+      rev_info.update({
+          'actions': [dict(link=link)],
+      })
 
 
 if __name__ == '__main__':

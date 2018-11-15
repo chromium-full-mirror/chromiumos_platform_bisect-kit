@@ -6,10 +6,10 @@
 
 from __future__ import print_function
 import os
-import unittest
-import tempfile
 import shutil
 import subprocess
+import tempfile
+import unittest
 
 from bisect_kit import cli
 from bisect_kit import git_util

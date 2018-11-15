@@ -29,8 +29,8 @@ will be set:
 """
 # Note, this script only works for master branch of chrome.
 from __future__ import print_function
-import os
 import logging
+import os
 
 from bisect_kit import cli
 from bisect_kit import configure
@@ -173,11 +173,27 @@ class ChromeSrcMasterDomain(core.BisectDomain):
     if self.config['dut']:
       env['DUT'] = self.config['dut']
 
-  def view(self, revlist, old, new):
-    url = ('https://chromium.googlesource.com/'
-           'chromium/src/+log/{old}..{new}?pretty=fuller&n=10000').format(
-               old=old[:12], new=new[:12])
-    print(url)
+  def fill_candidate_summary(self, summary, interesting_indexes):
+    old, new = summary['current_range']
+    chrome_repo_url = 'https://chromium.googlesource.com/chromium/src'
+    log_url = '%s/+log/%s..%s?n=10000' % (chrome_repo_url, old, new)
+    summary.update({
+        'links_note':
+            'The link of change list only lists chrome src/ commits. For '
+            'example, commits inside v8 and third party repos are not listed.',
+        'links': {
+            'change_list': log_url,
+            'fuller': log_url + '&pretty=fuller',
+        },
+    })
+
+    for i in interesting_indexes:
+      rev_info = summary['rev_info'][i]
+      rev_info.update({
+          'actions': {
+              'link': '%s/+/%s' % (chrome_repo_url, rev_info['rev']),
+          },
+      })
 
 
 if __name__ == '__main__':

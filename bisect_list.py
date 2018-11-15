@@ -55,9 +55,9 @@ class ListDomain(core.BisectDomain):
   def setenv(self, env, rev):
     pass
 
-  def view(self, revlist, old, new):
-    logger.info('[%s] is old', old)
-    logger.info('[%s] is new', new)
+  def fill_candidate_summary(self, summary, interesting_indexes):
+    # Do nothing.
+    return
 
 
 if __name__ == '__main__':

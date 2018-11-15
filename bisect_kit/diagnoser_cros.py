@@ -322,3 +322,39 @@ class CrosDiagnoser(object):
 
     if json_output:
       print(json.dumps(result, indent=2))
+
+  def cmd_view(self, json_output=False, verbose=False):
+    result = []
+
+    # Analyze log to determine what to show
+    bisects = []
+    history = self.states.data['history']
+    seen = set()
+    for entry in history:
+      if entry.get('event') != 'bisect':
+        continue
+      bisector = entry['bisector']
+      if bisector in seen:
+        continue
+      seen.add(bisector)
+      bisects.append(entry)
+
+    for entry in bisects:
+      bisector = wrapper.BisectorWrapper(entry['bisector'], entry['session'])
+      cmd = ['view']
+      if verbose:
+        cmd.append('--verbose')
+      if json_output:
+        cmd.append('--json')
+        output = bisector.call(*cmd, capture_output=True)
+        result.append({
+            'bisector': entry['bisector'],
+            'view': json.loads(output),
+        })
+      else:
+        print('bisector: %s' % entry['bisector'])
+        bisector.call(*cmd)
+        print('=' * 60)
+
+    if json_output:
+      print(json.dumps(result, indent=2))

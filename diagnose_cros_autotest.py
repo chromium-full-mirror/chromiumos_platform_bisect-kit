@@ -334,6 +334,19 @@ class DiagnoseCommandLine(object):
 
     diagnoser.cmd_log(opts.json)
 
+  def cmd_view(self, opts):
+    self.states.load()
+    path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+        self.config['mirror_base'], self.config['work_base'],
+        self.config['session'])
+    diagnoser = diagnoser_cros.CrosDiagnoser(
+        self.states, self.config['session'], path_factory,
+        self.config['chromeos_root'], self.config['chromeos_mirror'],
+        self.config['android_root'], self.config['android_mirror'],
+        self.config['chrome_root'], self.config['chrome_mirror'],
+        self.config['board'], self.config['noisy'], None)
+    diagnoser.cmd_view(opts.json, opts.verbose)
+
   def create_argument_parser(self):
     parser = argparse.ArgumentParser()
     common.add_common_arguments(parser)
@@ -467,6 +480,13 @@ class DiagnoseCommandLine(object):
     parser_log.add_argument(
         '--json', action='store_true', help='Machine readable output')
     parser_log.set_defaults(func=self.cmd_log)
+
+    parser_view = subparsers.add_parser(
+        'view', help='Prints summary of current status')
+    parser_view.add_argument('--verbose', '-v', action='store_true')
+    parser_view.add_argument(
+        '--json', action='store_true', help='Machine readable output')
+    parser_view.set_defaults(func=self.cmd_view)
 
     return parser
 

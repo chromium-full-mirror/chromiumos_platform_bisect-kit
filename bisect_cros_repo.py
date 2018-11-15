@@ -35,6 +35,12 @@ from bisect_kit import repo_util
 logger = logging.getLogger(__name__)
 
 
+def generate_action_link(action):
+  if action['action_type'] == 'commit':
+    repo_url = action['repo_url']
+    action['link'] = repo_url + '/+/' + action['rev']
+
+
 class ChromeOSRepoDomain(core.BisectDomain):
   """BisectDomain for ChromeOS code changes."""
   revtype = staticmethod(cros_util.argtype_cros_version)
@@ -125,15 +131,26 @@ class ChromeOSRepoDomain(core.BisectDomain):
     env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
     env['INTRA_REV'] = rev
 
-  def view(self, revlist, old, new):
-    print('old', old)
-    print('new', new)
+  def fill_candidate_summary(self, summary, interesting_indexes):
+    old, new = summary['current_range']
+    old_base, _, _ = codechange.parse_intra_rev(old)
+    _, new_next, _ = codechange.parse_intra_rev(new)
+    old_short = cros_util.version_to_short(old_base)
+    new_short = cros_util.version_to_short(new_next)
+    url_template = 'https://crosland.corp.google.com/log/%s..%s'
+    summary['links'] = {
+        'change_list': url_template % (old_short, new_short),
+    }
 
-    spec_manager = cros_util.ChromeOSSpecManager(self.config)
     cache = repo_util.RepoMirror(self.config['chromeos_mirror'])
+    spec_manager = cros_util.ChromeOSSpecManager(self.config)
     code_manager = codechange.CodeManager(self.config['chromeos_root'],
                                           spec_manager, cache)
-    code_manager.view_rev_diff(revlist, old, new)
+    for i in interesting_indexes:
+      rev_info = summary['rev_info'][i]
+      rev_info.update(code_manager.get_rev_detail(rev_info['rev']))
+      for action in rev_info.get('actions', []):
+        generate_action_link(action)
 
 
 if __name__ == '__main__':

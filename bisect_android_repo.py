@@ -59,6 +59,12 @@ def determine_android_build_id(opts, rev):
   return rev
 
 
+def generate_action_link(action):
+  if action['action_type'] == 'commit':
+    repo_url = action['repo_url']
+    action['link'] = repo_url + '/+/' + action['rev']
+
+
 class AndroidRepoDomain(core.BisectDomain):
   """BisectDomain for Android code changes."""
   # Accepts Android build id or ChromeOS version
@@ -174,28 +180,34 @@ class AndroidRepoDomain(core.BisectDomain):
     env['ANDROID_MIRROR'] = self.config['android_mirror']
     env['INTRA_REV'] = rev
 
-  def view(self, revlist, old, new):
-    print('old', old)
-    print('new', new)
-
-    old_base, old_next, _ = codechange.parse_intra_rev(old)
-    new_base, new_next, _ = codechange.parse_intra_rev(new)
-    # Only print log url if the range is within two releases.
-    if old_next in (new_base, new_next):
-      url_template = (
-          'https://android-build.googleplex.com/'
-          'builds/{new}/branches/{branch}/targets/{flavor}/cls?end={old}')
-      print(url_template.format(
-          old=old_base,
-          new=new_next,
-          branch=self.config['branch'],
-          flavor=self.config['flavor']))
+  def fill_candidate_summary(self, summary, interesting_indexes):
+    old, new = summary['current_range']
+    old_base, _, _ = codechange.parse_intra_rev(old)
+    _, new_next, _ = codechange.parse_intra_rev(new)
+    url_template = ('https://android-build.googleplex.com/'
+                    'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
+                        self.config['branch'], self.config['flavor'])
+    summary.update({
+        'link_note':
+            'Because the diff viewer is inclusive, you need to ignore changes '
+            'from starting version by yourself (b/118564983)',
+        'links': {
+            'change_list': url_template.format(old=old_base, new=new_next),
+            'minus': url_template.format(old=old_base, new=old_base),
+        },
+    })
 
     spec_manager = android_util.AndroidSpecManager(self.config)
     cache = repo_util.RepoMirror(self.config['android_mirror'])
     code_manager = codechange.CodeManager(self.config['android_root'],
                                           spec_manager, cache)
-    code_manager.view_rev_diff(revlist, old, new)
+    for i in interesting_indexes:
+      if i == 0:
+        continue
+      rev_info = summary['rev_info'][i]
+      rev_info.update(code_manager.get_rev_detail(rev_info.rev))
+      for action in rev_info.get('actions', []):
+        generate_action_link(action)
 
 
 if __name__ == '__main__':

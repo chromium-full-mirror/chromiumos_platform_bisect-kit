@@ -301,14 +301,13 @@ class ActionGroup(object):
         actions=[a.serialize() for a in self.actions])
 
   def summary(self, code_storage):
+    result = {}
     if self.comment:
-      return self.comment
-    assert self.actions
-    if len(self.actions) > 1:
-      # TODO(kcwu): show details for multiple Actions
-      return '(%d actions)' % len(self.actions)
-    else:
-      return self.actions[0].summary(code_storage)
+      result['comment'] = self.comment
+    result['actions'] = [
+        action.summary(code_storage) for action in self.actions
+    ]
+    return result
 
   @staticmethod
   def unserialize(data):
@@ -346,12 +345,22 @@ class GitCheckoutCommit(Action):
   def summary(self, code_storage):
     git_root = code_storage.cached_git_root(self.repo_url)
     try:
-      summary = git_util.get_commit_log(git_root, self.rev).splitlines()[0]
+      commit_summary = git_util.get_commit_log(git_root,
+                                               self.rev).splitlines()[0]
     except subprocess.CalledProcessError:
       logger.warning('failed to get commit log of %s at %s', self.rev[:10],
                      git_root)
-      summary = '(unknown)'
-    return 'commit %s %s %r' % (self.rev[:10], self.path, summary)
+      commit_summary = '(unknown)'
+    text = 'commit %s %s %r' % (self.rev[:10], self.path, commit_summary)
+    return dict(
+        timestamp=self.timestamp,
+        action_type='commit',
+        path=self.path,
+        commit_summary=commit_summary,
+        repo_url=self.repo_url,
+        rev=self.rev,
+        text=text,
+    )
 
 
 class GitAddRepo(Action):
@@ -378,7 +387,13 @@ class GitAddRepo(Action):
     code_storage.add_to_project_list(root_dir, self.path, self.repo_url)
 
   def summary(self, _code_storage):
-    return 'add repo %s from %s@%s' % (self.path, self.repo_url, self.rev[:10])
+    text = 'add repo %s from %s@%s' % (self.path, self.repo_url, self.rev[:10])
+    return dict(
+        timestamp=self.timestamp,
+        action_type='add_repo',
+        path=self.path,
+        text=text,
+    )
 
 
 class GitRemoveRepo(Action):
@@ -393,7 +408,12 @@ class GitRemoveRepo(Action):
     code_storage.remove_from_project_list(root_dir, self.path)
 
   def summary(self, _code_storage):
-    return 'remove repo %s' % self.path
+    return dict(
+        timestamp=self.timestamp,
+        action_type='remove_repo',
+        path=self.path,
+        text='remove repo %s' % self.path,
+    )
 
 
 def apply_actions(code_storage, action_groups, root_dir):
@@ -892,26 +912,15 @@ class CodeManager(object):
 
     return result
 
-  def view_rev_diff(self, revlist, old, new):
-    assert old in revlist
-    assert new in revlist
-    loaded_action_groups = None
-    old_idx = revlist.index(old)
-    new_idx = revlist.index(new)
+  def get_rev_detail(self, rev):
+    rev_old, rev_new, index = parse_intra_rev(rev)
+    if rev_old == rev_new:
+      return {}
 
-    for i, rev in enumerate(revlist[old_idx:new_idx + 1], old_idx):
-      rev_old, rev_new, index = parse_intra_rev(rev)
-      if rev_old == rev_new:
-        logger.info('[%d] %s', i, rev)
-      else:
-        if loaded_action_groups != (rev_old, rev_new):
-          action_groups = self.load_action_groups_between_releases(
-              rev_old, rev_new)
-          loaded_action_groups = (rev_old, rev_new)
-        # Indexes inside intra_rev are 1 based.
-        action_group = action_groups[index - 1]
-        summary = action_group.summary(self.code_storage)
-        logger.info('[%d] %s %s', i, rev, summary)
+    action_groups = self.load_action_groups_between_releases(rev_old, rev_new)
+    # Indexes inside intra_rev are 1 based.
+    action_group = action_groups[index - 1]
+    return action_group.summary(self.code_storage)
 
   def switch(self, rev):
     # easy case
