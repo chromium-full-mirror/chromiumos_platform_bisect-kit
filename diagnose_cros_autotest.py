@@ -302,7 +302,7 @@ class DiagnoseCommandLine(object):
         eval_cmd = common_eval_cmd + ['--prebuilt']
         try:
           if diagnoser.narrow_down_chrome(
-              eval_cmd, chrome_binaries=chrome_binaries) is not None:
+              eval_cmd, chrome_binaries=chrome_binaries):
             return
         except errors.VerifyOldFailed:
           logger.fatal('expect old chrome has old behavior but failed')
