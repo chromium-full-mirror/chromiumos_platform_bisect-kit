@@ -609,6 +609,10 @@ def check_if_need_recreate_chroot(stdout, stderr):
       "You must upgrade", stderr):
     return 'EAPI version mismatch'
 
+  if 'Chroot is too new. Consider running:' in stderr:
+    return 'chroot version is too new'
+
+  # old message before Oct 2018
   if 'Chroot version is too new. Consider running cros_sdk --replace' in stderr:
     return 'chroot version is too new'
 
