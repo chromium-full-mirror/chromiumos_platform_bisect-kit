@@ -240,6 +240,8 @@ class DiagnoseCommandLine(object):
       ]  # yapf: disable
     if self.config['test_that_args']:
       common_eval_cmd += ['--args', self.config['test_that_args']]
+    if self.config['test_name'].startswith('telemetry_'):
+      common_eval_cmd += ['--chrome_root', self.config['chrome_root']]
     return common_switch_cmd, common_eval_cmd
 
   def cmd_run(self, opts):

@@ -56,6 +56,12 @@ def create_argument_parser():
       default=configure.get('CHROMEOS_ROOT', ''),
       help='ChromeOS tree root')
   parser.add_argument(
+      '--chrome_root',
+      metavar='CHROME_ROOT',
+      type=cli.argtype_dir_path,
+      default=configure.get('CHROME_ROOT'),
+      help='Chrome tree root; necessary for telemetry tests')
+  parser.add_argument(
       '--test_name',
       required=True,
       help='Test name, like "video_VideoDecodeAccelerator.h264"')
@@ -194,7 +200,8 @@ def run_test(opts):
     cmd += ['--args', args]
 
   try:
-    output = cros_util.cros_sdk(opts.chromeos_root, *cmd)
+    output = cros_util.cros_sdk(
+        opts.chromeos_root, *cmd, chrome_root=opts.chrome_root)
   except subprocess.CalledProcessError as e:
     output = e.output
 
@@ -248,6 +255,10 @@ def main(args=None):
       return FATAL
     if opts.new_value is not None:
       logger.error('--new_value is provided but --metric is not')
+      return FATAL
+  if opts.test_name.startswith('telemetry_'):
+    if not opts.chrome_root:
+      logger.error('--chrome_root is mandatory for telemetry tests')
       return FATAL
 
   # Some versions of ChromeOS SDK is broken and ship bad 'ssh' executable. This

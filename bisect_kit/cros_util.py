@@ -540,6 +540,7 @@ def cros_sdk(chromeos_root, *args, **kwargs):
     chromeos_root: chromeos tree root
     *args: command to run
     **kwargs:
+      chrome_root: pass to cros_sdk; mount this path into the SDK chroot
       env: (dict) environment variables for the command
       stdin: standard input file handle for the command
       stderr_callback: Callback function for stderr. Called once per line.
@@ -551,7 +552,13 @@ def cros_sdk(chromeos_root, *args, **kwargs):
 
   # Use --no-ns-pid to prevent cros_sdk change our pgid, otherwise subsequent
   # commands would be considered as background process.
-  cmd = ['chromite/bin/cros_sdk', '--no-ns-pid'] + envs + ['--'] + list(args)
+  cmd = ['chromite/bin/cros_sdk', '--no-ns-pid']
+
+  if kwargs.get('chrome_root'):
+    cmd += ['--chrome_root', kwargs['chrome_root']]
+
+  cmd += envs + ['--'] + list(args)
+
   return util.check_output(
       *cmd,
       cwd=chromeos_root,
