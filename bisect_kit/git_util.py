@@ -463,7 +463,7 @@ def get_history_recursively(git_repo, path, after, before, parser_callback):
 
   # Sort and dedup.
   result2 = []
-  for x in sorted(result):
+  for x in sorted(result, key=lambda x: x[0]):
     if result2 and result2[-1] == x:
       continue
     result2.append(x)

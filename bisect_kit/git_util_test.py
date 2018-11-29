@@ -401,6 +401,20 @@ class TestGitOperation(unittest.TestCase):
         [(time + 10, c1), (time + 40, c4), (time + 50, c5), (time + 60, c6),
          (time + 80, c8), (time + 90, c9), (time + 100, c9)])
 
+  def test_get_history_recursively_ordering(self):
+    # All commits have identical commit time.
+    time = 1500000000
+
+    commits = []
+    for i in range(10):
+      commit = self.git.add_commit(time, 'msg', 'foo', str(i))
+      commits.append((time, commit))
+
+    # The commit ordering should be preserved.
+    self.assertEqual(
+        git_util.get_history_recursively(self.git_repo, 'foo', time, time,
+                                         lambda *_: []), commits)
+
 
 class TestGitUtil(unittest.TestCase):
   """Tests logic part of git_util module.
