@@ -392,8 +392,7 @@ def cros_flash(chromeos_root,
                image_path,
                version=None,
                clobber_stateful=False,
-               disable_rootfs_verification=True,
-               run_inside_chroot=False):
+               disable_rootfs_verification=True):
   """Flash a DUT with given ChromeOS image.
 
   This is implemented by 'cros flash' command line.
@@ -409,7 +408,6 @@ def cros_flash(chromeos_root,
     clobber_stateful: Clobber stateful partition when performing update
     disable_rootfs_verification: Disable rootfs verification after update
         is completed
-    run_inside_chroot: if True, run 'cros flash' command inside the chroot
   """
   logger.info('cros_flash %s %s %s %s', host, board, version, image_path)
 
@@ -423,10 +421,7 @@ def cros_flash(chromeos_root,
   if disable_rootfs_verification:
     args.append('--disable-rootfs-verification')
 
-  if run_inside_chroot:
-    cros_sdk(chromeos_root, 'cros', 'flash', *args)
-  else:
-    util.check_call('chromite/bin/cros', 'flash', *args, cwd=chromeos_root)
+  cros_sdk(chromeos_root, 'cros', 'flash', *args)
 
   if version:
     # In the past, cros flash may fail with returncode=0

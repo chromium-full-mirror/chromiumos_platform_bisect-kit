@@ -141,8 +141,7 @@ def switch(opts):
       opts.board,
       image_path,
       clobber_stateful=opts.clobber_stateful,
-      disable_rootfs_verification=opts.disable_rootfs_verification,
-      run_inside_chroot=True)
+      disable_rootfs_verification=opts.disable_rootfs_verification)
 
 
 def main(args=None):
