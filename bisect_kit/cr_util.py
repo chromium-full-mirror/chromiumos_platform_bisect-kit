@@ -207,25 +207,38 @@ def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
     targets: ninja targets. Default to build chrome.
     nodeploy: if True, only build, do not deploy
   """
-  # The main steps are written in the helper shell script because it is
-  # expected to be often local hacked by users.
-  dirname = os.path.dirname(os.path.abspath(__file__))
-  build_and_deploy_script = os.path.join(dirname, '..',
-                                         'build_and_deploy_chrome_helper.sh')
-  cmd = ['sh', '-ex', build_and_deploy_script] + targets
+  if not targets:
+    targets = ['chrome', 'chrome_sandbox', 'nacl_helper']
 
+  logger.info('build %s', targets)
   env = os.environ.copy()
-  env['DUT'] = dut
   # This work around http://crbug.com/658104, which depot_tool can't find GN
   # path correctly.
   env['CHROMIUM_BUILDTOOLS_PATH'] = os.path.abspath(
       os.path.join(chrome_src, 'buildtools'))
 
-  if nodeploy:
-    env['NO_DEPLOY'] = '1'
+  out_dir = os.path.join('out_%s' % board, 'Release')
 
   with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
-    simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
+    cmd = ['./third_party/depot_tools/autoninja', '-C', out_dir] + targets
+    try:
+      simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
+    except subprocess.CalledProcessError:
+      logger.warning('build failed, delete out directory and retry again')
+      shutil.rmtree(os.path.join(chrome_src, out_dir))
+      simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
+
+  if nodeploy:
+    return
+
+  logger.info('deploy %s', targets)
+  env = os.environ.copy()
+  env['DUT'] = dut
+
+  dirname = os.path.dirname(os.path.abspath(__file__))
+  deploy_script = os.path.join(dirname, '..', 'deploy_chrome_helper.sh')
+  cmd = ['sh', '-ex', deploy_script] + targets
+  simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
 
 
 class ChromeSpecManager(codechange.SpecManager):

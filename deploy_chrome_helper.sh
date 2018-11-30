@@ -1,5 +1,5 @@
 #!/bin/sh -ex
-# Copyright 2017 The Chromium OS Authors. All rights reserved.
+# Copyright 2018 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 [ -n "$DUT" ]
@@ -12,16 +12,6 @@ else
 fi
 
 out_dir=out_${SDK_BOARD}/Release
-
-# This step is redundant and harmless for recent chrome. Keep it for older
-# versions.
-./buildtools/linux64/gn gen $out_dir --args="$GN_ARGS"
-
-./third_party/depot_tools/autoninja -C $out_dir $TARGETS
-
-if [ -n "$NO_DEPLOY" ]; then
-    exit 0
-fi
 
 for TARGET in $TARGETS; do
     case "$TARGET" in

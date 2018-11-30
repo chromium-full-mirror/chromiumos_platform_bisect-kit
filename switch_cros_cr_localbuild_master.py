@@ -94,9 +94,6 @@ def main(args=None):
   if opts.nobuild:
     return
 
-  if not opts.target:
-    opts.target = ['chrome', 'chrome_sandbox', 'nacl_helper']
-
   # TODO(kcwu): support local patch.
   cr_util.build_and_deploy(
       opts.chrome_src,
