@@ -120,6 +120,26 @@ def commit_file(git_repo,
       'git', 'commit', '-q', '-m', message, path, cwd=git_repo, env=env)
 
 
+def config(git_repo, *args):
+  """Wrapper of 'git config'.
+
+  Args:
+    git_repo: path of git repo.
+    args: parameters pass to 'git config'
+  """
+  util.check_call('git', 'config', *args, cwd=git_repo)
+
+
+def fetch(git_repo, *args):
+  """Wrapper of 'git fetch'.
+
+  Args:
+    git_repo: path of git repo.
+    args: parameters pass to 'git fetch'
+  """
+  util.check_call('git', 'fetch', *args, cwd=git_repo)
+
+
 def is_containing_commit(git_repo, rev):
   """Determines given commit exists.
 

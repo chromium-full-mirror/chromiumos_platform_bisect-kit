@@ -404,6 +404,16 @@ class ChromeSpecManager(codechange.SpecManager):
       path_specs[path] = dep.as_path_spec()
     spec.entries = path_specs
 
+    # Mirror git repos if they do not exist.
+    with locking.lock_file(
+        os.path.join(self.config['chrome_mirror'],
+                     locking.LOCK_FILE_FOR_MIRROR_SYNC)):
+      for path_spec in spec.entries.values():
+        git_repo = code_storage.cached_git_root(path_spec.repo_url)
+        if os.path.exists(git_repo):
+          continue
+        gclient_util.mirror(code_storage, path_spec.repo_url)
+
     # Additional dependency fix.
     # DEPS files are maintained in the same tree as code, so releasing DEPS
     # will add one more commit. Because we want to match release DEPS against

@@ -319,6 +319,10 @@ cache_dir = %r
         continue
       util.check_call('git', 'fetch', cwd=git_repo)
 
+    # Some repos were removed from the DEPS and won't be synced here. They will
+    # be synced during DEPS file processing because the necessary information
+    # requires full DEPS parsing. (crbug.com/902238)
+
 
 def sync_chrome_code(opts, path_factory):
   # The sync step is identical to the initial gclient config step.

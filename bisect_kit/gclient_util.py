@@ -12,10 +12,12 @@ import operator
 import os
 import pprint
 import sys
+import tempfile
 import urlparse
 
 from bisect_kit import codechange
 from bisect_kit import git_util
+from bisect_kit import locking
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -80,6 +82,43 @@ def sync(gclient_dir,
     cmd.append('--ignore_locks')
 
   util.check_call(*cmd, cwd=gclient_dir)
+
+
+def mirror(code_storage, repo_url):
+  """Mirror git repo.
+
+  This function mimics the caching behavior of 'gclient sync' with 'cache_dir'.
+
+  Args:
+    code_storage: CodeStorage object
+    repo_url: remote repo url
+  """
+  logger.info('mirror %s', repo_url)
+  tmp_dir = tempfile.mkdtemp(dir=code_storage.cache_dir)
+  git_root = code_storage.cached_git_root(repo_url)
+  assert not os.path.exists(git_root)
+
+  util.check_call('git', 'init', '--bare', cwd=tmp_dir)
+
+  # These config parameters are copied from gclient.
+  git_util.config(tmp_dir, 'gc.autodetach', '0')
+  git_util.config(tmp_dir, 'gc.autopacklimit', '0')
+  git_util.config(tmp_dir, 'core.deltaBaseCacheLimit', '2g')
+  git_util.config(tmp_dir, 'remote.origin.url', repo_url)
+  git_util.config(tmp_dir, '--replace-all', 'remote.origin.fetch',
+                  '+refs/heads/*:refs/heads/*', r'\+refs/heads/\*:.*')
+  git_util.config(tmp_dir, '--replace-all', 'remote.origin.fetch',
+                  '+refs/tags/*:refs/tags/*', r'\+refs/tags/\*:.*')
+  git_util.config(tmp_dir, '--replace-all', 'remote.origin.fetch',
+                  '+refs/branch-heads/*:refs/branch-heads/*',
+                  r'\+refs/branch-heads/\*:.*')
+
+  git_util.fetch(tmp_dir, 'origin', '+refs/heads/*:refs/heads/*')
+  git_util.fetch(tmp_dir, 'origin', '+refs/tags/*:refs/tags/*')
+  git_util.fetch(tmp_dir, 'origin', '+refs/branch-heads/*:refs/branch-heads/*')
+
+  # Rename to correct name atomically.
+  os.rename(tmp_dir, git_root)
 
 
 # Copied from depot_tools' gclient.py
@@ -489,6 +528,11 @@ class DepsParser(object):
     """
     if '://' in repo_url:
       git_repo = self.code_storage.cached_git_root(repo_url)
+      if not os.path.exists(git_repo):
+        with locking.lock_file(
+            os.path.join(self.code_storage.cache_dir,
+                         locking.LOCK_FILE_FOR_MIRROR_SYNC)):
+          mirror(self.code_storage, repo_url)
     else:
       git_repo = repo_url
 
