@@ -264,10 +264,21 @@ def get_commit_hash(git_repo, rev):
 
   Returns:
     full git commit hash
+
+  Raises:
+    ValueError: `rev` is not unique or doesn't exist
   """
-  cmd = ['git', 'rev-parse', rev]
-  git_rev = util.check_output(*cmd, cwd=git_repo).strip()
-  assert git_rev
+  try:
+    # Use '^{commit}' to restrict search only commits.
+    # Use '--' to avoid ambiguity, like matching rev against path name.
+    output = util.check_output(
+        'git', 'rev-parse', '%s^{commit}' % rev, '--', cwd=git_repo)
+    git_rev = output.rstrip('-\n')
+  except subprocess.CalledProcessError:
+    # Do not use 'git rev-parse --disambiguate' to determine uniqueness
+    # because it searches objects other than commits as well.
+    raise ValueError('%s is not unique or does not exist' % rev)
+  assert is_git_rev(git_rev)
   return git_rev
 
 

@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class GitDomain(core.BisectDomain):
   """BisectDomain for git revisions."""
-  revtype = staticmethod(git_util.argtype_git_rev)
+  revtype = staticmethod(cli.argtype_notempty)
   help = globals()['__doc__']
 
   @staticmethod
@@ -39,12 +39,14 @@ class GitDomain(core.BisectDomain):
 
   @staticmethod
   def init(opts):
-    if not git_util.is_containing_commit(opts.git_repo, opts.old):
-      raise errors.ArgumentError(
-          '--old', '%s is not in git_repo=%r' % (opts.old, opts.git_repo))
-    if not git_util.is_containing_commit(opts.git_repo, opts.new):
-      raise errors.ArgumentError(
-          '--new', '%s is not in git_repo=%r' % (opts.new, opts.git_repo))
+    try:
+      opts.old = git_util.get_commit_hash(opts.git_repo, opts.old)
+    except ValueError as e:
+      raise errors.ArgumentError('--old', e.message)
+    try:
+      opts.new = git_util.get_commit_hash(opts.git_repo, opts.new)
+    except ValueError as e:
+      raise errors.ArgumentError('--new', e.message)
 
     config = dict(git_repo=opts.git_repo)
     revlist = git_util.get_revlist(opts.git_repo, opts.old, opts.new)

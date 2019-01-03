@@ -32,26 +32,12 @@ class TestGitDomain(unittest.TestCase):
     """Tests basic functionality."""
     bisector = cli.BisectorCommandLine(bisect_git.GitDomain)
 
-    start = 12345678000
-    fake_commits = map(str, range(start, start + 10))
-    old, new = fake_commits[0], fake_commits[-1]
+    self.git.create_commits(10)
+    commits = self.git.commits
+    old, new = commits[1], commits[-1]
 
-    def is_containing_commit(git_repo, rev):
-      self.assertEqual(git_repo, self.git_repo)
-      return rev in fake_commits
-
-    def get_revlist(git_repo, old, new):
-      self.assertEqual(git_repo, self.git_repo)
-      self.assertEqual(old, fake_commits[0])
-      self.assertEqual(new, fake_commits[-1])
-      return fake_commits
-
-    with mock.patch.multiple(
-        'bisect_kit.git_util',
-        is_containing_commit=is_containing_commit,
-        get_revlist=get_revlist):
-      bisector.main('init', '--old', old, '--new', new, '--git_repo',
-                    self.git_repo)
+    bisector.main('init', '--old', old, '--new', new, '--git_repo',
+                  self.git_repo)
 
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'true')

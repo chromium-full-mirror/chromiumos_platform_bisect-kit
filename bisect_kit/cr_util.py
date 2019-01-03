@@ -151,7 +151,7 @@ def query_git_rev(chrome_src, rev):
     try:
       # Query via git tag
       return git_util.get_commit_hash(chrome_src, rev)
-    except subprocess.CalledProcessError:
+    except ValueError:
       # Failed due to source code not synced yet? Anyway, query by web api
       url = 'https://omahaproxy.appspot.com/deps.json?version=' + rev
       logger.debug('fetch %s', url)
