@@ -470,9 +470,11 @@ def cmd_new(opts):
 
 def delete_tree(path):
   if is_btrfs_subvolume(path):
+    # btrfs should be mounted with 'user_subvol_rm_allowed' option and thus
+    # normal user permission is enough.
     util.check_call('btrfs', 'subvolume', 'delete', path)
   else:
-    util.check_call('rm', '-rf', path)
+    util.check_call('sudo', 'rm', '-rf', path)
 
 
 def cmd_list(opts):
