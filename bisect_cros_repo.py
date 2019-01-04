@@ -138,9 +138,12 @@ class ChromeOSRepoDomain(core.BisectDomain):
     old_short = cros_util.version_to_short(old_base)
     new_short = cros_util.version_to_short(new_next)
     url_template = 'https://crosland.corp.google.com/log/%s..%s'
-    summary['links'] = {
-        'change_list': url_template % (old_short, new_short),
-    }
+    summary['links'] = [
+        {
+            'name': 'change_list',
+            'url': url_template % (old_short, new_short),
+        },
+    ]
 
     cache = repo_util.RepoMirror(self.config['chromeos_mirror'])
     spec_manager = cros_util.ChromeOSSpecManager(self.config)

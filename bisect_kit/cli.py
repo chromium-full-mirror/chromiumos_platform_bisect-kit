@@ -530,10 +530,10 @@ class BisectorCommandLine(object):
     old, new = summary['current_range']
     old_idx, new_idx = map(self.states.data['revlist'].index, [old, new])
 
-    if 'links_note' in summary:
-      print(summary['links_note'])
-    for key, link in summary.get('links', {}).items():
-      print('%s: %s' % (key, link))
+    for link in summary.get('links', []):
+      print('%s: %s' % (link['name'], link['url']))
+      if 'note' in link:
+        print(link['note'])
 
     print('Range: (%s, %s], %s revs left' % (old, new, (new_idx - old_idx)))
     if 'remaining_steps' in summary:

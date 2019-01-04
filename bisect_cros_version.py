@@ -148,9 +148,12 @@ class ChromeOSVersionDomain(core.BisectDomain):
     old_short = cros_util.version_to_short(old)
     new_short = cros_util.version_to_short(new)
     url_template = 'https://crosland.corp.google.com/log/%s..%s'
-    summary['links'] = {
-        'change_list': url_template % (old_short, new_short),
-    }
+    summary['links'] = [
+        {
+            'name': 'change_list',
+            'url': url_template % (old_short, new_short),
+        },
+    ]
 
     for i in interesting_indexes:
       if i == 0:

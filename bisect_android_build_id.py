@@ -118,15 +118,18 @@ class AndroidBuildIDDomain(core.BisectDomain):
     url_template = ('https://android-build.googleplex.com/'
                     'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
                         self.config['branch'], self.config['flavor'])
-    summary.update({
-        'link_note':
-            'Because the diff viewer is inclusive, you need to ignore changes '
-            'from starting version by yourself (b/118564983)',
-        'links': {
-            'change_list': url_template.format(old=old, new=new),
-            'minus': url_template.format(old=old, new=old),
+    summary['links'] = [
+        {
+            'name': 'change_list',
+            'url': url_template.format(old=old, new=new),
+            'note': 'Because the diff viewer is inclusive, you need to ignore '
+                    'changes from starting version by yourself (b/118564983)',
         },
-    })
+        {
+            'name': 'minus',
+            'url': url_template.format(old=old, new=old),
+        },
+    ]
 
     for i in interesting_indexes:
       if i == 0:

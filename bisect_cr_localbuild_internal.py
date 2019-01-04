@@ -176,15 +176,20 @@ class ChromeSrcDomain(core.BisectDomain):
     log_url = (
         'https://chromium.googlesource.com/chromium/src/+log/%s..%s?n=10000' %
         (old_base, new_next))
-    summary.update({
-        'links_note':
-            'The link of change list only lists chrome src/ commits. For '
-            'example, commits inside v8 and third party repos are not listed.',
-        'links': {
-            'change_list': log_url,
-            'fuller': log_url + '&pretty=fuller',
+    summary['links'] = [
+        {
+            'name': 'change_list',
+            'url': log_url,
+            'note':
+                'The link of change list only lists chrome src/ commits. For '
+                'example, commits inside v8 and third party repos are not '
+                'listed.',
         },
-    })
+        {
+            'name': 'fuller',
+            'url': log_url + '&pretty=fuller',
+        },
+    ]
 
     cache = gclient_util.GclientCache(self.config['chrome_mirror'])
     spec_manager = cr_util.ChromeSpecManager(self.config)

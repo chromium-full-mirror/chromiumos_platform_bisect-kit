@@ -187,15 +187,19 @@ class AndroidRepoDomain(core.BisectDomain):
     url_template = ('https://android-build.googleplex.com/'
                     'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
                         self.config['branch'], self.config['flavor'])
-    summary.update({
-        'link_note':
-            'Because the diff viewer is inclusive, you need to ignore changes '
-            'from starting version by yourself (b/118564983)',
-        'links': {
-            'change_list': url_template.format(old=old_base, new=new_next),
-            'minus': url_template.format(old=old_base, new=old_base),
+
+    summary['links'] = [
+        {
+            'name': 'change_list',
+            'url': url_template.format(old=old_base, new=new_next),
+            'note': 'Because the diff viewer is inclusive, you need to ignore '
+                    'changes from starting version by yourself (b/118564983)',
         },
-    })
+        {
+            'name': 'minus',
+            'url': url_template.format(old=old_base, new=old_base),
+        },
+    ]
 
     spec_manager = android_util.AndroidSpecManager(self.config)
     cache = repo_util.RepoMirror(self.config['android_mirror'])
