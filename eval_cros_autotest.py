@@ -62,22 +62,6 @@ def create_argument_parser():
       default=configure.get('CHROME_ROOT'),
       help='Chrome tree root; necessary for telemetry tests')
   parser.add_argument(
-      '--test_name',
-      required=True,
-      help='Test name, like "video_VideoDecodeAccelerator.h264"')
-  parser.add_argument(
-      '--metric',
-      help=
-      'Metric name of performance test; example: "cheets_SystemRawImageSize"')
-  parser.add_argument(
-      '--old_value',
-      type=float,
-      help='For performance test, old value of given metric')
-  parser.add_argument(
-      '--new_value',
-      type=float,
-      help='For performance test, new value of given metric')
-  parser.add_argument(
       '--prebuilt',
       action='store_true',
       help='Run autotest using existing prebuilt package if specified; '
@@ -86,9 +70,40 @@ def create_argument_parser():
       '--reinstall',
       action='store_true',
       help='Remove existing autotest folder on the DUT first')
-  parser.add_argument(
+
+  group = parser.add_argument_group(title='Options for normal autotest tests')
+  group.add_argument(
+      '--test_name', help='Test name, like "video_VideoDecodeAccelerator.h264"')
+  group.add_argument(
+      '--metric',
+      help=
+      'Metric name of performance test; example: "cheets_SystemRawImageSize"')
+  group.add_argument(
+      '--old_value',
+      type=float,
+      help='For performance test, old value of given metric')
+  group.add_argument(
+      '--new_value',
+      type=float,
+      help='For performance test, new value of given metric')
+  group.add_argument(
       '--args',
       help='Extra args passed to "test_that --args"; Overrides the default')
+
+  group = parser.add_argument_group(title='Options for CTS/GTS tests')
+  group.add_argument('--cts_revision', help='CTS revision, like "9.0_r3"')
+  group.add_argument('--cts_abi', choices=['arm', 'x86'])
+  group.add_argument(
+      '--cts_prefix',
+      help='Prefix of autotest test name, '
+      'like cheets_CTS_N, cheets_CTS_P, cheets_GTS')
+  group.add_argument(
+      '--cts_module', help='CTS/GTS module name, like "CtsCameraTestCases"')
+  group.add_argument(
+      '--cts_test',
+      help='CTS/GTS test name, like '
+      '"android.hardware.cts.CameraTest#testDisplayOrientation"')
+  group.add_argument('--cts_timeout', type=float, help='timeout, in seconds')
 
   return parser
 
@@ -240,6 +255,25 @@ def main(args=None):
 
   if not cros_util.is_dut(opts.dut):
     return FATAL
+
+  is_cts = (
+      opts.cts_revision or opts.cts_abi or opts.cts_prefix or opts.cts_module or
+      opts.cts_test or opts.cts_timeout)
+  if is_cts:
+    if opts.test_name or opts.metric or opts.args:
+      parser.error(
+          'do not specify --test_name, --metric, --args for CTS/GTS tests')
+    opts.test_name = '%s.tradefed-run-test' % opts.cts_prefix
+    opts.args = 'module=%s test=%s' % (opts.cts_module, opts.cts_test)
+    if opts.cts_revision:
+      opts.args += ' revision=%s' % opts.cts_revision
+    if opts.cts_abi:
+      opts.args += ' abi=%s' % opts.cts_abi
+    if opts.cts_timeout:
+      opts.args += ' timeout=%s' % opts.cts_timeout
+  else:
+    if not opts.test_name:
+      parser.error('argument --test_name is required')
 
   # Verify command line options.
   if opts.metric:
