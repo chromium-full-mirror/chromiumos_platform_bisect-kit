@@ -61,7 +61,7 @@ def grab_dut(config):
   autotest_dir = os.path.join(config['chromeos_root'],
                               cros_util.prebuilt_autotest_dir)
   info = cros_util.get_autotest_test_info(autotest_dir, config['test_name'])
-  assert info
+  assert info, 'incorrect test name? %s' % config['test_name']
 
   reason = 'bisect-kit: %s' % config['session']
   if config.get('allocated_dut'):
@@ -94,7 +94,7 @@ def grab_dut(config):
 
 def may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
   info = cros_util.get_autotest_test_info(autotest_dir, test_name)
-  assert info
+  assert info, 'incorrect test name? %s' % test_name
   dirpath = os.path.dirname(info.path)
   for pypath in glob.glob(os.path.join(dirpath, '*.py')):
     if 'ChromeBinaryTest' in open(pypath).read():
