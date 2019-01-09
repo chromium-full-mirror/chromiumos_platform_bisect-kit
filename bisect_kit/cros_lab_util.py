@@ -129,24 +129,55 @@ def unlock_host(host):
   atest_cmd('host', 'mod', '--unlock', host)
 
 
-def allocate_host(reason, host=None, model=None, sku=None, extra_labels=None):
+def host_priority(info, pool_labels):
+  """Determine host priority according to pool preference.
+
+  Args:
+    info: host info
+    pool_labels: list of desired pool labels
+
+  Returns:
+    Priority. Lower value means higher priority. None if not in `pool_labels`.
+  """
+  for i, label in enumerate(pool_labels):
+    if label in info['Labels']:
+      return i
+  return None
+
+
+def allocate_host(reason,
+                  host=None,
+                  model=None,
+                  sku=None,
+                  pools=None,
+                  extra_labels=None):
   """Allocates a host from the lab for bisect.
 
   Args:
     reason: lock reason
-    host: allocation criteria: host name
+    host: allocation criteria: host name. If specified, other criteria are
+        ignored.
     model: allocation criteria: chromeos device model name
     sku: allocation criteria: device sku
+    pools: allocation criteria: allocate hosts from given pools; ordered by
+        priority
     extra_labels: more allocation criteria on labels
 
   Returns:
     host name in the lab; None if failed.
   """
+  pool_labels = []
+
   if host:
     hosts = list_host(host=host)
     assert hosts
   else:
-    labels = ['pool:suites']
+    if not pools:
+      raise ValueError('pools should not be empty')
+    for pool in pools:
+      pool_labels.append('pool:' + pool)
+
+    labels = []
     if model:
       labels.append('model:' + model)
     if sku:
@@ -155,12 +186,18 @@ def allocate_host(reason, host=None, model=None, sku=None, extra_labels=None):
     if extra_labels:
       labels += extra_labels
 
-    hosts = list_host(labels=labels)
+    hosts = {}
+    for host, info in list_host(labels=labels).items():
+      # Filters by desired pools.
+      if host_priority(info, pool_labels) is None:
+        continue
+      hosts[host] = info
+
     if not hosts:
       logger.error('no hosts meet requirements: %s', labels)
       return None
 
-  target_host = None
+  candidate_hosts = {}
   status_counter = collections.Counter()
   for host, info in hosts.items():
     if info.get('Locked') == 'True':
@@ -168,11 +205,15 @@ def allocate_host(reason, host=None, model=None, sku=None, extra_labels=None):
     else:
       status_counter[info['Status']] += 1
       if info['Status'] == 'Ready':
-        target_host = host
+        candidate_hosts[host] = info
   logger.info('host status: %s', status_counter)
-  if not target_host:
+  if not candidate_hosts:
     logger.error('no unlocked hosts are in Ready state')
     return None
+
+  target_host = sorted(
+      candidate_hosts,
+      key=lambda host: host_priority(candidate_hosts[host], pool_labels))[0]
 
   info = lock_host(target_host, reason)
   if info['Status'] != 'Ready':

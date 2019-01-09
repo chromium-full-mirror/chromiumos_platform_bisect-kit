@@ -82,6 +82,7 @@ def grab_dut(config):
         reason,
         model=config['model'],
         sku=config['sku'],
+        pools=config.get('pools', '').split(','),
         extra_labels=extra_labels)
 
   if not host:
@@ -193,6 +194,7 @@ class DiagnoseCommandLine(object):
         android_root=opts.android_root,
         android_mirror=opts.android_mirror,
         dut=opts.dut,
+        pools=opts.pools,
         model=opts.model,
         sku=opts.sku,
         board=opts.board,
@@ -419,6 +421,12 @@ class DiagnoseCommandLine(object):
         required=True,
         help='Address of DUT (Device Under Test). If "%s", DUT will be '
         'automatically allocated from the lab' % cros_lab_util.LAB_DUT)
+    group.add_argument(
+        '--pools',
+        type=cli.argtype_notempty,
+        default='bisector,suites',
+        help='Desired pools, comma separated and ordered by preference '
+        '(default: %(default)s)')
     group.add_argument(
         '--model',
         metavar='MODEL',
