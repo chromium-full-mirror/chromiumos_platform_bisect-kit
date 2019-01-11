@@ -492,9 +492,13 @@ class BisectorCommandLine(object):
 
   def cmd_view(self, opts):
     """Shows remaining candidates."""
-    self.strategy.rebuild()
-    # Rebuild twice in order to re-estimate noise.
-    self.strategy.rebuild()
+    try:
+      self.strategy.rebuild()
+      # Rebuild twice in order to re-estimate noise.
+      self.strategy.rebuild()
+    except errors.VerificationFailed:
+      # Do nothing, go ahead to show existing information anyway.
+      pass
 
     old_idx, new_idx = self.strategy.get_range()
     old, new = map(self.states.idx2rev, [old_idx, new_idx])
@@ -515,9 +519,10 @@ class BisectorCommandLine(object):
       interesting_indexes = set(range(len(summary['rev_info'])))
     else:
       interesting_indexes = set([old_idx, new_idx])
-      for i, p in enumerate(self.strategy.prob):
-        if p > 0.05:
-          interesting_indexes.add(i)
+      if self.strategy.prob:
+        for i, p in enumerate(self.strategy.prob):
+          if p > 0.05:
+            interesting_indexes.add(i)
 
     self.domain.fill_candidate_summary(summary, interesting_indexes)
 
@@ -588,7 +593,11 @@ class BisectorCommandLine(object):
           self.states.rev2idx(self.config['new']),
           confidence=self.config['confidence'],
           observation=self.config['noisy'])
-      self.strategy.rebuild()
+      try:
+        self.strategy.rebuild()
+      except errors.VerificationFailed:
+        # Do nothing, go ahead to show existing information anyway.
+        pass
       left, right = self.strategy.get_range()
       estimated_noise = self.strategy.get_noise_observation()
 

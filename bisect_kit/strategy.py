@@ -430,7 +430,12 @@ class NoisyBinarySearch(object):
     Note, if the probability model is unknown, old_p and new_p will be
     re-estimated after every rebuild() and update(), thus rebuild multiple times
     may result in different probability values.
+
+    Raises:
+      errors.VerificationFailed: Bisection range is not verified and false
+          events occur too many times.
     """
+    self.check_verification_range()
 
     assert 0 <= self.old_idx < self.new_idx < len(self.rev_info)
     # First, P(x_i is first new) = Normalize(init_prob[i])

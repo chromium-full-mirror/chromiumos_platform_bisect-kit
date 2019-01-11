@@ -148,6 +148,10 @@ class TestBisectorCommandLine(unittest.TestCase):
     with self.assertRaises(errors.VerificationFailed):
       bisector.main('run')
 
+    result = bisector.current_status()
+    self.assertEqual(result.get('inited'), True)
+    self.assertEqual(result.get('verified'), False)
+
   def test_run_false(self):
     bisector = cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=10', '--old=0', '--new=9')
@@ -155,6 +159,10 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'eval', 'false')
     with self.assertRaises(errors.VerificationFailed):
       bisector.main('run')
+
+    result = bisector.current_status()
+    self.assertEqual(result.get('inited'), True)
+    self.assertEqual(result.get('verified'), False)
 
   def test_simple(self):
     bisector = cli.BisectorCommandLine(DummyDomain)
@@ -175,6 +183,10 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'eval', 'sh', '-c', '[ "$BISECT_REV" -lt 7 ]')
     with self.assertRaises(errors.UnableToProceed):
       bisector.main('run')
+
+    result = bisector.current_status()
+    self.assertEqual(result.get('inited'), True)
+    self.assertEqual(result.get('verified'), False)
 
   def test_run_classic(self):
     bisector = cli.BisectorCommandLine(DummyDomain)
