@@ -39,11 +39,6 @@ FEATURES="$FEATURES -separatedebug splitdebug" \
 ./update_chroot \
     --toolchain_boards=$BOARD
 
-./setup_board \
-    --board=$BOARD \
-    --accept_licenses=@CHROMEOS \
-    --skip_chroot_upgrade
-
 ./build_packages \
     --board=$BOARD \
     --withdev \
