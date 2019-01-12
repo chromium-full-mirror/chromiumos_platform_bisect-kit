@@ -315,7 +315,7 @@ cache_dir = %r
       if git_repo_name.startswith('_cache_tmp'):
         continue
       git_repo = os.path.join(chrome_cache, git_repo_name)
-      if not git_util.is_git_rev(git_repo):
+      if not git_util.is_git_bare_dir(git_repo):
         continue
       util.check_call('git', 'fetch', cwd=git_repo)
 

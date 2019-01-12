@@ -50,6 +50,17 @@ def is_git_root(path):
   return os.path.exists(os.path.join(path, '.git'))
 
 
+def is_git_bare_dir(path):
+  """Is inside .git folder or bare git checkout."""
+  if not os.path.isdir(path):
+    return False
+  try:
+    return util.check_output(
+        'git', 'rev-parse', '--is-bare-repository', cwd=path) == 'true\n'
+  except subprocess.CalledProcessError:
+    return False
+
+
 def clone(git_repo, repo_url, reference=None):
   if not os.path.exists(git_repo):
     os.makedirs(git_repo)

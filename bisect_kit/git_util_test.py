@@ -118,6 +118,22 @@ class TestGitOperation(unittest.TestCase):
     git_util.init(self.git_repo)
     self.assertTrue(git_util.is_git_root(self.git_repo))
 
+  def test_is_git_bare_dir(self):
+    # git_repo is a normal git work dir.
+    self.assertFalse(git_util.is_git_bare_dir(self.git_repo))
+
+    # non-exist dir
+    shutil.rmtree(self.git_repo)
+    self.assertFalse(git_util.is_git_bare_dir(self.git_repo))
+
+    # empty dir
+    os.makedirs(self.git_repo)
+    self.assertFalse(git_util.is_git_bare_dir(self.git_repo))
+
+    # git bare dir
+    subprocess.check_call(['git', 'init', '-q', '--bare'], cwd=self.git_repo)
+    self.assertTrue(git_util.is_git_bare_dir(self.git_repo))
+
   def test_is_containing_commit(self):
     self.assertTrue(
         git_util.is_containing_commit(self.git_repo, self.commits[0]))
