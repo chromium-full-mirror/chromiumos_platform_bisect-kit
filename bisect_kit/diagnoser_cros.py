@@ -153,6 +153,34 @@ class CrosDiagnoser(object):
     if not need_android_bisect(self.old_info, self.new_info):
       return False
 
+    logger.info('bisect android prebuilt')
+    session = '%s/%s' % (self.session, self.cros_old)
+    bisector = wrapper.BisectorWrapper('bisect_android_build_id', session)
+    try:
+      bisector.init_if_necessary(
+          self.old_info['android_build_id'],
+          self.new_info['android_build_id'],
+          init_args=[
+              '--dut',
+              self.dut,
+              '--branch',
+              self.old_info['android_branch'],
+          ],
+          switch_cmd=['./switch_arc_prebuilt.py'],
+          eval_cmd=eval_cmd,
+          noisy=self.noisy)
+      if extra_switch_cmd:
+        bisector.append_switch_command(extra_switch_cmd)
+
+      android_old, android_new, self.noisy = bisector.narrow_down(
+          self.states, 'bisect android prebuilt')
+    except errors.VerifyOldFailed:
+      logger.fatal('expect old android has old behavior but failed')
+      raise
+    except errors.VerifyNewFailed:
+      logger.info('unable to reproduce, culprit is not in android')
+      return False
+
     # TODO(kcwu): what if the branch name does not have 'git_' prefix
     assert self.old_info['android_branch'].startswith('git_')
     git_branch = self.old_info['android_branch'][4:]
@@ -169,36 +197,6 @@ class CrosDiagnoser(object):
     if not os.path.exists(self.android_root):
       logger.info('android_root does not exist; skip android bisect')
       return None
-
-    logger.info('bisect android prebuilt')
-    session = '%s/%s' % (self.session, self.cros_old)
-    bisector = wrapper.BisectorWrapper('bisect_android_build_id', session)
-    try:
-      bisector.init_if_necessary(
-          self.old_info['android_build_id'],
-          self.new_info['android_build_id'],
-          init_args=[
-              '--dut',
-              self.dut,
-              '--branch',
-              self.old_info['android_branch'],
-              '--android_root',
-              self.android_root,
-          ],
-          switch_cmd=['./switch_arc_prebuilt.py'],
-          eval_cmd=eval_cmd,
-          noisy=self.noisy)
-      if extra_switch_cmd:
-        bisector.append_switch_command(extra_switch_cmd)
-
-      android_old, android_new, self.noisy = bisector.narrow_down(
-          self.states, 'bisect android prebuilt')
-    except errors.VerifyOldFailed:
-      logger.fatal('expect old android has old behavior but failed')
-      raise
-    except errors.VerifyNewFailed:
-      logger.info('unable to reproduce, culprit is not in android')
-      return False
 
     logger.info('bisect android local build')
     bisector = wrapper.BisectorWrapper('bisect_android_repo', session)

@@ -16,7 +16,6 @@ will be set:
   ANDROID_BRANCH (e.g. git_mnc-dr-arc-dev),
   ANDROID_FLAVOR (e.g. cheets_x86-user),
   ANDROID_BUILD_ID (e.g. 9876543),
-  ANDROID_ROOT (if available), and
   DUT (e.g. samus-dut, if available).
 """
 
@@ -63,11 +62,6 @@ class AndroidBuildIDDomain(core.BisectDomain):
         metavar='DUT',
         default=configure.get('DUT'),
         help='For ChromeOS, address of DUT (Device Under Test)')
-    parser.add_argument(
-        '--android_root',
-        type=cli.argtype_dir_path,
-        default=configure.get('ANDROID_ROOT'),
-        help='For ChromeOS, default android tree to search push_to_device.py')
 
   @staticmethod
   def init(opts):
@@ -85,8 +79,7 @@ class AndroidBuildIDDomain(core.BisectDomain):
       opts.branch = cros_util.query_android_branch(board, version)
       assert opts.branch
 
-    config = dict(
-        branch=opts.branch, flavor=opts.flavor, android_root=opts.android_root)
+    config = dict(branch=opts.branch, flavor=opts.flavor)
     if opts.dut:
       config['dut'] = opts.dut
 
@@ -110,8 +103,6 @@ class AndroidBuildIDDomain(core.BisectDomain):
     env['ANDROID_BUILD_ID'] = rev
     if self.config.get('dut'):
       env['DUT'] = self.config['dut']
-    if self.config.get('android_root'):
-      env['ANDROID_ROOT'] = self.config['android_root']
 
   def fill_candidate_summary(self, summary, interesting_indexes):
     old, new = summary['current_range']

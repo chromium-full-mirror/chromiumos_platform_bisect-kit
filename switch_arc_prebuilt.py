@@ -46,11 +46,6 @@ def create_argument_parser():
       metavar='ANDROID_FLAVOR',
       default=configure.get('ANDROID_FLAVOR'),
       help='example: cheets_x86-user')
-  parser.add_argument(
-      '--android_root',
-      type=cli.argtype_dir_path,
-      default=configure.get('ANDROID_ROOT', ''),
-      help='Android tree to search push_to_device.py')
 
   return parser
 
@@ -66,8 +61,7 @@ def main(args=None):
     assert opts.flavor
   logger.info('use flavor=%s', opts.flavor)
 
-  arc_util.push_prebuilt_to_device(opts.android_root, opts.dut, opts.flavor,
-                                   opts.build_id)
+  arc_util.push_prebuilt_to_device(opts.dut, opts.flavor, opts.build_id)
 
   arc_version = cros_util.query_dut_lsb_release(
       opts.dut).get('CHROMEOS_ARC_VERSION')
