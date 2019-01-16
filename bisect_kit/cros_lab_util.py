@@ -195,7 +195,9 @@ def allocate_host(reason,
 
     if not hosts:
       logger.error('no hosts meet requirements: %s', labels)
-      return None
+      raise errors.ExternalError(
+          'no DUTs (%s) in pool=%s; incorrect model or sku name?' % (labels,
+                                                                     pools))
 
   candidate_hosts = {}
   status_counter = collections.Counter()
