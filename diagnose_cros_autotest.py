@@ -452,7 +452,7 @@ class DiagnoseCommandLine(object):
     group.add_argument(
         '--pools',
         type=cli.argtype_notempty,
-        default='bisector,suites',
+        default='suites',
         help='Desired pools, comma separated and ordered by preference '
         '(default: %(default)s)')
     group.add_argument(
