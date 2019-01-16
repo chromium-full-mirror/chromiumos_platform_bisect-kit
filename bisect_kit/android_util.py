@@ -140,8 +140,21 @@ def fetch_artifact(flavor, build_id, filename, dest):
     filename: artifact name
     dest: local path to store the fetched artifact
   """
+  service_account_args = []
+  # These arguments are for bisector service and not required for users of
+  # bisect-kit using personal account.
+  if os.environ.get('ANDROID_CLOUD_SERVICE_ACCOUNT_EMAIL'):
+    assert os.environ.get('ANDROID_CLOUD_SERVICE_ACCOUNT_KEY')
+    service_account_args += [
+        '--email',
+        os.environ.get('ANDROID_CLOUD_SERVICE_ACCOUNT_EMAIL'),
+        '--apiary_service_account_private_key_path',
+        os.environ.get('ANDROID_CLOUD_SERVICE_ACCOUNT_KEY'),
+    ]
+
   util.check_call('/google/data/ro/projects/android/fetch_artifact', '--target',
-                  flavor, '--bid', build_id, filename, dest)
+                  flavor, '--bid', build_id, filename, dest,
+                  *service_account_args)
 
 
 def fetch_manifest(android_root, flavor, build_id):
