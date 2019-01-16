@@ -140,8 +140,9 @@ def host_priority(info, pool_labels):
     Priority. Lower value means higher priority. None if not in `pool_labels`.
   """
   for i, label in enumerate(pool_labels):
-    if label in info['Labels']:
-      return i
+    for host_label in info['Labels']:
+      if label.lower() == host_label.lower():
+        return i
   return None
 
 
