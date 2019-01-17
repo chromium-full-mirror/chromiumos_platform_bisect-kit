@@ -177,6 +177,16 @@ def get_additional_test_args(test_name):
   return ''
 
 
+def prepare_to_run_test(opts):
+  # Some versions of ChromeOS SDK is broken and ship bad 'ssh' executable. This
+  # works around the issue before we fixed the issue.
+  # TODO(kcwu): fix crbug/899490
+  cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'net-misc/openssh')
+
+  if opts.reinstall:
+    util.check_call('ssh', opts.dut, 'rm', '-rf', '/usr/local/autotest')
+
+
 def run_test(opts):
   """Runs an autotest test.
 
@@ -186,9 +196,6 @@ def run_test(opts):
   Returns:
     path of test result (outside chroot)
   """
-  if opts.reinstall:
-    util.check_call('ssh', opts.dut, 'rm', '-rf', '/usr/local/autotest')
-
   prebuilt_autotest_dir = os.path.join(cros_util.chromeos_root_inside_chroot,
                                        cros_util.prebuilt_autotest_dir)
   # Set results dir inside source tree, so it's easier to access them outside
@@ -295,10 +302,11 @@ def main(args=None):
       logger.error('--chrome_root is mandatory for telemetry tests')
       return FATAL
 
-  # Some versions of ChromeOS SDK is broken and ship bad 'ssh' executable. This
-  # works around the issue before we fixed the issue.
-  # TODO(kcwu): fix crbug/899490
-  cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'net-misc/openssh')
+  try:
+    prepare_to_run_test(opts)
+  except Exception:
+    logger.exception('failed when prepare, assume it is temporary; SKIP')
+    return SKIP
 
   result_dir = run_test(opts)
   if not result_dir:
