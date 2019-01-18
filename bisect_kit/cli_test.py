@@ -34,8 +34,17 @@ class TestCli(unittest.TestCase):
     with self.assertRaises(cli.ArgTypeError):
       cli.argtype_notempty('')
 
+  def test_argtype_re(self):
+    argtype = cli.argtype_re(r'^r\d+$', 'r123')
+    self.assertEqual(argtype('r123'), 'r123')
+
+    with self.assertRaises(cli.ArgTypeError):
+      argtype('hello')
+
   def test_argtype_multiplexer(self):
-    argtype = cli.argtype_multiplexer(cli.argtype_int, 'foobar', r'^r\d+$')
+    argtype = cli.argtype_multiplexer(cli.argtype_int,
+                                      cli.argtype_re('foobar', 'foobar'),
+                                      cli.argtype_re(r'^r\d+$', 'r123'))
     self.assertEqual(argtype('123456'), '123456')
     self.assertEqual(argtype('foobar'), 'foobar')
     self.assertEqual(argtype('r123'), 'r123')

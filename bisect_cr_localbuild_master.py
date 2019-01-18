@@ -45,7 +45,8 @@ logger = logging.getLogger(__name__)
 
 revtype = cli.argtype_multiplexer(cr_util.argtype_chrome_version,
                                   cros_util.argtype_cros_version,
-                                  git_util.argtype_git_rev, r'^#(\d+)$')
+                                  git_util.argtype_git_rev,
+                                  cli.argtype_re(r'^#(\d+)$', '#12345'))
 
 
 def guess_git_rev(opts, rev):

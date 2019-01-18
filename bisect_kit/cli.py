@@ -75,20 +75,44 @@ def argtype_int(s):
     raise ArgTypeError('should be a number', '123')
 
 
+def argtype_re(pattern, example):
+  r"""Validate argument matches `pattern`.
+
+  Args:
+    pattern: regex pattern
+    example: example string which matches `pattern`
+
+  Returns:
+    A new argtype function which matches regex `pattern`
+  """
+  assert re.match(pattern, example)
+
+  def validate(s):
+    if re.match(pattern, s):
+      return s
+    if re.escape(pattern) == pattern:
+      raise ArgTypeError('should be "%s"' % pattern, pattern)
+    raise ArgTypeError('should match "%s"' % pattern,
+                       '"%s" like %s' % (pattern, example))
+
+  return validate
+
+
 def argtype_multiplexer(*args):
   r"""argtype multiplexer
 
-  This function takes a list of argtypes or regex patterns and creates a new
-  function matching them. Moreover, it gives error message with examples.
+  This function takes a list of argtypes and creates a new function matching
+  them. Moreover, it gives error message with examples.
 
   Examples:
-    >>> argtype = argtype_multiplexer(argtype_int, r'^r\d+$')
+    >>> argtype = argtype_multiplexer(argtype_int,
+                                      argtype_re(r'^r\d+$', 'r123'))
     >>> argtype('123')
     123
     >>> argtype('r456')
     r456
     >>> argtype('hello')
-    ArgTypeError: Invalid argument (example value: 123, r\d+$)
+    ArgTypeError: Invalid argument (example value: 123, "r\d+$" like r123)
 
   Args:
     *args: list of argtypes or regex pattern.
@@ -100,11 +124,6 @@ def argtype_multiplexer(*args):
   def validate(s):
     examples = []
     for t in args:
-      if isinstance(t, str):
-        if re.match(t, s):
-          return s
-        examples.append(t)
-        continue
       try:
         return t(s)
       except ArgTypeError as e:
@@ -860,7 +879,9 @@ class BisectorCommandLine(object):
     parser_switch = subparsers.add_parser(
         'switch', help='Switch to given rev without eval')
     parser_switch.add_argument(
-        'rev', type=argtype_multiplexer(self.domain_cls.intra_revtype, 'next'))
+        'rev',
+        type=argtype_multiplexer(self.domain_cls.intra_revtype,
+                                 argtype_re('next', 'next')))
     parser_switch.set_defaults(func=self.cmd_switch)
 
     parser_old = subparsers.add_parser(
