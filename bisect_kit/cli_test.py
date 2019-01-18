@@ -323,6 +323,10 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'noisy', 'old=1/10,new=8/9')
     self.assertEqual(bisector.states.config['noisy'], 'old=1/10,new=8/9')
 
+    with mock.patch('sys.stdout', new_callable=StringIO.StringIO):
+      # Only make sure no exceptions. No output verification.
+      bisector.main('view')
+
   def test_current_status(self):
     common.init()
     bisector = cli.BisectorCommandLine(DummyDomain)

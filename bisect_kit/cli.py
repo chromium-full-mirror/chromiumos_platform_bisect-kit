@@ -541,7 +541,7 @@ class BisectorCommandLine(object):
         print(link['note'])
 
     print('Range: (%s, %s], %s revs left' % (old, new, (new_idx - old_idx)))
-    if 'remaining_steps' in summary:
+    if summary.get('remaining_steps'):
       print('(roughly %d steps)' % summary['remaining_steps'])
 
     for i, rev_info in enumerate(summary['rev_info']):
@@ -551,7 +551,7 @@ class BisectorCommandLine(object):
 
       detail = []
       if self.strategy.is_noisy():
-        detail.append('%.4f%%' % summary['prob'][i] * 100)
+        detail.append('%.4f%%' % (summary['prob'][i] * 100))
       if rev_info['result_counter']:
         detail.append(str(rev_info['result_counter']))
       values = sorted(rev_info['values'])
