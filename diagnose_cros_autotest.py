@@ -179,6 +179,9 @@ class DiagnoseCommandLine(object):
         self.argument_parser.error('--old_value is not provided')
       if opts.new_value is None:
         self.argument_parser.error('--new_value is not provided')
+      if opts.fail_to_pass:
+        self.argument_parser.error(
+            '--fail_to_pass is not for benchmark test (--metric)')
     else:
       if opts.old_value is not None:
         self.argument_parser.error(
@@ -210,6 +213,7 @@ class DiagnoseCommandLine(object):
         old=opts.old,
         new=opts.new,
         test_name=opts.test_name,
+        fail_to_pass=opts.fail_to_pass,
         metric=opts.metric,
         old_value=opts.old_value,
         new_value=opts.new_value,
@@ -257,6 +261,8 @@ class DiagnoseCommandLine(object):
           '--old_value', str(self.config['old_value']),
           '--new_value', str(self.config['new_value']),
       ]  # yapf: disable
+    elif self.config['fail_to_pass']:
+      common_eval_cmd.append('--fail_to_pass')
     if self.config['test_that_args']:
       common_eval_cmd += ['--args', self.config['test_that_args']]
     if self.config['test_name'].startswith('telemetry_'):
@@ -484,6 +490,12 @@ class DiagnoseCommandLine(object):
     group = parser_init.add_argument_group(
         title='Options for normal autotest tests')
     group.add_argument('--test_name', help='Test name')
+    group.add_argument(
+        '--fail_to_pass',
+        action='store_true',
+        help='For functional tests: bisect the CL fixed the regression (when '
+        'test became PASS). If not specified, the default is to bisect the CL '
+        'which broke the test (when test became FAIL)')
     group.add_argument('--metric', help='Metric name of benchmark test')
     group.add_argument(
         '--old_value',

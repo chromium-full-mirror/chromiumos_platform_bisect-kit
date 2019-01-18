@@ -75,6 +75,12 @@ def create_argument_parser():
   group.add_argument(
       '--test_name', help='Test name, like "video_VideoDecodeAccelerator.h264"')
   group.add_argument(
+      '--fail_to_pass',
+      action='store_true',
+      help='For functional tests: old behavior is FAIL and new behavior is '
+      'PASS; If not specified, default = old behavior is PASS and new '
+      'behavior is FAIL')
+  group.add_argument(
       '--metric',
       help=
       'Metric name of performance test; example: "cheets_SystemRawImageSize"')
@@ -290,6 +296,9 @@ def main(args=None):
     if opts.new_value is None:
       logger.error('--new_value is not provided')
       return FATAL
+    if opts.fail_to_pass:
+      logger.error('--fail_to_pass is not for benchmark test (--metric)')
+      return FATAL
   else:
     if opts.old_value is not None:
       logger.error('--old_value is provided but --metric is not')
@@ -327,11 +336,18 @@ def main(args=None):
     logger.info('values=%s, average=%s; NEW', values, average)
     return NEW
   else:
-    if passed:
-      logger.info('passed')
+    if opts.fail_to_pass:
+      if passed:
+        logger.info('passed')
+        return NEW
+      logger.info('failed')
       return OLD
-    logger.info('failed')
-    return NEW
+    else:
+      if passed:
+        logger.info('passed')
+        return OLD
+      logger.info('failed')
+      return NEW
 
 
 if __name__ == '__main__':
