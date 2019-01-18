@@ -346,6 +346,11 @@ class BisectorCommandLine(object):
   def config(self):
     return self.states.config
 
+  def _format_status(self, status):
+    if status in ('old', 'new'):
+      return '%s behavior'
+    return status
+
   def _add_sample(self, rev, status, **kwargs):
     idx = self.states.rev2idx(rev)
     self.states.add_sample(idx, status, **kwargs)
@@ -463,7 +468,7 @@ class BisectorCommandLine(object):
           self.strategy.check_verification_range()
 
         step, status, values = self._switch_and_eval(rev, prev_rev=prev_rev)
-        logger.info('rev=%s => status %s', rev, status)
+        logger.info('rev=%s status => %s', rev, self._format_status(status))
         force = False
 
         self._add_sample(rev, status, values=values)

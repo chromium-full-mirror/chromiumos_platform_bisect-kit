@@ -60,18 +60,18 @@ class VerificationFailed(Exception):
     super(VerificationFailed, self).__init__(msg)
 
 
-class VerifyOldFailed(VerificationFailed):
+class VerifyOldBehaviorFailed(VerificationFailed):
   """Old version does not behave as old."""
 
   def __init__(self, rev, bad_times=1):
-    super(VerifyOldFailed, self).__init__(rev, 'old', 'new', bad_times)
+    super(VerifyOldBehaviorFailed, self).__init__(rev, 'old', 'new', bad_times)
 
 
-class VerifyNewFailed(VerificationFailed):
+class VerifyNewBehaviorFailed(VerificationFailed):
   """New version does not behave as new."""
 
   def __init__(self, rev, bad_times=1):
-    super(VerifyNewFailed, self).__init__(rev, 'new', 'old', bad_times)
+    super(VerifyNewBehaviorFailed, self).__init__(rev, 'new', 'old', bad_times)
 
 
 class UnableToProceed(Exception):

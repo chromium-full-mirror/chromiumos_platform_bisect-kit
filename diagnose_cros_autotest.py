@@ -342,7 +342,7 @@ class DiagnoseCommandLine(object):
           if diagnoser.narrow_down_chrome(
               eval_cmd, chrome_binaries=chrome_binaries):
             return
-        except errors.VerifyOldFailed:
+        except errors.VerifyOldBehaviorFailed:
           logger.fatal('expect old chrome has old behavior but failed')
           raise
         except Exception:

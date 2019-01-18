@@ -174,10 +174,10 @@ class CrosDiagnoser(object):
 
       android_old, android_new, self.noisy = bisector.narrow_down(
           self.states, 'bisect android prebuilt')
-    except errors.VerifyOldFailed:
+    except errors.VerifyOldBehaviorFailed:
       logger.fatal('expect old android has old behavior but failed')
       raise
-    except errors.VerifyNewFailed:
+    except errors.VerifyNewBehaviorFailed:
       logger.info('unable to reproduce, culprit is not in android')
       return False
 
@@ -265,7 +265,7 @@ class CrosDiagnoser(object):
         bisector.append_switch_command(extra_switch_cmd)
 
       bisector.narrow_down(self.states, 'bisect chrome local build')
-    except errors.VerifyNewFailed:
+    except errors.VerifyNewBehaviorFailed:
       logger.info('unable to reproduce, culprit is not in chrome')
       return False
     return True

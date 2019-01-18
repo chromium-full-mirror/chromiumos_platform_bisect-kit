@@ -595,15 +595,15 @@ class NoisyBinarySearch(object):
       # P(try N times and old behavior occurs 0 times)
       p = self.old_p**self.rev_info[self.old_idx]['new']
       if p < 1.0 - self.verify_confidence:
-        raise errors.VerifyOldFailed(self.rev_info[self.old_idx].rev,
-                                     self.rev_info[self.old_idx]['new'])
+        raise errors.VerifyOldBehaviorFailed(self.rev_info[self.old_idx].rev,
+                                             self.rev_info[self.old_idx]['new'])
 
     if self.rev_info[self.new_idx]['new'] == 0:
       # P(try N times and new behavior occurs 0 times)
       p = (1 - self.new_p)**self.rev_info[self.new_idx]['old']
       if p < 1.0 - self.verify_confidence:
-        raise errors.VerifyNewFailed(self.rev_info[self.new_idx].rev,
-                                     self.rev_info[self.new_idx]['old'])
+        raise errors.VerifyNewBehaviorFailed(self.rev_info[self.new_idx].rev,
+                                             self.rev_info[self.new_idx]['old'])
 
   def show_summary(self, more=False):
     """Shows top ranked candidates.
