@@ -86,6 +86,12 @@ def argtype_intra_rev(argtype):
   """
 
   def argtype_function(s):
+    examples = []
+    try:
+      return argtype(s)
+    except cli.ArgTypeError as e:
+      examples += e.example
+
     m = re.match(_re_intra_rev, s)
     if m:
       try:
@@ -93,12 +99,12 @@ def argtype_intra_rev(argtype):
         argtype(m.group(2))
         return s
       except cli.ArgTypeError as e:
-        examples = []
         for example in e.example:
           examples.append(make_intra_rev(example, example, 10))
         raise cli.ArgTypeError('Invalid intra rev', examples)
-    raise cli.ArgTypeError('Invalid intra rev',
-                           [make_intra_rev('<rev1>', '<rev2>', 10)])
+
+    examples.append(make_intra_rev('<rev1>', '<rev2>', 10))
+    raise cli.ArgTypeError('Invalid rev', examples)
 
   return argtype_function
 
