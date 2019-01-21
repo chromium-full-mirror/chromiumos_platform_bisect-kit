@@ -83,8 +83,8 @@ class AndroidBuildIDDomain(core.BisectDomain):
     if opts.dut:
       config['dut'] = opts.dut
 
-    revlist = android_util.get_build_ids_between(opts.branch, opts.old,
-                                                 opts.new)
+    revlist = android_util.get_build_ids_between(opts.branch, opts.flavor,
+                                                 opts.old, opts.new)
 
     if opts.only_good_build:
       revlist = [

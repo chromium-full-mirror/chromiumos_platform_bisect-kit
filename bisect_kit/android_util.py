@@ -89,17 +89,22 @@ def is_good_build(branch, flavor, build_id):
   return False
 
 
-def get_build_ids_between(branch, start, end):
+def get_build_ids_between(branch, flavor, start, end):
   """Returns a list of build IDs.
 
   Args:
     branch: The Android branch from which to retrieve the builds.
+    flavor: Target name of the Android image in question.
+        E.g. "cheets_x86-userdebug" or "cheets_arm-user".
     start: The starting point build ID. (inclusive)
     end: The ending point build ID. (inclusive)
 
   Returns:
     A list of build IDs. (str)
   """
+  # Do not remove this argument because our internal implementation need it.
+  del flavor  # not used
+
   # TODO(kcwu): remove pagination hack after b/68239878 fixed
   build_id_set = set()
   tmp_end = end
@@ -231,7 +236,8 @@ class AndroidSpecManager(codechange.SpecManager):
 
   def collect_fixed_spec(self, old, new):
     result = []
-    revlist = get_build_ids_between(self.config['branch'], int(old), int(new))
+    revlist = get_build_ids_between(self.config['branch'],
+                                    self.config['flavor'], int(old), int(new))
     for rev in revlist:
       manifest_name = fetch_manifest(self.config['android_root'],
                                      self.config['flavor'], rev)

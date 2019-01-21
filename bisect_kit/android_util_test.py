@@ -25,8 +25,8 @@ class TestAndroidUtil(unittest.TestCase):
     with mock.patch.object(
         android_util, 'fetch_android_build_data', return_value=data):
       self.assertEqual(
-          android_util.get_build_ids_between('aosp-master', '4683349',
-                                             '4683388'),
+          android_util.get_build_ids_between('aosp-master', 'aosp_arm64-eng',
+                                             '4683349', '4683388'),
           ['4683349', '4683353', '4683364', '4683367', '4683388'])
 
     # check sort order
@@ -34,8 +34,9 @@ class TestAndroidUtil(unittest.TestCase):
     with mock.patch.object(
         android_util, 'fetch_android_build_data', return_value=data):
       self.assertEqual(
-          android_util.get_build_ids_between(
-              'aosp-master', '9999999', '10000001'), ['9999999', '10000001'])
+          android_util.get_build_ids_between('aosp-master', 'aosp_arm64-eng',
+                                             '9999999', '10000001'),
+          ['9999999', '10000001'])
 
   def test_is_good_build(self):
     with testing.mock_function_by_file(android_util, 'fetch_android_build_data',
