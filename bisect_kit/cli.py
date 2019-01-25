@@ -348,7 +348,7 @@ class BisectorCommandLine(object):
 
   def _format_status(self, status):
     if status in ('old', 'new'):
-      return '%s behavior'
+      return '%s behavior' % status
     return status
 
   def _add_sample(self, rev, status, **kwargs):
