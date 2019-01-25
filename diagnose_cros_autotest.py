@@ -55,7 +55,7 @@ CHROME_BINARIES_OF_TEST = {
 }
 
 
-def grab_dut(config):
+def get_test_dependency_labels(config):
   # Assume "DEPENDENCIES" is identical between the period of
   # `old` and `new` version.
   autotest_dir = os.path.join(config['chromeos_root'],
@@ -63,34 +63,46 @@ def grab_dut(config):
   info = cros_util.get_autotest_test_info(autotest_dir, config['test_name'])
   assert info, 'incorrect test name? %s' % config['test_name']
 
-  reason = 'bisect-kit: %s' % config['session']
+  extra_labels = []
+  dependencies = info.variables.get('DEPENDENCIES', '')
+  for label in dependencies.split(','):
+    label = label.strip()
+    # Skip non-machine labels
+    if not label or label in ['cleanup-reboot']:
+      continue
+    extra_labels.append(label)
+
+  return extra_labels
+
+
+def grab_dut(config):
+  reason = cros_lab_util.make_lock_reason(config['session'])
   if config.get('allocated_dut'):
     host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
-    logger.info('try to allocate the same host (%s) as last run', host_name)
-    host = cros_lab_util.allocate_host(reason, host=host_name)
+    logger.info('try to lock the same host (%s) as last run', host_name)
+    candidates = cros_lab_util.list_host(host=host_name).values()
   else:
-    extra_labels = []
-    dependencies = info.variables.get('DEPENDENCIES', '')
-    for label in dependencies.split(','):
-      label = label.strip()
-      # Skip non-machine labels
-      if label in ['cleanup-reboot']:
-        continue
-      extra_labels.append(label)
-
-    host = cros_lab_util.allocate_host(
-        reason,
+    extra_labels = get_test_dependency_labels(config)
+    candidates = cros_lab_util.seek_host(
+        pools=config.get('pools', '').split(','),
         model=config['model'],
         sku=config['sku'],
-        pools=config.get('pools', '').split(','),
         extra_labels=extra_labels)
 
-  if not host:
+  if (not candidates or candidates[0]['Status'] != 'Ready' or
+      candidates[0]['Locked']):
     logger.error('unable to allocate dut')
     return None
 
-  logger.info('allocated host %s', host)
-  return host
+  host_name = candidates[0]['Host']
+  info = cros_lab_util.lock_host(host_name, reason)
+  if info['Status'] != 'Ready':
+    cros_lab_util.unlock_host(host_name)
+    raise Exception(
+        'unexpected host status=%s, a race condition?' % info['Status'])
+
+  logger.info('allocated host %s', host_name)
+  return host_name
 
 
 def may_depend_on_extra_chrome_binaries(autotest_dir, test_name):

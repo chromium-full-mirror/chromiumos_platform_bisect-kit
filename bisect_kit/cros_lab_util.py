@@ -17,6 +17,23 @@ logger = logging.getLogger(__name__)
 # Magic keyword for automatic DUT allocation.
 LAB_DUT = ':lab:'
 
+# DUT state classification for allocation:
+#  - ready state: desired
+#  - good states: lock and wait
+#  - transient states: wait
+#  - bad states: ignore them
+# For locked hosts, treat them as transient or bad state depending on locked
+# by whom.
+LOCKED_BY_US = 'locked-by-us'
+LOCKED_BY_OTHERS = 'locked-by-others'
+READY_STATE = 'Ready'
+GOOD_STATES = ['Running']
+TRANSIENT_STATES = [
+    'Verifying', 'Pending', 'Provisioning', 'Repairing', 'Resetting',
+    LOCKED_BY_US
+]
+BAD_STATES = ['Repair Failed', LOCKED_BY_OTHERS]
+
 
 def dut_host_name(dut):
   """Converts DUT address to host name.
@@ -59,13 +76,13 @@ def list_host(host=None, labels=None, statuses=None, locked=None):
 
   Returns:
     A dict mapping host name to host info. "host info" is parsed dict of 'atest
-    host list'. Field 'Labels' is parsed into set; other fields are plain
-    strings. For example:
+    host list'. Field 'Labels' is parsed into set, 'Locked' is normalized to
+    bool; other fields are plain strings. For example:
 
     {
       'chromeos1-row1-rack1-host1': {
         'Status': 'Ready',
-        'Locked': 'False',
+        'Locked': False,
         'Locked by': 'None',
         'Labels': set(['board:daisy', 'webcam', 'servo', 'pool:suites',
                        'sku:snow_arm_v7l_rev4_2Gb']),
@@ -93,6 +110,8 @@ def list_host(host=None, labels=None, statuses=None, locked=None):
       key, value = item.split('=', 1)
       if key == 'Labels':
         value = set(value.split(', '))
+      elif key == 'Locked':
+        value = (value == 'True')
       entry[key] = value
     result[entry['Host']] = entry
 
@@ -129,102 +148,115 @@ def unlock_host(host):
   atest_cmd('host', 'mod', '--unlock', host)
 
 
-def host_priority(info, pool_labels):
-  """Determine host priority according to pool preference.
+def make_lock_reason(session):
+  return 'bisect-kit: %s' % session
+
+
+def is_locked_by_us(info):
+  return (info.get('Locked') and
+          info.get('Lock Reason', '').startswith('bisect-kit'))
+
+
+def _host_priority(pool_labels, info):
+  """Determine host priority according to status and pool.
+
+  The priority is:
+    ready > good states > transient states
+    and tie-breaking by pool
 
   Args:
-    info: host info
     pool_labels: list of desired pool labels
+    info: host info
 
   Returns:
-    Priority. Lower value means higher priority. None if not in `pool_labels`.
+    Priority. Lower value means higher priority.
   """
+  state = normalize_host_state(info)
+
+  pool_priority = None
   for i, label in enumerate(pool_labels):
     for host_label in info['Labels']:
       if label.lower() == host_label.lower():
-        return i
-  return None
+        pool_priority = i
+        break
+  assert pool_priority is not None
+
+  if state == READY_STATE:
+    return 0, pool_priority
+  if state in GOOD_STATES:
+    return 1, GOOD_STATES.index(state), pool_priority
+  if state in TRANSIENT_STATES:
+    return 2, TRANSIENT_STATES.index(state), pool_priority
+
+  assert state not in BAD_STATES, 'bad states should not reach this function'
+
+  # unknown state
+  logger.warning('Unknown state: %s', state)
+  return 3, pool_priority
 
 
-def allocate_host(reason,
-                  host=None,
-                  model=None,
-                  sku=None,
-                  pools=None,
-                  extra_labels=None):
-  """Allocates a host from the lab for bisect.
+def normalize_host_state(info):
+  if info['Locked'] and info['Status'] not in BAD_STATES:
+    if is_locked_by_us(info):
+      return LOCKED_BY_US
+    else:
+      return LOCKED_BY_OTHERS
+  return info['Status']
+
+
+def seek_host(pools, model=None, sku=None, extra_labels=None):
+  """Seeks DUT candidate to use in the lab.
 
   Args:
-    reason: lock reason
-    host: allocation criteria: host name. If specified, other criteria are
-        ignored.
+    pools: search criteria: host must be in the given pools; ordered by priority
     model: allocation criteria: chromeos device model name
     sku: allocation criteria: device sku
-    pools: allocation criteria: allocate hosts from given pools; ordered by
-        priority
     extra_labels: more allocation criteria on labels
 
   Returns:
-    host name in the lab; None if failed.
+    potential DUT candidates (list of host info), which are either ready to use
+    or need waiting; ordered by priority. Empty list if all hosts meet the
+    criteria are in bad state.
+
+  Raises:
+    errors.ExternalError: no hosts in the given pools (no matter any states)
   """
   pool_labels = []
 
-  if host:
-    hosts = list_host(host=host)
-    assert hosts
-  else:
-    if not pools:
-      raise ValueError('pools should not be empty')
-    for pool in pools:
-      pool_labels.append('pool:' + pool)
+  if not pools:
+    raise ValueError('pools should not be empty')
+  for pool in pools:
+    pool_labels.append('pool:' + pool)
 
-    labels = []
-    if model:
-      labels.append('model:' + model)
-    if sku:
-      labels.append('sku:' + sku)
+  labels = []
+  if model:
+    labels.append('model:' + model)
+  if sku:
+    labels.append('sku:' + sku)
+  if extra_labels:
+    labels += extra_labels
 
-    if extra_labels:
-      labels += extra_labels
+  hosts = {}
+  for pool_label in pool_labels:
+    hosts.update(list_host(labels=labels + [pool_label]))
 
-    hosts = {}
-    for host, info in list_host(labels=labels).items():
-      # Filters by desired pools.
-      if host_priority(info, pool_labels) is None:
-        continue
-      hosts[host] = info
+  if not hosts:
+    logger.error('no hosts meet requirements: %s', labels)
+    raise errors.ExternalError(
+        'no DUTs (%s) in pool=%s; incorrect model or sku name?' % (labels,
+                                                                   pools))
 
-    if not hosts:
-      logger.error('no hosts meet requirements: %s', labels)
-      raise errors.ExternalError(
-          'no DUTs (%s) in pool=%s; incorrect model or sku name?' % (labels,
-                                                                     pools))
-
-  candidate_hosts = {}
+  candidates = []
   status_counter = collections.Counter()
-  for host, info in hosts.items():
-    if info.get('Locked') == 'True':
-      status_counter['Locked'] += 1
-    else:
-      status_counter[info['Status']] += 1
-      if info['Status'] == 'Ready':
-        candidate_hosts[host] = info
+  for info in hosts.values():
+    state = normalize_host_state(info)
+    status_counter[state] += 1
+    if state not in BAD_STATES:
+      candidates.append(info)
   logger.info('host status: %s', status_counter)
-  if not candidate_hosts:
-    logger.error('no unlocked hosts are in Ready state')
-    return None
 
-  target_host = sorted(
-      candidate_hosts,
-      key=lambda host: host_priority(candidate_hosts[host], pool_labels))[0]
-
-  info = lock_host(target_host, reason)
-  if info['Status'] != 'Ready':
-    unlock_host(target_host)
-    raise Exception(
-        'unexpected host status=%s, a race condition?' % info['Status'])
-
-  return target_host
+  candidates.sort(key=lambda info: _host_priority(pool_labels, info))
+  return candidates
 
 
 @contextlib.contextmanager
