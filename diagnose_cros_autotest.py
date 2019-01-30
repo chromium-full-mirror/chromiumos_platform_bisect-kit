@@ -47,9 +47,9 @@ CHROME_BINARIES_OF_TEST = {
     'video_JEAPerf': ['jpeg_encode_accelerator_unittest'],
     'video_JpegDecodeAccelerator': ['jpeg_decode_accelerator_unittest'],
     'video_JpegEncodeAccelerator': ['jpeg_encode_accelerator_unittest'],
-    'video_VDAPerf': ['video_decode_accelerator_unittest'],
+    'video_VDAPerf*': ['video_decode_accelerator_unittest'],
     'video_VDASanity': ['video_decode_accelerator_unittest'],
-    'video_VEAPerf': ['video_encode_accelerator_unittest'],
+    'video_VEAPerf*': ['video_encode_accelerator_unittest'],
     'video_VideoDecodeAccelerator*': ['video_decode_accelerator_unittest'],
     'video_VideoEncodeAccelerator*': ['video_encode_accelerator_unittest'],
 }
