@@ -126,9 +126,9 @@ def determine_chrome_binaries(chromeos_root, test_name):
   if chrome_binaries:
     logger.info('This test depends on chrome binary: %s', chrome_binaries)
   elif may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
-    logger.warning(
+    raise errors.InternalError(
         '%s code used ChromeBinaryTest but the binary is unknown; '
-        'please update CHROME_BINARIES_OF_TEST table', test_name)
+        'please update CHROME_BINARIES_OF_TEST table' % test_name)
   return chrome_binaries
 
 
