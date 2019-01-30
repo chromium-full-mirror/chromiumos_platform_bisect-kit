@@ -21,6 +21,7 @@ from bisect_kit import locking
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
+emitted_warnings = set()
 
 
 def config(gclient_dir,
@@ -474,8 +475,11 @@ class DepsParser(object):
 
       # TODO(kcwu): support dep_type=cipd http://crbug.com/846564
       if dep.dep_type != 'git':
-        logger.warning('dep_type=%s is not supported yet: %s', dep.dep_type,
-                       path)
+        warning_key = ('dep_type', dep.dep_type, path)
+        if warning_key not in emitted_warnings:
+          emitted_warnings.add(warning_key)
+          logger.warning('dep_type=%s is not supported yet: %s', dep.dep_type,
+                         path)
         continue
 
       deps.entries[path] = dep
