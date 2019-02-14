@@ -409,6 +409,8 @@ class GitRemoveRepo(Action):
     assert self.path
     git_repo = os.path.join(root_dir, self.path)
     assert git_util.is_git_root(git_repo)
+    # TODO(kcwu): other projects may be sub-tree of `git_repo`.
+    # They should not be deleted. (crbug/930047)
     shutil.rmtree(git_repo)
 
     code_storage.remove_from_project_list(root_dir, self.path)

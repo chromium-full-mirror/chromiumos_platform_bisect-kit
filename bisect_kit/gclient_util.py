@@ -11,6 +11,7 @@ import logging
 import operator
 import os
 import pprint
+import shutil
 import sys
 import tempfile
 import urlparse
@@ -82,7 +83,46 @@ def sync(gclient_dir,
   if ignore_locks:
     cmd.append('--ignore_locks')
 
+  try:
+    old_projects = load_gclient_entries(gclient_dir)
+  except IOError:
+    old_projects = {}
+
   util.check_call(*cmd, cwd=gclient_dir)
+
+  # Remove dead .git folder after sync.
+  # Ideally, this should be handled by gclient but sometimes gclient didn't
+  # (crbug/930047).
+  new_projects = load_gclient_entries(gclient_dir)
+  for path in old_projects:
+    if path in new_projects:
+      continue
+    old_git_dir = os.path.join(gclient_dir, path)
+    if os.path.exists(old_git_dir):
+      logger.warning(
+          '%s was removed from .gclient_entries but %s still exists; remove it',
+          path, old_git_dir)
+      shutil.rmtree(old_git_dir)
+
+
+def load_gclient_entries(gclient_dir):
+  """Loads .gclient_entries."""
+  repo_project_list = os.path.join(gclient_dir, '.gclient_entries')
+  scope = {}
+  exec open(repo_project_list) in scope  # pylint: disable=exec-used
+  return scope.get('entries', {})
+
+
+def write_gclient_entries(gclient_dir, projects):
+  """Writes .gclient_entries."""
+  repo_project_list = os.path.join(gclient_dir, '.gclient_entries')
+  content = 'entries = {\n'
+  for item in sorted(projects.items()):
+    path, repo_url = map(pprint.pformat, item)
+    content += '  %s: %s,\n' % (path, repo_url)
+  content += '}\n'
+  with open(repo_project_list, 'w') as f:
+    f.write(content)
 
 
 def mirror(code_storage, repo_url):
@@ -429,6 +469,20 @@ class DepsParser(object):
     self.project_root = project_root
     self.code_storage = code_storage
 
+  def load_single_deps(self, content):
+
+    def var_function(name):
+      return '{%s}' % name
+
+    global_scope = dict(Var=var_function)
+    local_scope = {}
+    try:
+      exec (content, global_scope, local_scope)  # pylint: disable=exec-used
+    except SyntaxError:
+      raise
+
+    return local_scope
+
   def parse_single_deps(self, content, parent_vars=None, parent_path=''):
     """Parses DEPS file without recursion.
 
@@ -441,17 +495,9 @@ class DepsParser(object):
       Deps object
     """
 
-    def var_function(name):
-      return '{%s}' % name
-
-    global_scope = dict(Var=var_function)
-    local_scope = {}
-    try:
-      exec (content, global_scope, local_scope)  # pylint: disable=exec-used
-    except SyntaxError:
-      raise
-
+    local_scope = self.load_single_deps(content)
     deps = Deps()
+
     local_scope.setdefault('vars', {})
     if parent_vars:
       local_scope['vars'].update(parent_vars)
@@ -606,33 +652,17 @@ class GclientCache(codechange.CodeStorage):
     cache_path = self._url_to_cache_dir(repo_url)
     return os.path.join(self.cache_dir, cache_path)
 
-  def _load_project_list(self, project_root):
-    repo_project_list = os.path.join(project_root, '.gclient_entries')
-    scope = {}
-    exec open(repo_project_list) in scope  # pylint: disable=exec-used
-    return scope.get('entries', {})
-
-  def _save_project_list(self, project_root, projects):
-    repo_project_list = os.path.join(project_root, '.gclient_entries')
-    content = 'entries = {\n'
-    for item in sorted(projects.items()):
-      path, repo_url = map(pprint.pformat, item)
-      content += '  %s: %s,\n' % (path, repo_url)
-    content += '}\n'
-    with open(repo_project_list, 'w') as f:
-      f.write(content)
-
   def add_to_project_list(self, project_root, path, repo_url):
-    projects = self._load_project_list(project_root)
+    projects = load_gclient_entries(project_root)
 
     projects[path] = repo_url
 
-    self._save_project_list(project_root, projects)
+    write_gclient_entries(project_root, projects)
 
   def remove_from_project_list(self, project_root, path):
-    projects = self._load_project_list(project_root)
+    projects = load_gclient_entries(project_root)
 
     if path in projects:
       del projects[path]
 
-    self._save_project_list(project_root, projects)
+    write_gclient_entries(project_root, projects)
