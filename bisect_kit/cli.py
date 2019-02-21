@@ -574,7 +574,7 @@ class BisectorCommandLine(object):
         continue
 
       detail = []
-      if self.strategy.is_noisy():
+      if self.strategy.is_noisy() and summary['prob']:
         detail.append('%.4f%%' % (summary['prob'][i] * 100))
       if rev_info['result_counter']:
         detail.append(str(rev_info['result_counter']))
