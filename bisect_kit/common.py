@@ -75,7 +75,7 @@ def config_logging(opts):
       },
       'handlers': {
           'console': {
-              'level': 'INFO',
+              'level': 'DEBUG' if getattr(opts, 'debug') else 'INFO',
               'class': 'logging.StreamHandler',
               'formatter': 'simple',
           },
@@ -106,6 +106,10 @@ def add_common_arguments(parser):
       metavar='LOG_FILE',
       default=configure.get('LOG_FILE'),
       help='Override log filename')
+  parser.add_argument(
+      '--debug',
+      action='store_true',
+      help='Output DEBUG log to console')
 
   parser.add_argument(
       '--rc',
