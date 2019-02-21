@@ -241,15 +241,18 @@ class Dep(object):
     if not self.condition:
       return True
 
+    # Currently, we only support chromeos as target_os.
+    # TODO(kcwu): make it configurable if we need to bisect for other os.
+    target_os = ['chromeos']
+
     vars_dict = {
-        # default os: linux
-        'checkout_android': False,
-        'checkout_chromeos': False,
-        'checkout_fuchsia': False,
-        'checkout_ios': False,
-        'checkout_linux': True,
-        'checkout_mac': False,
-        'checkout_win': False,
+        'checkout_android': 'android' in target_os,
+        'checkout_chromeos': 'chromeos' in target_os,
+        'checkout_fuchsia': 'fuchsia' in target_os,
+        'checkout_ios': 'ios' in target_os,
+        'checkout_linux': 'unix' in target_os,
+        'checkout_mac': 'mac' in target_os,
+        'checkout_win': 'win' in target_os,
         # default cpu: x64
         'checkout_arm64': False,
         'checkout_arm': False,
