@@ -98,7 +98,7 @@ def create_argument_parser():
 
   group = parser.add_argument_group(title='Options for CTS/GTS tests')
   group.add_argument('--cts_revision', help='CTS revision, like "9.0_r3"')
-  group.add_argument('--cts_abi', choices=['arm', 'x86'])
+  group.add_argument('--cts_abi', choices=['armeabi-v7a', 'x86_64'])
   group.add_argument(
       '--cts_prefix',
       help='Prefix of autotest test name, '
