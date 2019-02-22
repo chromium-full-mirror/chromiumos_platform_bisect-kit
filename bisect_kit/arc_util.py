@@ -75,21 +75,31 @@ def push_prebuilt_to_device(dut, flavor, build_id):
   """
   # assume ARC's flavor is always product-variant
   assert '-' in flavor
-  product, variant = flavor.split('-')
-  args = [
-      '--force',
-      dut,
-      '--use-prebuilt',
-      '{product}/{variant}/{build_id}'.format(
-          product=product, variant=variant, build_id=build_id),
-  ]
+  product, _ = flavor.split('-')
+  build_filename = '{product}-img-{build_id}.zip'.format(
+      product=product, build_id=build_id)
+  sepolicy_filename = 'sepolicy.zip'
 
   tmp_dir = tempfile.mkdtemp()
   try:
     logger.debug('fetch and unpack push_to_device.zip to %s', tmp_dir)
     android_util.fetch_artifact(flavor, build_id, 'push_to_device.zip', tmp_dir)
+    android_util.fetch_artifact(flavor, build_id, build_filename, tmp_dir)
+    android_util.fetch_artifact(flavor, build_id, sepolicy_filename, tmp_dir)
+
     util.check_call('unzip', 'push_to_device.zip', cwd=tmp_dir)
     push_script = os.path.join(tmp_dir, 'push_to_device.py')
+
+    # Don't use --use-prebuilt because push_to_device.py doesn't support
+    # fetching artifacts with service account.
+    args = [
+        '--force',
+        dut,
+        '--use-prebuilt-file',
+        os.path.join(tmp_dir, build_filename),
+        '--sepolicy-artifacts-path',
+        os.path.join(tmp_dir, sepolicy_filename),
+    ]
     _push_to_device(dut, push_script, args)
   finally:
     logger.debug('clean up %s', tmp_dir)
