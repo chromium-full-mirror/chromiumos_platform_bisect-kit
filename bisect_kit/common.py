@@ -107,9 +107,7 @@ def add_common_arguments(parser):
       default=configure.get('LOG_FILE'),
       help='Override log filename')
   parser.add_argument(
-      '--debug',
-      action='store_true',
-      help='Output DEBUG log to console')
+      '--debug', action='store_true', help='Output DEBUG log to console')
 
   parser.add_argument(
       '--rc',

@@ -10,7 +10,6 @@ import unittest
 
 import mock
 
-from bisect_kit import cros_lab_util
 from bisect_kit import errors
 import cros_helper
 
