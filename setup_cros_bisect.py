@@ -26,6 +26,7 @@ import argparse
 import csv
 import logging
 import os
+import subprocess
 import time
 import urllib2
 import urlparse
@@ -408,7 +409,7 @@ def enumerate_android_branches_available(base):
   return branches
 
 
-def cmd_sync(opts):
+def do_sync(opts):
   path_factory = DefaultProjectPathFactory(opts.mirror_base, opts.work_base,
                                            CHECKOUT_TEMPLATE_NAME)
 
@@ -428,6 +429,16 @@ def cmd_sync(opts):
     android_branches = opts.android
   for branch in android_branches:
     sync_android_code(opts, path_factory, branch)
+
+
+def cmd_sync(opts):
+  try:
+    do_sync(opts)
+  except subprocess.CalledProcessError:
+    # Sync may fail due to network or server issues.
+    logger.exception('do_sync failed, will retry one minute later')
+    time.sleep(60)
+    do_sync(opts)
 
 
 def cmd_new(opts):
