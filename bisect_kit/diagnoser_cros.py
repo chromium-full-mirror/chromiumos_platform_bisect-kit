@@ -192,11 +192,13 @@ class CrosDiagnoser(object):
       logger.info('android_root = %s', self.android_root)
 
     if not os.path.exists(self.android_mirror):
-      logger.info('android_mirror does not exist; skip android bisect')
-      return None
+      logger.info(
+          'android_mirror does not exist; skip android local build bisect')
+      return True
     if not os.path.exists(self.android_root):
-      logger.info('android_root does not exist; skip android bisect')
-      return None
+      logger.info(
+          'android_root does not exist; skip android local build bisect')
+      return True
 
     logger.info('bisect android local build')
     bisector = wrapper.BisectorWrapper('bisect_android_repo', session)
