@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import textwrap
+import time
 import urllib2
 
 from bisect_kit import cli
@@ -225,6 +226,9 @@ def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
       simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
     except subprocess.CalledProcessError:
       logger.warning('build failed, delete out directory and retry again')
+      # Some compiler processes are still terminating. Short delay is
+      # necessary.
+      time.sleep(10)
       shutil.rmtree(os.path.join(chrome_src, out_dir))
       simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
 
