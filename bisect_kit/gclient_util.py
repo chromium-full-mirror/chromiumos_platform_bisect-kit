@@ -423,7 +423,7 @@ class TimeSeriesTree(object):
       for event in subtree.events():
         result.append(event)
 
-    result.sort()
+    result.sort(key=lambda x: x[0])
 
     return result
 

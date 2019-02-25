@@ -840,10 +840,7 @@ class CodeManager(object):
       next_float = specs[i + 1]
       logger.debug('[%d], between %s (%s) and %s (%s)', i, prev_float.name,
                    prev_float.timestamp, next_float.name, next_float.timestamp)
-      for action in self.generate_actions_between_specs(prev_float, next_float):
-        if action.timestamp < fixed_specs[0].timestamp:
-          continue
-        actions.append(action)
+      actions += self.generate_actions_between_specs(prev_float, next_float)
     action_groups = self.reorder_actions(actions)
 
     spec = self.synthesize_fixed_spec(float_specs[0], fixed_specs[0].timestamp)
