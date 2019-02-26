@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import signal
 import textwrap
 import time
 
@@ -226,6 +227,18 @@ def check_executable(program):
   return '%r is not executable. %s' % (program, hint)
 
 
+def format_returncode(returncode):
+  if returncode < 0:
+    signum = -returncode
+    signame = 'Unknown'
+    for k, v in vars(signal).items():
+      if k.startswith('SIG') and '_' not in k and v == signum:
+        signame = k
+    return 'terminated by signal %d (%s)' % (signum, signame)
+
+  return 'exited with code %d' % returncode
+
+
 def do_evaluate(evaluate_cmd, domain, rev):
   """Invokes evaluator command.
 
@@ -269,7 +282,8 @@ def do_evaluate(evaluate_cmd, domain, rev):
       stdout_callback=lambda line: _collect_bisect_result_values(values, line))
   returncode = p.wait()
   if returncode < 0 or returncode > 125:
-    raise errors.ExecutionFatalError('eval failed: %s' % returncode)
+    raise errors.ExecutionFatalError(
+        'eval failed: %s' % format_returncode(returncode))
 
   if returncode == 0:
     return 'old', values
@@ -309,7 +323,8 @@ def do_switch(switch_cmd, domain, rev):
 
   returncode = util.call(*switch_cmd, env=env)
   if returncode < 0 or returncode > 125:
-    raise errors.ExecutionFatalError('switch failed: %s' % returncode)
+    raise errors.ExecutionFatalError(
+        'switch failed: %s' % format_returncode(returncode))
 
   if returncode != 0:
     return 'skip'
