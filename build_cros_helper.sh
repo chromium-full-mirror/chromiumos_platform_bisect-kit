@@ -23,7 +23,26 @@ if [ -L "$IMAGE_DIR/$IMAGE_NAME" -a ! -e "$IMAGE_DIR/$IMAGE_NAME" ]; then
     rm "$IMAGE_DIR/$IMAGE_NAME"
 fi
 
-./setup_board --board=$BOARD
+# See chromite's code for release build options and flags, especially following
+# files:
+# - chromite/config/chromeos_config.py
+# - chromite/cbuildbot/stages/build_stages.py
+# - chromite/cbuildbot/commands.py
+
+# env variables from 'release' template. May be override by individial commands
+# below.
+# TODO(kcwu): afdo_use
+export USE='-cros-debug chrome_internal'
+export FEATURES='separatedebug'
+
+FEATURES="$FEATURES -separatedebug splitdebug" \
+./update_chroot \
+    --toolchain_boards=$BOARD
+
+./setup_board \
+    --board=$BOARD \
+    --accept_licenses=@CHROMEOS \
+    --skip_chroot_upgrade
 
 ./build_packages \
     --board=$BOARD \
