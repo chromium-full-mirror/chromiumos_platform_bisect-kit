@@ -336,7 +336,12 @@ class DiagnoseCommandLine(object):
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
         util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
-        util.check_call('ssh', dut, 'rm', '-rf', '/usr/local/autotest')
+        # Now, the version of autotest on the DUT is unknown. This is harmless
+        # to the final diagnose result. Even if the culprit is inside autotest
+        # itself, the verification step of chrome bisection will know that
+        # chrome is not culprit and go on.
+        # Do not delete existing autotest folders on the DUT, so chrome custom
+        # binary tests can reuse them.
 
         try:
           if diagnoser.narrow_down_android(eval_cmd):
