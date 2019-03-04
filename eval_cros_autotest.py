@@ -185,9 +185,12 @@ def get_additional_test_args(test_name):
 
 def prepare_to_run_test(opts):
   # Some versions of ChromeOS SDK is broken and ship bad 'ssh' executable. This
-  # works around the issue before we fixed the issue.
-  # TODO(kcwu): fix crbug/899490
-  cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'net-misc/openssh')
+  # works around the issue. See crbug/906289 for detail.
+  # TODO(kcwu): remove this workaround once we no longer support bisecting
+  # versions earlier than R73-11445.0.0.
+  ssh_path = os.path.join(opts.chromeos_root, 'chroot/usr/bin/ssh')
+  if 'file descriptor passing not supported' in open(ssh_path).read():
+    cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'net-misc/openssh')
 
   if opts.reinstall:
     util.ssh_cmd(opts.dut, 'rm', '-rf', '/usr/local/autotest')
