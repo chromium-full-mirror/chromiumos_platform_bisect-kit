@@ -27,10 +27,10 @@ SKIP = 'skip'
 FATAL = 'fatal'
 
 EXIT_CODE_MAP = {
-    OLD: 0,
-    NEW: 1,
-    SKIP: 125,
-    FATAL: 126,
+    OLD: cli.EXIT_CODE_OLD,
+    NEW: cli.EXIT_CODE_NEW,
+    SKIP: cli.EXIT_CODE_SKIP,
+    FATAL: cli.EXIT_CODE_FATAL,
 }
 
 
@@ -203,7 +203,7 @@ def run_once(opts):
     found = True
 
   if not found and not output_result['meet_terminate']:
-    if p.returncode > 125:
+    if p.returncode >= 128:
       logger.warning('fatal return, FATAL')
       return FATAL
     if p.returncode < 0:

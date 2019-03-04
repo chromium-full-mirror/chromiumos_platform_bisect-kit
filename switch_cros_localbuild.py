@@ -148,7 +148,7 @@ def switch(opts):
         disable_rootfs_verification=opts.disable_rootfs_verification)
   except Exception:
     if not cros_util.is_good_dut(opts.dut):
-      sys.exit(126)  # fatal, bisect should stop
+      sys.exit(cli.EXIT_CODE_FATAL)
     raise
 
 
@@ -161,7 +161,7 @@ def main(args=None):
   if not opts.nodeploy:
     if not cros_util.is_good_dut(opts.dut):
       logger.error('%r is not a good DUT', opts.dut)
-      sys.exit(126)  # fatal, bisect should stop
+      sys.exit(cli.EXIT_CODE_FATAL)
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 

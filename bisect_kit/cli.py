@@ -27,6 +27,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_SESSION_NAME = 'default'
 DEFAULT_CONFIDENCE = 0.999
 
+# Exit code of bisect eval script. These values are chosen compatible with 'git
+# bisect'.
+EXIT_CODE_OLD = 0
+EXIT_CODE_NEW = 1
+EXIT_CODE_SKIP = 125
+EXIT_CODE_FATAL = 128
+
 
 class ArgTypeError(argparse.ArgumentTypeError):
   """An error for argument validation failure.
@@ -247,9 +254,9 @@ def do_evaluate(evaluate_cmd, domain, rev):
 
   The result is determined according to the exit code of evaluator:
     0: 'old'
-    1..124: 'new'
+    1..124, 126, 127: 'new'
     125: 'skip'
-    126, 127: fatal error
+    128..255: fatal error
     terminated by signal: fatal error
 
   p.s. the definition of result is compatible with git-bisect(1).
@@ -281,7 +288,7 @@ def do_evaluate(evaluate_cmd, domain, rev):
       env=env,
       stdout_callback=lambda line: _collect_bisect_result_values(values, line))
   returncode = p.wait()
-  if returncode < 0 or returncode > 125:
+  if returncode < 0 or returncode >= 128:
     raise errors.ExecutionFatalError(
         'eval failed: %s' % format_returncode(returncode))
 
@@ -300,8 +307,8 @@ def do_switch(switch_cmd, domain, rev):
 
   The result is determined according to the exit code of switcher:
     0: switch succeeded
-    1..125: 'skip'
-    126, 127: fatal error
+    1..127: 'skip'
+    128..255: fatal error
     terminated by signal: fatal error
 
   In other words, any non-fatal errors are considered as 'skip'.
@@ -322,7 +329,7 @@ def do_switch(switch_cmd, domain, rev):
   domain.setenv(env, rev)
 
   returncode = util.call(*switch_cmd, env=env)
-  if returncode < 0 or returncode > 125:
+  if returncode < 0 or returncode >= 128:
     raise errors.ExecutionFatalError(
         'switch failed: %s' % format_returncode(returncode))
 

@@ -10,7 +10,7 @@ export DIALOG_EXTRA=1
 # skip
 export DIALOG_CANCEL=125
 # abort
-export DIALOG_ESC=127
+export DIALOG_ESC=128
 
 TEXT="$BISECT_REV
 What is current behavior?

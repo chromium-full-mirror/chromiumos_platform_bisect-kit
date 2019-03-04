@@ -86,7 +86,7 @@ class TestRunner(unittest.TestCase):
     self.assertEqual(runner.run_once(opts), runner.OLD)
 
     opts = parser.parse_args(['--new', '--returncode=0', 'program.not.found'])
-    self.assertEqual(runner.run_once(opts), runner.FATAL)
+    self.assertEqual(runner.run_once(opts), runner.OLD)
 
     opts = parser.parse_args(['--new', '--returncode=0', 'sh', '-c', 'kill $$'])
     self.assertEqual(runner.run_once(opts), runner.FATAL)
@@ -152,7 +152,7 @@ class TestRunner(unittest.TestCase):
   def test_main_fatal(self):
     self.assertEqual(
         runner.main(['--new', '--output', 'hello', '/non/existing/path']),
-        runner.FATAL)
+        runner.OLD)
 
   def test_main_shortcut(self):
     with mock.patch.object(
