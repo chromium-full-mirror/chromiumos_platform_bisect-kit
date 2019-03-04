@@ -9,6 +9,7 @@ from __future__ import print_function
 import argparse
 import logging
 import os
+import sys
 
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -137,13 +138,18 @@ def switch(opts):
   if opts.nodeploy:
     return
 
-  cros_util.cros_flash(
-      opts.chromeos_root,
-      opts.dut,
-      opts.board,
-      image_path,
-      clobber_stateful=opts.clobber_stateful,
-      disable_rootfs_verification=opts.disable_rootfs_verification)
+  try:
+    cros_util.cros_flash(
+        opts.chromeos_root,
+        opts.dut,
+        opts.board,
+        image_path,
+        clobber_stateful=opts.clobber_stateful,
+        disable_rootfs_verification=opts.disable_rootfs_verification)
+  except Exception:
+    if not cros_util.is_good_dut(opts.dut):
+      sys.exit(126)  # fatal, bisect should stop
+    raise
 
 
 def main(args=None):
@@ -152,7 +158,10 @@ def main(args=None):
   opts = parser.parse_args(args)
   common.config_logging(opts)
 
-  assert opts.nodeploy or cros_util.is_dut(opts.dut)
+  if not opts.nodeploy:
+    if not cros_util.is_good_dut(opts.dut):
+      logger.error('%r is not a good DUT', opts.dut)
+      sys.exit(126)  # fatal, bisect should stop
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 

@@ -139,11 +139,9 @@ def get_build_prop(host):
   Returns:
     dict of property
   """
-  cmd = [
-      'ssh', host, 'cat',
-      '/opt/google/containers/android/rootfs/root/system/build.prop'
-  ]
-  data = util.check_output(*cmd)
+  data = util.ssh_cmd(
+      host, 'cat',
+      '/opt/google/containers/android/rootfs/root/system/build.prop')
   if not data:
     return None
   result = {}

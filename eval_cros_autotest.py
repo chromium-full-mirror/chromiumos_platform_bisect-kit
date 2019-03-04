@@ -190,7 +190,7 @@ def prepare_to_run_test(opts):
   cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'net-misc/openssh')
 
   if opts.reinstall:
-    util.check_call('ssh', opts.dut, 'rm', '-rf', '/usr/local/autotest')
+    util.ssh_cmd(opts.dut, 'rm', '-rf', '/usr/local/autotest')
 
 
 def run_test(opts):

@@ -9,6 +9,7 @@ from __future__ import print_function
 import argparse
 import logging
 import os
+import sys
 
 from bisect_kit import cli
 from bisect_kit import common
@@ -66,19 +67,26 @@ def main(args=None):
   opts = parser.parse_args(args)
   common.config_logging(opts)
 
-  assert cros_util.is_dut(opts.dut)
+  if not cros_util.is_good_dut(opts.dut):
+    logger.error('%r is not a good DUT', opts.dut)
+    sys.exit(126)  # fatal, bisect should stop
   board = opts.board or cros_util.query_dut_board(opts.dut)
 
   # TODO(kcwu): clear cache of cros flash
   image_path = cros_util.prepare_prebuilt_image(board, opts.version)
-  cros_util.cros_flash(
-      opts.default_chromeos_root,
-      opts.dut,
-      board,
-      image_path,
-      version=opts.version,
-      clobber_stateful=opts.clobber_stateful,
-      disable_rootfs_verification=opts.disable_rootfs_verification)
+  try:
+    cros_util.cros_flash(
+        opts.default_chromeos_root,
+        opts.dut,
+        board,
+        image_path,
+        version=opts.version,
+        clobber_stateful=opts.clobber_stateful,
+        disable_rootfs_verification=opts.disable_rootfs_verification)
+  except Exception:
+    if not cros_util.is_good_dut(opts.dut):
+      sys.exit(126)  # fatal, bisect should stop
+    raise
 
 
 if __name__ == '__main__':

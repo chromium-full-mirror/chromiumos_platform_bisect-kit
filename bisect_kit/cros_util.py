@@ -114,13 +114,13 @@ def query_dut_lsb_release(host):
     dict for keys and values of /etc/lsb-release.
 
   Raises:
-    errors.ExecutionFatalError: cannot connect to host or lsb-release file
-        doesn't exist
+    errors.SshConnectionError: cannot connect to host
+    errors.ExternalError: lsb-release file doesn't exist
   """
   try:
-    output = util.check_output('ssh', host, 'cat', '/etc/lsb-release')
+    output = util.ssh_cmd(host, 'cat', '/etc/lsb-release')
   except subprocess.CalledProcessError:
-    raise errors.ExternalError('cannot connect to DUT or not a DUT')
+    raise errors.ExternalError('unable to read /etc/lsb-release; not a DUT')
   return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
 
 
@@ -133,13 +133,28 @@ def is_dut(host):
   Returns:
     True if the host is a chromeos device.
   """
-  return query_dut_lsb_release(host).get('DEVICETYPE') in [
-      'CHROMEBASE',
-      'CHROMEBIT',
-      'CHROMEBOOK',
-      'CHROMEBOX',
-      'REFERENCE',
-  ]
+  try:
+    return query_dut_lsb_release(host).get('DEVICETYPE') in [
+        'CHROMEBASE',
+        'CHROMEBIT',
+        'CHROMEBOOK',
+        'CHROMEBOX',
+        'REFERENCE',
+    ]
+  except (errors.ExternalError, errors.SshConnectionError):
+    return False
+
+
+def is_good_dut(host):
+  if not is_dut(host):
+    return False
+
+  # Sometimes python is broken after 'cros flash'.
+  try:
+    util.ssh_cmd(host, 'python', '-c', '1')
+    return True
+  except (subprocess.CalledProcessError, errors.SshConnectionError):
+    return False
 
 
 def query_dut_board(host):
@@ -166,11 +181,11 @@ def query_dut_boot_id(host, connect_timeout=None):
   Returns:
     boot uuid
   """
-  cmd = ['ssh']
-  if connect_timeout:
-    cmd += ['-oConnectTimeout=%d' % connect_timeout]
-  cmd += [host, 'cat', '/proc/sys/kernel/random/boot_id']
-  return util.check_output(*cmd).strip()
+  return util.ssh_cmd(
+      host,
+      'cat',
+      '/proc/sys/kernel/random/boot_id',
+      connect_timeout=connect_timeout).strip()
 
 
 def reboot(host):
@@ -179,8 +194,11 @@ def reboot(host):
   boot_id = query_dut_boot_id(host)
 
   # Depends on timing, ssh may return failure due to broken pipe,
-  # so don't check ssh return code.
-  util.call('ssh', host, 'reboot')
+  # so ignore any errors.
+  try:
+    util.ssh_cmd(host, 'reboot')
+  except subprocess.CalledProcessError:
+    pass
   wait_reboot_done(host, boot_id)
 
 

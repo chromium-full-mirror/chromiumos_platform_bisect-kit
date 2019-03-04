@@ -91,3 +91,7 @@ class ExternalError(Exception):
 
   Like configuration errors, network errors, DUT issues, etc.
   """
+
+
+class SshConnectionError(Exception):
+  """SSH connection error."""

@@ -13,6 +13,8 @@ import time
 
 import psutil
 
+from bisect_kit import errors
+
 logger = logging.getLogger(__name__)
 
 
@@ -179,6 +181,32 @@ def check_call(*args, **kwargs):
   p.wait()
   if p.returncode != 0:
     raise subprocess.CalledProcessError(p.returncode, args)
+
+
+def ssh_cmd(host, *args, **kwargs):
+  """Runs remote command using ssh.
+
+  Args:
+    host: remote host address
+    args: command and args running on the remote host
+    kwargs:
+      connect_timeout: connection timeout in seconds (int)
+
+  Raises:
+    subprocess.CalledProcessError if the exit code is non-zero.
+  """
+  cmd = ['ssh']
+  if kwargs.get('connect_timeout'):
+    cmd += ['-oConnectTimeout=%d' % kwargs['connect_timeout']]
+  cmd.append(host)
+  cmd += list(args)
+  try:
+    return check_output(*cmd)
+  except subprocess.CalledProcessError as e:
+    # ssh's own error code is 255.
+    if e.returncode == 255:
+      raise errors.SshConnectionError('ssh connection to %r failed' % host)
+    raise
 
 
 def version_key_func(v):
