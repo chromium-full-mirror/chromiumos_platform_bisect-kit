@@ -5,9 +5,10 @@
 """Test cros_util module."""
 
 from __future__ import print_function
-import unittest
-import subprocess
+import fnmatch
 import logging
+import subprocess
+import unittest
 
 import mock
 
@@ -130,6 +131,106 @@ class TestCrosUtil(unittest.TestCase):
       info = cros_util.version_info('caroline', '9462.0.0')
       self.assertEqual(info[cros_util.VERSION_KEY_CROS_SHORT_VERSION],
                        '9462.0.0')
+
+  def test_list_prebuilt_from_image_archive(self):
+    gs_path = 'gs://chromeos-image-archive/foo-release/R59-9410.0.0/'
+    with mock.patch.object(cros_util, 'gsutil_ls', return_value=[gs_path]):
+      self.assertEqual(
+          cros_util.list_prebuilt_from_image_archive('foo'),
+          [('R59-9410.0.0', gs_path + 'chromiumos_test_image.tar.xz')])
+
+    with mock.patch.object(cros_util, 'gsutil_ls', return_value=[]):
+      self.assertEqual(
+          cros_util.list_prebuilt_from_image_archive('wrong-board'), [])
+
+  def test_list_prebuilt_from_chromeos_releases(self):
+    gs_path = 'gs://chromeos-releases/dev-channel/foo/9402.0.0/'
+    with mock.patch.object(cros_util, 'gsutil_ls', return_value=[gs_path]):
+      self.assertEqual(
+          cros_util.list_prebuilt_from_chromeos_releases('foo'),
+          [('9402.0.0', gs_path + 'ChromeOS-test-R*-9402.0.0-foo.tar.xz')])
+
+    with mock.patch.object(cros_util, 'gsutil_ls', return_value=[]):
+      self.assertEqual(
+          cros_util.list_prebuilt_from_chromeos_releases('wrong-board'), [])
+
+  def test_chromeos_prebuilt_versions(self):
+    archive_base = 'gs://chromeos-image-archive/foo-release/'
+    release_base = 'gs://chromeos-releases/stable-channel/foo/'
+
+    gs_files = [
+        release_base + '9995.0.0/ChromeOS-test-R63-9994.0.0-foo.tar.xz',
+        release_base + '9995.0.0/ChromeOS-test-R63-9995.0.0-foo.tar.xz',
+        release_base + '9997.0.0/ChromeOS-test-R63-9997.0.0-foo.tar.xz',
+        archive_base + 'R63-9999.0.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-9999.1.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-10001.0.0/chromiumos_test_image.tar.xz',
+    ]
+
+    def gsutil_ls(*args, **_kwargs):
+      assert len(args) == 1
+      result = []
+      for gs_path in gs_files:
+        if fnmatch.fnmatchcase(gs_path, args[0]):
+          result.append(gs_path)
+      return result
+
+    def version_to_full(_board, version):
+      return 'R63-' + version
+
+    with mock.patch.object(
+        cros_util,
+        'list_prebuilt_from_chromeos_releases',
+        return_value=[
+            ('9994.0.0',
+             release_base + '9995.0.0/ChromeOS-test-R63-9994.0.0-foo.tar.xz'),
+            ('9995.0.0',
+             release_base + '9995.0.0/ChromeOS-test-R63-9995.0.0-foo.tar.xz'),
+            ('9997.0.0',
+             release_base + '9997.0.0/ChromeOS-test-R63-9997.0.0-foo.tar.xz'),
+        ]):
+      with mock.patch.object(
+          cros_util,
+          'list_prebuilt_from_image_archive',
+          return_value=[
+              ('R63-9998.0.0',
+               archive_base + 'R63-9998.0.0/chromiumos_test_image.tar.xz'),
+              ('R63-9999.0.0',
+               archive_base + 'R63-9999.0.0/chromiumos_test_image.tar.xz'),
+              ('R63-9999.1.0',
+               archive_base + 'R63-9999.1.0/chromiumos_test_image.tar.xz'),
+              ('R63-10000.0.0',
+               archive_base + 'R63-10000.0.0/chromiumos_test_image.tar.xz'),
+              ('R63-10001.0.0',
+               archive_base + 'R63-10001.0.0/chromiumos_test_image.tar.xz'),
+          ]):
+        with mock.patch.multiple(
+            cros_util, gsutil_ls=gsutil_ls, version_to_full=version_to_full):
+          # Both ends are in gs://chromeos-image-archive
+          self.assertEqual(
+              cros_util.list_chromeos_prebuilt_versions(
+                  'foo', '9998.0.0', '10001.0.0', only_good_build=False), [
+                      'R63-9998.0.0', 'R63-9999.0.0', 'R63-10000.0.0',
+                      'R63-10001.0.0'
+                  ])
+
+          # Both ends are in gs://chromeos-image-archive; only good build
+          self.assertEqual(
+              cros_util.list_chromeos_prebuilt_versions(
+                  'foo', '9998.0.0', '10001.0.0', only_good_build=True),
+              ['R63-9999.0.0', 'R63-10001.0.0'])
+
+          # Some are in gs://chromeos-releases
+          self.assertEqual(
+              cros_util.list_chromeos_prebuilt_versions(
+                  'foo', '9995.0.0', '9999.0.0', only_good_build=False),
+              ['R63-9995.0.0', 'R63-9997.0.0', 'R63-9998.0.0', 'R63-9999.0.0'])
+
+          # Some are in gs://chromeos-releases; only good build
+          self.assertEqual(
+              cros_util.list_chromeos_prebuilt_versions(
+                  'foo', '9995.0.0', '9999.0.0', only_good_build=True),
+              ['R63-9995.0.0', 'R63-9997.0.0', 'R63-9999.0.0'])
 
 
 if __name__ == '__main__':

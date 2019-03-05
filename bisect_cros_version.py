@@ -23,74 +23,24 @@ will be set:
 
 from __future__ import print_function
 import logging
-import re
 
 from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import errors
-from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
 
-def get_revlist(board, old, new, only_good_build=True):
-  """Get ChromeOS version numbers between given range
-
-  Args:
-    board: ChromeOS board name
-    old: start version (inclusive)
-    new: end version (inclusive)
-    only_good_build: only if test image is available
-
-  Returns:
-    list of version numbers (in either short or full format) between [old, new]
-    range (inclusive).
-  """
+def get_revlist(board, old, new):
   logger.info('get_revlist %s %s %s', board, old, new)
-  old = cros_util.version_to_short(old)
-  new = cros_util.version_to_short(new)
+  full_versions = cros_util.list_chromeos_prebuilt_versions(board, old, new)
+  short_versions = map(cros_util.version_to_short, full_versions)
 
-  # First, search images from gs://chromeos-image-archive
-  query_path = cros_util.gs_archive_path.format(board=board)
-  if only_good_build:
-    query_path += '/*/chromiumos_test_image.tar.xz'
-
-  rev_map = {}  # dict: short version -> short or full version
-  for line in cros_util.gsutil_ls(query_path):
-    m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+)', line)
-    if m:
-      full_version = m.group(1)
-      rev_map[cros_util.version_to_short(full_version)] = full_version
-
-  # Second, search images from gs://chromeos-releases
-  # Because look up milestone by short version number is slow, defer the
-  # look up.
-  # TODO(kcwu): cache milestone number of short version number.
-  for line in cros_util.gsutil_ls(
-      cros_util.gs_release_path.format(
-          channel='*', board=board, short_version=''),
-      ignore_errors=True):
-    m = re.match(r'gs:\S+/(\d+\.\d+\.\d+)/$', line)
-    if m:
-      short_version = m.group(1)
-      if short_version not in rev_map:
-        rev_map[short_version] = short_version
-
-  result = []
-  for rev in sorted(rev_map, key=util.version_key_func):
-    if not util.is_direct_relative_version(new, rev):
-      continue
-    if not util.is_version_lesseq(old, rev):
-      continue
-    if not util.is_version_lesseq(rev, new):
-      continue
-    result.append(rev_map[rev])
-
-  old = rev_map[old]
-  new = rev_map[new]
-  return old, new, result
+  old_idx = short_versions.index(cros_util.version_to_short(old))
+  new_idx = short_versions.index(cros_util.version_to_short(new))
+  return full_versions[old_idx], full_versions[new_idx], full_versions
 
 
 class ChromeOSVersionDomain(core.BisectDomain):
@@ -123,7 +73,7 @@ class ChromeOSVersionDomain(core.BisectDomain):
     if not opts.board:
       opts.board = cros_util.query_dut_board(opts.dut)
 
-    old, new, revlist = get_revlist(opts.board, opts.old, opts.new, False)
+    old, new, revlist = get_revlist(opts.board, opts.old, opts.new)
     config = dict(dut=opts.dut, board=opts.board, old=old, new=new)
     return config, revlist
 
@@ -135,13 +85,12 @@ class ChromeOSVersionDomain(core.BisectDomain):
       env['DUT'] = self.config['dut']
     env['BOARD'] = self.config['board']
 
-    milestone, short_version = cros_util.recognize_version(
-        self.config['board'], rev)
-    full_version = cros_util.make_cros_full_version(milestone, short_version)
+    assert cros_util.is_cros_full_version(rev)
+    milestone, short_version = cros_util.version_split(rev)
     env['MILESTONE'] = milestone
     env['CROS_SHORT_VERSION'] = short_version
-    env['CROS_FULL_VERSION'] = full_version
-    env['CROS_VERSION'] = full_version
+    env['CROS_FULL_VERSION'] = rev
+    env['CROS_VERSION'] = rev
 
   def fill_candidate_summary(self, summary, interesting_indexes):
     old, new = summary['current_range']

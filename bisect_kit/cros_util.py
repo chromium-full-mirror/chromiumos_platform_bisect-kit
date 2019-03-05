@@ -357,6 +357,127 @@ def version_to_full(board, version):
   return make_cros_full_version(milestone, version)
 
 
+def list_prebuilt_from_image_archive(board):
+  """Lists ChromeOS prebuilt image available from gs://chromeos-image-archive.
+
+  gs://chromeos-image-archive contains only recent builds (in two years).
+  We prefer this function to list_prebuilt_from_chromeos_releases() because
+    - this is what "cros flash" supports directly.
+    - the paths have milestone information, so we don't need to do slow query
+      by ourselves.
+
+  Args:
+    board: ChromeOS board name
+
+  Returns:
+    list of (version, gs_path):
+      version: Chrome OS version in full format
+      gs_path: gs path of test image
+  """
+  result = []
+  for line in gsutil_ls(gs_archive_path.format(board=board)):
+    m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+)', line)
+    if m:
+      full_version = m.group(1)
+      test_image = 'chromiumos_test_image.tar.xz'
+      assert line.endswith('/')
+      gs_path = line + test_image
+      result.append((full_version, gs_path))
+  return result
+
+
+def list_prebuilt_from_chromeos_releases(board):
+  """Lists ChromeOS versions available from gs://chromeos-releases.
+
+  gs://chromeos-releases contains more builds. However, 'cros flash' doesn't
+  support it.
+
+  Args:
+    board: ChromeOS board name
+
+  Returns:
+    list of (version, gs_path):
+      version: Chrome OS version in short format
+      gs_path: gs path of test image (with wildcard)
+  """
+  result = []
+  for line in gsutil_ls(
+      gs_release_path.format(channel='*', board=board, short_version=''),
+      ignore_errors=True):
+    m = re.match(r'gs:\S+/(\d+\.\d+\.\d+)/$', line)
+    if m:
+      short_version = m.group(1)
+      test_image = 'ChromeOS-test-R*-{short_version}-{board}.tar.xz'.format(
+          short_version=short_version, board=board)
+      gs_path = line + test_image
+      result.append((short_version, gs_path))
+  return result
+
+
+def list_chromeos_prebuilt_versions(board,
+                                    old,
+                                    new,
+                                    only_good_build=True,
+                                    include_older_build=True):
+  """Lists ChromeOS version numbers with prebuilt between given range
+
+  Args:
+    board: ChromeOS board name
+    old: start version (inclusive)
+    new: end version (inclusive)
+    only_good_build: only if test image is available
+    include_older_build: include prebuilt in gs://chromeos-releases
+
+  Returns:
+    list of sorted version numbers (in full format) between [old, new] range
+    (inclusive).
+  """
+  old = version_to_short(old)
+  new = version_to_short(new)
+
+  rev_map = {}  # dict: short version -> (short or full version, gs line)
+  for full_version, gs_path in list_prebuilt_from_image_archive(board):
+    short_version = version_to_short(full_version)
+    rev_map[short_version] = full_version, gs_path
+
+  if include_older_build and old not in rev_map:
+    for short_version, gs_path in list_prebuilt_from_chromeos_releases(board):
+      if short_version not in rev_map:
+        rev_map[short_version] = short_version, gs_path
+
+  result = []
+  for rev in sorted(rev_map, key=util.version_key_func):
+    if not util.is_direct_relative_version(new, rev):
+      continue
+    if not util.is_version_lesseq(old, rev):
+      continue
+    if not util.is_version_lesseq(rev, new):
+      continue
+
+    version, gs_path = rev_map[rev]
+
+    # version_to_full() and gsutil_ls() may take long time if versions are a
+    # lot. This is acceptable because we usually bisect only short range.
+
+    if only_good_build:
+      gs_result = gsutil_ls(gs_path, ignore_errors=True)
+      if not gs_result:
+        logger.warning('%s is not a good build, ignore', version)
+        continue
+      assert len(gs_result) == 1
+      m = re.search(r'(R\d+-\d+\.\d+\.\d+)', gs_result[0])
+      if not m:
+        logger.warning('format of image path is unexpected: %s', gs_result[0])
+        continue
+      version = m.group(1)
+    elif is_cros_short_version(version):
+      version = version_to_full(board, version)
+
+    result.append(version)
+
+  return result
+
+
 def prepare_prebuilt_image(board, version):
   """Prepare chromeos prebuilt image.
 
