@@ -193,11 +193,11 @@ def reboot(host):
   logger.debug('reboot %s', host)
   boot_id = query_dut_boot_id(host)
 
-  # Depends on timing, ssh may return failure due to broken pipe,
-  # so ignore any errors.
   try:
     util.ssh_cmd(host, 'reboot')
-  except subprocess.CalledProcessError:
+  except errors.SshConnectionError:
+    # Depends on timing, ssh may return failure due to broken pipe, which is
+    # working as intended. Ignore such kind of errors.
     pass
   wait_reboot_done(host, boot_id)
 
@@ -213,7 +213,7 @@ def wait_reboot_done(host, boot_id):
       # set tight limit because it's inside retry loop.
       assert boot_id != query_dut_boot_id(host, connect_timeout=3)
       return
-    except subprocess.CalledProcessError:
+    except errors.SshConnectionError:
       logger.debug('reboot not ready? sleep wait 1 sec')
       time.sleep(1)
 
