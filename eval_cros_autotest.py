@@ -189,8 +189,10 @@ def prepare_to_run_test(opts):
   # TODO(kcwu): remove this workaround once we no longer support bisecting
   # versions earlier than R73-11445.0.0.
   ssh_path = os.path.join(opts.chromeos_root, 'chroot/usr/bin/ssh')
-  if 'file descriptor passing not supported' in open(ssh_path).read():
-    cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'net-misc/openssh')
+  if os.path.exists(ssh_path):
+    if 'file descriptor passing not supported' in open(ssh_path).read():
+      cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge',
+                         'net-misc/openssh')
 
   if opts.reinstall:
     util.ssh_cmd(opts.dut, 'rm', '-rf', '/usr/local/autotest')
