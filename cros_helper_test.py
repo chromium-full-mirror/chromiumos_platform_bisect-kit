@@ -100,7 +100,7 @@ class TestCmdAllocateDut(unittest.TestCase):
         assert not info['Locked']
         info.update({'Locked': True, 'Lock Reason': reason})
         return info
-    raise ValueError('cannot lock non-existant host: ' + host)
+    raise ValueError('cannot lock non-existent host: ' + host)
 
   def _unlock_host(self, host):
     for info in self.hosts:
@@ -108,7 +108,7 @@ class TestCmdAllocateDut(unittest.TestCase):
         assert info['Locked']
         info.update({'Locked': False, 'Lock Reason': None})
         return info
-    raise ValueError('cannot unlock non-existant host: ' + host)
+    raise ValueError('cannot unlock non-existent host: ' + host)
 
   def _change_and_lock(self, **kwargs):
 
