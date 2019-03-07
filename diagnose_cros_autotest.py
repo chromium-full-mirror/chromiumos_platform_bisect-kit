@@ -346,7 +346,7 @@ class DiagnoseCommandLine(object):
         try:
           if diagnoser.narrow_down_android(eval_cmd):
             return
-        except errors.VerificationFailed:
+        except errors.DiagnoseContradiction:
           raise
         except Exception:
           logger.exception('exception in android bisector before verification; '
@@ -359,8 +359,7 @@ class DiagnoseCommandLine(object):
           if diagnoser.narrow_down_chrome(
               eval_cmd, chrome_binaries=chrome_binaries):
             return
-        except errors.VerifyOldBehaviorFailed:
-          logger.fatal('expect old chrome has old behavior but failed')
+        except errors.DiagnoseContradiction:
           raise
         except Exception:
           logger.exception('exception in chrome bisector before verification; '

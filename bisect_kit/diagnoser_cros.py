@@ -175,8 +175,10 @@ class CrosDiagnoser(object):
       android_old, android_new, self.noisy = bisector.narrow_down(
           self.states, 'bisect android prebuilt')
     except errors.VerifyOldBehaviorFailed:
-      logger.fatal('expect old android has old behavior but failed')
-      raise
+      logger.exception('expect old android has old behavior but failed')
+      raise errors.DiagnoseContradiction(
+          'verified that old chromeos has old behavior; '
+          'but it became new behavior after deployed old android prebuilt')
     except errors.VerifyNewBehaviorFailed:
       logger.info('unable to reproduce, culprit is not in android')
       return False
@@ -219,8 +221,11 @@ class CrosDiagnoser(object):
       android_old, android_new, self.noisy = bisector.narrow_down(
           self.states, 'bisect android local build')
     except errors.VerificationFailed:
-      logger.fatal('verified with android prebuilt but failed with local build')
-      raise
+      logger.exception(
+          'verified with android prebuilt but failed with local build')
+      raise errors.DiagnoseContradiction(
+          'verified that the issue could be reproduced with android prebuilt; '
+          'but unable to reproduce with local build')
     return True
 
   def narrow_down_chrome(self,
@@ -267,6 +272,11 @@ class CrosDiagnoser(object):
         bisector.append_switch_command(extra_switch_cmd)
 
       bisector.narrow_down(self.states, 'bisect chrome local build')
+    except errors.VerifyOldBehaviorFailed:
+      logger.exception('expect old chrome has old behavior but failed')
+      raise errors.DiagnoseContradiction(
+          'verified that old chromeos has old behavior; '
+          'but it became new behavior after deployed chrome')
     except errors.VerifyNewBehaviorFailed:
       logger.info('unable to reproduce, culprit is not in chrome')
       return False
@@ -293,7 +303,12 @@ class CrosDiagnoser(object):
     if extra_switch_cmd:
       bisector.append_switch_command(extra_switch_cmd)
 
-    bisector.narrow_down(self.states, 'bisect chromeos local build')
+    try:
+      bisector.narrow_down(self.states, 'bisect chromeos local build')
+    except errors.VerificationFailed:
+      raise errors.DiagnoseContradiction(
+          'verified that the issue could be reproduced with chromeos prebuilt; '
+          'but unable to reproduce with local build')
 
   def cmd_log(self, json_output=False):
     result = []

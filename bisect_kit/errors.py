@@ -44,6 +44,14 @@ class WrongAssumption(Exception):
   """
 
 
+class DiagnoseContradiction(Exception):
+  """Contradiction happened during diagnose.
+
+  Test result of individual component/version is unreliable/untrustable
+  (something wrong and/or flakiness out of control).
+  """
+
+
 class VerificationFailed(Exception):
   """Bisection range is verified false."""
 
