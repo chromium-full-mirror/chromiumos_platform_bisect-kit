@@ -218,7 +218,10 @@ def run_test(opts):
                                  'site_utils/test_that.py')
   else:
     test_that_bin = '/usr/bin/test_that'
-  cmd = [test_that_bin, opts.dut, opts.test_name, '--results_dir', results_dir]
+  cmd = [
+      test_that_bin, opts.dut, opts.test_name, '--debug', '--results_dir',
+      results_dir
+  ]
   if opts.prebuilt:
     cmd += ['--autotest_dir', prebuilt_autotest_dir]
 
