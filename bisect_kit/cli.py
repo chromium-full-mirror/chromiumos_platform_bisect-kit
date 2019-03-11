@@ -503,8 +503,10 @@ class BisectorCommandLine(object):
           current_state = self.states.get(idx)
           if current_state['skip'] > (
               current_state['old'] + current_state['new'] + 1) * 5:
-            message = 'too much "skip" for rev=%r' % rev
-            raise errors.UnableToProceed(message)
+            raise errors.UnableToProceed(
+                'something wrong, '
+                'unable to evalulate rev=%r (skip) %d times' %
+                (rev, current_state['skip']))
 
         self.strategy.show_summary()
 
