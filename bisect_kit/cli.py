@@ -493,21 +493,13 @@ class BisectorCommandLine(object):
         logger.info('rev=%s status => %s', rev, self._format_status(status))
         force = False
 
-        self._add_sample(rev, status, values=values)
+        self.states.add_sample(idx, status, values=values)
         self.states.save()
 
         # Bail out if bisection range is unlikely true.
         self.strategy.check_verification_range()
 
-        if status == 'skip':
-          current_state = self.states.get(idx)
-          if current_state['skip'] > (
-              current_state['old'] + current_state['new'] + 1) * 5:
-            raise errors.UnableToProceed(
-                'something wrong, '
-                'unable to evalulate rev=%r (skip) %d times' %
-                (rev, current_state['skip']))
-
+        self.strategy.update(idx, status)
         self.strategy.show_summary()
 
         if step == 'switch' and status == 'skip':
@@ -529,7 +521,7 @@ class BisectorCommandLine(object):
       self.states.save()
       raise
     finally:
-      if rev:
+      if rev and sum(self.strategy.prob) > 0:
         # progress so far
         old_idx, new_idx = self.strategy.get_range()
         self.states.add_history(

@@ -481,6 +481,9 @@ class NoisyBinarySearch(object):
     assert self.rev_info
     self.check_verification_range()
 
+    if result == 'skip':
+      self.check_proceed_with_skip(idx)
+
     if self._is_changing_skip_weight(idx, result):
       # Incremental update by skip_weight.
       new_skip_weight = self.get_weight_by_skip(self.rev_info)
@@ -604,6 +607,31 @@ class NoisyBinarySearch(object):
       if p < 1.0 - self.verify_confidence:
         raise errors.VerifyNewBehaviorFailed(self.rev_info[self.new_idx].rev,
                                              self.rev_info[self.new_idx]['old'])
+
+  def check_proceed_with_skip(self, idx):
+    """Checks if we should proceed after skips.
+
+    We just got one more 'skip' result. Should we tolerate it or stop bisecting?
+
+    Args:
+      idx: index of the new skip.
+
+    Raises:
+      errors.UnableToProceed: skip too many times, probably serious issue and
+          unable to proceed
+    """
+    # we just got skip
+    assert self.rev_info[idx]['skip'] > 0
+
+    non_skip_count = self.rev_info[idx]['old'] + self.rev_info[idx]['new']
+    if ((idx in (self.old_idx, self.new_idx) and non_skip_count == 0 and
+         self.rev_info[idx]['skip'] > SKIP_FOREVER) or
+        (self.rev_info[idx]['skip'] >
+         (non_skip_count + 1) * (SKIP_FOREVER + 2))):
+      raise errors.UnableToProceed(
+          'something wrong, '
+          'unable to evalulate rev=%r (skip) %d times' %
+          (self.rev_info[idx].rev, self.rev_info[idx]['skip']))
 
   def show_summary(self, more=False):
     """Shows top ranked candidates.

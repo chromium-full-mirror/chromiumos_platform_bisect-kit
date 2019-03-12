@@ -149,6 +149,17 @@ class TestNoisyBinarySearch(unittest.TestCase):
       # Should not raise ValueError (math domain error).
       bsearch.next_idx()
 
+  def test_update_skip(self):
+    bsearch = strategy.NoisyBinarySearch(self.rev_info, oracle=(0.1, 0.9))
+    bsearch.rebuild()
+    for _ in range(strategy.SKIP_FOREVER):
+      self.rev_info[99]['skip'] += 1
+      bsearch.update(99, 'skip')
+
+    with self.assertRaises(errors.UnableToProceed):
+      self.rev_info[99]['skip'] += 1
+      bsearch.update(99, 'skip')
+
   def test_rebuild_skip(self):
     bsearch = strategy.NoisyBinarySearch(self.rev_info, oracle=(0, 0.9))
     self.rev_info[0]['old'] += 1

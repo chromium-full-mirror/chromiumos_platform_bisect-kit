@@ -276,8 +276,10 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('run', '-1')
     self.assertEqual(bisector.strategy.get_range(), (20, 30))
 
-    bisector.main('skip', '20*10')
-    bisector.main('skip', '30*10')
+    with self.assertRaises(errors.UnableToProceed):
+      bisector.main('skip', '20*10')
+    with self.assertRaises(errors.UnableToProceed):
+      bisector.main('skip', '30*10')
     self.assertEqual(bisector.strategy.get_range(), (20, 30))
 
   def test_cmd_switch(self):
