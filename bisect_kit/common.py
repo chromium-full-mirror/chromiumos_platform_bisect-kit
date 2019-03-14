@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_SESSION_BASE = 'bisect.sessions'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
+BISECT_KIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def config_logging(opts):
   """Config logging handlers.

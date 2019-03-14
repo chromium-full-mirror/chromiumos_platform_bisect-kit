@@ -22,6 +22,7 @@ import time
 
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import common
 from bisect_kit import cr_util
 from bisect_kit import errors
 from bisect_kit import git_util
@@ -786,9 +787,9 @@ def build_image(chromeos_root, board, rev):
     logger.info('"%s" already exists, skip build step', image_path)
     return image_path
 
-  dirname = os.path.dirname(os.path.abspath(__file__))
   script_name = 'build_cros_helper.sh'
-  copy_into_chroot(chromeos_root, os.path.join(dirname, '..', script_name),
+  copy_into_chroot(chromeos_root,
+                   os.path.join(common.BISECT_KIT_ROOT, script_name),
                    script_name)
   cros_sdk(chromeos_root, 'chmod', '+x', script_name)
 

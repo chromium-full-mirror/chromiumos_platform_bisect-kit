@@ -17,6 +17,7 @@ import urllib2
 
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import common
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util
@@ -239,8 +240,8 @@ def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
   env = os.environ.copy()
   env['DUT'] = dut
 
-  dirname = os.path.dirname(os.path.abspath(__file__))
-  deploy_script = os.path.join(dirname, '..', 'deploy_chrome_helper.sh')
+  deploy_script = os.path.join(common.BISECT_KIT_ROOT,
+                               'deploy_chrome_helper.sh')
   cmd = ['sh', '-ex', deploy_script] + targets
   simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
 
