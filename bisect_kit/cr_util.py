@@ -362,6 +362,9 @@ class ChromeSpecManager(codechange.SpecManager):
     releases_dir = os.path.join(self.spec_dir, 'releases')
     result = []
     for rev in sorted(os.listdir(releases_dir), key=util.version_key_func):
+      # 74.0.3696.0/DEPS is bad and rejected by gclient (crbug/929544)
+      if rev in ['74.0.3696.0']:
+        continue
       if not is_chrome_version(rev):
         continue
       if util.is_version_lesseq(rev, new) and util.is_direct_relative_version(
