@@ -26,6 +26,7 @@ from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cros_util
 from bisect_kit import cr_util
+from bisect_kit import errors
 from bisect_kit import gclient_util
 import bisect_cr_localbuild_internal
 
@@ -102,6 +103,14 @@ def main(args=None):
   cache = gclient_util.GclientCache(opts.chrome_mirror)
   spec_manager = cr_util.ChromeSpecManager(config)
   code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
+
+  if cr_util.is_chrome_version(rev):
+    release_deps_file = spec_manager.get_release_deps(rev)
+    path = os.path.join(spec_manager.spec_dir, release_deps_file)
+    if not os.path.exists(path):
+      raise errors.ArgumentError(
+          'rev',
+          '%s does not exists; run setup_cros_bisect.py sync first' % path)
 
   logger.info('switch source code')
   code_manager.switch(rev)

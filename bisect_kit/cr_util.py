@@ -478,10 +478,9 @@ class ChromeSpecManager(codechange.SpecManager):
     """
     release_deps_file = self.get_release_deps(rev)
     path = os.path.join(self.spec_dir, release_deps_file)
-    if not os.path.exists(path):
-      # Give hint that first time sync is very slow.
-      logger.info(
-          'gclient sync --with_branch_heads, may need more than half hours')
+    # The buildspec repo is already sync'ed using setup_cros_bisect.py, so DEPS
+    # files should exist.
+    assert os.path.exists(path), '%s not found' % path
 
     with locking.lock_file(
         os.path.join(self.config['chrome_mirror'],
