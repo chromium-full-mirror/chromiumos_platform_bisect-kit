@@ -243,7 +243,9 @@ class Dep(object):
 
     # Currently, we only support chromeos as target_os.
     # TODO(kcwu): make it configurable if we need to bisect for other os.
-    target_os = ['chromeos']
+    # We don't specify `target_os_only`, so `unix` will be considered by
+    # gclient as well.
+    target_os = ['chromeos', 'unix']
 
     vars_dict = {
         'checkout_android': 'android' in target_os,
