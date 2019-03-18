@@ -228,21 +228,21 @@ class Spec(object):
     logger.info('diff between %s and %s', self.name, rhs.name)
     expect = set(self.entries)
     actual = set(rhs.entries)
-    common = 0
+    common_count = 0
     for path in sorted(expect - actual):
       logger.info('-%s', path)
     for path in sorted(actual - expect):
       logger.info('+%s', path)
     for path in sorted(expect & actual):
       if self[path] == rhs[path]:
-        common += 1
+        common_count += 1
         continue
       if self[path].at != rhs[path].at:
         logger.info(' %s: at %s vs %s', path, self[path].at, rhs[path].at)
       if self[path].repo_url != rhs[path].repo_url:
         logger.info(' %s: repo_url %s vs %s', path, self[path].repo_url,
                     rhs[path].repo_url)
-    logger.info('and common=%s', common)
+    logger.info('and common=%s', common_count)
 
 
 class Action(object):
