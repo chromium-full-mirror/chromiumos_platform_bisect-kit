@@ -384,7 +384,14 @@ class GitAddRepo(Action):
 
   def apply(self, code_storage, root_dir):
     git_repo = os.path.join(root_dir, self.path)
-    assert not os.path.exists(git_repo)
+    if os.path.exists(git_repo):
+      if os.path.isdir(git_repo) and not os.listdir(git_repo):
+        # mimic gclient's behavior; don't panic
+        logger.warning(
+            'adding repo %s; there is already an empty directory; '
+            'assume it is okay', git_repo)
+      else:
+        assert not os.path.exists(git_repo), '%s already exists' % git_repo
 
     reference = code_storage.cached_git_root(self.repo_url)
     git_util.clone(git_repo, self.repo_url, reference=reference)
