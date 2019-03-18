@@ -650,8 +650,18 @@ class CodeManager(object):
       # At next_float.timestamp.
       if path not in next_float:
         # remove repo
-        actions.append(GitRemoveRepo(next_float.timestamp, path))
         next_at = None
+        sub_repos = [p for p in prev_float.entries if p.startswith(path + '/')]
+        group = ActionGroup(next_float.timestamp, comment='remove %s' % path)
+        # Remove deeper repo first
+        for path2 in sorted(sub_repos, reverse=True):
+          group.add(GitRemoveRepo(next_float.timestamp, path2))
+        group.add(GitRemoveRepo(next_float.timestamp, path))
+        for path2 in sorted(set(sub_repos) & set(next_float.entries)):
+          group.add(
+              GitAddRepo(next_float.timestamp, path2,
+                         next_float[path2].repo_url, prev_float[path2].at))
+        actions.append(group)
 
       elif next_float[path].is_static():
         # pinned to certain commit on different branch
@@ -705,7 +715,7 @@ class CodeManager(object):
     """Reorder and cluster actions.
 
     Args:
-      actions: list of Action objects
+      actions: list of Action or ActionGroup objects
 
     Returns:
       list of ActionGroup objects
@@ -714,8 +724,11 @@ class CodeManager(object):
     actions.sort(key=lambda x: x.timestamp)
     result = []
     for action in actions:
-      group = ActionGroup(action.timestamp)
-      group.add(action)
+      if isinstance(action, ActionGroup):
+        group = action
+      else:
+        group = ActionGroup(action.timestamp)
+        group.add(action)
       result.append(group)
     return result
 

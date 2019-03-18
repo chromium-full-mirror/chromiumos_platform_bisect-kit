@@ -137,6 +137,8 @@ def main(args=None):
   if opts.nobuild:
     return
 
+  gclient_util.runhook(opts.chrome_root)
+
   # TODO(kcwu): support local patch.
   cr_util.build_and_deploy(
       opts.chrome_src,

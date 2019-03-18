@@ -114,11 +114,28 @@ def sync(gclient_dir,
     if path in new_projects:
       continue
     old_git_dir = os.path.join(gclient_dir, path)
-    if os.path.exists(old_git_dir):
+    if not os.path.exists(old_git_dir):
+      continue
+
+    if git_util.is_git_root(old_git_dir):
       logger.warning(
           '%s was removed from .gclient_entries but %s still exists; remove it',
           path, old_git_dir)
       shutil.rmtree(old_git_dir)
+    else:
+      logger.warning(
+          '%s was removed from .gclient_entries but %s still exists;'
+          ' keep it because it is not git root', path, old_git_dir)
+
+
+def runhook(gclient_dir, jobs=8):
+  """Simply wrapper of `gclient runhook`.
+
+  Args:
+    gclient_dir: root directory of gclient project
+    jobs: how many workers running in parallel
+  """
+  util.check_call('gclient', 'runhook', '--jobs', str(jobs), cwd=gclient_dir)
 
 
 def load_gclient_entries(gclient_dir):
