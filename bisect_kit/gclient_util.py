@@ -110,7 +110,12 @@ def load_gclient_entries(gclient_dir):
   repo_project_list = os.path.join(gclient_dir, '.gclient_entries')
   scope = {}
   exec open(repo_project_list) in scope  # pylint: disable=exec-used
-  return scope.get('entries', {})
+  entries = scope.get('entries', {})
+
+  # normalize path: remove trailing slash
+  entries = dict((os.path.normpath(path), url) for path, url in entries.items())
+
+  return entries
 
 
 def write_gclient_entries(gclient_dir, projects):
@@ -517,9 +522,10 @@ class DepsParser(object):
       logger.warning('deps_os is no longer supported')
 
     for path, dep_entry in local_scope['deps'].items():
+      path = path.format(**deps.variables)
       if local_scope.get('use_relative_paths', False):
         path = os.path.join(parent_path, path)
-      path = path.format(**deps.variables)
+      path = os.path.normpath(path)
       dep = Dep(path, deps.variables, dep_entry)
       if not dep.eval_condition():
         continue
