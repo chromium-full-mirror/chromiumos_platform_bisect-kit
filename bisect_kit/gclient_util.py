@@ -70,7 +70,23 @@ def sync(gclient_dir,
     ignore_locks: bypass gclient's lock
     jobs: how many workers running in parallel
   """
-  cmd = ['gclient', 'sync', '--jobs', str(jobs), '--delete_unversioned_trees']
+  # Work around gclient issue crbug/943430
+  # gclient rejected to sync if there are untracked symlink even with --force
+  for path in [
+      'src/chromeos/assistant/libassistant/src/deps',
+      'src/chromeos/assistant/libassistant/src/libassistant',
+  ]:
+    if os.path.islink(os.path.join(gclient_dir, path)):
+      os.unlink(os.path.join(gclient_dir, path))
+
+  cmd = [
+      'gclient',
+      'sync',
+      '--jobs=%d' % jobs,
+      '--delete_unversioned_trees',
+      # --force is necessary because runhook may generate some untracked files.
+      '--force',
+  ]
   if with_branch_heads:
     cmd.append('--with_branch_heads')
   if with_tags:

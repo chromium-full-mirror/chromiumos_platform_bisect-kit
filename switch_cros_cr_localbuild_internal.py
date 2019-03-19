@@ -28,6 +28,7 @@ from bisect_kit import cros_util
 from bisect_kit import cr_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
+from bisect_kit import util
 import bisect_cr_localbuild_internal
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,23 @@ def create_argument_parser():
   return parser
 
 
+def _apply_additional_patch(root_dir, rev):
+  # TODO(kcwu): generalize patching mechanism to make it user configurable.
+  base_rev, _, _ = codechange.parse_intra_rev(rev)
+
+  # Hack to disable assistant
+  # Assistant use custom build rules, which may break build randomly (see
+  # b/126633034 and b/127926563).
+  # This patch file can support up to 73.0.3669.0, for easier versions, let
+  # it go (just rely on retry).
+  if (util.is_version_lesseq('73.0.3669.0', base_rev) and
+      util.is_version_lesseq(base_rev, '74.0.3699.0')):
+    patch_file = os.path.join(common.BISECT_KIT_ROOT,
+                              'patching/0001-disable-assistant.patch')
+    path = os.path.join(root_dir, 'src')
+    util.check_call('git', 'am', patch_file, cwd=path)
+
+
 def main(args=None):
   common.init()
   parser = create_argument_parser()
@@ -114,6 +132,7 @@ def main(args=None):
 
   logger.info('switch source code')
   code_manager.switch(rev)
+  _apply_additional_patch(opts.chrome_root, rev)
 
   if opts.nobuild:
     return

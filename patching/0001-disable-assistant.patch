@@ -1,0 +1,40 @@
+From 60723424e310628d24b2f87d2c8fd950377c56bb Mon Sep 17 00:00:00 2001
+From: Kuang-che Wu <kcwu@chromium.org>
+Date: Thu, 14 Mar 2019 18:14:40 +0800
+Subject: [PATCH] disable-assistant
+
+---
+ ash/BUILD.gn                     | 2 +-
+ chromeos/assistant/assistant.gni | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/ash/BUILD.gn b/ash/BUILD.gn
+index f8c779f04c3a..f0d8f798205e 100644
+--- a/ash/BUILD.gn
++++ b/ash/BUILD.gn
+@@ -1867,7 +1867,7 @@ test("ash_unittests") {
+ 
+     # TODO(stevenjb): Remove this dependency, https://crbug.com/644355.
+     "//chromeos/network:test_support",
+-    "//chromeos/services/assistant:test_support",
++    #"//chromeos/services/assistant:test_support",
+     "//chromeos/services/multidevice_setup/public/cpp:test_support",
+     "//chromeos/services/multidevice_setup/public/mojom",
+     "//components/account_id",
+diff --git a/chromeos/assistant/assistant.gni b/chromeos/assistant/assistant.gni
+index 21b216f8ba95..929e44b04fe2 100644
+--- a/chromeos/assistant/assistant.gni
++++ b/chromeos/assistant/assistant.gni
+@@ -3,7 +3,8 @@ import("//build/config/chrome_build.gni")
+ declare_args() {
+   # Enable assistant features. Assistant related code is compiled only when
+   # true. The default assistant implementation is a stub.
+-  enable_cros_assistant = is_chromeos
++  #enable_cros_assistant = is_chromeos
++  enable_cros_assistant = false
+ }
+ 
+ declare_args() {
+-- 
+2.21.0.360.g471c308f928-goog
+

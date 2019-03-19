@@ -323,6 +323,16 @@ class ChromeSpecManager(codechange.SpecManager):
 
     return meta_dir
 
+  def _hack_trim_libassistant(self, old, _new, spec):
+    # Before 74.0.3694.0, assistant use custom hook to sync code.
+    # This is bad practice and difficult to deal. Because most of
+    # regressions are not related to assistant, we simply remove repo
+    # changes inside libassistant to make things easier (b/126633034).
+    if util.is_version_lesseq(old, '74.0.3694.0'):
+      for path in spec.entries.keys():
+        if path.startswith('src/chromeos/assistant/libassistant/src/'):
+          del spec.entries[path]
+
   def collect_float_spec(self, old, new):
     logger.info('collect_float_spec')
     old_timestamp = self.lookup_build_timestamp(old)
@@ -355,6 +365,7 @@ class ChromeSpecManager(codechange.SpecManager):
         old_timestamp, new_timestamp, meta_dir):
       spec = codechange.Spec(codechange.SPEC_FLOAT, '(n/a)', timestamp, path)
       spec.entries = path_specs
+      self._hack_trim_libassistant(old, new, spec)
       result.append(spec)
     return result
 
@@ -380,24 +391,25 @@ class ChromeSpecManager(codechange.SpecManager):
       if util.is_version_lesseq(old, rev):
         path = os.path.join('releases', rev, 'DEPS')
         timestamp = git_util.get_commit_time(self.spec_dir, 'HEAD', path)
-        result.append(
-            codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path))
+        spec = codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path)
+        self.parse_spec(spec)
+        self._hack_trim_libassistant(old, new, spec)
+        result.append(spec)
 
     assert result[0].name == old, '%s != %s' % (result[0].name, old)
     assert result[-1].name == new, '%s != %s' % (result[-1].name, new)
     return result
 
   def parse_spec(self, spec):
-    logging.debug('parse_spec %s', spec.name)
-
-    if spec.spec_type == codechange.SPEC_FLOAT:
-      # Already parsed during collect_float_spec().
-      # Fully parsing during collect_float_spec() is more efficient than
-      # calling parsing here because we lost knowledge of commit ordering here
-      # and calling get_rev_by_time() is very slow.
-      assert spec.entries
+    # Return if already parsed during collect_float_spec() and
+    # collect_fixed_spec().
+    # Fully parsing during collect_float_spec() is more efficient than
+    # calling parsing here because we lost knowledge of commit ordering here
+    # and calling get_rev_by_time() is very slow.
+    if spec.entries:
       return
 
+    logging.debug('parse_spec %s', spec.name)
     code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
     parser = gclient_util.DepsParser(self.config['chrome_root'], code_storage)
 
