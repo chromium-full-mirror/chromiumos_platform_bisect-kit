@@ -95,8 +95,8 @@ def _apply_additional_patch(root_dir, rev):
   # b/126633034 and b/127926563).
   # This patch file can support up to 73.0.3669.0, for easier versions, let
   # it go (just rely on retry).
-  if (util.is_version_lesseq('73.0.3669.0', base_rev) and
-      util.is_version_lesseq(base_rev, '74.0.3699.0')):
+  if (cr_util.is_version_lesseq('73.0.3669.0', base_rev) and
+      cr_util.is_version_lesseq(base_rev, '74.0.3699.0')):
     patch_file = os.path.join(common.BISECT_KIT_ROOT,
                               'patching/0001-disable-assistant.patch')
     path = os.path.join(root_dir, 'src')

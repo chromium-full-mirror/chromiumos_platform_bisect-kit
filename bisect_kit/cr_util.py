@@ -34,6 +34,36 @@ def is_chrome_version(s):
   return bool(re.match(RE_CHROME_VERSION, s))
 
 
+def _canonical_build_number(s):
+  """Returns canonical build number.
+
+  "The BUILD and PATCH numbers together are the canonical representation of
+  what code is in a given release."
+  ref: https://www.chromium.org/developers/version-numbers
+
+  This format is used for version comparison.
+
+  Args:
+    s: chrome version string, in format MAJOR.MINOR.BUILD.PATCH
+
+  Returns:
+    BUILD.PATCH
+  """
+  assert s.count('.') == 3
+  return '.'.join(s.split('.')[2:])
+
+
+def is_version_lesseq(a, b):
+  """Compares whether Chrome version `a` is less or equal to version `b`."""
+  return util.is_version_lesseq(
+      _canonical_build_number(a), _canonical_build_number(b))
+
+
+def is_direct_relative_version(a, b):
+  return util.is_direct_relative_version(
+      _canonical_build_number(a), _canonical_build_number(b))
+
+
 def extract_branch_from_version(rev):
   """Extracts branch number from version string
 
@@ -328,7 +358,7 @@ class ChromeSpecManager(codechange.SpecManager):
     # This is bad practice and difficult to deal. Because most of
     # regressions are not related to assistant, we simply remove repo
     # changes inside libassistant to make things easier (b/126633034).
-    if util.is_version_lesseq(old, '74.0.3694.0'):
+    if is_version_lesseq(old, '74.0.3694.0'):
       for path in spec.entries.keys():
         if path.startswith('src/chromeos/assistant/libassistant/src/'):
           del spec.entries[path]
@@ -378,17 +408,16 @@ class ChromeSpecManager(codechange.SpecManager):
         continue
       if not is_chrome_version(rev):
         continue
-      if util.is_version_lesseq(rev, new) and util.is_direct_relative_version(
-          rev, new):
+      if is_version_lesseq(rev, new) and is_direct_relative_version(rev, new):
         result.append(rev)
     return result
 
   def collect_fixed_spec(self, old, new):
     logger.info('collect_fixed_spec')
-    assert util.is_direct_relative_version(old, new)
+    assert is_direct_relative_version(old, new)
     result = []
     for rev in self.enumerate_ancestor(new):
-      if util.is_version_lesseq(old, rev):
+      if is_version_lesseq(old, rev):
         path = os.path.join('releases', rev, 'DEPS')
         timestamp = git_util.get_commit_time(self.spec_dir, 'HEAD', path)
         spec = codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path)

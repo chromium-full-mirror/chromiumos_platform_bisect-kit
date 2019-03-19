@@ -19,7 +19,6 @@ from bisect_kit import cros_util
 from bisect_kit import cr_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
-from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +103,7 @@ class ChromeSrcDomain(core.BisectDomain):
       raise errors.ArgumentError(
           '--old and --new', 'start and end of chrome versions are identical')
 
-    if not util.is_version_lesseq(old, new):
+    if not cr_util.is_version_lesseq(old, new):
       raise errors.ArgumentError(
           '--old and --new',
           'start chrome version (%s) is newer than end version (%s)' % (old,
@@ -133,7 +132,7 @@ class ChromeSrcDomain(core.BisectDomain):
       if not os.path.exists(path):
         raise errors.InternalError("%s doesn't exist" % path)
 
-    if not util.is_direct_relative_version(old, new):
+    if not cr_util.is_direct_relative_version(old, new):
       logger.warning('old=%s is not parent of new=%s', old, new)
       old_ancestor = spec_manager.enumerate_ancestor(old)
       new_ancestor = spec_manager.enumerate_ancestor(new)

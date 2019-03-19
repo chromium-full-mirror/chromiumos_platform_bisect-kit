@@ -24,6 +24,20 @@ class TestCrUtil(unittest.TestCase):
     assert not cr_util.is_chrome_version('59.0.3065')
     assert not cr_util.is_chrome_version('59.0.3065.0.0')
 
+  def test_is_version_lesseq(self):
+    assert cr_util.is_version_lesseq('75.0.3731.0', '75.0.3731.0')
+    assert cr_util.is_version_lesseq('75.0.3731.0', '75.0.3732.0')
+    assert not cr_util.is_version_lesseq('75.0.3732.0', '75.0.3731.0')
+
+    assert cr_util.is_version_lesseq('74.0.3726.0', '75.0.3731.0')
+
+  def test_is_direct_relative_version(self):
+    assert cr_util.is_direct_relative_version('74.0.3726.0', '75.0.3731.0')
+    assert cr_util.is_direct_relative_version('75.0.3731.0', '74.0.3726.0')
+    assert cr_util.is_direct_relative_version('73.0.3683.0', '75.0.3731.0')
+    assert not cr_util.is_direct_relative_version('73.0.3683.1', '75.0.3731.0')
+    assert not cr_util.is_direct_relative_version('75.0.3731.0', '73.0.3683.1')
+
   def test_extract_branch_from_version(self):
     self.assertEqual(cr_util.extract_branch_from_version('59.0.3064.0'), '3064')
 
