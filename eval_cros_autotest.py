@@ -70,6 +70,10 @@ def create_argument_parser():
       '--reinstall',
       action='store_true',
       help='Remove existing autotest folder on the DUT first')
+  parser.add_argument(
+      '--reboot_before_test',
+      action='store_true',
+      help='Reboot before test run')
 
   group = parser.add_argument_group(title='Options for normal autotest tests')
   group.add_argument(
@@ -196,6 +200,9 @@ def prepare_to_run_test(opts):
 
   if opts.reinstall:
     util.ssh_cmd(opts.dut, 'rm', '-rf', '/usr/local/autotest')
+
+  if opts.reboot_before_test:
+    cros_util.reboot(opts.dut)
 
 
 def run_test(opts):

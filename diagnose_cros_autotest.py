@@ -238,6 +238,7 @@ class DiagnoseCommandLine(object):
         noisy=opts.noisy,
         test_that_args=opts.args,
         always_reflash=opts.always_reflash,
+        reboot_before_test=opts.reboot_before_test,
     )
 
     self.states.init(config)
@@ -275,6 +276,8 @@ class DiagnoseCommandLine(object):
       ]  # yapf: disable
     elif self.config['fail_to_pass']:
       common_eval_cmd.append('--fail_to_pass')
+    if self.config['reboot_before_test']:
+      common_eval_cmd.append('--reboot_before_test')
     if self.config['test_that_args']:
       common_eval_cmd += ['--args', self.config['test_that_args']]
     if self.config['test_name'].startswith('telemetry_'):
@@ -552,6 +555,10 @@ class DiagnoseCommandLine(object):
         help='Do not trust ChromeOS version number of DUT and always reflash. '
         'This is usually only needed when resume because previous bisect was '
         'interrupted and the DUT may be in an unexpected state')
+    group.add_argument(
+        '--reboot_before_test',
+        action='store_true',
+        help='Reboot before test run')
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser('run', help='Start auto bisection')
