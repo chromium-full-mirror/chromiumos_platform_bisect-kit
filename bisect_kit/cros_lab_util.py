@@ -64,7 +64,7 @@ def atest_cmd(topic, action, *args):
     raise errors.ExternalError(str(e))
 
 
-def list_host(host=None, labels=None, statuses=None, locked=None):
+def list_host(host=None, labels=None, statuses=None, locked=None, server=None):
   """List DUTs with criteria in the lab.
 
   Args:
@@ -73,6 +73,7 @@ def list_host(host=None, labels=None, statuses=None, locked=None):
     statuses: only list hosts with given criteria of DUT status (list)
     locked: only list locked/unlocked hosts if `locked` is True or False.
         Default (None) is don't care.
+    server: specify the autotest server to talk to
 
   Returns:
     A dict mapping host name to host info. "host info" is parsed dict of 'atest
@@ -102,6 +103,8 @@ def list_host(host=None, labels=None, statuses=None, locked=None):
       atest_args.append('--locked')
     else:
       atest_args.append('--unlocked')
+  if server:
+    atest_args.append('--web=' + server)
 
   result = {}
   for line in atest_cmd('host', 'list', *atest_args).splitlines():
@@ -134,7 +137,17 @@ def lock_host(host, reason):
   info = hosts[host]
 
   # make sure it's locked by me
-  assert info['Lock Reason'] == reason
+  assert info.get('Lock Reason') == reason
+
+  hosts_from_shard = list_host(host=host, server=info['Shard'])
+  info_from_shard = hosts_from_shard[host]
+  if info_from_shard.get('Lock Reason') != reason:
+    # TODO(kcwu): retry if shard is not consistent with main server
+    logger.warning(
+        'unexpected locking state from shard server: '
+        'status=%r, locked=%s, by=%s, reason=%r', info_from_shard['Status'],
+        info_from_shard['Locked'], info_from_shard['Locked by'],
+        info_from_shard.get('Lock Reason'))
 
   return info
 
