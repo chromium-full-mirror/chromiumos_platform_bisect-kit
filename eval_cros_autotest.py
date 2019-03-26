@@ -282,6 +282,7 @@ def main(args=None):
   common.config_logging(opts)
 
   if not cros_util.is_dut(opts.dut):
+    logger.error('%r is not a valid DUT address', opts.dut)
     return FATAL
 
   is_cts = (
