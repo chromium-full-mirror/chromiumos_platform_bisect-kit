@@ -319,12 +319,8 @@ class DiagnoseCommandLine(object):
           self.states.save()
         common_eval_cmd.append(dut)
 
-        diagnoser = diagnoser_cros.CrosDiagnoser(
-            self.states, self.config['session'], path_factory,
-            self.config['chromeos_root'], self.config['chromeos_mirror'],
-            self.config['android_root'], self.config['android_mirror'],
-            self.config['chrome_root'], self.config['chrome_mirror'],
-            self.config['board'], self.config['noisy'], dut)
+        diagnoser = diagnoser_cros.CrosDiagnoser(self.states, path_factory,
+                                                 self.config, dut)
 
         eval_cmd = common_eval_cmd + ['--prebuilt', '--reinstall']
         # Do not specify version for autotest prebuilt switching here. The trick
@@ -382,12 +378,8 @@ class DiagnoseCommandLine(object):
     path_factory = setup_cros_bisect.DefaultProjectPathFactory(
         self.config['mirror_base'], self.config['work_base'],
         self.config['session'])
-    diagnoser = diagnoser_cros.CrosDiagnoser(
-        self.states, self.config['session'], path_factory,
-        self.config['chromeos_root'], self.config['chromeos_mirror'],
-        self.config['android_root'], self.config['android_mirror'],
-        self.config['chrome_root'], self.config['chrome_mirror'],
-        self.config['board'], self.config['noisy'], None)
+    diagnoser = diagnoser_cros.CrosDiagnoser(self.states, path_factory,
+                                             self.config, None)
 
     diagnoser.cmd_log(opts.json)
 
@@ -396,12 +388,8 @@ class DiagnoseCommandLine(object):
     path_factory = setup_cros_bisect.DefaultProjectPathFactory(
         self.config['mirror_base'], self.config['work_base'],
         self.config['session'])
-    diagnoser = diagnoser_cros.CrosDiagnoser(
-        self.states, self.config['session'], path_factory,
-        self.config['chromeos_root'], self.config['chromeos_mirror'],
-        self.config['android_root'], self.config['android_mirror'],
-        self.config['chrome_root'], self.config['chrome_mirror'],
-        self.config['board'], self.config['noisy'], None)
+    diagnoser = diagnoser_cros.CrosDiagnoser(self.states, path_factory,
+                                             self.config, None)
     diagnoser.cmd_view(opts.json, opts.verbose)
 
   def create_argument_parser(self):

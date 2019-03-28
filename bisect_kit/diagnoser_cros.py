@@ -67,20 +67,13 @@ def need_android_bisect(old_info, new_info):
 class CrosDiagnoser(object):
   """Integrated bisectors API for ChromeOS regression analysis."""
 
-  def __init__(self, states, session, path_factory, chromeos_root,
-               chromeos_mirror, android_root, android_mirror, chrome_root,
-               chrome_mirror, board, noisy, dut):
+  def __init__(self, states, path_factory, config, dut):
     self.states = states
-    self.session = session
     self.path_factory = path_factory
-    self.chromeos_root = chromeos_root
-    self.chromeos_mirror = chromeos_mirror
-    self.android_root = android_root
-    self.android_mirror = android_mirror
-    self.chrome_root = chrome_root
-    self.chrome_mirror = chrome_mirror
-    self.board = board
-    self.noisy = noisy
+    self.config = config
+    # self.noisy will be updated after we gather more information from each
+    # bisect session.
+    self.noisy = config['noisy']
     self.dut = dut
 
     self.cros_old = None
@@ -101,11 +94,12 @@ class CrosDiagnoser(object):
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch chromeos version
     """
-    bisector = wrapper.BisectorWrapper('bisect_cros_version', self.session)
+    bisector = wrapper.BisectorWrapper('bisect_cros_version',
+                                       self.config['session'])
     bisector.init_if_necessary(
         old,
         new,
-        init_args=['--dut', self.dut, '--board', self.board],
+        init_args=['--dut', self.dut, '--board', self.config['board']],
         switch_cmd=['./switch_cros_prebuilt.py'],
         eval_cmd=eval_cmd,
         noisy=self.noisy)
@@ -115,8 +109,8 @@ class CrosDiagnoser(object):
     self.cros_old, self.cros_new, self.noisy = bisector.narrow_down(
         self.states, 'bisect chromeos prebuilt')
 
-    self.old_info = cros_util.version_info(self.board, self.cros_old)
-    self.new_info = cros_util.version_info(self.board, self.cros_new)
+    self.old_info = cros_util.version_info(self.config['board'], self.cros_old)
+    self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
     logger.info('old: cros %s, chrome %s, android %s',
                 self.old_info['cros_full_version'], self.old_info['cr_version'],
                 self.old_info.get('android_build_id'))
@@ -134,8 +128,8 @@ class CrosDiagnoser(object):
       short_version = cros_util.version_to_short(self.cros_old)
       if cros_util.query_dut_short_version(self.dut) == short_version:
         return
-    util.check_call('./switch_cros_prebuilt.py', '--board', self.board,
-                    self.dut, self.cros_old)
+    util.check_call('./switch_cros_prebuilt.py', '--board',
+                    self.config['board'], self.dut, self.cros_old)
 
   def narrow_down_android(self, eval_cmd, extra_switch_cmd=None):
     """Bisect with Android prebuilt and localbuild.
@@ -154,7 +148,7 @@ class CrosDiagnoser(object):
       return False
 
     logger.info('bisect android prebuilt')
-    session = '%s/%s' % (self.session, self.cros_old)
+    session = '%s/%s' % (self.config['session'], self.cros_old)
     bisector = wrapper.BisectorWrapper('bisect_android_build_id', session)
     try:
       bisector.init_if_necessary(
@@ -186,18 +180,20 @@ class CrosDiagnoser(object):
     # TODO(kcwu): what if the branch name does not have 'git_' prefix
     assert self.old_info['android_branch'].startswith('git_')
     git_branch = self.old_info['android_branch'][4:]
-    if not self.android_mirror:
-      self.android_mirror = self.path_factory.get_android_mirror(git_branch)
-      logger.info('android_mirror = %s', self.android_mirror)
-    if not self.android_root:
-      self.android_root = self.path_factory.get_android_tree(git_branch)
-      logger.info('android_root = %s', self.android_root)
+    android_mirror = self.config['android_mirror']
+    if not android_mirror:
+      android_mirror = self.path_factory.get_android_mirror(git_branch)
+      logger.info('android_mirror = %s', android_mirror)
+    android_root = self.config['android_root']
+    if not android_root:
+      android_root = self.path_factory.get_android_tree(git_branch)
+      logger.info('android_root = %s', android_root)
 
-    if not os.path.exists(self.android_mirror):
+    if not os.path.exists(android_mirror):
       logger.info(
           'android_mirror does not exist; skip android local build bisect')
       return True
-    if not os.path.exists(self.android_root):
+    if not os.path.exists(android_root):
       logger.info(
           'android_root does not exist; skip android local build bisect')
       return True
@@ -209,8 +205,8 @@ class CrosDiagnoser(object):
           android_old,
           android_new,
           init_args=[
-              '--dut', self.dut, '--android_root', self.android_root,
-              '--android_mirror', self.android_mirror
+              '--dut', self.dut, '--android_root', android_root,
+              '--android_mirror', android_mirror
           ],
           switch_cmd=['./switch_arc_localbuild.py'],
           eval_cmd=eval_cmd,
@@ -251,7 +247,7 @@ class CrosDiagnoser(object):
       return False
 
     logger.info('bisect chrome local build')
-    session = '%s/%s' % (self.session, self.cros_old)
+    session = '%s/%s' % (self.config['session'], self.cros_old)
     switch_cmd = ['./switch_cros_cr_localbuild_internal.py', self.dut]
     if chrome_binaries:
       for target in chrome_binaries:
@@ -262,8 +258,8 @@ class CrosDiagnoser(object):
           self.old_info['cr_version'],
           self.new_info['cr_version'],
           init_args=[
-              '--chrome_root', self.chrome_root, '--chrome_mirror',
-              self.chrome_mirror
+              '--chrome_root', self.config['chrome_root'], '--chrome_mirror',
+              self.config['chrome_mirror']
           ],
           switch_cmd=switch_cmd,
           eval_cmd=eval_cmd,
@@ -289,13 +285,15 @@ class CrosDiagnoser(object):
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch ChromeOS version
     """
-    bisector = wrapper.BisectorWrapper('bisect_cros_repo', self.session)
+    bisector = wrapper.BisectorWrapper('bisect_cros_repo',
+                                       self.config['session'])
     bisector.init_if_necessary(
         self.cros_old,
         self.cros_new,
         init_args=[
-            '--dut', self.dut, '--board', self.board, '--chromeos_root',
-            self.chromeos_root, '--chromeos_mirror', self.chromeos_mirror
+            '--dut', self.dut, '--board', self.config['board'],
+            '--chromeos_root', self.config['chromeos_root'],
+            '--chromeos_mirror', self.config['chromeos_mirror']
         ],
         switch_cmd=['./switch_cros_localbuild.py'],
         eval_cmd=eval_cmd,
