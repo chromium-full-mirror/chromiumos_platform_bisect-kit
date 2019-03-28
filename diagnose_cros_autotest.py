@@ -239,6 +239,11 @@ class DiagnoseCommandLine(object):
         test_that_args=opts.args,
         always_reflash=opts.always_reflash,
         reboot_before_test=opts.reboot_before_test,
+        bypass_chromeos_prebuilt=opts.bypass_chromeos_prebuilt,
+        bypass_chromeos_build=opts.bypass_chromeos_build,
+        bypass_chrome_build=opts.bypass_chrome_build,
+        bypass_android_prebuilt=opts.bypass_android_prebuilt,
+        bypass_android_build=opts.bypass_android_build,
     )
 
     self.states.init(config)
@@ -547,6 +552,26 @@ class DiagnoseCommandLine(object):
         '--reboot_before_test',
         action='store_true',
         help='Reboot before test run')
+    group.add_argument(
+        '--bypass_chromeos_prebuilt',
+        action='store_true',
+        help='Bypass chromeos prebuilt image bisect')
+    group.add_argument(
+        '--bypass_chromeos_build',
+        action='store_true',
+        help='Bypass chromeos local build bisect')
+    group.add_argument(
+        '--bypass_chrome_build',
+        action='store_true',
+        help='Bypass chrome local build bisect')
+    group.add_argument(
+        '--bypass_android_prebuilt',
+        action='store_true',
+        help='Bypass android prebuilt image bisect')
+    group.add_argument(
+        '--bypass_android_build',
+        action='store_true',
+        help='Bypass chromeos local build bisect')
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser('run', help='Start auto bisection')

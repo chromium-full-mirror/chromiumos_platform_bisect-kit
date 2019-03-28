@@ -81,6 +81,12 @@ class CrosDiagnoser(object):
     self.old_info = None
     self.new_info = None
 
+  def _verified_chromeos_prebuilt(self):
+    if self.config['bypass_chromeos_prebuilt']:
+      return 'assume'
+    else:
+      return 'verified'
+
   def narrow_down_chromeos_prebuilt(self,
                                     old,
                                     new,
@@ -94,20 +100,27 @@ class CrosDiagnoser(object):
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch chromeos version
     """
-    bisector = wrapper.BisectorWrapper('bisect_cros_version',
-                                       self.config['session'])
-    bisector.init_if_necessary(
-        old,
-        new,
-        init_args=['--dut', self.dut, '--board', self.config['board']],
-        switch_cmd=['./switch_cros_prebuilt.py'],
-        eval_cmd=eval_cmd,
-        noisy=self.noisy)
-    if extra_switch_cmd:
-      bisector.append_switch_command(extra_switch_cmd)
+    if self.config['bypass_chromeos_prebuilt']:
+      logger.info('bypassed chromeos prebuilt image bisect; '
+                  'assume that old chromeos has old behavior and '
+                  'new chromeos has new behavior')
+      self.cros_old = old
+      self.cros_new = new
+    else:
+      bisector = wrapper.BisectorWrapper('bisect_cros_version',
+                                         self.config['session'])
+      bisector.init_if_necessary(
+          old,
+          new,
+          init_args=['--dut', self.dut, '--board', self.config['board']],
+          switch_cmd=['./switch_cros_prebuilt.py'],
+          eval_cmd=eval_cmd,
+          noisy=self.noisy)
+      if extra_switch_cmd:
+        bisector.append_switch_command(extra_switch_cmd)
 
-    self.cros_old, self.cros_new, self.noisy = bisector.narrow_down(
-        self.states, 'bisect chromeos prebuilt')
+      self.cros_old, self.cros_new, self.noisy = bisector.narrow_down(
+          self.states, 'bisect chromeos prebuilt')
 
     self.old_info = cros_util.version_info(self.config['board'], self.cros_old)
     self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
@@ -147,35 +160,46 @@ class CrosDiagnoser(object):
     if not need_android_bisect(self.old_info, self.new_info):
       return False
 
-    logger.info('bisect android prebuilt')
-    session = '%s/%s' % (self.config['session'], self.cros_old)
-    bisector = wrapper.BisectorWrapper('bisect_android_build_id', session)
-    try:
-      bisector.init_if_necessary(
-          self.old_info['android_build_id'],
-          self.new_info['android_build_id'],
-          init_args=[
-              '--dut',
-              self.dut,
-              '--branch',
-              self.old_info['android_branch'],
-          ],
-          switch_cmd=['./switch_arc_prebuilt.py'],
-          eval_cmd=eval_cmd,
-          noisy=self.noisy)
-      if extra_switch_cmd:
-        bisector.append_switch_command(extra_switch_cmd)
-
-      android_old, android_new, self.noisy = bisector.narrow_down(
-          self.states, 'bisect android prebuilt')
-    except errors.VerifyOldBehaviorFailed:
-      logger.exception('expect old android has old behavior but failed')
-      raise errors.DiagnoseContradiction(
-          'verified that old chromeos has old behavior; '
-          'but it became new behavior after deployed old android prebuilt')
-    except errors.VerifyNewBehaviorFailed:
-      logger.info('unable to reproduce, culprit is not in android')
+    if (self.config['bypass_android_prebuilt'] and
+        self.config['bypass_android_build']):
+      logger.info('bypassed android bisect')
       return False
+
+    session = '%s/%s' % (self.config['session'], self.cros_old)
+    if self.config['bypass_android_prebuilt']:
+      logger.info('bypassed android prebuilt bisect')
+      android_old = self.old_info['android_build_id']
+      android_new = self.new_info['android_build_id']
+    else:
+      logger.info('bisect android prebuilt')
+      bisector = wrapper.BisectorWrapper('bisect_android_build_id', session)
+      try:
+        bisector.init_if_necessary(
+            self.old_info['android_build_id'],
+            self.new_info['android_build_id'],
+            init_args=[
+                '--dut',
+                self.dut,
+                '--branch',
+                self.old_info['android_branch'],
+            ],
+            switch_cmd=['./switch_arc_prebuilt.py'],
+            eval_cmd=eval_cmd,
+            noisy=self.noisy)
+        if extra_switch_cmd:
+          bisector.append_switch_command(extra_switch_cmd)
+
+        android_old, android_new, self.noisy = bisector.narrow_down(
+            self.states, 'bisect android prebuilt')
+      except errors.VerifyOldBehaviorFailed:
+        logger.exception('expect old android has old behavior but failed')
+        raise errors.DiagnoseContradiction(
+            '%s that old chromeos has old behavior; '
+            'but it became new behavior after deployed old android prebuilt' %
+            self._verified_chromeos_prebuilt())
+      except errors.VerifyNewBehaviorFailed:
+        logger.info('unable to reproduce, culprit is not in android')
+        return False
 
     # TODO(kcwu): what if the branch name does not have 'git_' prefix
     assert self.old_info['android_branch'].startswith('git_')
@@ -216,12 +240,21 @@ class CrosDiagnoser(object):
 
       android_old, android_new, self.noisy = bisector.narrow_down(
           self.states, 'bisect android local build')
-    except errors.VerificationFailed:
-      logger.exception(
-          'verified with android prebuilt but failed with local build')
-      raise errors.DiagnoseContradiction(
-          'verified that the issue could be reproduced with android prebuilt; '
-          'but unable to reproduce with local build')
+    except errors.VerificationFailed as e:
+      if not self.config['bypass_android_prebuilt']:
+        logger.exception(
+            'verified with android prebuilt but failed with local build')
+        raise errors.DiagnoseContradiction(
+            'verified that the issue could be reproduced with '
+            'android prebuilt; but unable to reproduce with local build')
+      elif isinstance(e, errors.VerifyOldBehaviorFailed):
+        raise errors.DiagnoseContradiction(
+            '%s that old chromeos has old behavior; '
+            'but it became new behavior after deployed old android prebuilt' %
+            self._verified_chromeos_prebuilt())
+      else:
+        logger.info('unable to reproduce, culprit is not in android')
+        return False
     return True
 
   def narrow_down_chrome(self,
@@ -244,6 +277,10 @@ class CrosDiagnoser(object):
     """
     if self.old_info['cr_version'] == self.new_info['cr_version']:
       logger.info('chrome version identical')
+      return False
+
+    if self.config['bypass_chrome_build']:
+      logger.info('bypassed chrome local build bisect')
       return False
 
     logger.info('bisect chrome local build')
@@ -271,8 +308,9 @@ class CrosDiagnoser(object):
     except errors.VerifyOldBehaviorFailed:
       logger.exception('expect old chrome has old behavior but failed')
       raise errors.DiagnoseContradiction(
-          'verified that old chromeos has old behavior; '
-          'but it became new behavior after deployed chrome')
+          '%s that old chrome os has old behavior; '
+          'but it became new behavior after deployed chrome' %
+          self._verified_chromeos_prebuilt())
     except errors.VerifyNewBehaviorFailed:
       logger.info('unable to reproduce, culprit is not in chrome')
       return False
@@ -285,6 +323,10 @@ class CrosDiagnoser(object):
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch ChromeOS version
     """
+    if self.config['bypass_chromeos_build']:
+      logger.info('bypassed chromeos local build bisect')
+      return
+
     bisector = wrapper.BisectorWrapper('bisect_cros_repo',
                                        self.config['session'])
     bisector.init_if_necessary(
@@ -305,8 +347,9 @@ class CrosDiagnoser(object):
       bisector.narrow_down(self.states, 'bisect chromeos local build')
     except errors.VerificationFailed:
       raise errors.DiagnoseContradiction(
-          'verified that the issue could be reproduced with chromeos prebuilt; '
-          'but unable to reproduce with local build')
+          '%s that the issue could be reproduced with chromeos prebuilt; '
+          'but unable to reproduce with local build' %
+          self._verified_chromeos_prebuilt())
 
   def cmd_log(self, json_output=False):
     result = []
