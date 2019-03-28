@@ -630,7 +630,7 @@ class NoisyBinarySearch(object):
          (non_skip_count + 1) * (SKIP_FOREVER + 2))):
       raise errors.UnableToProceed(
           'something wrong, '
-          'unable to evalulate rev=%r (skip) %d times' %
+          'unable to evaluate rev=%r (skip) %d times' %
           (self.rev_info[idx].rev, self.rev_info[idx]['skip']))
 
   def show_summary(self, more=False):
