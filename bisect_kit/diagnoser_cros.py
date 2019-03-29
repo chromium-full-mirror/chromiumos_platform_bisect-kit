@@ -345,10 +345,15 @@ class CrosDiagnoser(object):
 
     try:
       bisector.narrow_down(self.states, 'bisect chromeos local build')
-    except errors.VerificationFailed:
+    except errors.VerifyNewBehaviorFailed:
       raise errors.DiagnoseContradiction(
           '%s that the issue could be reproduced with chromeos prebuilt; '
           'but unable to reproduce with local build' %
+          self._verified_chromeos_prebuilt())
+    except errors.VerifyOldBehaviorFailed:
+      raise errors.DiagnoseContradiction(
+          '%s that the issue could only be reproduced with new chromeos '
+          'prebuilt; but reproduced with both old and new local build' %
           self._verified_chromeos_prebuilt())
 
   def cmd_log(self, json_output=False):
