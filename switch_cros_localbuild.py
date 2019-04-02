@@ -77,14 +77,33 @@ def create_argument_parser():
 
 
 def mark_as_stable(opts):
-  cmd = ['chromite/bin/cros_list_overlays', '--all']
-  output = util.check_output(*cmd, cwd=opts.chromeos_root)
-  overlays = ':'.join(output.splitlines())
+  overlays = util.check_output(
+      'chromite/bin/cros_list_overlays', '--all',
+      cwd=opts.chromeos_root).splitlines()
+
+  # Get overlays listed in manifest file.
+  known_projects = []
+  for path in repo_util.projects_in_manifest(opts.chromeos_root):
+    known_projects.append(
+        os.path.realpath(os.path.join(opts.chromeos_root, path)))
+  logger.debug('known_projects %s', known_projects)
+
+  # Skip recent added overlays.
+  # cros_mark_as_stable expects all overlays is recorded in manifest file
+  # but we haven't synthesized manifest files for each intra versions yet.
+  # TODO(kcwu): synthesize manifest file
+  for overlay in list(overlays):
+    if 'private-overlays/' in overlay and overlay not in known_projects:
+      logger.warning(
+          'bisect-kit cannot handle recently added overlay %s yet; ignore',
+          overlay)
+      overlays.remove(overlay)
+      continue
 
   cmd = [
       'chromite/bin/cros_mark_as_stable',
       '-b', opts.board,
-      '-o', overlays,
+      '--overlays', ':'.join(overlays),
       '--debug',
       '--all',
       'commit',

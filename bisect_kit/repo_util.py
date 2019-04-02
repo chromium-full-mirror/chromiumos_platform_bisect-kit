@@ -280,6 +280,18 @@ class ManifestParser(object):
                                             end_time, parse_dependencies)
 
 
+def projects_in_manifest(repo_root):
+  manifest_dir = os.path.join(repo_root, '.repo', 'manifests')
+  manifest_file = os.path.join(repo_root, '.repo', 'manifest.xml')
+  parser = ManifestParser(manifest_dir)
+  manifest = open(manifest_file).read()
+  root = parser.parse_single_xml(manifest)
+  result = []
+  for node in root.findall('.//project'):
+    result.append(node.get('path', node.get('name')))
+  return result
+
+
 class RepoMirror(codechange.CodeStorage):
   """Repo git mirror."""
 
