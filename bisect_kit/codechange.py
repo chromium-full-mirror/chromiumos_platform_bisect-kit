@@ -405,6 +405,8 @@ class GitAddRepo(Action):
         timestamp=self.timestamp,
         action_type='add_repo',
         path=self.path,
+        repo_url=self.repo_url,
+        rev=self.rev,
         text=text,
     )
 
