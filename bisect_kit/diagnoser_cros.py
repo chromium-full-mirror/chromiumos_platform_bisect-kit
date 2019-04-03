@@ -157,13 +157,14 @@ class CrosDiagnoser(object):
       True: culprit is inside Android
       False: culprit is not inside Android or unable to bisect
     """
+    verified = False
     if not need_android_bisect(self.old_info, self.new_info):
-      return False
+      return verified
 
     if (self.config['bypass_android_prebuilt'] and
         self.config['bypass_android_build']):
       logger.info('bypassed android bisect')
-      return False
+      return verified
 
     session = '%s/%s' % (self.config['session'], self.cros_old)
     if self.config['bypass_android_prebuilt']:
@@ -191,6 +192,7 @@ class CrosDiagnoser(object):
 
         android_old, android_new, self.noisy = bisector.narrow_down(
             self.states, 'bisect android prebuilt')
+        verified = True
       except errors.VerifyOldBehaviorFailed:
         logger.exception('expect old android has old behavior but failed')
         raise errors.DiagnoseContradiction(
@@ -199,7 +201,11 @@ class CrosDiagnoser(object):
             self._verified_chromeos_prebuilt())
       except errors.VerifyNewBehaviorFailed:
         logger.info('unable to reproduce, culprit is not in android')
-        return False
+        return verified
+
+    if self.config['bypass_android_build']:
+      logger.info('bypassed android local build bisect')
+      return verified
 
     # TODO(kcwu): what if the branch name does not have 'git_' prefix
     assert self.old_info['android_branch'].startswith('git_')
@@ -216,11 +222,11 @@ class CrosDiagnoser(object):
     if not os.path.exists(android_mirror):
       logger.info(
           'android_mirror does not exist; skip android local build bisect')
-      return True
+      return verified
     if not os.path.exists(android_root):
       logger.info(
           'android_root does not exist; skip android local build bisect')
-      return True
+      return verified
 
     logger.info('bisect android local build')
     bisector = wrapper.BisectorWrapper('bisect_android_repo', session)
@@ -240,8 +246,9 @@ class CrosDiagnoser(object):
 
       android_old, android_new, self.noisy = bisector.narrow_down(
           self.states, 'bisect android local build')
+      verified = True
     except errors.VerificationFailed as e:
-      if not self.config['bypass_android_prebuilt']:
+      if verified:
         logger.exception(
             'verified with android prebuilt but failed with local build')
         raise errors.DiagnoseContradiction(
@@ -254,8 +261,8 @@ class CrosDiagnoser(object):
             self._verified_chromeos_prebuilt())
       else:
         logger.info('unable to reproduce, culprit is not in android')
-        return False
-    return True
+        return verified
+    return verified
 
   def narrow_down_chrome(self,
                          eval_cmd,
