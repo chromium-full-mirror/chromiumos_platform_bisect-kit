@@ -89,14 +89,6 @@ def create_argument_parser():
       help=
       'Metric name of performance test; example: "cheets_SystemRawImageSize"')
   group.add_argument(
-      '--old_value',
-      type=float,
-      help='For performance test, old value of given metric')
-  group.add_argument(
-      '--new_value',
-      type=float,
-      help='For performance test, new value of given metric')
-  group.add_argument(
       '--args',
       help='Extra args passed to "test_that --args"; Overrides the default')
 
@@ -306,21 +298,8 @@ def main(args=None):
 
   # Verify command line options.
   if opts.metric:
-    if opts.old_value is None:
-      logger.error('--old_value is not provided')
-      return FATAL
-    if opts.new_value is None:
-      logger.error('--new_value is not provided')
-      return FATAL
     if opts.fail_to_pass:
       logger.error('--fail_to_pass is not for benchmark test (--metric)')
-      return FATAL
-  else:
-    if opts.old_value is not None:
-      logger.error('--old_value is provided but --metric is not')
-      return FATAL
-    if opts.new_value is not None:
-      logger.error('--new_value is provided but --metric is not')
       return FATAL
   if opts.test_name.startswith('telemetry_'):
     if not opts.chrome_root:
@@ -345,12 +324,9 @@ def main(args=None):
       return SKIP
 
     print('BISECT_RESULT_VALUES=', ' '.join(map(str, values)))
-    average = float(sum(values)) / len(values)
-    if abs(average - opts.old_value) < abs(average - opts.new_value):
-      logger.info('values=%s, average=%s; OLD', values, average)
-      return OLD
-    logger.info('values=%s, average=%s; NEW', values, average)
-    return NEW
+    logger.info('values=%s', values)
+    # The exit code doesn't matter.
+    return OLD
   else:
     if opts.fail_to_pass:
       if passed:

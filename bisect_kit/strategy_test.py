@@ -80,6 +80,20 @@ class TestNoisyBinarySearch(unittest.TestCase):
     self.assertAlmostEqual(prob[49], 0)
     self.assertAlmostEqual(prob[50], 1)
 
+  def test_classify_result_from_values(self):
+    bsearch = strategy.NoisyBinarySearch(
+        self.rev_info, old_value=10, new_value=1000, oracle=(0, 0.9))
+    self.assertEqual(bsearch.classify_result_from_values([1]), 'old')
+    self.assertEqual(bsearch.classify_result_from_values([100]), 'old')
+    self.assertEqual(bsearch.classify_result_from_values([400]), 'old')
+    self.assertEqual(bsearch.classify_result_from_values([600]), 'new')
+    self.assertEqual(bsearch.classify_result_from_values([1111]), 'new')
+
+    self.assertEqual(
+        bsearch.classify_result_from_values([300, 400, 500]), 'old')
+    self.assertEqual(
+        bsearch.classify_result_from_values([500, 600, 700]), 'new')
+
   def test_rebuild(self):
     bsearch = strategy.NoisyBinarySearch(
         self.rev_info, confidence=0.99, oracle=(0, 0.9))

@@ -115,6 +115,8 @@ class CrosDiagnoser(object):
           init_args=['--dut', self.dut, '--board', self.config['board']],
           switch_cmd=['./switch_cros_prebuilt.py'],
           eval_cmd=eval_cmd,
+          old_value=self.config['old_value'],
+          new_value=self.config['new_value'],
           noisy=self.noisy)
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
@@ -186,6 +188,8 @@ class CrosDiagnoser(object):
             ],
             switch_cmd=['./switch_arc_prebuilt.py'],
             eval_cmd=eval_cmd,
+            old_value=self.config['old_value'],
+            new_value=self.config['new_value'],
             noisy=self.noisy)
         if extra_switch_cmd:
           bisector.append_switch_command(extra_switch_cmd)
@@ -240,6 +244,8 @@ class CrosDiagnoser(object):
           ],
           switch_cmd=['./switch_arc_localbuild.py'],
           eval_cmd=eval_cmd,
+          old_value=self.config['old_value'],
+          new_value=self.config['new_value'],
           noisy=self.noisy)
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
@@ -307,6 +313,8 @@ class CrosDiagnoser(object):
           ],
           switch_cmd=switch_cmd,
           eval_cmd=eval_cmd,
+          old_value=self.config['old_value'],
+          new_value=self.config['new_value'],
           noisy=self.noisy)
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
@@ -346,6 +354,8 @@ class CrosDiagnoser(object):
         ],
         switch_cmd=['./switch_cros_localbuild.py'],
         eval_cmd=eval_cmd,
+        old_value=self.config['old_value'],
+        new_value=self.config['new_value'],
         noisy=self.noisy)
     if extra_switch_cmd:
       bisector.append_switch_command(extra_switch_cmd)

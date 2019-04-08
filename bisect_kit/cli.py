@@ -401,7 +401,11 @@ class BisectorCommandLine(object):
     new_idx = revlist.index(config['new'])
     assert old_idx < new_idx
 
-    config.update(confidence=opts.confidence, noisy=opts.noisy)
+    config.update(
+        confidence=opts.confidence,
+        noisy=opts.noisy,
+        old_value=opts.old_value,
+        new_value=opts.new_value)
 
     self.states.init(config, revlist)
     self.states.save()
@@ -438,6 +442,9 @@ class BisectorCommandLine(object):
     t1 = time.time()
     if status == 'skip':
       return 'eval', status, values
+
+    if self.strategy.is_value_bisection():
+      status = self.strategy.classify_result_from_values(values)
     self.states.data['stats']['eval_count'] += 1
     self.states.data['stats']['eval_time'] += t1 - t0
 
@@ -490,7 +497,11 @@ class BisectorCommandLine(object):
           self.strategy.check_verification_range()
 
         step, status, values = self._switch_and_eval(rev, prev_rev=prev_rev)
-        logger.info('rev=%s status => %s', rev, self._format_status(status))
+        if self.strategy.is_value_bisection():
+          logger.info('rev=%s status => %s: %s', rev,
+                      self._format_status(status), values)
+        else:
+          logger.info('rev=%s status => %s', rev, self._format_status(status))
         force = False
 
         self.states.add_sample(idx, status, values=values)
@@ -631,6 +642,8 @@ class BisectorCommandLine(object):
           self.states.rev_info,
           self.states.rev2idx(self.config['old']),
           self.states.rev2idx(self.config['new']),
+          old_value=self.config['old_value'],
+          new_value=self.config['new_value'],
           confidence=self.config['confidence'],
           observation=self.config['noisy'])
       try:
@@ -844,6 +857,14 @@ class BisectorCommandLine(object):
         'and new fail rate increased to 2/3. '
         'Skip if not flaky, say, "new=2/3" means old is always good.')
     parser_init.add_argument(
+        '--old_value',
+        type=float,
+        help='For performance test, value of old behavior')
+    parser_init.add_argument(
+        '--new_value',
+        type=float,
+        help='For performance test, value of new behavior')
+    parser_init.add_argument(
         '--confidence',
         type=float,
         default=DEFAULT_CONFIDENCE,
@@ -972,6 +993,8 @@ class BisectorCommandLine(object):
           self.states.rev_info,
           self.states.rev2idx(self.config['old']),
           self.states.rev2idx(self.config['new']),
+          old_value=self.config['old_value'],
+          new_value=self.config['new_value'],
           confidence=self.config['confidence'],
           observation=self.config['noisy'])
 

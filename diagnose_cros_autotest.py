@@ -276,8 +276,6 @@ class DiagnoseCommandLine(object):
     if self.config['metric']:
       common_eval_cmd += [
           '--metric', self.config['metric'],
-          '--old_value', str(self.config['old_value']),
-          '--new_value', str(self.config['new_value']),
       ]  # yapf: disable
     elif self.config['fail_to_pass']:
       common_eval_cmd.append('--fail_to_pass')

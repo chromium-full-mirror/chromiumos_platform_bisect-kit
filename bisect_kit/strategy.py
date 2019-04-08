@@ -40,6 +40,8 @@ class NoisyBinarySearch(object):
                rev_info,
                old_idx=0,
                new_idx=None,
+               old_value=None,
+               new_value=None,
                oracle=None,
                observation=None,
                confidence=0.999,
@@ -73,6 +75,8 @@ class NoisyBinarySearch(object):
       rev_info: List of RevInfo.
       old_idx: Index of rev, which has old behavior.
       new_idx: Index of rev, which has new behavior.
+      old_value: For value bisection, the value of old version.
+      new_value: For value bisection, the value of new version.
       oracle: The oracle model of probability distribution.
       observation: Observed test results.
       confidence: Required confidence for bisection result.
@@ -84,6 +88,8 @@ class NoisyBinarySearch(object):
     self.rev_info = rev_info
     self.old_idx = old_idx
     self.new_idx = new_idx
+    self.old_value = old_value
+    self.new_value = new_value
     self.oracle = oracle
     if observation is None:
       self.prior_observation = None
@@ -464,6 +470,16 @@ class NoisyBinarySearch(object):
         return True
 
     return False
+
+  def is_value_bisection(self):
+    return self.old_value is not None and self.new_value is not None
+
+  def classify_result_from_values(self, values):
+    assert values
+    average = float(sum(values)) / len(values)
+    if abs(average - self.old_value) < abs(average - self.new_value):
+      return 'old'
+    return 'new'
 
   def update(self, idx, result):
     """Incremental update by one more test result.
