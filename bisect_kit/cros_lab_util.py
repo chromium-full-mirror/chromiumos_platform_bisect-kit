@@ -115,6 +115,9 @@ def list_host(host=None, labels=None, statuses=None, locked=None, server=None):
         value = set(value.split(', '))
       elif key == 'Locked':
         value = (value == 'True')
+      elif key == 'Shard':
+        if value == 'None':
+          value = None
       entry[key] = value
     result[entry['Host']] = entry
 
