@@ -444,6 +444,10 @@ class BisectorCommandLine(object):
       return 'eval', status, values
 
     if self.strategy.is_value_bisection():
+      if not values:
+        raise errors.ExecutionFatalError(
+            'eval command (%s) terminated normally but did not output values' %
+            self.config['evaluate_cmd'])
       status = self.strategy.classify_result_from_values(values)
     self.states.data['stats']['eval_count'] += 1
     self.states.data['stats']['eval_time'] += t1 - t0

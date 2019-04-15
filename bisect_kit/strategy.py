@@ -475,7 +475,7 @@ class NoisyBinarySearch(object):
     return self.old_value is not None and self.new_value is not None
 
   def classify_result_from_values(self, values):
-    assert values
+    assert values, 'eval script terminated normally but does not output values?'
     average = float(sum(values)) / len(values)
     if abs(average - self.old_value) < abs(average - self.new_value):
       return 'old'

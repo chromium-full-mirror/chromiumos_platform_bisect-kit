@@ -316,7 +316,11 @@ def main(args=None):
   if not result_dir:
     return FATAL
 
-  passed, values = gather_test_result(opts, result_dir)
+  try:
+    passed, values = gather_test_result(opts, result_dir)
+  except Exception:
+    logger.exception('failed to parse test result')
+    return FATAL
 
   if opts.metric:
     if not values:
