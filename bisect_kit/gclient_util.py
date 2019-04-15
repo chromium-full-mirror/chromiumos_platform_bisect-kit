@@ -690,6 +690,7 @@ class GclientCache(codechange.CodeStorage):
     norm_url = parsed.netloc + parsed.path
     if norm_url.endswith('.git'):
       norm_url = norm_url[:-len('.git')]
+    norm_url = norm_url.replace('googlesource.com/a/', 'googlesource.com/')
     return norm_url.replace('-', '--').replace('/', '-').lower()
 
   def cached_git_root(self, repo_url):
