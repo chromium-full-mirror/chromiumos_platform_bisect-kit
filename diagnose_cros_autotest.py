@@ -201,6 +201,9 @@ class DiagnoseCommandLine(object):
       if opts.new_value is not None:
         self.argument_parser.error(
             '--new_value is provided but --metric is not')
+      if opts.recompute_init_values is not None:
+        self.argument_parser.error(
+            '--recompute_init_values is provided but --metric is not')
 
   def cmd_init(self, opts):
     path_factory = setup_cros_bisect.DefaultProjectPathFactory(
@@ -229,6 +232,7 @@ class DiagnoseCommandLine(object):
         metric=opts.metric,
         old_value=opts.old_value,
         new_value=opts.new_value,
+        recompute_init_values=opts.recompute_init_values,
         cts_revision=opts.cts_revision,
         cts_abi=opts.cts_abi,
         cts_prefix=opts.cts_prefix,
@@ -515,6 +519,10 @@ class DiagnoseCommandLine(object):
         '--new_value',
         type=float,
         help='For benchmark test, new value of metric')
+    group.add_argument(
+        '--recompute_init_values',
+        action='store_true',
+        help='For performance test, recompute initial values')
 
     group = parser_init.add_argument_group(title='Options for CTS/GTS tests')
     group.add_argument('--cts_revision', help='CTS revision, like "9.0_r3"')

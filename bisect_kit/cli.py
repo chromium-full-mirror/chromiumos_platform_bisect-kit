@@ -373,11 +373,6 @@ class BisectorCommandLine(object):
       return '%s behavior' % status
     return status
 
-  def _add_sample(self, rev, status, **kwargs):
-    idx = self.states.rev2idx(rev)
-    self.states.add_sample(idx, status, **kwargs)
-    self.strategy.update(idx, status)
-
   def cmd_reset(self, _opts):
     """Resets bisect session and clean up saved result."""
     self.states.reset()
@@ -387,6 +382,18 @@ class BisectorCommandLine(object):
 
     See init command's help message for more detail.
     """
+    if (opts.old_value is None) != (opts.new_value is None):
+      raise errors.ArgumentError('--old_value and --new_value',
+                                 'both should be specified')
+    if opts.old_value is not None and opts.old_value == opts.new_value:
+      raise errors.ArgumentError('--old_value and --new_value',
+                                 'their values should be different')
+    if opts.recompute_init_values and opts.old_value is None:
+      raise errors.ArgumentError(
+          '--recompute_init_values',
+          '--old_value and --new_value must be specified '
+          'when --recompute_init_values is present')
+
     config, revlist = self.domain_cls.init(opts)
     logger.info('found %d revs to bisect', len(revlist))
     logger.debug('revlist %r', revlist)
@@ -405,7 +412,8 @@ class BisectorCommandLine(object):
         confidence=opts.confidence,
         noisy=opts.noisy,
         old_value=opts.old_value,
-        new_value=opts.new_value)
+        new_value=opts.new_value,
+        recompute_init_values=opts.recompute_init_values)
 
     self.states.init(config, revlist)
     self.states.save()
@@ -420,39 +428,44 @@ class BisectorCommandLine(object):
       prev_rev: Previous version.
 
     Returns:
-      (step, status, values):
+      (step, sample):
         step: Last step executed ('switch' or 'eval').
-        status: Execution result ('old', 'new', or 'skip').
-        values: Collected values from eval step. None if last step is 'switch'.
+        sample (dict): sampling result of `rev`. The dict contains:
+          status: Execution result ('old', 'new', or 'skip').
+          values: For eval bisection, collected values from eval step.
+          switch_time: how much time in switch step
+          eval_time: how much time in eval step
     """
+    sample = {'rev': rev}
     if prev_rev != rev:
       logger.debug('switch to rev=%s', rev)
       t0 = time.time()
       status = do_switch(self.config['switch'], self.domain, rev)
       t1 = time.time()
+      sample['switch_time'] = t1 - t0
+      sample['status'] = status
       if status == 'skip':
         logger.debug('switch failed => skip')
-        return 'switch', status, None
-      self.states.data['stats']['switch_count'] += 1
-      self.states.data['stats']['switch_time'] += t1 - t0
+        return 'switch', sample
 
     logger.debug('eval rev=%s', rev)
     t0 = time.time()
     status, values = do_evaluate(self.config['eval'], self.domain, rev)
     t1 = time.time()
+    sample['eval_time'] = t1 - t0
+    sample['status'] = status
     if status == 'skip':
-      return 'eval', status, values
+      return 'eval', sample
 
     if self.strategy.is_value_bisection():
       if not values:
         raise errors.ExecutionFatalError(
             'eval command (%s) terminated normally but did not output values' %
-            self.config['evaluate_cmd'])
-      status = self.strategy.classify_result_from_values(values)
-    self.states.data['stats']['eval_count'] += 1
-    self.states.data['stats']['eval_time'] += t1 - t0
+            self.config['eval'])
+      sample['values'] = values
+      sample['status'] = self.strategy.classify_result_from_values(values)
 
-    return 'eval', status, values
+    return 'eval', sample
 
   def _next_idx_iter(self, opts, force):
     if opts.revs:
@@ -488,7 +501,6 @@ class BisectorCommandLine(object):
     try:
       assert self.config.get('switch')
       assert self.config.get('eval')
-      self.strategy.rebuild()
 
       prev_rev = None
       force = opts.force
@@ -500,24 +512,24 @@ class BisectorCommandLine(object):
           # range becomes not acceptable.
           self.strategy.check_verification_range()
 
-        step, status, values = self._switch_and_eval(rev, prev_rev=prev_rev)
-        if self.strategy.is_value_bisection():
-          logger.info('rev=%s status => %s: %s', rev,
-                      self._format_status(status), values)
-        else:
-          logger.info('rev=%s status => %s', rev, self._format_status(status))
-        force = False
-
-        self.states.add_sample(idx, status, values=values)
+        step, sample = self._switch_and_eval(rev, prev_rev=prev_rev)
+        self.states.add_history('sample', **sample)
         self.states.save()
+        if 'values' in sample:
+          logger.info('rev=%s status => %s: %s', rev,
+                      self._format_status(sample['status']), sample['values'])
+        else:
+          logger.info('rev=%s status => %s', rev,
+                      self._format_status(sample['status']))
+        force = False
 
         # Bail out if bisection range is unlikely true.
         self.strategy.check_verification_range()
 
-        self.strategy.update(idx, status)
+        self.strategy.add_sample(idx, **sample)
         self.strategy.show_summary()
 
-        if step == 'switch' and status == 'skip':
+        if step == 'switch' and sample['status'] == 'skip':
           # Previous switch failed and thus the current version is unknown. Set
           # it None, so next switch operation won't be bypassed (due to
           # optimization).
@@ -536,7 +548,7 @@ class BisectorCommandLine(object):
       self.states.save()
       raise
     finally:
-      if rev and sum(self.strategy.prob) > 0:
+      if rev and self.strategy.state == self.strategy.STARTED:
         # progress so far
         old_idx, new_idx = self.strategy.get_range()
         self.states.add_history(
@@ -547,25 +559,17 @@ class BisectorCommandLine(object):
 
   def cmd_view(self, opts):
     """Shows remaining candidates."""
-    try:
-      self.strategy.rebuild()
-      # Rebuild twice in order to re-estimate noise.
-      self.strategy.rebuild()
-    except errors.VerificationFailed:
-      # Do nothing, go ahead to show existing information anyway.
-      pass
-
     old_idx, new_idx = self.strategy.get_range()
     old, new = map(self.states.idx2rev, [old_idx, new_idx])
     highlight_old_idx, highlight_new_idx = self.strategy.get_range(
         self.strategy.confidence / 10.0)
     summary = {
-        'rev_info': [vars(info).copy() for info in self.states.rev_info],
+        'rev_info': [info.to_dict() for info in self.strategy.rev_info],
         'current_range': (old, new),
         'highlight_range':
             map(self.states.idx2rev, [highlight_old_idx, highlight_new_idx]),
         'prob':
-            self.strategy.prob,
+            self.strategy.get_prob(),
         'remaining_steps':
             self.strategy.remaining_steps(),
     }
@@ -627,6 +631,19 @@ class BisectorCommandLine(object):
           if 'link' in action:
             print('\t%s' % action['link'])
 
+  def _strategy_factory(self):
+    rev_info = self.states.load_rev_info()
+    assert rev_info
+    return strategy.NoisyBinarySearch(
+        rev_info,
+        self.states.rev2idx(self.config['old']),
+        self.states.rev2idx(self.config['new']),
+        old_value=self.config['old_value'],
+        new_value=self.config['new_value'],
+        recompute_init_values=self.config['recompute_init_values'],
+        confidence=self.config['confidence'],
+        observation=self.config['noisy'])
+
   def current_status(self, session=None, session_base=None):
     """Gets current bisect status.
 
@@ -642,19 +659,7 @@ class BisectorCommandLine(object):
     """
     self._create_states(session=session, session_base=session_base)
     if self.states.load():
-      self.strategy = strategy.NoisyBinarySearch(
-          self.states.rev_info,
-          self.states.rev2idx(self.config['old']),
-          self.states.rev2idx(self.config['new']),
-          old_value=self.config['old_value'],
-          new_value=self.config['new_value'],
-          confidence=self.config['confidence'],
-          observation=self.config['noisy'])
-      try:
-        self.strategy.rebuild()
-      except errors.VerificationFailed:
-        # Do nothing, go ahead to show existing information anyway.
-        pass
+      self.strategy = self._strategy_factory()
       left, right = self.strategy.get_range()
       estimated_noise = self.strategy.get_noise_observation()
 
@@ -698,7 +703,6 @@ class BisectorCommandLine(object):
 
   def cmd_next(self, _opts):
     """Prints next suggested rev to bisect."""
-    self.strategy.rebuild()
     if self.strategy.is_done():
       print('done')
       return
@@ -710,8 +714,6 @@ class BisectorCommandLine(object):
   def cmd_switch(self, opts):
     """Switches to given rev without eval."""
     assert self.config.get('switch')
-
-    self.strategy.rebuild()
 
     if opts.rev == 'next':
       idx = self.strategy.next_idx()
@@ -726,10 +728,18 @@ class BisectorCommandLine(object):
       print('switch failed')
 
   def _add_revs_status_helper(self, revs, status):
-    self.strategy.rebuild()
+    if self.strategy.is_value_bisection():
+      assert status not in ('old', 'new')
     for rev, times in revs:
-      self._add_sample(rev, status, times=times, comment='manual')
-    self.states.save()
+      idx = self.states.rev2idx(rev)
+      sample = {'rev': rev, 'status': status}
+      # times=1 is default in the loader. Add 'times' entry only if necessary
+      # in order to simplify the dict.
+      if times > 1:
+        sample['times'] = times
+      self.states.add_history('sample', **sample)
+      self.states.save()
+      self.strategy.add_sample(idx, **sample)
 
   def cmd_new(self, opts):
     """Tells bisect engine the said revs have "new" behavior."""
@@ -869,6 +879,10 @@ class BisectorCommandLine(object):
         type=float,
         help='For performance test, value of new behavior')
     parser_init.add_argument(
+        '--recompute_init_values',
+        action='store_true',
+        help='For performance test, recompute initial values')
+    parser_init.add_argument(
         '--confidence',
         type=float,
         default=DEFAULT_CONFIDENCE,
@@ -993,13 +1007,6 @@ class BisectorCommandLine(object):
     if opts.command not in ('init', 'reset', 'config'):
       self.states.load()
       self.domain = self.domain_cls(self.states.config)
-      self.strategy = strategy.NoisyBinarySearch(
-          self.states.rev_info,
-          self.states.rev2idx(self.config['old']),
-          self.states.rev2idx(self.config['new']),
-          old_value=self.config['old_value'],
-          new_value=self.config['new_value'],
-          confidence=self.config['confidence'],
-          observation=self.config['noisy'])
+      self.strategy = self._strategy_factory()
 
     return opts.func(opts)

@@ -12,6 +12,51 @@ import os
 from bisect_kit import core
 
 
+class TestRevInfo(unittest.TestCase):
+  """Test core.RevInfo class."""
+
+  def test_simple(self):
+    rev_info = core.RevInfo('foo')
+    self.assertEqual(rev_info.rev, 'foo')
+    self.assertEqual(rev_info['old'], 0)
+    self.assertEqual(rev_info['new'], 0)
+    self.assertEqual(rev_info['skip'], 0)
+
+  def test_add_sample(self):
+    rev_info = core.RevInfo('foo')
+    rev_info.add_sample(status='old')
+    self.assertEqual(rev_info['old'], 1)
+    rev_info.add_sample(status='old', times=2)
+    self.assertEqual(rev_info['old'], 3)
+
+  def test_averages(self):
+    rev_info = core.RevInfo('foo')
+    rev_info.add_sample(status='old', values=[1, 3])
+    self.assertEqual(rev_info.averages(), [2])
+    rev_info.add_sample(status='old', values=[6, 6])
+    self.assertEqual(rev_info.averages(), [2, 6])
+
+  def test_reclassify(self):
+    rev_info = core.RevInfo('foo')
+    rev_info.add_sample(status='init', values=[1, 3])
+    rev_info.add_sample(status='init', values=[10, 10])
+    rev_info.add_sample(status='init', values=[1, 100])
+    rev_info.add_sample(status='skip')
+    rev_info.reclassify(1, 3, 5)
+    self.assertEqual(rev_info['old'], 1)
+    self.assertEqual(rev_info['new'], 2)
+    self.assertEqual(rev_info['skip'], 1)
+
+  def test_reclassify_reverse(self):
+    rev_info = core.RevInfo('foo')
+    rev_info.add_sample(status='init', values=[1, 3])
+    rev_info.add_sample(status='init', values=[10, 10])
+    rev_info.add_sample(status='init', values=[1, 100])
+    rev_info.reclassify(5, 3, 1)
+    self.assertEqual(rev_info['old'], 2)
+    self.assertEqual(rev_info['new'], 1)
+
+
 class TestBisectStates(unittest.TestCase):
   """Test core.BisectStates class."""
 
@@ -28,25 +73,15 @@ class TestBisectStates(unittest.TestCase):
     self.assertEqual(states.idx2rev(1), 'b')
     self.assertEqual(states.rev2idx('b'), 1)
 
-    states.add_sample(1, 'old', times=5)
-    self.assertEqual(states.get(1)['old'], 5)
-
-    states.add_sample(1, 'old', comment='foobar')
-    self.assertEqual(states.get(1)['old'], 6)
-
   def test_save_and_load(self):
     states = core.BisectStates(self.session_file)
     revlist = map(str, range(10))
     states.init({}, revlist)
-    states.add_sample(1, 'old')
-    states.add_sample(1, 'old')
-    states.add_sample(5, 'new')
     states.config['foo'] = 'bar'
     states.save()
 
     states = core.BisectStates(self.session_file)
     states.load()
-    self.assertEqual(states.get(1)['old'], 2)
     self.assertEqual(states.config.get('foo'), 'bar')
     self.assertEqual(states.rev2idx('5'), 5)
 

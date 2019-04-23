@@ -40,6 +40,20 @@ def least(values):
   return min(x for x in values if x > 0)
 
 
+def average(values):
+  """Calculates average of values.
+
+  Args:
+    values: numbers, at least one element
+
+  Raises:
+    ValueError: if empty
+  """
+  if not values:
+    raise ValueError('calculate average of empty list')
+  return float(sum(values)) / len(values)
+
+
 class EntropyStats(object):
   r"""A data structure to maintain cross entropy of a set of values.
 

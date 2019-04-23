@@ -14,6 +14,21 @@ from bisect_kit import errors
 from bisect_kit import strategy
 
 
+class TestStrategy(unittest.TestCase):
+  """Test global functions in strategy module."""
+
+  def test_trend_score(self):
+    self.assertEqual(strategy.trend_score(1.0, 2.0, 1.0, 2.0), 1.0)
+    self.assertEqual(strategy.trend_score(1.0, 3.0, 100, 101), 0.5)
+    self.assertLess(strategy.trend_score(1.0, 3.0, 101, 100), 0)
+    self.assertEqual(strategy.trend_score(100.0, 300.0, 10.0, 30.0), 1.0)
+    self.assertEqual(strategy.trend_score(100.0, 300.0, 10.0, 20.0), 0.5)
+    self.assertLess(strategy.trend_score(100.0, 300.0, 20.0, 10.0), 0)
+
+    self.assertEqual(strategy.trend_score(0.0, 300.0, 0.0, 30.0), 0.1)
+    self.assertLess(strategy.trend_score(-10.0, 10.0, 10.0, -10.0), 0)
+
+
 # pylint: disable=protected-access
 class TestNoisyBinarySearch(unittest.TestCase):
   """Test NoisyBinarySearch class."""
@@ -80,40 +95,25 @@ class TestNoisyBinarySearch(unittest.TestCase):
     self.assertAlmostEqual(prob[49], 0)
     self.assertAlmostEqual(prob[50], 1)
 
-  def test_classify_result_from_values(self):
-    bsearch = strategy.NoisyBinarySearch(
-        self.rev_info, old_value=10, new_value=1000, oracle=(0, 0.9))
-    self.assertEqual(bsearch.classify_result_from_values([1]), 'old')
-    self.assertEqual(bsearch.classify_result_from_values([100]), 'old')
-    self.assertEqual(bsearch.classify_result_from_values([400]), 'old')
-    self.assertEqual(bsearch.classify_result_from_values([600]), 'new')
-    self.assertEqual(bsearch.classify_result_from_values([1111]), 'new')
-
-    self.assertEqual(
-        bsearch.classify_result_from_values([300, 400, 500]), 'old')
-    self.assertEqual(
-        bsearch.classify_result_from_values([500, 600, 700]), 'new')
-
-  def test_rebuild(self):
+  def test_prob(self):
     bsearch = strategy.NoisyBinarySearch(
         self.rev_info, confidence=0.99, oracle=(0, 0.9))
     for i in [0, 10, 20, 30, 40, 50]:
-      self.rev_info[i]['old'] += 1
+      bsearch.add_sample(i, 'old')
     for i in [60, 70, 80, 90, 99]:
-      self.rev_info[i]['new'] += 1
+      bsearch.add_sample(i, 'new')
 
-    bsearch.rebuild()
-
-    self.assertLess(bsearch.prob[5], bsearch.prob[15])
-    self.assertLess(bsearch.prob[15], bsearch.prob[25])
-    self.assertLess(bsearch.prob[25], bsearch.prob[35])
-    self.assertLess(bsearch.prob[35], bsearch.prob[45])
-    self.assertLess(bsearch.prob[45], bsearch.prob[55])
-    self.assertAlmostEqual(bsearch.prob[55], 0.09, 6)
-    self.assertAlmostEqual(bsearch.prob[65], 0)
-    self.assertAlmostEqual(bsearch.prob[75], 0)
-    self.assertAlmostEqual(bsearch.prob[85], 0)
-    self.assertAlmostEqual(bsearch.prob[95], 0)
+    prob = bsearch.get_prob()
+    self.assertLess(prob[5], prob[15])
+    self.assertLess(prob[15], prob[25])
+    self.assertLess(prob[25], prob[35])
+    self.assertLess(prob[35], prob[45])
+    self.assertLess(prob[45], prob[55])
+    self.assertAlmostEqual(prob[55], 0.09, 6)
+    self.assertAlmostEqual(prob[65], 0)
+    self.assertAlmostEqual(prob[75], 0)
+    self.assertAlmostEqual(prob[85], 0)
+    self.assertAlmostEqual(prob[95], 0)
 
     self.assertEqual(bsearch.get_range(), (40, 60))
     self.assertEqual(bsearch.next_idx(), 54)
@@ -124,15 +124,14 @@ class TestNoisyBinarySearch(unittest.TestCase):
         self.rev_info, observation='old=1/10,new=9/10')
     self.assertEqual(bsearch.get_noise_observation(), 'old=1/10,new=9/10')
 
-    self.rev_info[0]['old'] += 1
-    self.rev_info[10]['new'] += 1
-    self.rev_info[20]['old'] += 2
-    self.rev_info[30]['old'] += 20
-    self.rev_info[50]['new'] += 20
-    self.rev_info[60]['new'] += 20
-    self.rev_info[90]['old'] += 2
-    self.rev_info[99]['new'] += 1
-    bsearch.rebuild()
+    bsearch.add_sample(0, 'old')
+    bsearch.add_sample(10, 'new')
+    bsearch.add_sample(20, 'old', times=2)
+    bsearch.add_sample(30, 'old', times=20)
+    bsearch.add_sample(50, 'new', times=20)
+    bsearch.add_sample(60, 'new', times=20)
+    bsearch.add_sample(90, 'old', times=2)
+    bsearch.add_sample(99, 'new')
 
     self.assertEqual(bsearch.get_noise_observation(), 'old=2/34,new=50/53')
 
@@ -150,111 +149,102 @@ class TestNoisyBinarySearch(unittest.TestCase):
       rev_info.append(core.RevInfo(str(i)))
 
     bsearch = strategy.NoisyBinarySearch(rev_info, oracle=(0.01, 1))
-    rev_info[n - 1]['new'] += 1
-    rev_info[0]['old'] += 1
-    bsearch.rebuild()
+    bsearch.add_sample(n - 1, 'new')
+    bsearch.add_sample(0, 'old')
 
     rng = random.Random(0)
     for _ in range(10):
       idx = rng.randint(1, n - 2)
-      rev_info[idx]['skip'] += 1
-      bsearch.update(idx, 'skip')
+      bsearch.add_sample(idx, 'skip')
 
       # Should not raise ValueError (math domain error).
       bsearch.next_idx()
 
-  def test_update_skip(self):
+  def test_many_skip(self):
     bsearch = strategy.NoisyBinarySearch(self.rev_info, oracle=(0.1, 0.9))
-    bsearch.rebuild()
-    for _ in range(strategy.SKIP_FOREVER):
-      self.rev_info[99]['skip'] += 1
-      bsearch.update(99, 'skip')
+    for _ in range(strategy.SKIP_FOREVER - 1):
+      bsearch.add_sample(99, 'skip')
 
     with self.assertRaises(errors.UnableToProceed):
-      self.rev_info[99]['skip'] += 1
-      bsearch.update(99, 'skip')
+      bsearch.add_sample(99, 'skip')
 
-  def test_rebuild_skip(self):
+  def test_skip(self):
     bsearch = strategy.NoisyBinarySearch(self.rev_info, oracle=(0, 0.9))
-    self.rev_info[0]['old'] += 1
-    self.rev_info[99]['new'] += 1
-    bsearch.rebuild()
+    bsearch.add_sample(0, 'old')
+    bsearch.add_sample(99, 'new')
     self.assertEqual(bsearch.get_range(), (0, 99))
     self.assertEqual(bsearch.next_idx(), 45)
 
-    self.rev_info[45]['skip'] += 1
-    bsearch.rebuild()
+    bsearch.add_sample(45, 'skip')
     self.assertEqual(bsearch.get_range(), (0, 99))
     self.assertNotEqual(bsearch.next_idx(), 45)
 
   def test_skip_then_success(self):
     bsearch = strategy.NoisyBinarySearch(self.rev_info)
-    self.rev_info[0]['old'] += 1
-    self.rev_info[99]['skip'] += 10
-    bsearch.rebuild()
+    bsearch.add_sample(0, 'old')
+    bsearch.add_sample(99, 'new')
+    bsearch.add_sample(98, 'skip', times=strategy.SKIP_FOREVER)
     # Skip too many times, the probability is set to 0.
-    self.assertEqual(bsearch.prob[99], 0)
+    self.assertEqual(bsearch.get_prob()[98], 0)
 
     # Suddenly the result is not 'skip' any more. The probability jump from
     # zero to non-zero.
-    self.rev_info[99]['new'] += 1
-    bsearch.update(99, 'new')
-    self.assertGreater(bsearch.prob[99], 0)
+    bsearch.add_sample(98, 'new')
+    self.assertGreater(bsearch.get_prob()[98], 0)
 
   def test_get_range_with_skip(self):
     bsearch = strategy.NoisyBinarySearch(self.rev_info, oracle=(0, 0.9))
-    self.rev_info[0]['old'] += 1
-    self.rev_info[33]['old'] += 10
-    self.rev_info[34]['skip'] += 10
-    self.rev_info[35]['new'] += 10
-    bsearch.rebuild()
+    bsearch.add_sample(0, 'old')
+    bsearch.add_sample(33, 'old', times=10)
+    bsearch.add_sample(34, 'skip', times=strategy.SKIP_FOREVER)
+    bsearch.add_sample(35, 'new', times=10)
+    bsearch.add_sample(99, 'new')
 
     self.assertEqual(bsearch.get_range(), (33, 35))
 
-  def test_update_noisy(self):
+  def test_noisy(self):
     bsearch = strategy.NoisyBinarySearch(
         self.rev_info, confidence=0.99, oracle=(0, 0.9))
-    bsearch.rebuild()
+    self.assertTrue(bsearch.is_noisy())
     for i in [0, 10, 20, 30, 40, 50]:
-      self.rev_info[i]['old'] += 1
-      bsearch.update(i, 'old')
+      bsearch.add_sample(i, 'old')
     for i in [60, 70, 80, 90, 99]:
-      self.rev_info[i]['new'] += 1
-      bsearch.update(i, 'new')
+      bsearch.add_sample(i, 'new')
 
-    self.assertLess(bsearch.prob[5], bsearch.prob[15])
-    self.assertLess(bsearch.prob[15], bsearch.prob[25])
-    self.assertLess(bsearch.prob[25], bsearch.prob[35])
-    self.assertLess(bsearch.prob[35], bsearch.prob[45])
-    self.assertLess(bsearch.prob[45], bsearch.prob[55])
-    self.assertAlmostEqual(bsearch.prob[55], 0.09, 6)
-    self.assertAlmostEqual(bsearch.prob[65], 0)
-    self.assertAlmostEqual(bsearch.prob[75], 0)
-    self.assertAlmostEqual(bsearch.prob[85], 0)
-    self.assertAlmostEqual(bsearch.prob[95], 0)
+    prob = bsearch.get_prob()
+    self.assertLess(prob[5], prob[15])
+    self.assertLess(prob[15], prob[25])
+    self.assertLess(prob[25], prob[35])
+    self.assertLess(prob[35], prob[45])
+    self.assertLess(prob[45], prob[55])
+    self.assertAlmostEqual(prob[55], 0.09, 6)
+    self.assertAlmostEqual(prob[65], 0)
+    self.assertAlmostEqual(prob[75], 0)
+    self.assertAlmostEqual(prob[85], 0)
+    self.assertAlmostEqual(prob[95], 0)
 
     self.assertEqual(bsearch.get_range(), (40, 60))
     self.assertEqual(bsearch.next_idx(), 54)
     assert not bsearch.is_done()
 
-  def test_update_classic(self):
+    bsearch.show_summary()
+
+  def test_classic(self):
     self.rev_info = []
     for i in range(465):
       self.rev_info.append(core.RevInfo(str(i)))
     bsearch = strategy.NoisyBinarySearch(self.rev_info, 462, 463)
-    bsearch.rebuild()
     assert not bsearch.is_done()
 
-    self.rev_info[462]['old'] += 1
-    bsearch.update(462, 'old')
-    self.assertAlmostEqual(bsearch.prob[462], 0)
+    bsearch.add_sample(462, 'old')
     assert not bsearch.is_done()
 
-    self.rev_info[463]['new'] += 1
-    bsearch.update(463, 'new')
+    bsearch.add_sample(463, 'new')
     assert bsearch.is_done()
-    self.assertAlmostEqual(bsearch.prob[463], 1)
+    self.assertAlmostEqual(bsearch.get_prob()[463], 1)
     self.assertEqual(bsearch.get_range(), (462, 463))
+    self.assertEqual(bsearch.remaining_steps(), 0)
+    bsearch.show_summary()
 
   def perform_search(self, size, ans, old_p, new_p, confidence, random_seed=0):
     """Performs full noisy binary search.
@@ -279,7 +269,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
         oracle=(old_p, new_p),
         # Verify range until success.
         verify_confidence=1.0)
-    bsearch.rebuild()
 
     rng = random.Random(random_seed)
     count = 0
@@ -289,9 +278,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
         result = 'new'
       else:
         result = 'old'
-      rev_info[idx][result] += 1
       count += 1
-      bsearch.update(idx, result)
+      bsearch.add_sample(idx, result)
 
     return count, bsearch.get_best_guess()
 
@@ -365,6 +353,75 @@ class TestNoisyBinarySearch(unittest.TestCase):
     self.assertLess(common_guess[1], n)
     # With 0.9 confidence, about 0.9 of guesses are correct.
     self.assertGreater(common_guess[1], n * 0.9)
+
+  def test_recompute_init_values(self):
+    bsearch = strategy.NoisyBinarySearch(
+        self.rev_info,
+        0,
+        99,
+        old_value=10.0,
+        new_value=20.0,
+        recompute_init_values=True)
+    self.assertEqual(bsearch.next_idx(), 99)
+    self.assertEqual(bsearch.next_idx(), 99)
+
+    # same value, twice is enough
+    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 99)
+    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 0)
+
+    # different value, at least 3 times
+    bsearch.add_sample(0, 'init', values=[10.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 0)
+    bsearch.add_sample(0, 'init', values=[11.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 0)
+    bsearch.add_sample(0, 'init', values=[12.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 49)
+
+  def test_recompute_init_values_unreproducible(self):
+    bsearch = strategy.NoisyBinarySearch(
+        self.rev_info,
+        0,
+        99,
+        old_value=10.0,
+        new_value=20.0,
+        recompute_init_values=True)
+
+    # same value, twice is enough
+    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 99)
+    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 0)
+
+    # different value, at least 3 times
+    bsearch.add_sample(0, 'init', values=[19.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 0)
+    bsearch.add_sample(0, 'init', values=[18.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 0)
+    with self.assertRaises(errors.WrongAssumption):
+      bsearch.add_sample(0, 'init', values=[21.0], eval_time=1000)
+
+  def test_recompute_init_values_undecidable(self):
+    bsearch = strategy.NoisyBinarySearch(
+        self.rev_info,
+        0,
+        99,
+        old_value=10.0,
+        new_value=20.0,
+        recompute_init_values=True)
+
+    # same value, twice is enough
+    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+
+    # One sample with good trend
+    bsearch.add_sample(0, 'init', values=[10.0], eval_time=100)
+    self.assertEqual(bsearch.next_idx(), 0)
+    # But others are not, so need more samples
+    for _ in range(10):
+      bsearch.add_sample(0, 'init', values=[17.0], eval_time=100)
+      self.assertEqual(bsearch.next_idx(), 0)
 
 
 if __name__ == '__main__':

@@ -227,7 +227,6 @@ class TestBisectorCommandLine(unittest.TestCase):
 
       bisector.main('run')
       self.assertEqual(bisector.strategy.get_best_guess(), 42)
-      self.assertEqual(bisector.states.stats['eval_count'], 2 + 7)
 
     with mock.patch(
         'sys.stdout', new_callable=StringIO.StringIO) as mock_stdout:

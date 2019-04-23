@@ -12,6 +12,8 @@ import shutil
 import tempfile
 import time
 
+from bisect_kit import math_util
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,8 +25,11 @@ class RevInfo(object):
   Attributes:
     rev (str): revision id
     result_counter (dict): count of results, example: dict(new=3, old=2)
-    values (list of numbers): additional values collected during evaluation,
-                              like performance score.
+    values (list of list of numbers):
+        list of values collected during evaluations. There could be more than
+        one value for a single evaluation.
+    switch_time: total duration of switch step for such revision
+    eval_time: total duration of eval step for such revision
   """
 
   def __init__(self, rev):
@@ -32,15 +37,81 @@ class RevInfo(object):
 
     self.result_counter = {}
     self.values = []
+    self.switch_time = 0
+    self.eval_time = 0
+
+  def to_dict(self):
+    result = vars(self).copy()
+    result['averages'] = self.averages()
+    # backward compatible with old behavior
+    # TODO(kcwu): remove this after callers migrated
+    result['values'] = self.averages()
+    return result
 
   def __getitem__(self, key):
     return self.result_counter.get(key, 0)
 
   def __setitem__(self, key, value):
+    """Shortcut of add_sample()."""
     self.result_counter[key] = value
+    # Prune dead entries, so it looks good if we output 'result_counter'
+    # directly.
+    if value == 0:
+      del self.result_counter[key]
 
-  def append_values(self, values):
-    self.values += values
+  def summary(self):
+    """Summary of the result of this revision."""
+    averages = sorted(self.averages())
+    if not averages:
+      return '%s' % self.result_counter
+    if len(averages) == 1:
+      return '%s %.3f' % (self.result_counter, averages[0])
+
+    return '%s n=%d,avg=%.3f,median=%.3f,min=%.3f,max=%.3f' % (
+        self.result_counter, len(averages), math_util.average(averages),
+        averages[len(averages) // 2], averages[0], averages[-1])
+
+  def averages(self):
+    """Takes the average of sample values.
+
+    In other words, one (average) value for each sample.
+    """
+    return map(math_util.average, self.values)
+
+  def add_sample(self,
+                 status=None,
+                 values=None,
+                 times=None,
+                 switch_time=None,
+                 eval_time=None,
+                 **kwargs):
+    if 'rev' in kwargs:
+      assert kwargs['rev'] == self.rev
+    assert status in (None, 'init', 'old', 'new', 'skip')
+
+    if times is None:
+      times = 1
+    if values:
+      assert isinstance(values, list)
+      assert times == 1
+      self.values.append(values)
+    self[status] += times
+    if switch_time:
+      self.switch_time += switch_time
+    if eval_time:
+      self.eval_time += eval_time
+
+  def reclassify(self, old_avg, threshold, new_avg):
+    """Reclassify status by values."""
+    assert self['init'] == len(self.values) > 0
+    assert self['old'] + self['new'] == 0
+    for avg in self.averages():
+      if old_avg < new_avg:
+        status = 'old' if avg < threshold else 'new'
+      else:
+        status = 'new' if avg < threshold else 'old'
+      self['init'] -= 1
+      self[status] += 1
 
 
 class States(object):
@@ -122,9 +193,6 @@ class BisectStates(States):
     # Mapping of rev to idx; constructed from data['revlist'].
     self.rev_index = {}
 
-    # List of RevInfo; constructed from data['revlist'] and data['history'].
-    self.rev_info = []
-
   @property
   def config(self):
     return self.data['config']
@@ -163,30 +231,23 @@ class BisectStates(States):
   def set_data(self, data):
     super(BisectStates, self).set_data(data)
 
-    self.rev_info = []
     self.rev_index = {}
-
     for i, rev in enumerate(self.data['revlist']):
-      self.rev_info.append(RevInfo(rev))
       self.rev_index[rev] = i
 
+  def load_rev_info(self):
+    rev_info = []
+    for rev in self.data['revlist']:
+      rev_info.append(RevInfo(rev))
     for entry in self.data['history']:
       if entry.get('event', 'sample') != 'sample':
         continue
       idx = self.rev2idx(entry['rev'])
-      self.rev_info[idx][entry['status']] += entry.get('times', 1)
-      self.rev_info[idx].values += entry.get('values', [])
-
-  def get(self, idx):
-    """Get rev info by index.
-
-    Args:
-      idx: index of rev
-    """
-    return self.rev_info[idx]
+      rev_info[idx].add_sample(**entry)
+    return rev_info
 
   def idx2rev(self, idx):
-    return self.rev_info[idx].rev
+    return self.data['revlist'][idx]
 
   def rev2idx(self, rev):
     return self.rev_index[rev]
@@ -194,19 +255,6 @@ class BisectStates(States):
   def add_history(self, event, **kwargs):
     entry = dict(event=event, timestamp=time.time(), **kwargs)
     self.data['history'].append(entry)
-
-  def add_sample(self, idx, status, values=None, times=1, comment=''):
-    self.rev_info[idx][status] += times
-    if values:
-      self.rev_info[idx].append_values(values)
-    entry = dict(rev=self.idx2rev(idx), status=status)
-    if times > 1:
-      entry['times'] = times
-    if comment:
-      entry['comment'] = comment
-    if values:
-      entry['values'] = values
-    self.add_history('sample', **entry)
 
 
 class BisectDomain(object):

@@ -59,6 +59,7 @@ class BisectorWrapper(object):
                         eval_cmd,
                         old_value=None,
                         new_value=None,
+                        recompute_init_values=False,
                         noisy=None):
     status = self.current_status()
     if not status['inited']:
@@ -69,6 +70,8 @@ class BisectorWrapper(object):
         common_init_args += ['--old_value', str(old_value)]
       if new_value is not None:
         common_init_args += ['--new_value', str(new_value)]
+      if recompute_init_values:
+        common_init_args.append('--recompute_init_values')
       self.call('init', *(common_init_args + init_args))
 
     self.switch_cmds = [switch_cmd]

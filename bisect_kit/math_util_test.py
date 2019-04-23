@@ -41,6 +41,13 @@ class TestMathUtil(unittest.TestCase):
     with self.assertRaises(ValueError):
       math_util.least([])
 
+  def test_average(self):
+    self.assertAlmostEqual(math_util.average([5]), 5)
+    self.assertAlmostEqual(math_util.average([1, 2]), 1.5)
+
+    with self.assertRaises(ValueError):
+      math_util.average([])
+
 
 class TestEntropyStats(unittest.TestCase):
   """Test EntropyStats"""

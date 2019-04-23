@@ -15,12 +15,58 @@ from bisect_kit import math_util
 
 logger = logging.getLogger(__name__)
 
-# If a given version got more than SKIP_FOREVER times of 'skip' evaluation
-# result, ignores the said version forever.
-SKIP_FOREVER = 2
+# If a given version got equal to or more than SKIP_FOREVER times of 'skip'
+# evaluation result, ignores the said version forever.
+SKIP_FOREVER = 3
 
 # Constant that denotes version is known not noisy.
 NOT_NOISY = (None, None)
+
+
+def trend_score(prev_from, prev_to, now_from, now_to):
+  """Calculates "trend score".
+
+  Assume we have observed benchmark number changed from `prev_from` to
+  `prev_to` from a dashboard, say, from 100 to 110. Now, we reproduced the same
+  test locally and obtained our own benchmark values, from `now_from` to
+  `now_to`. Because our local test may not be able to reproduce the exact
+  identical changes (100 to 102) for some reasons, but it may have similar
+  trend, say, 95 to 97, which is considered as a good reproduction.
+
+  Here, we define the "similar trend" for two cases.
+    1. we can reproduce the delta, but the value shifted, ex. previous values
+       are 100->102 and our new values are 95->97 (delta=+2).
+    2. we can reproduce the proportion change, but the value scaled, ex.
+       previous values are 10->15 and our local values are 8->12 (+50%).
+
+  The property of trend score:
+    - score=0 if our local values stay the same
+    - score=1 if we have similar change (delta or proportion); it's possible
+      that score>1.
+    - between 0 and 1 if we have the same trend but no so significant
+    - negative if opposite direction, ex. previous values are increasing but our
+      values are decreasing.
+
+  Some cases proportion is inapplicable (ex. zero to non-zero, negative to
+  positive, etc.), then only delta is used in calculation.
+
+  Args:
+    prev_from: previous value changed from
+    prev_to: previous value changed to
+    now_from: our new value changed from
+    now_to: our new value changed to
+
+  Returns:
+    the score value
+  """
+  assert prev_to != prev_from
+  abs_score = (now_to - now_from) / (prev_to - prev_from)
+  if now_from == 0 or prev_from == 0 or prev_to * prev_from < 0:
+    return abs_score
+
+  ratio_score = ((now_to - now_from) / now_from) / (
+      (prev_to - prev_from) / prev_from)
+  return max(abs_score, ratio_score)
 
 
 # Old version of pylint may give false-positive warning.
@@ -30,11 +76,23 @@ class NoisyBinarySearch(object):
 
   Example usage:
     bsearch = NoisyBinarySearch(rev_info, observation='old=1/10,new=9/10')
-    bsearch.rebuild()
     while not bsearch.is_done():
       bsearch.update(idx, get_result(rev_info[idx]))
     print(bsearch.get_best_guess())
   """
+
+  # States
+  #   INITED:
+  #     Before both ends are verified.
+  #     Recomputing initial values is also done in this phase.
+  #     Not yet to calculate probabilities for each candidate.
+  #   STARTED:
+  #     Started to bisect.
+  # There are no error states because exceptions are raised for fatal errors.
+  # There are no "done" states because the confidence may become lower after
+  # feeding more data.
+  INITED = 'inited'
+  STARTED = 'started'
 
   def __init__(self,
                rev_info,
@@ -42,6 +100,7 @@ class NoisyBinarySearch(object):
                new_idx=None,
                old_value=None,
                new_value=None,
+               recompute_init_values=False,
                oracle=None,
                observation=None,
                confidence=0.999,
@@ -71,30 +130,52 @@ class NoisyBinarySearch(object):
         signal is not noisy and this class will fallback to classic binary
         search.
 
+    If recompute_init_values is True, the state transition is:
+      1. `old_value` and `new_value` have values
+         but `threshold` is None
+         => `prob` is None
+      2. _next_idx_for_initial() return None, so
+         `old_avg`, `new_avg`, and `threshold` could be calculated
+         => reclassify 'old' and 'new'
+
     Args:
       rev_info: List of RevInfo.
       old_idx: Index of rev, which has old behavior.
       new_idx: Index of rev, which has new behavior.
       old_value: For value bisection, the value of old version.
       new_value: For value bisection, the value of new version.
+      recompute_init_values: For value bisection, recompute values of old and
+        new versions.
       oracle: The oracle model of probability distribution.
       observation: Observed test results.
       confidence: Required confidence for bisection result.
       verify_confidence: Bisect range verification confidence.
     """
     assert oracle is None or observation is None
+    self._state = self.INITED
+    self.dirty = True
     if new_idx is None:
       new_idx = len(rev_info) - 1
+    assert rev_info is not None
     self.rev_info = rev_info
     self.old_idx = old_idx
     self.new_idx = new_idx
     self.old_value = old_value
     self.new_value = new_value
+    self.recompute_init_values = recompute_init_values
     self.oracle = oracle
-    if observation is None:
+    if oracle:
+      self.old_p, self.new_p = self.oracle
       self.prior_observation = None
-    else:
+    elif observation:
       self.prior_observation = self._parse_observation(observation)
+      self.observation = None
+      (left_new, left_trial), (right_new, right_trial) = self.prior_observation
+      self.old_p, self.new_p = self._observation_to_prob(
+          left_new, left_trial, right_new, right_trial)
+    else:
+      self.prior_observation = None
+      self.old_p, self.new_p = 0, 1
     self.confidence = confidence
     self.verify_confidence = verify_confidence
 
@@ -111,13 +192,91 @@ class NoisyBinarySearch(object):
     self.skip_weight = None
     self.init_prob = None
 
-    self.old_p, self.new_p = self._estimate_model()
+    self.threshold = None
+    if self.recompute_init_values:
+      self.old_avg = None
+      self.new_avg = None
+    else:
+      self.old_avg = old_value
+      self.new_avg = new_value
 
   def is_noisy(self):
     """Is noisy case?"""
     if self.oracle and self.oracle != (0, 1):
       return True
     return self.prior_observation is not None
+
+  @property
+  def state(self):
+    if self._state == self.INITED:
+      if not self.dirty:
+        return self._state
+      idx = self._next_idx_for_initial()
+      self.dirty = False
+      if idx is not None:
+        return self._state
+      self._state = self.STARTED
+
+      if self.is_value_bisection():
+        if self.old_avg is None:
+          self.old_avg = math_util.average(
+              self.rev_info[self.old_idx].averages())
+        if self.new_avg is None:
+          self.new_avg = math_util.average(
+              self.rev_info[self.new_idx].averages())
+        score = trend_score(self.old_value, self.new_value, self.old_avg,
+                            self.new_avg)
+        if score <= 0:
+          raise errors.WrongAssumption(
+              'unable to reproduce the same trend (%f->%f): %f->%f' %
+              (self.old_value, self.new_value, self.old_avg, self.new_avg))
+        # Reject if we cannot reproduce the trend even half way.
+        # TODO(kcwu): make this threshold configurable.
+        if score < 0.5:
+          expect_delta = abs(self.new_value - self.old_value)
+          actual_delta = abs(self.new_avg - self.old_avg)
+          if self.old_value == 0 or self.old_avg == 0:
+            raise errors.WrongAssumption('unable to reproduce the value gap: '
+                                         'expect delta=%f; actual delta=%f' %
+                                         (expect_delta, actual_delta))
+          raise errors.WrongAssumption(
+              'unable to reproduce the value gap: '
+              'expect delta=%f (%f%%); actual delta=%f (%f%%)' %
+              (expect_delta, abs(expect_delta / self.old_value), actual_delta,
+               abs(actual_delta / self.old_avg)))
+        if self.threshold is None:
+          self.threshold = (self.old_avg + self.new_avg) / 2
+        self.rev_info[self.old_idx].reclassify(self.old_avg, self.threshold,
+                                               self.new_avg)
+        self.rev_info[self.new_idx].reclassify(self.old_avg, self.threshold,
+                                               self.new_avg)
+
+    if self._state == self.STARTED:
+      if self.prob is None:
+        self._rebuild()
+        self._estimate_model()
+        assert self.prob
+      return self._state
+
+  def add_sample(self, idx, status=None, **kwargs):
+    sample = dict(status=status, **kwargs)
+    self.rev_info[idx].add_sample(**sample)
+    self.dirty = True
+
+    status = sample['status']
+    self.check_verification_range()
+    if status == 'skip':
+      self.check_proceed_with_skip(idx)
+    if self.state == self.INITED:
+      pass
+    elif self.state == self.STARTED:
+      if status == 'init':
+        status = self.classify_result_from_values(sample['values'])
+      assert self.prob
+      for _ in range(sample.get('times', 1)):
+        self._update(idx, status)
+    else:
+      assert 0, 'unexpected state: ' + self.state
 
   @staticmethod
   def _parse_observation(observation):
@@ -164,20 +323,19 @@ class NoisyBinarySearch(object):
       right_new: how many NEW in right region.
       right_trial: how many trials in right region.
     """
-    (left_new, left_trial), (right_new, right_trial) = self.prior_observation
-
-    if not self.is_range_verified():
+    if self.observation:
+      (left_new, left_trial), (right_new, right_trial) = self.observation
       return left_new, left_trial, right_new, right_trial
 
-    old_idx, new_idx = self.get_range()
+    (left_new, left_trial), (right_new, right_trial) = self.prior_observation
     if (left_new, left_trial) != NOT_NOISY:
-      for info in self.rev_info[:old_idx + 1]:
-        left_trial += info['old'] + info['new']
-        left_new += info['new']
+      info = self.rev_info[self.old_idx]
+      left_trial += info['old'] + info['new']
+      left_new += info['new']
     if (right_new, right_trial) != NOT_NOISY:
-      for info in self.rev_info[new_idx:]:
-        right_trial += info['old'] + info['new']
-        right_new += info['new']
+      info = self.rev_info[self.new_idx]
+      right_trial += info['old'] + info['new']
+      right_new += info['new']
 
     return left_new, left_trial, right_new, right_trial
 
@@ -203,55 +361,79 @@ class NoisyBinarySearch(object):
     #   = (num+1)/(trial+2)
     return float(num + 1) / (trial + 2)
 
+  @staticmethod
+  def _observation_to_prob(left_new, left_trial, right_new, right_trial):
+    old_p, new_p = 0, 1
+    if (left_new, left_trial) != NOT_NOISY:
+      old_p = NoisyBinarySearch._expected_probability_from_observation(
+          left_trial, left_new)
+    if (right_new, right_trial) != NOT_NOISY:
+      new_p = NoisyBinarySearch._expected_probability_from_observation(
+          right_trial, right_new)
+    return old_p, new_p
+
   def _estimate_model_from_observation(self):
     """Estimates model from observation.
 
     We don't know the real probability distribution. Assume they are Bernoulli
     process and calculates the expected probability from observations.
 
-    Returns:
-      old_p: Estimated false-positive probability for old candidates.
-      new_p: Estimated true-positive probability for new candidates.
+    Because the model will be slightly different after _rebuild(), we will
+    repeat until it is stable.
     """
-    old_p, new_p = 0, 1
+    assert self.prior_observation
 
-    left_new, left_trial, right_new, right_trial = self._gather_noise_count()
-    if (left_new, left_trial) != NOT_NOISY:
-      old_p = self._expected_probability_from_observation(left_trial, left_new)
-    if (right_new, right_trial) != NOT_NOISY:
-      new_p = self._expected_probability_from_observation(
-          right_trial, right_new)
+    (left_new, left_trial), (right_new, right_trial) = self.prior_observation
 
-    return old_p, new_p
+    seen = set()
+    while True:
+      old_idx, new_idx = self.get_range()
+      if (old_idx, new_idx) in seen:
+        break
+      seen.add((old_idx, new_idx))
+      if (left_new, left_trial) != NOT_NOISY:
+        for info in self.rev_info[:old_idx + 1]:
+          left_trial += info['old'] + info['new']
+          left_new += info['new']
+      if (right_new, right_trial) != NOT_NOISY:
+        for info in self.rev_info[new_idx:]:
+          right_trial += info['old'] + info['new']
+          right_new += info['new']
+
+      self.observation = (left_new, left_trial), (right_new, right_trial)
+      self.old_p, self.new_p = self._observation_to_prob(
+          left_new, left_trial, right_new, right_trial)
+
+      if (self.old_p, self.new_p) in seen:
+        break
+      seen.add((self.old_p, self.new_p))
+      self._rebuild()
 
   def _estimate_model(self):
     """Estimates probability of old false-positive and new true-positive.
 
     In other words, the rates of new behavior is observed at old revisions
     and new revisions respectively.
-
-    Returns:
-      old_p: Estimated false-positive probability for old candidates.
-      new_p: Estimated true-positive probability for new candidates.
     """
     if self.oracle:
-      old_p, new_p = self.oracle
+      self.old_p, self.new_p = self.oracle
     elif self.prior_observation:
-      old_p, new_p = self._estimate_model_from_observation()
-      logger.debug('estimated model: old_p=%s, new_p=%s', old_p, new_p)
+      self._estimate_model_from_observation()
+      logger.debug('estimated model: old_p=%s, new_p=%s', self.old_p,
+                   self.new_p)
     else:
-      old_p, new_p = 0, 1
+      self.old_p, self.new_p = 0, 1
 
-    if 0 < old_p < 1.0 - self.confidence:
+    if 0 < self.old_p < 1.0 - self.confidence:
       logger.warning(
           'Confidence value (%r) is too low to detect '
-          'old candidates with new behavior (p=%r)', self.confidence, old_p)
-    if self.confidence < new_p < 1.0:
+          'old candidates with new behavior (p=%r)', self.confidence,
+          self.old_p)
+    if self.confidence < self.new_p < 1.0:
       logger.warning(
           'Confidence value (%r) is too low to detect '
           'new candidates with old behavior (p=%r)', self.confidence,
-          1.0 - new_p)
-    return old_p, new_p
+          1.0 - self.new_p)
 
   def get_noise_observation(self):
     """Gets current noise observation.
@@ -313,7 +495,7 @@ class NoisyBinarySearch(object):
         continue
 
       # If retried enough times but still 'skip', don't try them forever.
-      if info['skip'] > SKIP_FOREVER:
+      if info['skip'] >= SKIP_FOREVER:
         weighting[i] = 0
       else:
         # Allow retry, but the more 'skip', the lower weighting.
@@ -430,19 +612,13 @@ class NoisyBinarySearch(object):
     prob = map(float, prob)
     return prob
 
-  def rebuild(self):
+  def _rebuild(self):
     """Rebuilds probability.
-
-    Note, if the probability model is unknown, old_p and new_p will be
-    re-estimated after every rebuild() and update(), thus rebuild multiple times
-    may result in different probability values.
 
     Raises:
       errors.VerificationFailed: Bisection range is not verified and false
           events occur too many times.
     """
-    self.check_verification_range()
-
     assert 0 <= self.old_idx < self.new_idx < len(self.rev_info)
     # First, P(x_i is first new) = Normalize(init_prob[i])
     #                            = Normalize(init_weight[i] * skip_weight[i])
@@ -450,8 +626,6 @@ class NoisyBinarySearch(object):
     self.init_prob = [p * w for p, w in zip(self.init_weight, self.skip_weight)]
     self.prob = self._calculate_probs(self.old_p, self.new_p, self.rev_info,
                                       self.init_prob)
-
-    self.old_p, self.new_p = self._estimate_model()
 
   def _is_changing_skip_weight(self, idx, result):
     if result == 'skip':
@@ -476,18 +650,18 @@ class NoisyBinarySearch(object):
 
   def classify_result_from_values(self, values):
     assert values, 'eval script terminated normally but does not output values?'
-    average = float(sum(values)) / len(values)
-    if abs(average - self.old_value) < abs(average - self.new_value):
-      return 'old'
-    return 'new'
+    if self.state == self.INITED:
+      return 'init'
+    assert self.threshold is not None
+    assert values
+    avg = math_util.average(values)
+    if self.old_avg < self.new_avg:
+      return 'old' if avg < self.threshold else 'new'
+    else:
+      return 'new' if avg < self.threshold else 'old'
 
-  def update(self, idx, result):
+  def _update(self, idx, result):
     """Incremental update by one more test result.
-
-    Note, if the probability model is unknown, old_p and new_p will be
-    re-estimated after every rebuild() and update(), thus the calculated
-    probabilities by update() and rebuild() may be different.
-    TODO(kcwu): rebuild for a while?
 
     Args:
       idx: index of the new test.
@@ -495,10 +669,6 @@ class NoisyBinarySearch(object):
     """
     assert self.prob
     assert self.rev_info
-    self.check_verification_range()
-
-    if result == 'skip':
-      self.check_proceed_with_skip(idx)
 
     if self._is_changing_skip_weight(idx, result):
       # Incremental update by skip_weight.
@@ -509,7 +679,7 @@ class NoisyBinarySearch(object):
           # A non-skip result after several skips, the weight will jump from
           # zero to non-zero and unable to update incrementally.
           if cur_skip_w == 0:
-            self.rebuild()
+            self._rebuild()
             return
           self.prob[i] *= new_skip_w / cur_skip_w
       self.skip_weight = new_skip_weight
@@ -535,7 +705,9 @@ class NoisyBinarySearch(object):
     sum_prob = sum(self.prob)
     assert sum_prob > 0
     self.prob = [x / sum_prob for x in self.prob]
-    self.old_p, self.new_p = self._estimate_model()
+
+    if self.prior_observation:
+      self._estimate_model()
 
   def get_range(self, confidence=None):
     """Gets narrowed-down bisection range so far.
@@ -554,8 +726,9 @@ class NoisyBinarySearch(object):
         left: Index likely before the point of probability change.
         right: Index likely after the point of probability change.
     """
-    if not self.prob:
+    if self.state == self.INITED:
       return self.old_idx, self.new_idx
+    assert self.prob
 
     if confidence is None:
       confidence = self.confidence
@@ -610,6 +783,9 @@ class NoisyBinarySearch(object):
       errors.VerificationFailed: Bisection range is not verified and false
           events occur too many times.
     """
+    if self.state == self.INITED and self.is_value_bisection():
+      return
+
     if self.rev_info[self.old_idx]['old'] == 0:
       # P(try N times and old behavior occurs 0 times)
       p = self.old_p**self.rev_info[self.old_idx]['new']
@@ -641,8 +817,8 @@ class NoisyBinarySearch(object):
 
     non_skip_count = self.rev_info[idx]['old'] + self.rev_info[idx]['new']
     if ((idx in (self.old_idx, self.new_idx) and non_skip_count == 0 and
-         self.rev_info[idx]['skip'] > SKIP_FOREVER) or
-        (self.rev_info[idx]['skip'] >
+         self.rev_info[idx]['skip'] >= SKIP_FOREVER) or
+        (self.rev_info[idx]['skip'] >=
          (non_skip_count + 1) * (SKIP_FOREVER + 2))):
       raise errors.UnableToProceed(
           'something wrong, '
@@ -655,6 +831,21 @@ class NoisyBinarySearch(object):
     Args:
       more: If true, shows versions with any test result as well.
     """
+
+    def show_candidate(idx):
+      if self.state == self.STARTED and self.is_noisy():
+        logger.info('[%d] %s %.4f%%; %s', idx, self.rev_info[idx].rev,
+                    self.prob[idx] * 100, self.rev_info[idx].summary())
+      else:
+        logger.info('[%d] %s; %s', idx, self.rev_info[idx].rev,
+                    self.rev_info[idx].summary())
+
+    if self.state == self.INITED:
+      logger.info('Verifying initial range:')
+      for i in (self.old_idx, self.new_idx):
+        show_candidate(i)
+      return
+
     prob_rank = sorted(
         ((p, i) for i, p in enumerate(self.prob) if p > 0), reverse=True)
     left, right = self.get_range(1.0 - self.confidence)
@@ -686,28 +877,7 @@ class NoisyBinarySearch(object):
                   self.rev_info[right].rev, size)
 
     for i in sorted(interesting):
-      note = ''
-      if (self.prob[i] == prob_rank[0][0] and
-          (len(prob_rank) == 1 or prob_rank[0][0] != prob_rank[:5][-1][0])):
-        # highlight best candidate
-        note = '<------------------'
-      values = sorted(self.rev_info[i].values)
-      if not values:
-        value_display = ''
-      elif len(values) == 1:
-        value_display = '%.3f' % values[0]
-      else:
-        value_display = 'n=%d,avg=%.3f,median=%.3f,min=%.3f,max=%.3f' % (
-            len(values), sum(values) / len(values), values[len(values) // 2],
-            values[0], values[-1])
-
-      if self.is_noisy():
-        logger.info('[%d] %s %.4f%%; %s %s %s', i, self.rev_info[i].rev,
-                    self.prob[i] * 100, self.rev_info[i].result_counter,
-                    value_display, note)
-      else:
-        logger.info('[%d] %s; %s %s %s', i, self.rev_info[i].rev,
-                    self.rev_info[i].result_counter, value_display, note)
+      show_candidate(i)
 
   def remaining_steps(self):
     # TODO(kcwu): estimate remaining steps for noisy case
@@ -719,7 +889,7 @@ class NoisyBinarySearch(object):
 
   def is_done(self):
     """If we have an answer with high confidence."""
-    if not self.is_range_verified():
+    if self.state == self.INITED:
       return False
     assert self.prob
     # TODO(kcwu): revise to consider the real probability of true-positive is
@@ -735,12 +905,15 @@ class NoisyBinarySearch(object):
     Returns:
       Index of the element with max probability.
     """
+    if self.state == self.INITED:
+      return None
     assert self.prob
     return self.prob.index(max(self.prob))
 
   @staticmethod
   def _next_idx_entropy(old_p, new_p, prob):
     """Determines next index to binary search according to information gain."""
+    assert prob
     orig_stats = math_util.EntropyStats(map(float, prob))
     new_stats = orig_stats.multiply(old_p)
     old_stats = orig_stats.multiply(1.0 - old_p)
@@ -774,19 +947,99 @@ class NoisyBinarySearch(object):
 
     return best_i
 
+  def _next_idx_for_initial(self):
+    """Returns index to probe for initial samples
+
+    1. Enough sample points for old and new version. By "enough", it means
+       (weak heuristic),
+      - At leat two samples.
+      - If the two samples are different, we need more.
+      - If eval is fast, we should get more samples.
+
+    2. Compare the value distribution between old and new version. Acquire
+    more samples until they are roughly distinguishable.
+      - Within reasonable time.
+    """
+    assert self._state == self.INITED
+    if not self.recompute_init_values:
+      # Try 'new' before 'old' in order to know whether the issue is
+      # reproducible earlier
+      if self.rev_info[self.new_idx]['new'] == 0:
+        return self.new_idx
+
+      if self.rev_info[self.old_idx]['old'] == 0:
+        return self.old_idx
+
+      return None
+
+    def is_one_side_enough(info):
+      count = info['init']
+      if count > 30:
+        return True
+      if count < 2:
+        return False
+      averages = info.averages()
+      if count == 2 and averages[0] != averages[1]:
+        return False
+
+      # Spend 5 minutes for one side sounds reasonable.
+      return info.eval_time > 300
+
+    if not is_one_side_enough(self.rev_info[self.new_idx]):
+      logger.debug('%s not enough', self.rev_info[self.new_idx].rev)
+      return self.new_idx
+
+    if not is_one_side_enough(self.rev_info[self.old_idx]):
+      logger.debug('%s not enough', self.rev_info[self.old_idx].rev)
+      return self.old_idx
+
+    old_avg = math_util.average(self.rev_info[self.old_idx].averages())
+    new_avg = math_util.average(self.rev_info[self.new_idx].averages())
+    user_diff = self.new_value - self.old_value
+    assert user_diff != 0
+
+    # If the samples have the same (at least 1/2) trend as expected, we can
+    # stop collect more samples.
+    if trend_score(self.old_value, self.new_value, old_avg, new_avg) > 0.5:
+      return None
+    logger.debug('not distinguishable')
+
+    # If the best case values do not help, it probably has no hope.
+    if user_diff > 0:
+      new_max = max(self.rev_info[self.new_idx].averages())
+      old_min = min(self.rev_info[self.old_idx].averages())
+      if trend_score(self.old_value, self.new_value, old_min, new_max) < 0.5:
+        return None
+    else:
+      new_min = min(self.rev_info[self.new_idx].averages())
+      old_max = max(self.rev_info[self.old_idx].averages())
+      if trend_score(self.old_value, self.new_value, old_max, new_min) < 0.5:
+        return None
+
+    # If not obviously distinguishable, spend half hour to collect initial
+    # samples.
+    if self.rev_info[self.old_idx].eval_time < 1800:
+      return self.old_idx
+    if self.rev_info[self.new_idx].eval_time < 1800:
+      return self.new_idx
+    return None
+
+  def get_prob(self):
+    if self.state == self.INITED:
+      return None
+    return self.prob
+
   def next_idx(self):
     """Determines next index to binary search.
 
     Returns:
       Index to try for binary search.
     """
+    if self.state == self.INITED:
+      idx = self._next_idx_for_initial()
+      assert idx is not None
+      return idx
+
+    assert self.state == self.STARTED
     assert self.prob
-    # Try 'new' before 'old' in order to know whether the issue is reproducible
-    # earlier
-    if self.rev_info[self.new_idx]['new'] == 0:
-      return self.new_idx
-
-    if self.rev_info[self.old_idx]['old'] == 0:
-      return self.old_idx
-
     return self._next_idx_entropy(self.old_p, self.new_p, self.prob)

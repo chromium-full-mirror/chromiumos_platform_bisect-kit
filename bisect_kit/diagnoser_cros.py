@@ -117,6 +117,7 @@ class CrosDiagnoser(object):
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
           new_value=self.config['new_value'],
+          recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
@@ -190,6 +191,7 @@ class CrosDiagnoser(object):
             eval_cmd=eval_cmd,
             old_value=self.config['old_value'],
             new_value=self.config['new_value'],
+            recompute_init_values=self.config['recompute_init_values'],
             noisy=self.noisy)
         if extra_switch_cmd:
           bisector.append_switch_command(extra_switch_cmd)
@@ -246,6 +248,7 @@ class CrosDiagnoser(object):
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
           new_value=self.config['new_value'],
+          recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
@@ -315,6 +318,7 @@ class CrosDiagnoser(object):
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
           new_value=self.config['new_value'],
+          recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
@@ -356,6 +360,7 @@ class CrosDiagnoser(object):
         eval_cmd=eval_cmd,
         old_value=self.config['old_value'],
         new_value=self.config['new_value'],
+        recompute_init_values=self.config['recompute_init_values'],
         noisy=self.noisy)
     if extra_switch_cmd:
       bisector.append_switch_command(extra_switch_cmd)
