@@ -9,3 +9,12 @@ partial-metadata.json
 
 android-build-status-4683364.json
     Redacted from Android build status file of build id=4683364
+
+results-chart.autotest-without-graph.json
+    results-chart.json of cheets_PerfBootServer
+
+results-chart.octane.json
+    results-chart.json of telemetry_Benchmarks.octane
+
+results-chart.cros_ui_smoothness.json
+    results-chart.json of telemetry_Benchmarks.cros_ui_smoothness

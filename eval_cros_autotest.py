@@ -12,13 +12,13 @@ clean autotest install.
 """
 from __future__ import print_function
 import argparse
-import json
 import logging
 import os
 import re
 import subprocess
 import sys
 
+from bisect_kit import catapult_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
@@ -138,31 +138,6 @@ def parse_test_report_log(result_log, metric):
   return passed, values
 
 
-def parse_test_result_chart(json_path, metric):
-  data = json.load(open(json_path))
-
-  # format 1, telemetry
-  if 'charts' in data:
-    summary = data['charts'][metric]['summary']
-
-  # format 2, autotest without graph
-  elif metric in data:
-    summary = data[metric]['summary']
-
-  # format 3, autotest with graph
-  elif metric.count('.') == 1:
-    name, subname = metric.split('.')
-    summary = data[name][subname]
-
-  else:
-    logger.error('metric "%s" not in %s', metric, json_path)
-    return []
-
-  if 'values' in summary:
-    return summary['values']
-  return [summary['value']]
-
-
 def get_additional_test_args(test_name):
   """Gets extra arguments to specific test.
 
@@ -262,7 +237,8 @@ def gather_test_result(opts, result_dir):
         if filename != 'results-chart.json':
           continue
         full_path = os.path.join(root, filename)
-        values += parse_test_result_chart(full_path, opts.metric)
+        values = catapult_util.get_benchmark_values(full_path, opts.metric)
+        return passed, values
 
   return passed, values
 

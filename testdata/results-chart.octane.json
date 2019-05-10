@@ -1,0 +1,458 @@
+{
+  "trace_rerun_options": [],
+  "benchmark_metadata": {
+    "rerun_options": [],
+    "type": "telemetry_benchmark",
+    "name": "octane",
+    "description": "Google's Octane JavaScript benchmark.\n\n  http://chromium.github.io/octane/index.html?auto=1\n  "
+  },
+  "format_version": "0.1",
+  "benchmark_description": "Google's Octane JavaScript benchmark.\n\n  http://chromium.github.io/octane/index.html?auto=1\n  ",
+  "enabled": true,
+  "charts": {
+    "Mandreel": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "Mandreel",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          27514.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Runs the 3D Bullet Physics Engine ported from C++ to JavaScript via Mandreel (277,377 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "Mandreel",
+        "important": false,
+        "values": [
+          27514.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Runs the 3D Bullet Physics Engine ported from C++ to JavaScript via Mandreel (277,377 lines)."
+      }
+    },
+    "MandreelLatency": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "MandreelLatency",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          35107.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "MandreelLatency",
+        "important": false,
+        "values": [
+          35107.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values"
+      }
+    },
+    "DeltaBlue": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "DeltaBlue",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          58309.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "One-way constraint solver, originally written in Smalltalk by John Maloney and Mario Wolczko (880 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "DeltaBlue",
+        "important": false,
+        "values": [
+          58309.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "One-way constraint solver, originally written in Smalltalk by John Maloney and Mario Wolczko (880 lines)."
+      }
+    },
+    "NavierStokes": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "NavierStokes",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          33586.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "2D NavierStokes equations solver, heavily manipulates double precision arrays. Based on Oliver Hunt's code (387 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "NavierStokes",
+        "important": false,
+        "values": [
+          33586.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "2D NavierStokes equations solver, heavily manipulates double precision arrays. Based on Oliver Hunt's code (387 lines)."
+      }
+    },
+    "EarleyBoyer": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "EarleyBoyer",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          40576.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Classic Scheme benchmarks, translated to JavaScript by Florian Loitsch's Scheme2Js compiler (4684 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "EarleyBoyer",
+        "important": false,
+        "values": [
+          40576.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Classic Scheme benchmarks, translated to JavaScript by Florian Loitsch's Scheme2Js compiler (4684 lines)."
+      }
+    },
+    "Total": {
+      "Score": {
+        "name": "Total.Score",
+        "value": 30135,
+        "important": true,
+        "units": "score",
+        "type": "scalar",
+        "description": "Geometric mean of the scores of each individual benchmark in the Octane benchmark collection."
+      }
+    },
+    "SplayLatency": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "SplayLatency",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          34146.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "SplayLatency",
+        "important": false,
+        "values": [
+          34146.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values"
+      }
+    },
+    "CodeLoad": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "CodeLoad",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          24419.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Measures how quickly a JavaScript engine can start executing code after loading a large JavaScript program, social widget being a common example. The source for test is derived from open source libraries (Closure, jQuery) (1,530 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "CodeLoad",
+        "important": false,
+        "values": [
+          24419.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Measures how quickly a JavaScript engine can start executing code after loading a large JavaScript program, social widget being a common example. The source for test is derived from open source libraries (Closure, jQuery) (1,530 lines)."
+      }
+    },
+    "Crypto": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "Crypto",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          27494.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Encryption and decryption benchmark based on code by Tom Wu (1698 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "Crypto",
+        "important": false,
+        "values": [
+          27494.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Encryption and decryption benchmark based on code by Tom Wu (1698 lines)."
+      }
+    },
+    "Box2D": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "Box2D",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          46629.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "Box2D",
+        "important": false,
+        "values": [
+          46629.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values"
+      }
+    },
+    "Gameboy": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "Gameboy",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          23150.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Emulate the portable console's architecture and runs a demanding 3D simulation, all in JavaScript (11,097 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "Gameboy",
+        "important": false,
+        "values": [
+          23150.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Emulate the portable console's architecture and runs a demanding 3D simulation, all in JavaScript (11,097 lines)."
+      }
+    },
+    "Typescript": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "Typescript",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          33545.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "Typescript",
+        "important": false,
+        "values": [
+          33545.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values"
+      }
+    },
+    "Richards": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "Richards",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          22530.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "OS kernel simulation benchmark, originally written in BCPL by Martin Richards (539 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "Richards",
+        "important": false,
+        "values": [
+          22530.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "OS kernel simulation benchmark, originally written in BCPL by Martin Richards (539 lines)."
+      }
+    },
+    "RegExp": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "RegExp",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          5581.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Regular expression benchmark generated by extracting regular expression operations from 50 of the most popular web pages (1761 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "RegExp",
+        "important": false,
+        "values": [
+          5581.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Regular expression benchmark generated by extracting regular expression operations from 50 of the most popular web pages (1761 lines)."
+      }
+    },
+    "PdfJS": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "PdfJS",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          23264.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Mozilla's PDF Reader implemented in JavaScript. It measures decoding and interpretation time (33,056 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "PdfJS",
+        "important": false,
+        "values": [
+          23264.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Mozilla's PDF Reader implemented in JavaScript. It measures decoding and interpretation time (33,056 lines)."
+      }
+    },
+    "zlib": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "zlib",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          58083.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "zlib",
+        "important": false,
+        "values": [
+          58083.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values"
+      }
+    },
+    "Splay": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "Splay",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          20642.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Data manipulation benchmark that deals with splay trees and exercises the automatic memory management subsystem (394 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "Splay",
+        "important": false,
+        "values": [
+          20642.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Data manipulation benchmark that deals with splay trees and exercises the automatic memory management subsystem (394 lines)."
+      }
+    },
+    "RayTrace": {
+      "http://chromium.github.io/octane/index.html?auto=1": {
+        "std": 0.0,
+        "name": "RayTrace",
+        "type": "list_of_scalar_values",
+        "important": false,
+        "values": [
+          62381.0
+        ],
+        "story_tags": [],
+        "units": "score",
+        "page_id": 0,
+        "description": "Ray tracer benchmark based on code by Adam Burmister (904 lines)."
+      },
+      "summary": {
+        "std": 0.0,
+        "name": "RayTrace",
+        "important": false,
+        "values": [
+          62381.0
+        ],
+        "units": "score",
+        "type": "list_of_scalar_values",
+        "description": "Ray tracer benchmark based on code by Adam Burmister (904 lines)."
+      }
+    }
+  },
+  "next_version": "0.2",
+  "benchmark_name": "octane"
+}
