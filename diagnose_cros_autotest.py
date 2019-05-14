@@ -201,7 +201,7 @@ class DiagnoseCommandLine(object):
       if opts.new_value is not None:
         self.argument_parser.error(
             '--new_value is provided but --metric is not')
-      if opts.recompute_init_values is not None:
+      if opts.recompute_init_values:
         self.argument_parser.error(
             '--recompute_init_values is provided but --metric is not')
 
