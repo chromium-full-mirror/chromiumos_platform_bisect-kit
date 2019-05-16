@@ -193,12 +193,13 @@ class NoisyBinarySearch(object):
     self.init_prob = None
 
     self.threshold = None
-    if self.recompute_init_values:
-      self.old_avg = None
-      self.new_avg = None
-    else:
-      self.old_avg = old_value
-      self.new_avg = new_value
+    if old_value is not None:
+      if self.recompute_init_values:
+        self.old_avg = None
+        self.new_avg = None
+      else:
+        self.old_avg = old_value
+        self.new_avg = new_value
 
   def is_noisy(self):
     """Is noisy case?"""
@@ -217,7 +218,7 @@ class NoisyBinarySearch(object):
         return self._state
       self._state = self.STARTED
 
-      if self.is_value_bisection():
+      if self.is_value_bisection() and self.recompute_init_values:
         if self.old_avg is None:
           self.old_avg = math_util.average(
               self.rev_info[self.old_idx].averages())
@@ -650,7 +651,7 @@ class NoisyBinarySearch(object):
 
   def classify_result_from_values(self, values):
     assert values, 'eval script terminated normally but does not output values?'
-    if self.state == self.INITED:
+    if self.state == self.INITED and self.recompute_init_values:
       return 'init'
     assert self.threshold is not None
     assert values
