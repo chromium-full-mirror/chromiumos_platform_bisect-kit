@@ -8,6 +8,7 @@ load-plugins=chromite.cli.cros.lint
 [MESSAGES CONTROL]
 disable=
     broad-except,
+    duplicate-code,
     fixme,
     file-ignored,
     invalid-name,

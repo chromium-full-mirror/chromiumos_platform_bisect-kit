@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Diagnose ChromeOS regressions on top of subcomponent bisectors."""
 from __future__ import print_function
+import argparse
 import datetime
 import json
 import logging
@@ -11,10 +12,15 @@ import os
 import time
 
 from bisect_kit import core
+from bisect_kit import common
+from bisect_kit import configure
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
 from bisect_kit import wrapper
+from bisect_kit import cli
+import setup_cros_bisect
 
 logger = logging.getLogger(__name__)
 
@@ -441,3 +447,327 @@ class CrosDiagnoser(object):
 
     if json_output:
       print(json.dumps(result, indent=2))
+
+
+class DiagnoseCommandLineBase(object):
+  """Diagnose command line interface."""
+
+  def __init__(self):
+    common.init()
+    self.argument_parser = self.create_argument_parser()
+    self.states = None
+
+  @property
+  def config(self):
+    return self.states.config
+
+  def check_options(self, opts, path_factory):
+    if not opts.chromeos_mirror:
+      opts.chromeos_mirror = path_factory.get_chromeos_mirror()
+      logger.info('chromeos_mirror = %s', opts.chromeos_mirror)
+    if not opts.chromeos_root:
+      opts.chromeos_root = path_factory.get_chromeos_tree()
+      logger.info('chromeos_root = %s', opts.chromeos_root)
+    if not opts.chrome_mirror:
+      opts.chrome_mirror = path_factory.get_chrome_cache()
+      logger.info('chrome_mirror = %s', opts.chrome_mirror)
+    if not opts.chrome_root:
+      opts.chrome_root = path_factory.get_chrome_tree()
+      logger.info('chrome_root = %s', opts.chrome_root)
+
+    if opts.dut == cros_lab_util.LAB_DUT:
+      if not opts.model and not opts.sku:
+        self.argument_parser.error(
+            'either --model or --sku need to be specified if DUT is "%s"' %
+            cros_lab_util.LAB_DUT)
+      # Board name cannot be deduced from auto allocated devices because they
+      # may be provisioned with image of unexpected board.
+      if not opts.board:
+        self.argument_parser.error('--board need to be specified if DUT is "%s"'
+                                   % cros_lab_util.LAB_DUT)
+    else:
+      if not opts.board:
+        opts.board = cros_util.query_dut_board(opts.dut)
+
+    if cros_util.is_cros_short_version(opts.old):
+      opts.old = cros_util.version_to_full(opts.board, opts.old)
+    if cros_util.is_cros_short_version(opts.new):
+      opts.new = cros_util.version_to_full(opts.board, opts.new)
+
+    if opts.metric:
+      if opts.old_value is None:
+        self.argument_parser.error('--old_value is not provided')
+      if opts.new_value is None:
+        self.argument_parser.error('--new_value is not provided')
+      if opts.fail_to_pass:
+        self.argument_parser.error(
+            '--fail_to_pass is not for benchmark test (--metric)')
+    else:
+      if opts.old_value is not None:
+        self.argument_parser.error(
+            '--old_value is provided but --metric is not')
+      if opts.new_value is not None:
+        self.argument_parser.error(
+            '--new_value is provided but --metric is not')
+      if opts.recompute_init_values:
+        self.argument_parser.error(
+            '--recompute_init_values is provided but --metric is not')
+
+  def init_hook(self, opts):
+    pass  # implemented by subclass if necessary
+
+  def cmd_init(self, opts):
+    path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+        opts.mirror_base, opts.work_base, opts.session)
+    self.check_options(opts, path_factory)
+
+    config = dict(
+        session=opts.session,
+        mirror_base=opts.mirror_base,
+        work_base=opts.work_base,
+        chromeos_root=opts.chromeos_root,
+        chromeos_mirror=opts.chromeos_mirror,
+        chrome_root=opts.chrome_root,
+        chrome_mirror=opts.chrome_mirror,
+        android_root=opts.android_root,
+        android_mirror=opts.android_mirror,
+        dut=opts.dut,
+        pools=opts.pools,
+        model=opts.model,
+        sku=opts.sku,
+        board=opts.board,
+        old=opts.old,
+        new=opts.new,
+        test_name=opts.test_name,
+        fail_to_pass=opts.fail_to_pass,
+        metric=opts.metric,
+        old_value=opts.old_value,
+        new_value=opts.new_value,
+        recompute_init_values=opts.recompute_init_values,
+        noisy=opts.noisy,
+        always_reflash=opts.always_reflash,
+        reboot_before_test=opts.reboot_before_test,
+        bypass_chromeos_prebuilt=opts.bypass_chromeos_prebuilt,
+        bypass_chromeos_build=opts.bypass_chromeos_build,
+        bypass_chrome_build=opts.bypass_chrome_build,
+        bypass_android_prebuilt=opts.bypass_android_prebuilt,
+        bypass_android_build=opts.bypass_android_build,
+    )
+
+    self.states.init(config)
+    self.init_hook(opts)
+    self.states.save()
+
+  def cmd_run(self, opts):
+    raise NotImplementedError  # implemented by subclass
+
+  def cmd_log(self, opts):
+    self.states.load()
+    path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+        self.config['mirror_base'], self.config['work_base'],
+        self.config['session'])
+    diagnoser = CrosDiagnoser(self.states, path_factory, self.config, None)
+
+    diagnoser.cmd_log(opts.json)
+
+  def cmd_view(self, opts):
+    self.states.load()
+    path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+        self.config['mirror_base'], self.config['work_base'],
+        self.config['session'])
+    diagnoser = CrosDiagnoser(self.states, path_factory, self.config, None)
+    diagnoser.cmd_view(opts.json, opts.verbose)
+
+  def create_argument_parser_hook(self, parser_init):
+    pass  # implemented by subclass if necessary
+
+  def create_argument_parser(self):
+    parser = argparse.ArgumentParser()
+    common.add_common_arguments(parser)
+    parser.add_argument('--session_base', default='bisect.sessions')
+    parser.add_argument('--session', help='Session name', required=True)
+    subparsers = parser.add_subparsers(
+        dest='command', title='commands', metavar='<command>')
+
+    parser_init = subparsers.add_parser('init', help='Initialize')
+    group = parser_init.add_argument_group(
+        title='Source tree path options',
+        description='''
+        Specify the paths of chromeos/chrome/android mirror and checkout. They
+        have the same default values as setup_cros_bisect.py, so usually you can
+        omit them and it just works.
+        ''')
+    group.add_argument(
+        '--mirror_base',
+        metavar='MIRROR_BASE',
+        default=configure.get('MIRROR_BASE',
+                              setup_cros_bisect.DEFAULT_MIRROR_BASE),
+        help='Directory for mirrors (default: %(default)s)')
+    group.add_argument(
+        '--work_base',
+        metavar='WORK_BASE',
+        default=configure.get('WORK_BASE', setup_cros_bisect.DEFAULT_WORK_BASE),
+        help='Directory for bisection working directories '
+        '(default: %(default)s)')
+    group.add_argument(
+        '--chromeos_root',
+        metavar='CHROMEOS_ROOT',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROMEOS_ROOT'),
+        help='ChromeOS tree root')
+    group.add_argument(
+        '--chromeos_mirror',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROMEOS_MIRROR'),
+        help='ChromeOS repo mirror path')
+    group.add_argument(
+        '--android_root',
+        metavar='ANDROID_ROOT',
+        type=cli.argtype_dir_path,
+        default=configure.get('ANDROID_ROOT'),
+        help='Android tree root')
+    group.add_argument(
+        '--android_mirror',
+        type=cli.argtype_dir_path,
+        default=configure.get('ANDROID_MIRROR'),
+        help='Android repo mirror path')
+    group.add_argument(
+        '--chrome_root',
+        metavar='CHROME_ROOT',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROME_ROOT'),
+        help='Chrome tree root')
+    group.add_argument(
+        '--chrome_mirror',
+        metavar='CHROME_MIRROR',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROME_MIRROR'),
+        help="chrome's gclient cache dir")
+
+    group = parser_init.add_argument_group(title='DUT allocation options')
+    group.add_argument(
+        '--dut',
+        metavar='DUT',
+        required=True,
+        help='Address of DUT (Device Under Test). If "%s", DUT will be '
+        'automatically allocated from the lab' % cros_lab_util.LAB_DUT)
+    group.add_argument(
+        '--pools',
+        type=cli.argtype_notempty,
+        default='suites',
+        help='Desired pools, comma separated and ordered by preference '
+        '(default: %(default)s)')
+    group.add_argument(
+        '--model',
+        metavar='MODEL',
+        help='"model" criteria if DUT is auto allocated from the lab')
+    group.add_argument(
+        '--sku',
+        metavar='SKU',
+        help='"sku" criteria if DUT is auto allocated from the lab')
+
+    group = parser_init.add_argument_group(title='Essential options')
+    group.add_argument(
+        '--board',
+        metavar='BOARD',
+        default=configure.get('BOARD'),
+        help='ChromeOS board name; auto detected if DUT is not auto allocated')
+    group.add_argument(
+        '--old',
+        type=cros_util.argtype_cros_version,
+        required=True,
+        help='ChromeOS version with old behavior')
+    group.add_argument(
+        '--new',
+        type=cros_util.argtype_cros_version,
+        required=True,
+        help='ChromeOS version with new behavior')
+
+    group = parser_init.add_argument_group(
+        title='Options for normal autotest tests')
+    group.add_argument('--test_name', help='Test name')
+    group.add_argument(
+        '--fail_to_pass',
+        action='store_true',
+        help='For functional tests: bisect the CL fixed the regression (when '
+        'test became PASS). If not specified, the default is to bisect the CL '
+        'which broke the test (when test became FAIL)')
+    group.add_argument('--metric', help='Metric name of benchmark test')
+    group.add_argument(
+        '--old_value',
+        type=float,
+        help='For benchmark test, old value of metric')
+    group.add_argument(
+        '--new_value',
+        type=float,
+        help='For benchmark test, new value of metric')
+    group.add_argument(
+        '--recompute_init_values',
+        action='store_true',
+        help='For performance test, recompute initial values')
+
+    self.create_argument_parser_hook(parser_init)
+
+    group = parser_init.add_argument_group(title='Bisect behavior options')
+    group.add_argument(
+        '--noisy',
+        help='Enable noisy binary search. Example value: "old=1/10,new=2/3"')
+    group.add_argument(
+        '--always_reflash',
+        action='store_true',
+        help='Do not trust ChromeOS version number of DUT and always reflash. '
+        'This is usually only needed when resume because previous bisect was '
+        'interrupted and the DUT may be in an unexpected state')
+    group.add_argument(
+        '--reboot_before_test',
+        action='store_true',
+        help='Reboot before test run')
+    group.add_argument(
+        '--bypass_chromeos_prebuilt',
+        action='store_true',
+        help='Bypass chromeos prebuilt image bisect')
+    group.add_argument(
+        '--bypass_chromeos_build',
+        action='store_true',
+        help='Bypass chromeos local build bisect')
+    group.add_argument(
+        '--bypass_chrome_build',
+        action='store_true',
+        help='Bypass chrome local build bisect')
+    group.add_argument(
+        '--bypass_android_prebuilt',
+        action='store_true',
+        help='Bypass android prebuilt image bisect')
+    group.add_argument(
+        '--bypass_android_build',
+        action='store_true',
+        help='Bypass chromeos local build bisect')
+    parser_init.set_defaults(func=self.cmd_init)
+
+    parser_run = subparsers.add_parser('run', help='Start auto bisection')
+    parser_run.set_defaults(func=self.cmd_run)
+
+    parser_log = subparsers.add_parser(
+        'log', help='Prints what has been done so far')
+    parser_log.add_argument(
+        '--json', action='store_true', help='Machine readable output')
+    parser_log.set_defaults(func=self.cmd_log)
+
+    parser_view = subparsers.add_parser(
+        'view', help='Prints summary of current status')
+    parser_view.add_argument('--verbose', '-v', action='store_true')
+    parser_view.add_argument(
+        '--json', action='store_true', help='Machine readable output')
+    parser_view.set_defaults(func=self.cmd_view)
+
+    return parser
+
+  def main(self, args=None):
+    opts = self.argument_parser.parse_args(args)
+    common.config_logging(opts)
+
+    session_base = configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE)
+    session_file = os.path.join(session_base, opts.session,
+                                self.__class__.__name__)
+    self.states = DiagnoseStates(session_file)
+    opts.func(opts)

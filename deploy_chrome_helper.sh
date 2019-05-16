@@ -13,6 +13,10 @@ fi
 
 out_dir=out_${SDK_BOARD}/Release
 
+AUTOTEST_TEST_BINARY_PATH= \
+    /usr/local/autotest/deps/chrome_test/test_src/out/Release/
+TAST_TEST_BINARY_PATH=/usr/local/libexec/chrome-binary-tests/
+
 for TARGET in $TARGETS; do
     case "$TARGET" in
         chrome_sandbox|nacl_helper)
@@ -25,8 +29,8 @@ for TARGET in $TARGETS; do
             ;;
         *_unittest|*_unittests)
             chmod o+x $out_dir/$TARGET
-            rsync $out_dir/$TARGET \
-            $DUT:/usr/local/autotest/deps/chrome_test/test_src/out/Release/
+            rsync $out_dir/$TARGET $DUT:$AUTOTEST_TEST_BINARY_PATH
+            rsync $out_dir/$TARGET $DUT:$TAST_TEST_BINARY_PATH
             ;;
         *)
             echo "Unknown target $TARGET. Please extend $0 script " \
