@@ -110,7 +110,7 @@ def snapshot_or_copytree(src, dst):
 
 def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
   manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
-  util.check_call('git', 'fetch', cwd=manifest_dir)
+  git_util.fetch(manifest_dir)
 
   manifest_path = 'default.xml'
   manifest_full_path = os.path.join(manifest_dir, manifest_path)
@@ -318,7 +318,7 @@ cache_dir = %r
       git_repo = os.path.join(chrome_cache, git_repo_name)
       if not git_util.is_git_bare_dir(git_repo):
         continue
-      util.check_call('git', 'fetch', cwd=git_repo)
+      git_util.fetch(git_repo)
 
     # Some repos were removed from the DEPS and won't be synced here. They will
     # be synced during DEPS file processing because the necessary information

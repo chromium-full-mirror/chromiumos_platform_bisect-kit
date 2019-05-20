@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 
 from bisect_kit import cli
 from bisect_kit import util
@@ -142,13 +143,39 @@ def config(git_repo, *args):
 
 
 def fetch(git_repo, *args):
-  """Wrapper of 'git fetch'.
+  """Wrapper of 'git fetch' with retry support.
 
   Args:
     git_repo: path of git repo.
     args: parameters pass to 'git fetch'
   """
-  util.check_call('git', 'fetch', *args, cwd=git_repo)
+  for tries in range(5):
+    if tries > 0:
+      delay = min(60, 10 * 2**tries)
+      logger.warning('git fetch failed, will retry %s seconds later', delay)
+      time.sleep(delay)
+
+    stderr_lines = []
+    try:
+      util.check_call(
+          'git',
+          'fetch',
+          *args,
+          cwd=git_repo,
+          stderr_callback=stderr_lines.append)
+      break
+    except subprocess.CalledProcessError:
+      stderr = ''.join(stderr_lines)
+      # only retry 5xx internal server error
+      if 'The requested URL returned error: 5' not in stderr:
+        raise
+  else:
+    # Reached retry limit but haven't succeeded.
+    # In other words, there must be exceptions raised inside above loop.
+    logger.error('git fetch failed too much times')
+    # It's okay to raise because we are in the same scope as above loop.
+    # pylint: disable=misplaced-bare-raise
+    raise
 
 
 def is_containing_commit(git_repo, rev):

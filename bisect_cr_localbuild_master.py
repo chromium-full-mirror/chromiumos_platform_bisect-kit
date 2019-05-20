@@ -39,7 +39,6 @@ from bisect_kit import cros_util
 from bisect_kit import cr_util
 from bisect_kit import errors
 from bisect_kit import git_util
-from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +77,9 @@ def guess_git_rev(opts, rev):
 
   if cr_util.is_chrome_version(rev):
     if not git_util.is_containing_commit(chrome_src, rev):
-      util.check_call('git', 'fetch', '--tags', cwd=chrome_src)
+      git_util.fetch(chrome_src, '--tags')
   else:
-    util.check_call('git', 'fetch', cwd=chrome_src)
+    git_util.fetch(chrome_src)
 
   git_rev = cr_util.query_git_rev(chrome_src, rev)
   logger.info('Git hash of %s is %s', rev, git_rev)
