@@ -200,6 +200,7 @@ class NoisyBinarySearch(object):
       else:
         self.old_avg = old_value
         self.new_avg = new_value
+        self.threshold = (old_value + new_value) / 2
 
   def is_noisy(self):
     """Is noisy case?"""

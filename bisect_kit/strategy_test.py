@@ -354,6 +354,22 @@ class TestNoisyBinarySearch(unittest.TestCase):
     # With 0.9 confidence, about 0.9 of guesses are correct.
     self.assertGreater(common_guess[1], n * 0.9)
 
+  def test_value_bisect(self):
+    bsearch = strategy.NoisyBinarySearch(
+        self.rev_info, 0, 99, old_value=10.0, new_value=20.0)
+    self.assertTrue(bsearch.is_value_bisection())
+    self.assertEqual(bsearch.classify_result_from_values([100]), 'new')
+    self.assertEqual(bsearch.classify_result_from_values([0]), 'old')
+
+    # verify the range
+    self.assertEqual(bsearch.next_idx(), 99)
+    bsearch.add_sample(99, 'new', values=[20.0], eval_time=1000)
+    self.assertEqual(bsearch.next_idx(), 0)
+    bsearch.add_sample(0, 'old', values=[11.0], eval_time=1000)
+
+    # middle point
+    self.assertEqual(bsearch.next_idx(), 49)
+
   def test_recompute_init_values(self):
     bsearch = strategy.NoisyBinarySearch(
         self.rev_info,
@@ -362,6 +378,9 @@ class TestNoisyBinarySearch(unittest.TestCase):
         old_value=10.0,
         new_value=20.0,
         recompute_init_values=True)
+    self.assertTrue(bsearch.is_value_bisection())
+    self.assertEqual(bsearch.classify_result_from_values([100]), 'init')
+    self.assertEqual(bsearch.classify_result_from_values([0]), 'init')
     self.assertEqual(bsearch.next_idx(), 99)
     self.assertEqual(bsearch.next_idx(), 99)
 
