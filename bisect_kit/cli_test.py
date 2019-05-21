@@ -100,6 +100,10 @@ class TestCli(unittest.TestCase):
     self.assertRegexpMatches(cli.check_executable('what'), r'PATH')
     self.assertRegexpMatches(cli.check_executable('eval-manually.sh'), r'\./')
 
+  def test_lookup_signal_name(self):
+    self.assertEqual(cli.lookup_signal_name(15), 'SIGTERM')
+    self.assertEqual(cli.lookup_signal_name(99), 'Unknown')
+
 
 class DummyDomain(core.BisectDomain):
   """Dummy subclass of BisectDomain."""

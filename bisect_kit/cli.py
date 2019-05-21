@@ -234,14 +234,33 @@ def check_executable(program):
   return '%r is not executable. %s' % (program, hint)
 
 
+def lookup_signal_name(signum):
+  """Look up signal name by signal number.
+
+  Args:
+    signum: signal number
+
+  Returns:
+    signal name, like "SIGTERM". "Unknown" for unexpected number.
+  """
+  for k, v in vars(signal).items():
+    if k.startswith('SIG') and '_' not in k and v == signum:
+      return k
+  return 'Unknown'
+
+
 def format_returncode(returncode):
+  # returncode is negative if the process is terminated by signal directly.
   if returncode < 0:
     signum = -returncode
-    signame = 'Unknown'
-    for k, v in vars(signal).items():
-      if k.startswith('SIG') and '_' not in k and v == signum:
-        signame = k
+    signame = lookup_signal_name(signum)
     return 'terminated by signal %d (%s)' % (signum, signame)
+  # Some programs, e.g. shell, handled signal X and exited with (128 + X).
+  if returncode > 128:
+    signum = returncode - 128
+    signame = lookup_signal_name(signum)
+    return 'exited with code %d; may be signal %d (%s)' % (returncode, signum,
+                                                           signame)
 
   return 'exited with code %d' % returncode
 
