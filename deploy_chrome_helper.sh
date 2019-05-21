@@ -13,8 +13,8 @@ fi
 
 out_dir=out_${SDK_BOARD}/Release
 
-AUTOTEST_TEST_BINARY_PATH= \
-    /usr/local/autotest/deps/chrome_test/test_src/out/Release/
+AUTOTEST_TEST_BINARY_PATH=\
+/usr/local/autotest/deps/chrome_test/test_src/out/Release/
 TAST_TEST_BINARY_PATH=/usr/local/libexec/chrome-binary-tests/
 
 for TARGET in $TARGETS; do
