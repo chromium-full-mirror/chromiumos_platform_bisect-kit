@@ -354,7 +354,7 @@ def version_to_full(board, version):
   if is_cros_full_version(version):
     return version
   milestone = query_milestone_by_version(board, version)
-  assert milestone
+  assert milestone, 'incorrect board=%s or version=%s ?' % (board, version)
   return make_cros_full_version(milestone, version)
 
 

@@ -9,17 +9,18 @@ import datetime
 import json
 import logging
 import os
+import subprocess
 import time
 
-from bisect_kit import core
+from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
 from bisect_kit import wrapper
-from bisect_kit import cli
 import setup_cros_bisect
 
 logger = logging.getLogger(__name__)
@@ -488,6 +489,14 @@ class DiagnoseCommandLineBase(object):
     else:
       if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)
+
+    try:
+      cros_util.gsutil_ls(
+          '-d',
+          cros_util.gs_release_path.format(
+              channel='*', board=opts.board, short_version=''))
+    except subprocess.CalledProcessError:
+      self.argument_parser.error('incorrect board name: %r' % opts.board)
 
     if cros_util.is_cros_short_version(opts.old):
       opts.old = cros_util.version_to_full(opts.board, opts.old)
