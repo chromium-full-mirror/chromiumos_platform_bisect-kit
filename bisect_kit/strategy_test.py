@@ -370,6 +370,32 @@ class TestNoisyBinarySearch(unittest.TestCase):
     # middle point
     self.assertEqual(bsearch.next_idx(), 49)
 
+  def test_value_bisect_unreproducible(self):
+    bsearch = strategy.NoisyBinarySearch(
+        self.rev_info, 0, 99, old_value=10.0, new_value=20.0)
+    self.assertEqual(bsearch.next_idx(), 99)
+
+    with self.assertRaises(errors.VerifyNewBehaviorFailed):
+      bsearch.add_sample(99, 'old', values=[1.0], eval_time=1000)
+
+  def test_value_bisect_noisy_unreproducible(self):
+    bsearch = strategy.NoisyBinarySearch(
+        self.rev_info,
+        0,
+        99,
+        old_value=10.0,
+        new_value=20.0,
+        observation='old=1/100,new=99/100')
+    self.assertEqual(bsearch.next_idx(), 99)
+
+    # It's acceptable to have opposite status few times due to noise.
+    bsearch.add_sample(99, 'old', values=[1.0], eval_time=1000)
+
+    # Pretty high confidence that opposite 100 times is almost impossible.
+    with self.assertRaises(errors.VerifyNewBehaviorFailed):
+      for _ in range(100):
+        bsearch.add_sample(99, 'old', values=[1.0], eval_time=1000)
+
   def test_recompute_init_values(self):
     bsearch = strategy.NoisyBinarySearch(
         self.rev_info,

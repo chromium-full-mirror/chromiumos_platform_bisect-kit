@@ -785,7 +785,7 @@ class NoisyBinarySearch(object):
       errors.VerificationFailed: Bisection range is not verified and false
           events occur too many times.
     """
-    if self.state == self.INITED and self.is_value_bisection():
+    if self.state == self.INITED and self.recompute_init_values:
       return
 
     if self.rev_info[self.old_idx]['old'] == 0:
