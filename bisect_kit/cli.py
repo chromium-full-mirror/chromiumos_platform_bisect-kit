@@ -12,6 +12,8 @@ import logging
 import os
 import re
 import signal
+import subprocess
+import sys
 import textwrap
 import time
 
@@ -265,6 +267,42 @@ def format_returncode(returncode):
   return 'exited with code %d' % returncode
 
 
+def _execute_command(step, args, env=None, stdout_callback=None):
+  """Helper of do_evaluate() and do_switch().
+
+  Args:
+    step: step name
+    args: command line arguments
+    env: environment variables
+    stdout_callback: Callback function for stdout. Called once per line.
+
+  Returns:
+    returncode; range 0 <= returncode < 128
+
+  Raises:
+    errors.ExecutionFatalError if child process returned fatal error code.
+  """
+  stderr_lines = []
+  p = util.Popen(
+      args,
+      env=env,
+      stdout_callback=stdout_callback,
+      stderr_callback=stderr_lines.append)
+  returncode = p.wait()
+  if returncode < 0 or returncode >= 128:
+    # Only output error messages of child process if it is fatal error.
+    print(
+        'Last stderr lines of "%s"' % subprocess.list2cmdline(args),
+        file=sys.stderr)
+    print('=' * 40, file=sys.stderr)
+    for line in stderr_lines[-50:]:
+      print(line, end='', file=sys.stderr)
+    print('=' * 40, file=sys.stderr)
+    raise errors.ExecutionFatalError(
+        '%s failed: %s' % (step, format_returncode(returncode)))
+  return returncode
+
+
 def do_evaluate(evaluate_cmd, domain, rev):
   """Invokes evaluator command.
 
@@ -302,15 +340,11 @@ def do_evaluate(evaluate_cmd, domain, rev):
   domain.setenv(env, rev)
 
   values = []
-  p = util.Popen(
+  returncode = _execute_command(
+      'eval',
       evaluate_cmd,
       env=env,
       stdout_callback=lambda line: _collect_bisect_result_values(values, line))
-  returncode = p.wait()
-  if returncode < 0 or returncode >= 128:
-    raise errors.ExecutionFatalError(
-        'eval failed: %s' % format_returncode(returncode))
-
   if returncode == 0:
     return 'old', values
   if returncode == 125:
@@ -347,11 +381,7 @@ def do_switch(switch_cmd, domain, rev):
   env['BISECT_REV'] = rev
   domain.setenv(env, rev)
 
-  returncode = util.call(*switch_cmd, env=env)
-  if returncode < 0 or returncode >= 128:
-    raise errors.ExecutionFatalError(
-        'switch failed: %s' % format_returncode(returncode))
-
+  returncode = _execute_command('switch', switch_cmd, env=env)
   if returncode != 0:
     return 'skip'
   return None

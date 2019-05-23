@@ -55,12 +55,14 @@ def config_logging(opts):
       opts.log_file = DEFAULT_LOG_FILENAME
   os.environ['LOG_FILE'] = opts.log_file
 
-  root_handlers = ['file-log']
-  # When running nested, for example bisector calling runner, disable console
-  # output to avoid duplication.
-  if not os.environ.get('DISABLE_CONSOLE_OUTPUT'):
-    root_handlers.append('console')
-    os.environ['DISABLE_CONSOLE_OUTPUT'] = '1'
+  if getattr(opts, 'debug'):
+    os.environ['BISECT_KIT_CONSOLE_LOG_LEVEL'] = 'DEBUG'
+  # By default, top level process, i.e. bisectors, output INFO level
+  # messages to console.
+  # Child processes, i.e. switcher and evaluator, output less verbosely ---
+  # only warnings and errors to console.
+  console_level = os.environ.get('BISECT_KIT_CONSOLE_LOG_LEVEL', 'INFO')
+  os.environ['BISECT_KIT_CONSOLE_LOG_LEVEL'] = 'WARNING'
 
   logging.config.dictConfig({
       'version': 1,
@@ -77,7 +79,7 @@ def config_logging(opts):
       },
       'handlers': {
           'console': {
-              'level': 'DEBUG' if getattr(opts, 'debug') else 'INFO',
+              'level': console_level,
               'class': 'logging.StreamHandler',
               'formatter': 'simple',
           },
@@ -91,7 +93,7 @@ def config_logging(opts):
           },
       },
       'root': {
-          'handlers': root_handlers,
+          'handlers': ['file-log', 'console'],
           'level': 'DEBUG',
       },
   })
