@@ -15,6 +15,7 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import repo_util
 from bisect_kit import util
@@ -144,7 +145,7 @@ def switch(opts):
   code_manager.switch(opts.rev)
 
   if opts.nobuild:
-    return
+    return 0
 
   try:
     image_path = build(opts)
@@ -155,20 +156,18 @@ def switch(opts):
     image_path = build(opts)
 
   if opts.nodeploy:
-    return
+    return 0
 
-  try:
-    cros_util.cros_flash(
-        opts.chromeos_root,
-        opts.dut,
-        opts.board,
-        image_path,
-        clobber_stateful=opts.clobber_stateful,
-        disable_rootfs_verification=opts.disable_rootfs_verification)
-  except Exception:
-    if not cros_util.is_good_dut(opts.dut):
-      sys.exit(cli.EXIT_CODE_FATAL)
-    raise
+  if cros_util.cros_flash_with_retry(
+      opts.chromeos_root,
+      opts.dut,
+      opts.board,
+      image_path,
+      clobber_stateful=opts.clobber_stateful,
+      disable_rootfs_verification=opts.disable_rootfs_verification,
+      repair_callback=cros_lab_util.repair):
+    return 0
+  return 1
 
 
 def main(args=None):
@@ -179,15 +178,28 @@ def main(args=None):
 
   if not opts.nodeploy:
     if not cros_util.is_good_dut(opts.dut):
-      logger.error('%r is not a good DUT', opts.dut)
-      sys.exit(cli.EXIT_CODE_FATAL)
+      logger.fatal('%r is not a good DUT', opts.dut)
+      if not cros_lab_util.repair(opts.dut):
+        sys.exit(cli.EXIT_CODE_FATAL)
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 
   if cros_util.is_cros_short_version(opts.rev):
     opts.rev = cros_util.version_to_full(opts.board, opts.rev)
 
-  switch(opts)
+  try:
+    returncode = switch(opts)
+  except Exception:
+    logger.exception('switch failed')
+    returncode = 1
+
+  # No matter switching succeeded or not, DUT must be in good state.
+  # switch() already tried repairing if possible, no repair here.
+  if not cros_util.is_good_dut(opts.dut):
+    logger.fatal('%r is not a good DUT', opts.dut)
+    returncode = cli.EXIT_CODE_FATAL
+  logger.info('done')
+  sys.exit(returncode)
 
 
 if __name__ == '__main__':

@@ -14,6 +14,7 @@ import sys
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,23 @@ def create_argument_parser():
   return parser
 
 
+def switch(opts):
+  # TODO(kcwu): clear cache of cros flash
+  image_path = cros_util.prepare_prebuilt_image(opts.board, opts.version)
+
+  if cros_util.cros_flash_with_retry(
+      opts.default_chromeos_root,
+      opts.dut,
+      opts.board,
+      image_path,
+      version=opts.version,
+      clobber_stateful=opts.clobber_stateful,
+      disable_rootfs_verification=opts.disable_rootfs_verification,
+      repair_callback=cros_lab_util.repair):
+    return 0
+  return 1
+
+
 def main(args=None):
   common.init()
   parser = create_argument_parser()
@@ -69,24 +87,24 @@ def main(args=None):
 
   if not cros_util.is_good_dut(opts.dut):
     logger.error('%r is not a good DUT', opts.dut)
-    sys.exit(cli.EXIT_CODE_FATAL)
-  board = opts.board or cros_util.query_dut_board(opts.dut)
-
-  # TODO(kcwu): clear cache of cros flash
-  image_path = cros_util.prepare_prebuilt_image(board, opts.version)
-  try:
-    cros_util.cros_flash(
-        opts.default_chromeos_root,
-        opts.dut,
-        board,
-        image_path,
-        version=opts.version,
-        clobber_stateful=opts.clobber_stateful,
-        disable_rootfs_verification=opts.disable_rootfs_verification)
-  except Exception:
-    if not cros_util.is_good_dut(opts.dut):
+    if not cros_lab_util.repair(opts.dut):
       sys.exit(cli.EXIT_CODE_FATAL)
-    raise
+  if not opts.board:
+    opts.board = cros_util.query_dut_board(opts.dut)
+
+  try:
+    returncode = switch(opts)
+  except Exception:
+    logger.exception('switch failed')
+    returncode = 1
+
+  # No matter switching succeeded or not, DUT must be in good state.
+  # switch() already tried repairing if possible, no repair here.
+  if not cros_util.is_good_dut(opts.dut):
+    logger.fatal('%r is not a good DUT', opts.dut)
+    returncode = cli.EXIT_CODE_FATAL
+  logger.info('done')
+  sys.exit(returncode)
 
 
 if __name__ == '__main__':

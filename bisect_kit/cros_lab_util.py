@@ -8,7 +8,9 @@ import collections
 import contextlib
 import errno
 import logging
+import subprocess
 
+from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
 
@@ -33,6 +35,10 @@ TRANSIENT_STATES = [
     LOCKED_BY_US
 ]
 BAD_STATES = ['Repair Failed', LOCKED_BY_OTHERS]
+
+
+def is_lab_dut(dut):
+  return dut.endswith('.cros')
 
 
 def dut_host_name(dut):
@@ -306,3 +312,49 @@ def dut_manager(dut, allocator):
       unlock_host(host)
   else:
     yield dut
+
+
+def repair(dut):
+  """Requests lab automatic DUT repairing.
+
+  Note, repairing is unavailable to some DUTs due to infra or some other
+  reasons.
+
+  Args:
+    dut: dut address
+
+  Returns:
+    True if repaired. False if failed or unable to repair.
+  """
+  if not is_lab_dut(dut):
+    logger.warning('%s is not DUT in lab; skip repair', dut)
+    return False
+  logger.info('repair %s', dut)
+
+  host = dut_host_name(dut)
+  hosts = list_host(host=host)
+  info = hosts[host]
+
+  board = None
+  model = None
+  for label in info['Labels']:
+    if label.startswith('board:'):
+      board = label[6:]
+    if label.startswith('model:'):
+      model = label[6:]
+  assert board and model
+
+  try:
+    # Should specify DUT hostname (without .cros suffix), otherwise it would
+    # confuse AFE crbug/967609.
+    result = util.check_output('deploy', 'repair', '--board', board, '--model',
+                               model, host)
+  except subprocess.CalledProcessError:
+    logger.exception('deploy repair failed')
+    return False
+  if '0 failures' not in result:
+    logger.error('deploy repair failed')
+    return False
+
+  assert cros_util.is_good_dut(dut)
+  return True

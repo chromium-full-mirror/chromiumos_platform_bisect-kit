@@ -530,6 +530,10 @@ class DiagnoseCommandLineBase(object):
         opts.mirror_base, opts.work_base, opts.session)
     self.check_options(opts, path_factory)
 
+    if not cros_util.is_good_dut(opts.dut):
+      if not cros_lab_util.repair(opts.dut):
+        raise ValueError('DUT is in bad state')
+
     config = dict(
         session=opts.session,
         mirror_base=opts.mirror_base,

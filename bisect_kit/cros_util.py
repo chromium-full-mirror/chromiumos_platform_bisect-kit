@@ -548,6 +548,9 @@ def cros_flash(chromeos_root,
     clobber_stateful: Clobber stateful partition when performing update
     disable_rootfs_verification: Disable rootfs verification after update
         is completed
+
+  Raises:
+    errors.ExternalError: cros flash failed
   """
   logger.info('cros_flash %s %s %s %s', host, board, version, image_path)
 
@@ -563,14 +566,58 @@ def cros_flash(chromeos_root,
   if disable_rootfs_verification:
     args.append('--disable-rootfs-verification')
 
-  cros_sdk(chromeos_root, 'cros', 'flash', *args)
+  try:
+    cros_sdk(chromeos_root, 'cros', 'flash', *args)
+  except subprocess.CalledProcessError:
+    raise errors.ExternalError('cros flash failed')
 
   if version:
     # In the past, cros flash may fail with returncode=0
     # So let's have an extra check.
     short_version = version_to_short(version)
     dut_version = query_dut_short_version(host)
-    assert dut_version == short_version
+    if dut_version != short_version:
+      raise errors.ExternalError(
+          'although cros flash succeeded, the OS version is unexpected: '
+          'actual=%s expect=%s' % (dut_version, short_version))
+
+  # "cros flash" may terminate sucessfully but the DUT starts self-repairing
+  # (b/130786578), so it's necessary to do sanity check.
+  if not is_good_dut(host):
+    raise errors.ExternalError(
+        'although cros flash succeeded, the DUT is in bad state')
+
+
+def cros_flash_with_retry(chromeos_root,
+                          host,
+                          board,
+                          image_path,
+                          version=None,
+                          clobber_stateful=False,
+                          disable_rootfs_verification=True,
+                          repair_callback=None):
+  # 'cros flash' is not 100% reliable, retry if necessary.
+  for attempt in range(2):
+    if attempt > 0:
+      logger.info('will retry 60 seconds later')
+      time.sleep(60)
+
+    try:
+      cros_flash(
+          chromeos_root,
+          host,
+          board,
+          image_path,
+          version=version,
+          clobber_stateful=clobber_stateful,
+          disable_rootfs_verification=disable_rootfs_verification)
+      return True
+    except errors.ExternalError:
+      logger.exception('cros flash failed')
+      if repair_callback and not repair_callback(host):
+        logger.warning('not repaired, assume it is harmless')
+      continue
+  return False
 
 
 def version_info(board, version):
