@@ -141,6 +141,12 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       if opts.test_name or opts.metric or opts.args:
         self.argument_parser.error(
             'do not specify --test_name, --metric, --args for CTS/GTS tests')
+      if not opts.cts_prefix:
+        self.argument_parser.error(
+            '--cts_prefix should be specified for CTS/GTS tests')
+      if not opts.cts_module:
+        self.argument_parser.error(
+            '--cts_module should be specified for CTS/GTS tests')
       opts.test_name = '%s.tradefed-run-test' % opts.cts_prefix
     elif not opts.test_name:
       self.argument_parser.error(

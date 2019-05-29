@@ -260,6 +260,10 @@ def main(args=None):
     if opts.test_name or opts.metric or opts.args:
       parser.error(
           'do not specify --test_name, --metric, --args for CTS/GTS tests')
+    if not opts.cts_prefix:
+      parser.error('--cts_prefix should be specified for CTS/GTS tests')
+    if not opts.cts_module:
+      parser.error('--cts_module should be specified for CTS/GTS tests')
     opts.test_name = '%s.tradefed-run-test' % opts.cts_prefix
     opts.args = 'module=%s test=%s' % (opts.cts_module, opts.cts_test)
     if opts.cts_revision:
