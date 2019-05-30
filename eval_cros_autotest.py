@@ -106,6 +106,8 @@ def create_argument_parser():
       help='CTS/GTS test name, like '
       '"android.hardware.cts.CameraTest#testDisplayOrientation"')
   group.add_argument('--cts_timeout', type=float, help='timeout, in seconds')
+  group.add_argument(
+      '--cts_runonce', action='store_true', help='run test only once')
 
   return parser
 
@@ -255,7 +257,7 @@ def main(args=None):
 
   is_cts = (
       opts.cts_revision or opts.cts_abi or opts.cts_prefix or opts.cts_module or
-      opts.cts_test or opts.cts_timeout)
+      opts.cts_test or opts.cts_runonce or opts.cts_timeout)
   if is_cts:
     if opts.test_name or opts.metric or opts.args:
       parser.error(
@@ -270,6 +272,8 @@ def main(args=None):
       opts.args += ' revision=%s' % opts.cts_revision
     if opts.cts_abi:
       opts.args += ' abi=%s' % opts.cts_abi
+    if opts.cts_runonce:
+      opts.args += ' max_retry=0'
     if opts.cts_timeout:
       opts.args += ' timeout=%s' % opts.cts_timeout
   else:
