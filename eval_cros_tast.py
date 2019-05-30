@@ -18,6 +18,7 @@ from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cros_util
+from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,16 @@ def create_argument_parser():
 def prepare_to_run_test(opts):
   if opts.reboot_before_test:
     cros_util.reboot(opts.dut)
+
+
+def list_tast_tests(opts, pattern=None):
+  cmd = ['tast', 'list']
+  if not opts.tast_build:
+    cmd.append('-build=false')
+  cmd.append(opts.dut)
+  if pattern:
+    cmd.append(pattern)
+  return cros_util.cros_sdk(opts.chromeos_root, *cmd).splitlines()
 
 
 def run_test(opts):
@@ -154,6 +165,19 @@ def main(args=None):
       return FATAL
   # Remove the "tast." prefix prepended by autotest.
   opts.test_name = re.sub(r'^tast\.', '', opts.test_name)
+
+  tests = list_tast_tests(opts, opts.test_name)
+  if tests:
+    if len(tests) != 1 or tests[0] != opts.test_name:
+      # For example, tast in chroot after 12205.0.0 is IPC incompatible with
+      # tast on DUT earlier than 12028.0.0 (crbug/932307)
+      logger.fatal('"tast list" returns unexpected tests; '
+                   'incompatible tast on DUT and in chroot?')
+      return FATAL
+  else:
+    tests = list_tast_tests(opts)
+    util.show_similar_candidates('test name', opts.test_name, tests)
+    return FATAL
 
   try:
     prepare_to_run_test(opts)

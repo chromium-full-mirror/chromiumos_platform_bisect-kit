@@ -5,6 +5,7 @@
 """Utility functions and classes."""
 
 from __future__ import print_function
+import difflib
 import logging
 import Queue
 import subprocess
@@ -286,3 +287,16 @@ def is_direct_relative_version(a, b):
       branched = True
 
   return True
+
+
+def show_similar_candidates(key, value, candidates):
+  logger.error('incorrect %s: %r; possible candidates:', key, value)
+  if not candidates:
+    logger.error('(no candidates at all)')
+    return
+  similar_candidates = difflib.get_close_matches(value, candidates)
+  if not similar_candidates:
+    logger.error('(no similar candidates)')
+    return
+  for candidate in similar_candidates:
+    logger.error('    %s', candidate)
