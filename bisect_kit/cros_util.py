@@ -38,7 +38,7 @@ re_chromeos_short_version = r'^\d+\.\d+\.\d+$'
 
 gs_archive_path = 'gs://chromeos-image-archive/{board}-release'
 gs_release_path = (
-    'gs://chromeos-releases/{channel}-channel/{board}/{short_version}')
+    'gs://chromeos-releases/{channel}-channel/{boardpath}/{short_version}')
 
 # Assume gsutil is in PATH.
 gsutil_bin = 'gsutil'
@@ -221,6 +221,22 @@ def wait_reboot_done(host, boot_id):
   raise errors.ExternalError('reboot failed?')
 
 
+def gs_release_boardpath(board):
+  """Normalizes board name for gs://chromeos-releases/
+
+  This follows behavior of PushImage() in chromite/scripts/pushimage.py
+  Note, only gs://chromeos-releases/ needs normalization,
+  gs://chromeos-image-archive does not.
+
+  Args:
+    board: ChromeOS board name
+
+  Returns:
+    normalized board name
+  """
+  return board.replace('_', '-')
+
+
 def gsutil(*args, **kwargs):
   """gsutil command line wrapper.
 
@@ -297,7 +313,9 @@ def query_milestone_by_version(board, short_version):
 
   for channel in ['canary', 'dev', 'beta', 'stable']:
     path = gs_release_path.format(
-        channel=channel, board=board, short_version=short_version)
+        channel=channel,
+        boardpath=gs_release_boardpath(board),
+        short_version=short_version)
     for line in gsutil_ls(path, ignore_errors=True):
       m = re.search(r'\bR(\d+)-' + short_version, line)
       if not m:
@@ -306,6 +324,42 @@ def query_milestone_by_version(board, short_version):
 
   logger.error('unable to query milestone of %s for %s', short_version, board)
   return None
+
+
+def list_board_names(chromeos_root):
+  """List board names.
+
+  Args:
+    chromeos_root: chromeos tree root
+
+  Returns:
+    list of board names
+  """
+  # Following logic is simplified from chromite/lib/portage_util.py
+  cros_list_overlays = os.path.join(chromeos_root,
+                                    'chromite/bin/cros_list_overlays')
+  overlays = util.check_output(cros_list_overlays).splitlines()
+  result = set()
+  for overlay in overlays:
+    conf_file = os.path.join(overlay, 'metadata', 'layout.conf')
+    name = None
+    if os.path.exists(conf_file):
+      for line in open(conf_file):
+        m = re.match(r'^repo-name\s*=\s*(\S+)\s*$', line)
+        if m:
+          name = m.group(1)
+          break
+
+    if not name:
+      name_file = os.path.join(overlay, 'profiles', 'repo_name')
+      if os.path.exists(name_file):
+        name = open(name_file).read().strip()
+
+    if name:
+      name = re.sub(r'-private$', '', name)
+      result.add(name)
+
+  return list(result)
 
 
 def recognize_version(board, version):
@@ -403,7 +457,8 @@ def list_prebuilt_from_chromeos_releases(board):
   """
   result = []
   for line in gsutil_ls(
-      gs_release_path.format(channel='*', board=board, short_version=''),
+      gs_release_path.format(
+          channel='*', boardpath=gs_release_boardpath(board), short_version=''),
       ignore_errors=True):
     m = re.match(r'gs:\S+/(\d+\.\d+\.\d+)/$', line)
     if m:
@@ -512,7 +567,9 @@ def prepare_prebuilt_image(board, version):
       fn = 'ChromeOS-test-{full_version}-{board}.tar.xz'.format(
           full_version=full_version, board=board)
       gs_path = gs_release_path.format(
-          channel=channel, board=board, short_version=short_version)
+          channel=channel,
+          boardpath=gs_release_boardpath(board),
+          short_version=short_version)
       gs_path += '/' + fn
       if gsutil_ls(gs_path, ignore_errors=True):
         # TODO(kcwu): delete tmp

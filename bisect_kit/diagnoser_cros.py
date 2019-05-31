@@ -9,7 +9,6 @@ import datetime
 import json
 import logging
 import os
-import subprocess
 import time
 
 from bisect_kit import cli
@@ -490,12 +489,9 @@ class DiagnoseCommandLineBase(object):
       if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)
 
-    try:
-      cros_util.gsutil_ls(
-          '-d',
-          cros_util.gs_release_path.format(
-              channel='*', board=opts.board, short_version=''))
-    except subprocess.CalledProcessError:
+    names = cros_util.list_board_names(opts.chromeos_root)
+    if opts.board not in names:
+      util.show_similar_candidates('board name', opts.board, names)
       self.argument_parser.error('incorrect board name: %r' % opts.board)
 
     if cros_util.is_cros_short_version(opts.old):
