@@ -193,11 +193,12 @@ def main(args=None):
     logger.exception('switch failed')
     returncode = 1
 
-  # No matter switching succeeded or not, DUT must be in good state.
-  # switch() already tried repairing if possible, no repair here.
-  if not cros_util.is_good_dut(opts.dut):
-    logger.fatal('%r is not a good DUT', opts.dut)
-    returncode = cli.EXIT_CODE_FATAL
+  if not opts.nodeploy:
+    # No matter switching succeeded or not, DUT must be in good state.
+    # switch() already tried repairing if possible, no repair here.
+    if not cros_util.is_good_dut(opts.dut):
+      logger.fatal('%r is not a good DUT', opts.dut)
+      returncode = cli.EXIT_CODE_FATAL
   logger.info('done')
   sys.exit(returncode)
 
