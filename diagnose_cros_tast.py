@@ -120,6 +120,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                                      lambda: grab_dut(self.config)) as dut:
         if not dut:
           raise errors.NoDutAvailable('unable to allocate DUT')
+        if not cros_util.is_good_dut(dut):
+          if not cros_lab_util.repair(dut):
+            raise errors.ExternalError('Not a good DUT and unable to repair')
         assert cros_util.is_dut(dut)
         if self.config['dut'] == cros_lab_util.LAB_DUT:
           self.config['allocated_dut'] = dut
