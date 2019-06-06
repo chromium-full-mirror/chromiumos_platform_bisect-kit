@@ -798,13 +798,22 @@ def cros_sdk(chromeos_root, *args, **kwargs):
 
   # Use --no-ns-pid to prevent cros_sdk change our pgid, otherwise subsequent
   # commands would be considered as background process.
-  cmd = ['chromite/bin/cros_sdk', '--no-ns-pid']
+  prefix = ['chromite/bin/cros_sdk', '--no-ns-pid']
 
   if kwargs.get('chrome_root'):
-    cmd += ['--chrome_root', kwargs['chrome_root']]
+    prefix += ['--chrome_root', kwargs['chrome_root']]
 
-  cmd += envs + ['--'] + list(args)
+  prefix += envs + ['--']
 
+  # In addition to the output of command we are interested, cros_sdk may
+  # generate its own messages. For example, chroot creation messages if we run
+  # cros_sdk the first time.
+  # This is the hack to run dummy command once, so we can get clean output for
+  # the command we are interested.
+  cmd = prefix + ['true']
+  util.check_call(*cmd, cwd=chromeos_root)
+
+  cmd = prefix + list(args)
   return util.check_output(
       *cmd,
       cwd=chromeos_root,
