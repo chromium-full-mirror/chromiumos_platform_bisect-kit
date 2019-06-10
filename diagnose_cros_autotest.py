@@ -242,7 +242,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         diagnoser = diagnoser_cros.CrosDiagnoser(self.states, path_factory,
                                                  self.config, dut)
 
-        eval_cmd = common_eval_cmd + ['--prebuilt', '--reinstall']
+        eval_cmd = common_eval_cmd + ['--prebuilt']
         # Do not specify version for autotest prebuilt switching here. The trick
         # is that version number is obtained via bisector's environment variable
         # CROS_VERSION.
@@ -255,12 +255,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
         util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
-        # Now, the version of autotest on the DUT is unknown. This is harmless
-        # to the final diagnose result. Even if the culprit is inside autotest
-        # itself, the verification step of chrome bisection will know that
-        # chrome is not culprit and go on.
-        # Do not delete existing autotest folders on the DUT, so chrome custom
-        # binary tests can reuse them.
 
         try:
           if diagnoser.narrow_down_android(eval_cmd):
@@ -272,8 +266,19 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                            'assume culprit is not inside android and continue')
         # Assume it's ok to leave random version of android prebuilt on DUT.
 
-        # Don't --reinstall to keep chrome binaries override.
         eval_cmd = common_eval_cmd + ['--prebuilt']
+
+        if chrome_binaries:
+          # Now, the version of autotest on the DUT is unknown and may be even
+          # not installed. Invoke the test once here, so
+          #   - make sure autotest-deps is installed, with expected version
+          #   - autotest-deps is installed first, so our chrome_binaries
+          #     won't be reset to default version during bisection.
+          # It's acceptable to spend extra time to run test once because
+          #   - only few tests do so
+          #   - tests are migrating away from autotest
+          util.call(*eval_cmd)
+
         try:
           if diagnoser.narrow_down_chrome(
               eval_cmd, chrome_binaries=chrome_binaries):
@@ -284,7 +289,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           logger.exception('exception in chrome bisector before verification; '
                            'assume culprit is not inside chrome and continue')
 
-        eval_cmd = common_eval_cmd + ['--reinstall']
+        eval_cmd = common_eval_cmd
         diagnoser.narrow_down_chromeos_localbuild(eval_cmd)
         logger.info('%s done', __file__)
     except Exception as e:

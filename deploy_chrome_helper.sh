@@ -29,6 +29,10 @@ for TARGET in $TARGETS; do
             ;;
         *_unittest|*_unittests)
             chmod o+x $out_dir/$TARGET
+            if ssh $DUT [ ! -d $AUTOTEST_TEST_BINARY_PATH ]; then
+                echo "Warning: $AUTOTEST_TEST_BINARY_PATH does not exist" >&2
+                ssh $DUT mkdir -p $AUTOTEST_TEST_BINARY_PATH
+            fi
             rsync $out_dir/$TARGET $DUT:$AUTOTEST_TEST_BINARY_PATH
             rsync $out_dir/$TARGET $DUT:$TAST_TEST_BINARY_PATH
             ;;
