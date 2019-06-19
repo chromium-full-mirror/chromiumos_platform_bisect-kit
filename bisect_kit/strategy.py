@@ -727,6 +727,9 @@ class NoisyBinarySearch(object):
       (left, right):
         left: Index likely before the point of probability change.
         right: Index likely after the point of probability change.
+
+    Raises:
+      errors.WrongAssumption: the bisection range is invalid
     """
     if self.state == self.INITED:
       return self.old_idx, self.new_idx

@@ -105,22 +105,24 @@ class AndroidBuildIDDomain(core.BisectDomain):
       env['DUT'] = self.config['dut']
 
   def fill_candidate_summary(self, summary, interesting_indexes):
-    old, new = summary['current_range']
     url_template = ('https://android-build.googleplex.com/'
                     'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
                         self.config['branch'], self.config['flavor'])
-    summary['links'] = [
-        {
-            'name': 'change_list',
-            'url': url_template.format(old=old, new=new),
-            'note': 'Because the diff viewer is inclusive, you need to ignore '
-                    'changes from starting version by yourself (b/118564983)',
-        },
-        {
-            'name': 'minus',
-            'url': url_template.format(old=old, new=old),
-        },
-    ]
+    if 'current_range' in summary:
+      old, new = summary['current_range']
+      summary['links'] = [
+          {
+              'name': 'change_list',
+              'url': url_template.format(old=old, new=new),
+              'note':
+                  'Because the diff viewer is inclusive, you need to ignore '
+                  'changes from starting version by yourself (b/118564983)',
+          },
+          {
+              'name': 'minus',
+              'url': url_template.format(old=old, new=old),
+          },
+      ]
 
     for i in interesting_indexes:
       if i == 0:

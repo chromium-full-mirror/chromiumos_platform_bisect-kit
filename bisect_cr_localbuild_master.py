@@ -174,23 +174,24 @@ class ChromeSrcMasterDomain(core.BisectDomain):
       env['DUT'] = self.config['dut']
 
   def fill_candidate_summary(self, summary, interesting_indexes):
-    old, new = summary['current_range']
     chrome_repo_url = 'https://chromium.googlesource.com/chromium/src'
-    log_url = '%s/+log/%s..%s?n=10000' % (chrome_repo_url, old, new)
-    summary['links'] = [
-        {
-            'name': 'change_list',
-            'url': log_url,
-            'note':
-                'The link of change list only lists chrome src/ commits. For '
-                'example, commits inside v8 and third party repos are not '
-                'listed.',
-        },
-        {
-            'name': 'fuller',
-            'url': log_url + '&pretty=fuller',
-        },
-    ]
+    if 'current_range' in summary:
+      old, new = summary['current_range']
+      log_url = '%s/+log/%s..%s?n=10000' % (chrome_repo_url, old, new)
+      summary['links'] = [
+          {
+              'name': 'change_list',
+              'url': log_url,
+              'note':
+                  'The link of change list only lists chrome src/ commits. For '
+                  'example, commits inside v8 and third party repos are not '
+                  'listed.',
+          },
+          {
+              'name': 'fuller',
+              'url': log_url + '&pretty=fuller',
+          },
+      ]
 
     for i in interesting_indexes:
       rev_info = summary['rev_info'][i]

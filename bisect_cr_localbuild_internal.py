@@ -168,27 +168,28 @@ class ChromeSrcDomain(core.BisectDomain):
       env['DUT'] = self.config['dut']
 
   def fill_candidate_summary(self, summary, interesting_indexes):
-    old, new = summary['current_range']
-    old_base, _, _ = codechange.parse_intra_rev(old)
-    _, new_next, _ = codechange.parse_intra_rev(new)
+    if 'current_range' in summary:
+      old, new = summary['current_range']
+      old_base, _, _ = codechange.parse_intra_rev(old)
+      _, new_next, _ = codechange.parse_intra_rev(new)
 
-    log_url = (
-        'https://chromium.googlesource.com/chromium/src/+log/%s..%s?n=10000' %
-        (old_base, new_next))
-    summary['links'] = [
-        {
-            'name': 'change_list',
-            'url': log_url,
-            'note':
-                'The link of change list only lists chrome src/ commits. For '
-                'example, commits inside v8 and third party repos are not '
-                'listed.',
-        },
-        {
-            'name': 'fuller',
-            'url': log_url + '&pretty=fuller',
-        },
-    ]
+      log_url = (
+          'https://chromium.googlesource.com/chromium/src/+log/%s..%s?n=10000' %
+          (old_base, new_next))
+      summary['links'] = [
+          {
+              'name': 'change_list',
+              'url': log_url,
+              'note':
+                  'The link of change list only lists chrome src/ commits. For '
+                  'example, commits inside v8 and third party repos are not '
+                  'listed.',
+          },
+          {
+              'name': 'fuller',
+              'url': log_url + '&pretty=fuller',
+          },
+      ]
 
     cache = gclient_util.GclientCache(self.config['chrome_mirror'])
     spec_manager = cr_util.ChromeSpecManager(self.config)

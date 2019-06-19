@@ -93,16 +93,17 @@ class ChromeOSVersionDomain(core.BisectDomain):
     env['CROS_VERSION'] = rev
 
   def fill_candidate_summary(self, summary, interesting_indexes):
-    old, new = summary['current_range']
-    old_short = cros_util.version_to_short(old)
-    new_short = cros_util.version_to_short(new)
     url_template = 'https://crosland.corp.google.com/log/%s..%s'
-    summary['links'] = [
-        {
-            'name': 'change_list',
-            'url': url_template % (old_short, new_short),
-        },
-    ]
+    if 'current_range' in summary:
+      old, new = summary['current_range']
+      old_short = cros_util.version_to_short(old)
+      new_short = cros_util.version_to_short(new)
+      summary['links'] = [
+          {
+              'name': 'change_list',
+              'url': url_template % (old_short, new_short),
+          },
+      ]
 
     for i in interesting_indexes:
       if i == 0:

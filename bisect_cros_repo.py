@@ -132,18 +132,19 @@ class ChromeOSRepoDomain(core.BisectDomain):
     env['INTRA_REV'] = rev
 
   def fill_candidate_summary(self, summary, interesting_indexes):
-    old, new = summary['current_range']
-    old_base, _, _ = codechange.parse_intra_rev(old)
-    _, new_next, _ = codechange.parse_intra_rev(new)
-    old_short = cros_util.version_to_short(old_base)
-    new_short = cros_util.version_to_short(new_next)
-    url_template = 'https://crosland.corp.google.com/log/%s..%s'
-    summary['links'] = [
-        {
-            'name': 'change_list',
-            'url': url_template % (old_short, new_short),
-        },
-    ]
+    if 'current_range' in summary:
+      old, new = summary['current_range']
+      old_base, _, _ = codechange.parse_intra_rev(old)
+      _, new_next, _ = codechange.parse_intra_rev(new)
+      old_short = cros_util.version_to_short(old_base)
+      new_short = cros_util.version_to_short(new_next)
+      url_template = 'https://crosland.corp.google.com/log/%s..%s'
+      summary['links'] = [
+          {
+              'name': 'change_list',
+              'url': url_template % (old_short, new_short),
+          },
+      ]
 
     cache = repo_util.RepoMirror(self.config['chromeos_mirror'])
     spec_manager = cros_util.ChromeOSSpecManager(self.config)

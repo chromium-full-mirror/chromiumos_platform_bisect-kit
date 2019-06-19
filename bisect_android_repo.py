@@ -181,25 +181,27 @@ class AndroidRepoDomain(core.BisectDomain):
     env['INTRA_REV'] = rev
 
   def fill_candidate_summary(self, summary, interesting_indexes):
-    old, new = summary['current_range']
-    old_base, _, _ = codechange.parse_intra_rev(old)
-    _, new_next, _ = codechange.parse_intra_rev(new)
-    url_template = ('https://android-build.googleplex.com/'
-                    'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
-                        self.config['branch'], self.config['flavor'])
+    if 'current_range' in summary:
+      old, new = summary['current_range']
+      old_base, _, _ = codechange.parse_intra_rev(old)
+      _, new_next, _ = codechange.parse_intra_rev(new)
+      url_template = ('https://android-build.googleplex.com/'
+                      'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
+                          self.config['branch'], self.config['flavor'])
 
-    summary['links'] = [
-        {
-            'name': 'change_list',
-            'url': url_template.format(old=old_base, new=new_next),
-            'note': 'Because the diff viewer is inclusive, you need to ignore '
-                    'changes from starting version by yourself (b/118564983)',
-        },
-        {
-            'name': 'minus',
-            'url': url_template.format(old=old_base, new=old_base),
-        },
-    ]
+      summary['links'] = [
+          {
+              'name': 'change_list',
+              'url': url_template.format(old=old_base, new=new_next),
+              'note':
+                  'Because the diff viewer is inclusive, you need to ignore '
+                  'changes from starting version by yourself (b/118564983)',
+          },
+          {
+              'name': 'minus',
+              'url': url_template.format(old=old_base, new=old_base),
+          },
+      ]
 
     spec_manager = android_util.AndroidSpecManager(self.config)
     cache = repo_util.RepoMirror(self.config['android_mirror'])

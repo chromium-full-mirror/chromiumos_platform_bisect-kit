@@ -608,23 +608,32 @@ class BisectorCommandLine(object):
 
   def cmd_view(self, opts):
     """Shows remaining candidates."""
-    old_idx, new_idx = self.strategy.get_range()
-    old, new = map(self.states.idx2rev, [old_idx, new_idx])
-    highlight_old_idx, highlight_new_idx = self.strategy.get_range(
-        self.strategy.confidence / 10.0)
     summary = {
         'rev_info': [info.to_dict() for info in self.strategy.rev_info],
-        'current_range': (old, new),
-        'highlight_range':
-            map(self.states.idx2rev, [highlight_old_idx, highlight_new_idx]),
-        'prob':
-            self.strategy.get_prob(),
-        'remaining_steps':
-            self.strategy.remaining_steps(),
     }
+
+    try:
+      old_idx, new_idx = self.strategy.get_range()
+      highlight_old_idx, highlight_new_idx = self.strategy.get_range(
+          self.strategy.confidence / 10.0)
+    except errors.WrongAssumption:
+      pass
+    else:
+      old, new = map(self.states.idx2rev, [old_idx, new_idx])
+      summary.update({
+          'current_range': (old, new),
+          'highlight_range':
+              map(self.states.idx2rev, [highlight_old_idx, highlight_new_idx]),
+          'prob':
+              self.strategy.get_prob(),
+          'remaining_steps':
+              self.strategy.remaining_steps(),
+      })
 
     if opts.verbose or opts.json:
       interesting_indexes = set(range(len(summary['rev_info'])))
+    elif 'current_range' not in summary:
+      interesting_indexes = set()
     else:
       interesting_indexes = set([old_idx, new_idx])
       if self.strategy.prob:
@@ -640,17 +649,19 @@ class BisectorCommandLine(object):
       self.show_summary(summary, interesting_indexes, verbose=opts.verbose)
 
   def show_summary(self, summary, interesting_indexes, verbose=False):
-    old, new = summary['current_range']
-    old_idx, new_idx = map(self.states.data['revlist'].index, [old, new])
-
     for link in summary.get('links', []):
       print('%s: %s' % (link['name'], link['url']))
       if 'note' in link:
         print(link['note'])
 
-    print('Range: (%s, %s], %s revs left' % (old, new, (new_idx - old_idx)))
-    if summary.get('remaining_steps'):
-      print('(roughly %d steps)' % summary['remaining_steps'])
+    if 'current_range' in summary:
+      old, new = summary['current_range']
+      old_idx, new_idx = map(self.states.data['revlist'].index, [old, new])
+      print('Range: (%s, %s], %s revs left' % (old, new, (new_idx - old_idx)))
+      if summary.get('remaining_steps'):
+        print('(roughly %d steps)' % summary['remaining_steps'])
+    else:
+      old_idx, new_idx = None, None
 
     for i, rev_info in enumerate(summary['rev_info']):
       if (not verbose and not old_idx <= i <= new_idx and
@@ -658,7 +669,7 @@ class BisectorCommandLine(object):
         continue
 
       detail = []
-      if self.strategy.is_noisy() and summary['prob']:
+      if self.strategy.is_noisy() and summary.get('prob'):
         detail.append('%.4f%%' % (summary['prob'][i] * 100))
       if rev_info['result_counter']:
         detail.append(str(rev_info['result_counter']))
