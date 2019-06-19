@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -107,6 +108,12 @@ def run_test(opts):
   # chroot.
   results_dir = os.path.join(cros_util.chromeos_root_inside_chroot,
                              'tmp/tast_results_tmp')
+  results_dir_output_chroot = results_dir.replace(
+      cros_util.chromeos_root_inside_chroot, opts.chromeos_root)
+  # Don't reuse existing results dir, otherwise tast may rename output files.
+  if os.path.exists(results_dir_output_chroot):
+    shutil.rmtree(results_dir_output_chroot)
+
   # TODO(kcwu): add -timeout
   cmd = ['tast', '-verbose', 'run']
   if not opts.tast_build:
@@ -119,8 +126,7 @@ def run_test(opts):
     logger.fatal('failed to run tast, incorrect test name?')
     return None
 
-  return results_dir.replace(cros_util.chromeos_root_inside_chroot,
-                             opts.chromeos_root)
+  return results_dir_output_chroot
 
 
 def gather_test_result(opts, result_dir):
