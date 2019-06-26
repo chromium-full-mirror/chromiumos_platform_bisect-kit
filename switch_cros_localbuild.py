@@ -37,8 +37,8 @@ def create_argument_parser():
       'rev',
       nargs='?',
       type=cli.argtype_notempty,
-      metavar='INTRA_REV',
-      default=configure.get('INTRA_REV', ''),
+      metavar='CROS_VERSION',
+      default=configure.get('CROS_VERSION', ''),
       help='ChromeOS local build version string, in format short version, '
       'full version, or "full,full+N"')
   parser.add_argument(
@@ -175,6 +175,10 @@ def main(args=None):
   parser = create_argument_parser()
   opts = parser.parse_args(args)
   common.config_logging(opts)
+
+  # --nobuild imply --nodeploy
+  if opts.nobuild:
+    opts.nodeploy = True
 
   if not opts.nodeploy:
     if not cros_util.is_good_dut(opts.dut):

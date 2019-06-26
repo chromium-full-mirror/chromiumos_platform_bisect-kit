@@ -54,8 +54,7 @@ CHROME_BINARIES_OF_TEST = {
 def get_test_dependency_labels(config):
   # Assume "DEPENDENCIES" is identical between the period of
   # `old` and `new` version.
-  autotest_dir = os.path.join(config['chromeos_root'],
-                              cros_util.prebuilt_autotest_dir)
+  autotest_dir = os.path.join(config['chromeos_root'], cros_util.autotest_path)
   info = cros_util.get_autotest_test_info(autotest_dir, config['test_name'])
   assert info, 'incorrect test name? %s' % config['test_name']
 
@@ -118,7 +117,7 @@ def determine_chrome_binaries(chromeos_root, test_name):
       chrome_binaries = binaries
       break
 
-  autotest_dir = os.path.join(chromeos_root, cros_util.prebuilt_autotest_dir)
+  autotest_dir = os.path.join(chromeos_root, cros_util.autotest_path)
   if chrome_binaries:
     logger.info('This test depends on chrome binary: %s', chrome_binaries)
   elif may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
@@ -163,22 +162,28 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         test_that_args=opts.args,
     )
 
-    # Unpack old autotest prebuilt, assume following information don't change
-    # between versions:
-    #  - what chrome binaries to run
-    #  - dependency labels for DUT allocation
-    common_switch_cmd, _common_eval_cmd = self._build_cmds()
-    util.check_call(*(common_switch_cmd + [self.config['old']]))
-
   def _build_cmds(self):
     # prebuilt version will be specified later.
-    common_switch_cmd = [
+    cros_switch_cmd = [
+        './switch_cros_localbuild.py',
+        '--chromeos_root',
+        self.config['chromeos_root'],
+        '--chromeos_mirror',
+        self.config['chromeos_mirror'],
+        '--board',
+        self.config['board'],
+        '--nobuild',
+        self.config['dut'],
+    ]
+    autotest_switch_cmd = [
         './switch_autotest_prebuilt.py',
-        '--chromeos_root', self.config['chromeos_root'],
-        '--board', self.config['board'],
-    ]  # yapf: disable
+        '--chromeos_root',
+        self.config['chromeos_root'],
+        '--board',
+        self.config['board'],
+    ]
     if self.config['test_name'] and not self.config['cts_test']:
-      common_switch_cmd += ['--test_name', self.config['test_name']]
+      autotest_switch_cmd += ['--test_name', self.config['test_name']]
 
     common_eval_cmd = [
         './eval_cros_autotest.py',
@@ -208,7 +213,12 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     if self.config.get('cts_runonce'):
       common_eval_cmd.append('--cts_runonce')
 
-    return common_switch_cmd, common_eval_cmd
+    common_switch_cmds = [
+        cros_switch_cmd,
+        autotest_switch_cmd,
+    ]
+
+    return common_switch_cmds, common_eval_cmd
 
   def cmd_run(self, opts):
     del opts  # unused
@@ -219,7 +229,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       path_factory = setup_cros_bisect.DefaultProjectPathFactory(
           self.config['mirror_base'], self.config['work_base'],
           self.config['session'])
-      common_switch_cmd, common_eval_cmd = self._build_cmds()
+      common_switch_cmds, common_eval_cmd = self._build_cmds()
 
       if self.config['test_name']:
         chrome_binaries = determine_chrome_binaries(
@@ -246,15 +256,18 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         # Do not specify version for autotest prebuilt switching here. The trick
         # is that version number is obtained via bisector's environment variable
         # CROS_VERSION.
-        extra_switch_cmd = common_switch_cmd
+        extra_switch_cmds = common_switch_cmds
         diagnoser.narrow_down_chromeos_prebuilt(
             self.config['old'],
             self.config['new'],
             eval_cmd,
-            extra_switch_cmd=extra_switch_cmd)
+            extra_switch_cmds=extra_switch_cmds)
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
-        util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
+        env = os.environ.copy()
+        env['CROS_VERSION'] = diagnoser.cros_old
+        for cmd in common_switch_cmds:
+          util.check_call(*cmd, env=env)
 
         try:
           if diagnoser.narrow_down_android(eval_cmd):

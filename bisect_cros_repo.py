@@ -17,7 +17,7 @@ When running switcher and evaluator, following environment variables
 will be set:
   BOARD (e.g. samus),
   DUT (e.g. samus-dut),
-  INTRA_REV (e.g. 9901.0.0,9902.0.0+3), and
+  CROS_VERSION (e.g. 9901.0.0,9902.0.0+3), and
   CHROMEOS_ROOT (e.g. ~/chromiumos).
 """
 
@@ -129,7 +129,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
       env['BOARD'] = self.config['board']
     env['CHROMEOS_ROOT'] = self.config['chromeos_root']
     env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
-    env['INTRA_REV'] = rev
+    env['CROS_VERSION'] = rev
 
   def fill_candidate_summary(self, summary, interesting_indexes):
     if 'current_range' in summary:

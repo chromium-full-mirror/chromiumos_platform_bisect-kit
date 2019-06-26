@@ -45,7 +45,7 @@ gsutil_bin = 'gsutil'
 
 chromeos_root_inside_chroot = '/mnt/host/source'
 # relative to chromeos_root
-prebuilt_autotest_dir = 'tmp/autotest-prebuilt'
+autotest_path = 'src/third_party/autotest/files'
 
 VERSION_KEY_CROS_SHORT_VERSION = 'cros_short_version'
 VERSION_KEY_CROS_FULL_VERSION = 'cros_full_version'
