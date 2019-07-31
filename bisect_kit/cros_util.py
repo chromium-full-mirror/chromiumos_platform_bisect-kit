@@ -22,7 +22,6 @@ import time
 
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import common
 from bisect_kit import cr_util
 from bisect_kit import errors
 from bisect_kit import git_util
@@ -46,6 +45,9 @@ gsutil_bin = 'gsutil'
 chromeos_root_inside_chroot = '/mnt/host/source'
 # relative to chromeos_root
 autotest_path = 'src/third_party/autotest/files'
+# Relative to chromeos root. Images are cached_images_dir/$board/$image_name.
+cached_images_dir = 'src/build/images'
+test_image_filename = 'chromiumos_test_image.bin'
 
 VERSION_KEY_CROS_SHORT_VERSION = 'cros_short_version'
 VERSION_KEY_CROS_FULL_VERSION = 'cros_full_version'
@@ -534,18 +536,19 @@ def list_chromeos_prebuilt_versions(board,
   return result
 
 
-def prepare_prebuilt_image(board, version):
+def prepare_prebuilt_image(chromeos_root, board, version):
   """Prepare chromeos prebuilt image.
 
   It searches for xbuddy image which "cros flash" can use, or fetch image to
   local disk.
 
   Args:
+    chromeos_root: chromeos tree root
     board: ChromeOS board name
     version: ChromeOS version number in short or full format
 
   Returns:
-    xbuddy path or file path (outside chroot)
+    xbuddy path or file path (relative to chromeos_root)
   """
   assert is_cros_version(version)
   full_version = version_to_full(board, version)
@@ -557,7 +560,8 @@ def prepare_prebuilt_image(board, version):
     image_path = 'xbuddy://remote/{board}/{full_version}/test'.format(
         board=board, full_version=full_version)
   else:
-    tmp_dir = 'tmp/ChromeOS-test-%s-%s' % (full_version, board)
+    tmp_dir = os.path.join(chromeos_root, 'tmp',
+                           'ChromeOS-test-%s-%s' % (full_version, board))
     if not os.path.exists(tmp_dir):
       os.makedirs(tmp_dir)
     # gs://chromeos-releases may have more old images than
@@ -575,8 +579,8 @@ def prepare_prebuilt_image(board, version):
         # TODO(kcwu): delete tmp
         gsutil('cp', gs_path, tmp_dir)
         util.check_call('tar', 'Jxvf', fn, cwd=tmp_dir)
-        image_path = os.path.abspath(
-            os.path.join(tmp_dir, 'chromiumos_test_image.bin'))
+        image_path = os.path.relpath(
+            os.path.join(tmp_dir, test_image_filename), chromeos_root)
         break
 
   assert image_path
@@ -598,9 +602,8 @@ def cros_flash(chromeos_root,
     chromeos_root: use 'cros flash' of which chromeos tree
     host: DUT address
     board: ChromeOS board name
-    image_path: chromeos image xbuddy path or file path. If
-        run_inside_chroot is True, the file path is relative to src/scrips.
-        Otherwise, the file path is relative to chromeos_root.
+    image_path: chromeos image xbuddy path or file path. For relative
+        path, it should be relative to chromeos_root.
     version: ChromeOS version in short or full format
     clobber_stateful: Clobber stateful partition when performing update
     disable_rootfs_verification: Disable rootfs verification after update
@@ -614,6 +617,11 @@ def cros_flash(chromeos_root,
   # Reboot is necessary because sometimes previous 'cros flash' failed and
   # entered a bad state.
   reboot(host)
+
+  # Handle relative path.
+  if '://' not in image_path and not os.path.isabs(image_path):
+    assert os.path.exists(os.path.join(chromeos_root, image_path))
+    image_path = os.path.join(chromeos_root_inside_chroot, image_path)
 
   args = [
       '--debug', '--no-ping', '--send-payload-in-parallel', host, image_path
@@ -880,40 +888,39 @@ def check_if_need_recreate_chroot(stdout, stderr):
   return None
 
 
-def build_image(chromeos_root, board, rev):
-  """Build ChromeOS image.
+def build_packages(chromeos_root, board):
+  """Build ChromeOS packages.
 
   Args:
     chromeos_root: chromeos tree root
     board: ChromeOS board name
-    rev: the version name to build
-
-  Returns:
-    Image path
   """
-
-  # If the given version is already built, reuse it.
-  image_name = 'bisect-%s' % rev.replace('/', '_')
-  image_path = os.path.join('../build/images', board, image_name,
-                            'chromiumos_test_image.bin')
-  if exists_in_chroot(chromeos_root, image_path):
-    logger.info('"%s" already exists, skip build step', image_path)
-    return image_path
-
-  script_name = 'build_cros_helper.sh'
-  copy_into_chroot(chromeos_root,
-                   os.path.join(common.BISECT_KIT_ROOT, script_name),
-                   script_name)
-  cros_sdk(chromeos_root, 'chmod', '+x', script_name)
-
   stderr_lines = []
   try:
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
       cros_sdk(
           chromeos_root,
-          './%s' % script_name,
+          './update_chroot',
+          '--toolchain_boards',
           board,
-          image_name,
+          env={
+              'USE': '-cros-debug chrome_internal',
+              'FEATURES': 'separatedebug -separatedebug splitdebug',
+          },
+          stderr_callback=stderr_lines.append)
+      cros_sdk(
+          chromeos_root,
+          './build_packages',
+          '--board',
+          board,
+          '--withdev',
+          '--noworkon',
+          '--skip_chroot_upgrade',
+          '--accept_licenses=@CHROMEOS',
+          env={
+              'USE': '-cros-debug chrome_internal',
+              'FEATURES': 'separatedebug',
+          },
           stderr_callback=stderr_lines.append)
   except subprocess.CalledProcessError as e:
     # Detect failures due to incompatibility between chroot and source tree. If
@@ -925,7 +932,50 @@ def build_image(chromeos_root, board, rev):
     # For other failures, don't know how to handle. Just bail out.
     raise
 
-  return image_path
+
+def build_image(chromeos_root, board):
+  """Build ChromeOS image.
+
+  Args:
+    chromeos_root: chromeos tree root
+    board: ChromeOS board name
+
+  Returns:
+    image folder; relative to chromeos_root
+  """
+  stderr_lines = []
+  try:
+    with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
+      cros_sdk(
+          chromeos_root,
+          './build_image',
+          '--board',
+          board,
+          '--noenable_rootfs_verification',
+          'test',
+          env={
+              'USE': '-cros-debug chrome_internal',
+              'FEATURES': 'separatedebug',
+          },
+          stderr_callback=stderr_lines.append)
+  except subprocess.CalledProcessError as e:
+    # Detect failures due to incompatibility between chroot and source tree. If
+    # so, notify the caller to recreate chroot and retry.
+    reason = check_if_need_recreate_chroot(e.output, ''.join(stderr_lines))
+    if reason:
+      raise NeedRecreateChrootException(reason)
+
+    # For other failures, don't know how to handle. Just bail out.
+    raise
+
+  image_symlink = os.path.join(chromeos_root, cached_images_dir, board,
+                               'latest')
+  assert os.path.exists(image_symlink)
+  image_name = os.readlink(image_symlink)
+  image_folder = os.path.join(cached_images_dir, board, image_name)
+  assert os.path.exists(
+      os.path.join(chromeos_root, image_folder, test_image_filename))
+  return image_folder
 
 
 class AutotestControlInfo(object):

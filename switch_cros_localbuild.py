@@ -118,17 +118,33 @@ def cleanup(opts):
 
 
 def build(opts):
+  # Used many times in this function, shorten it.
+  chromeos_root = opts.chromeos_root
+
   # create chroot if necessary
-  if (not os.path.exists(os.path.join(opts.chromeos_root, 'chroot')) and
-      not os.path.exists(os.path.join(opts.chromeos_root, 'chroot.img'))):
-    util.check_output(
-        'chromite/bin/cros_sdk', '--create', cwd=opts.chromeos_root)
+  if (not os.path.exists(os.path.join(chromeos_root, 'chroot')) and
+      not os.path.exists(os.path.join(chromeos_root, 'chroot.img'))):
+    util.check_output('chromite/bin/cros_sdk', '--create', cwd=chromeos_root)
 
   logger.info('mark as stable')
   mark_as_stable(opts)
 
-  logger.info('build image')
-  return cros_util.build_image(opts.chromeos_root, opts.board, opts.rev)
+  cached_name = 'bisect-%s' % opts.rev.replace('/', '_')
+  image_folder = os.path.join(cros_util.cached_images_dir, opts.board,
+                              cached_name)
+  image_path = os.path.join(image_folder, cros_util.test_image_filename)
+
+  # If the given version is already built, reuse it.
+  if not os.path.exists(os.path.join(chromeos_root, image_path)):
+    logger.info('build image')
+    cros_util.build_packages(chromeos_root, opts.board)
+    built_image_folder = cros_util.build_image(chromeos_root, opts.board)
+    image_name = os.path.basename(
+        os.path.join(chromeos_root, built_image_folder))
+    os.symlink(image_name, os.path.join(chromeos_root, image_folder))
+
+  assert os.path.exists(os.path.join(chromeos_root, image_path))
+  return image_path
 
 
 def switch(opts):
