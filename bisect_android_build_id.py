@@ -114,13 +114,6 @@ class AndroidBuildIDDomain(core.BisectDomain):
           {
               'name': 'change_list',
               'url': url_template.format(old=old, new=new),
-              'note':
-                  'Because the diff viewer is inclusive, you need to ignore '
-                  'changes from starting version by yourself (b/118564983)',
-          },
-          {
-              'name': 'minus',
-              'url': url_template.format(old=old, new=old),
           },
       ]
 
