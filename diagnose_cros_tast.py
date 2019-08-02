@@ -89,6 +89,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
   def _build_cmds(self):
     common_eval_cmd = [
         './eval_cros_tast.py',
+        '--with_private_bundles',
         '--chromeos_root', self.config['chromeos_root'],
         '--test_name', self.config['test_name'],
     ]  # yapf: disable

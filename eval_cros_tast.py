@@ -57,6 +57,10 @@ def create_argument_parser():
       help='Build tast test bundle (-build=true) if specified; '
       'default is using prebuilt bundle on the DUT')
   parser.add_argument(
+      '--with_private_bundles',
+      action='store_true',
+      help='Whether search tests in private bundles or not')
+  parser.add_argument(
       '--reboot_before_test',
       action='store_true',
       help='Reboot before test run')
@@ -85,21 +89,37 @@ def prepare_to_run_test(opts):
     cros_util.reboot(opts.dut)
 
 
-def list_tast_tests(opts, pattern=None):
-  cmd = ['tast', 'list']
+def get_tast_bundle_info(opts, pattern=None):
+  bundles = ['cros']
+  flags = ['-json']
   if not opts.tast_build:
-    cmd.append('-build=false')
-  cmd.append(opts.dut)
+    flags.append('-build=false')
+    if opts.with_private_bundles:
+      flags.append('-downloadprivatebundles=true')
+  else:
+    if opts.with_private_bundles:
+      bundles.append('crosint')
+
+  args = [opts.dut]
   if pattern:
-    cmd.append(pattern)
-  return cros_util.cros_sdk(opts.chromeos_root, *cmd).splitlines()
+    args.append(pattern)
+
+  result = {}
+  for bundle in bundles:
+    cmd = ['tast', 'list'] + flags + ['-buildbundle=' + bundle] + args
+    json_text = cros_util.cros_sdk(opts.chromeos_root, *cmd, log_output=False)
+    for entry in json.loads(json_text):
+      result[entry['name']] = bundle
+
+  return result
 
 
-def run_test(opts):
+def run_test(opts, bundle):
   """Runs an autotest test.
 
   Args:
     opts: An argparse.Namespace to hold command line arguments.
+    bundle: tast's test bundle
 
   Returns:
     path of test result (outside chroot)
@@ -118,6 +138,10 @@ def run_test(opts):
   cmd = ['tast', '-verbose', 'run']
   if not opts.tast_build:
     cmd.append('-build=false')
+    if opts.with_private_bundles:
+      cmd.append('-downloadprivatebundles=true')
+  else:
+    cmd.append('-buildbundle=' + bundle)
   cmd += ['-resultsdir', results_dir, opts.dut, opts.test_name]
 
   try:
@@ -164,6 +188,13 @@ def main(args=None):
     logger.error('%r is not a valid DUT address', opts.dut)
     return FATAL
 
+  if opts.with_private_bundles and not opts.tast_build:
+    version = cros_util.query_dut_short_version(opts.dut)
+    if cros_util.is_cros_localbuild_version(version):
+      logger.error(
+          'for non-official chromeos image, --tast_build must be specified')
+      return FATAL
+
   # Verify command line options.
   if opts.metric:
     if opts.fail_to_pass:
@@ -172,17 +203,18 @@ def main(args=None):
   # Remove the "tast." prefix prepended by autotest.
   opts.test_name = re.sub(r'^tast\.', '', opts.test_name)
 
-  tests = list_tast_tests(opts, opts.test_name)
-  if tests:
-    if len(tests) != 1 or tests[0] != opts.test_name:
-      # For example, tast in chroot after 12205.0.0 is IPC incompatible with
-      # tast on DUT earlier than 12028.0.0 (crbug/932307)
-      logger.fatal('"tast list" returns unexpected tests; '
-                   'incompatible tast on DUT and in chroot?')
-      return FATAL
-  else:
-    tests = list_tast_tests(opts)
-    util.show_similar_candidates('test name', opts.test_name, tests)
+  tast_bundle_info = get_tast_bundle_info(opts, opts.test_name)
+  if not tast_bundle_info:
+    tast_bundle_info = get_tast_bundle_info(opts)
+    util.show_similar_candidates('test name', opts.test_name,
+                                 list(tast_bundle_info))
+    return FATAL
+
+  if len(tast_bundle_info) != 1 or opts.test_name not in tast_bundle_info:
+    # For example, tast in chroot after 12205.0.0 is IPC incompatible with
+    # tast on DUT earlier than 12028.0.0 (crbug/932307)
+    logger.fatal('"tast list" returns unexpected tests; '
+                 'incompatible tast on DUT and in chroot?')
     return FATAL
 
   try:
@@ -191,7 +223,8 @@ def main(args=None):
     logger.exception('failed when prepare, assume it is temporary; SKIP')
     return SKIP
 
-  result_dir = run_test(opts)
+  bundle = tast_bundle_info[opts.test_name]
+  result_dir = run_test(opts, bundle)
   if not result_dir:
     return FATAL
 

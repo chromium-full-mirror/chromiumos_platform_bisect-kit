@@ -796,6 +796,7 @@ def cros_sdk(chromeos_root, *args, **kwargs):
     **kwargs:
       chrome_root: pass to cros_sdk; mount this path into the SDK chroot
       env: (dict) environment variables for the command
+      log_output: Whether write the output of the child process to log.
       stdin: standard input file handle for the command
       stderr_callback: Callback function for stderr. Called once per line.
   """
@@ -825,6 +826,7 @@ def cros_sdk(chromeos_root, *args, **kwargs):
   return util.check_output(
       *cmd,
       cwd=chromeos_root,
+      log_output=kwargs.get('log_output', True),
       stdin=kwargs.get('stdin'),
       stderr_callback=kwargs.get('stderr_callback'))
 
