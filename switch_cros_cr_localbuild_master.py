@@ -89,7 +89,7 @@ def main(args=None):
   rev = bisect_cr_localbuild_master.guess_git_rev(opts, opts.rev)
 
   git_util.checkout_version(opts.chrome_src, rev)
-  gclient_util.sync(opts.chrome_src)
+  gclient_util.sync(opts.chrome_root)
 
   if opts.nobuild:
     return
