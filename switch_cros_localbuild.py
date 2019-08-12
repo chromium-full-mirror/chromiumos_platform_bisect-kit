@@ -71,7 +71,11 @@ def create_argument_parser():
   parser.add_argument(
       '--nobuild',
       action='store_true',
-      help='Sync source code only; do not build; imply --nodeploy')
+      help='Sync source code only; do not build; imply --noimage')
+  parser.add_argument(
+      '--noimage',
+      action='store_true',
+      help='Build packages only; do not build image; imply --nodeploy')
   parser.add_argument(
       '--nodeploy', action='store_true', help='Do not deploy after build')
   return parser
@@ -129,6 +133,11 @@ def build(opts):
   logger.info('mark as stable')
   mark_as_stable(opts)
 
+  if opts.noimage:
+    logger.info('build packages')
+    cros_util.build_packages(chromeos_root, opts.board)
+    return None
+
   cached_name = 'bisect-%s' % opts.rev.replace('/', '_')
   image_folder = os.path.join(cros_util.cached_images_dir, opts.board,
                               cached_name)
@@ -171,7 +180,7 @@ def switch(opts):
         'chromite/bin/cros_sdk', '--delete', cwd=opts.chromeos_root)
     image_path = build(opts)
 
-  if opts.nodeploy:
+  if opts.noimage or opts.nodeploy:
     return 0
 
   if cros_util.cros_flash_with_retry(

@@ -5,8 +5,8 @@
 # found in the LICENSE file.
 """Switcher for ChromeOS autotest prebuilt
 
-It unpacks autotest prebuilt packages into
-$CHROMEOS_ROOT/src/third_party/autotest (that is, autotest_dir).
+It unpacks autotest prebuilt (both client and server packages) into
+$CHROMEOS_ROOT/tmp/autotest-prebuilt (that is, autotest_dir).
 Later, you can run tests using "eval_cros_autotest.py --prebuilt" or
 "test_that --autotest_dir".
 """
@@ -27,8 +27,10 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 AUTOTEST_CLIENT_TARBALL = 'autotest_packages.tar'
+AUTOTEST_SERVER_TARBALL = 'autotest_server_package.tar.bz2'
 GS_BUILD_PATH = 'gs://chromeos-image-archive/{board}-release/{full_version}'
 GS_AUTOTEST_CLIENT_PATH = GS_BUILD_PATH + '/' + AUTOTEST_CLIENT_TARBALL
+GS_AUTOTEST_SERVER_PATH = GS_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL
 
 
 def create_argument_parser():
@@ -58,29 +60,42 @@ def create_argument_parser():
   return parser
 
 
-def switch(autotest_dir, board, version):
+def switch(autotest_dir, board, version, test_name):
   full_version = cros_util.version_to_full(board, version)
   logger.info('Unpack autotest packages for %s %s', board, full_version)
 
   autotest_client_path = GS_AUTOTEST_CLIENT_PATH.format(
       board=board, full_version=full_version)
+  autotest_server_path = GS_AUTOTEST_SERVER_PATH.format(
+      board=board, full_version=full_version)
 
   # TODO(kcwu): cache downloaded tarballs
   tmp_dir = tempfile.mkdtemp()
-  packages_dir = os.path.join(autotest_dir, 'packages')
-  if os.path.exists(packages_dir):
-    shutil.rmtree(packages_dir)
+  if os.path.exists(autotest_dir):
+    shutil.rmtree(autotest_dir)
+  os.makedirs(autotest_dir)
 
   cros_util.gsutil('cp', autotest_client_path, tmp_dir)
   tarball = os.path.join(tmp_dir, AUTOTEST_CLIENT_TARBALL)
   # strip 'autotest/'
   util.check_call(
-      'tar',
-      'xvf',
-      tarball,
-      '--strip-components=1',
-      'autotest/packages',
-      cwd=autotest_dir)
+      'tar', 'xvf', tarball, '--strip-components=1', cwd=autotest_dir)
+  cros_util.gsutil('cp', autotest_server_path, tmp_dir)
+  tarball = os.path.join(tmp_dir, AUTOTEST_SERVER_TARBALL)
+  util.check_call(
+      'tar', 'xf', tarball, '--strip-components=1', cwd=autotest_dir)
+
+  # Need to extract the control file if the target is a client site test.
+  if test_name:
+    test_name = test_name.split('.')[0]
+    client_tarball = os.path.abspath(
+        os.path.join(autotest_dir, 'packages', 'test-%s.tar.bz2' % test_name))
+    if os.path.exists(client_tarball):
+      client_test_dir = os.path.join(autotest_dir, 'client', 'site_tests',
+                                     test_name)
+      if not os.path.exists(client_test_dir):
+        os.makedirs(client_test_dir)
+        util.check_call('tar', 'xvf', client_tarball, cwd=client_test_dir)
 
   shutil.rmtree(tmp_dir)
 
@@ -91,7 +106,10 @@ def main(args=None):
   opts = parser.parse_args(args)
   common.config_logging(opts)
 
-  autotest_dir = os.path.join(opts.chromeos_root, cros_util.autotest_path)
+  autotest_dir = os.path.join(opts.chromeos_root,
+                              cros_util.prebuilt_autotest_dir)
+  switch(autotest_dir, opts.board, opts.version, opts.test_name)
+
   # Verify test control file exists.
   if opts.test_name:
     found = cros_util.get_autotest_test_info(autotest_dir, opts.test_name)
@@ -102,8 +120,6 @@ def main(args=None):
         info = cros_util.parse_autotest_control_file(control_file)
         names.append(info.name)
       util.show_similar_candidates('test_name', opts.test_name, names)
-
-  switch(autotest_dir, opts.board, opts.version)
 
 
 if __name__ == '__main__':

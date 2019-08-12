@@ -183,18 +183,23 @@ def run_test(opts):
   Returns:
     path of test result (outside chroot)
   """
+  prebuilt_autotest_dir = os.path.join(cros_util.chromeos_root_inside_chroot,
+                                       cros_util.prebuilt_autotest_dir)
   # Set results dir inside source tree, so it's easier to access them outside
   # chroot.
   results_dir = os.path.join(cros_util.chromeos_root_inside_chroot,
                              'tmp/autotest_results_tmp')
-  test_that_bin = '/usr/bin/test_that'
+  if opts.prebuilt:
+    test_that_bin = os.path.join(prebuilt_autotest_dir,
+                                 'site_utils/test_that.py')
+  else:
+    test_that_bin = '/usr/bin/test_that'
   cmd = [
       test_that_bin, opts.dut, opts.test_name, '--debug', '--results_dir',
       results_dir
   ]
   if opts.prebuilt:
-    cmd += ['--autotest_dir', '/mnt/host/source/src/third_party/autotest/files']
-    cmd.append('--no-quickmerge')
+    cmd += ['--autotest_dir', prebuilt_autotest_dir]
 
   args = get_additional_test_args(opts.test_name)
   if opts.args:

@@ -44,7 +44,7 @@ gsutil_bin = 'gsutil'
 
 chromeos_root_inside_chroot = '/mnt/host/source'
 # relative to chromeos_root
-autotest_path = 'src/third_party/autotest/files'
+prebuilt_autotest_dir = 'tmp/autotest-prebuilt'
 # Relative to chromeos root. Images are cached_images_dir/$board/$image_name.
 cached_images_dir = 'src/build/images'
 test_image_filename = 'chromiumos_test_image.bin'

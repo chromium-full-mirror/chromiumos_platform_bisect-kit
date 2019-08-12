@@ -97,14 +97,14 @@ class CrosDiagnoser(object):
                                     old,
                                     new,
                                     eval_cmd,
-                                    extra_switch_cmds=None):
+                                    extra_switch_cmd=None):
     """Bisect with ChromeOS prebuilt.
 
     Args:
       old: old ChromeOS version
       new: new ChromeOS version
       eval_cmd: command to reproduce the regression
-      extra_switch_cmds: additional command to run when switch chromeos version
+      extra_switch_cmd: additional command to run when switch chromeos version
     """
     if self.config['bypass_chromeos_prebuilt']:
       logger.info('bypassed chromeos prebuilt image bisect; '
@@ -125,9 +125,8 @@ class CrosDiagnoser(object):
           new_value=self.config['new_value'],
           recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
-      if extra_switch_cmds:
-        for cmd in extra_switch_cmds:
-          bisector.append_switch_command(cmd)
+      if extra_switch_cmd:
+        bisector.append_switch_command(extra_switch_cmd)
 
       self.cros_old, self.cros_new, self.noisy = bisector.narrow_down(
           self.states, 'bisect chromeos prebuilt')
@@ -154,14 +153,14 @@ class CrosDiagnoser(object):
     util.check_call('./switch_cros_prebuilt.py', '--board',
                     self.config['board'], self.dut, self.cros_old)
 
-  def narrow_down_android(self, eval_cmd, extra_switch_cmds=None):
+  def narrow_down_android(self, eval_cmd, extra_switch_cmd=None):
     """Bisect with Android prebuilt and localbuild.
 
     It's known that the version of ChromeOS has old behavior.
 
     Args:
       eval_cmd: command to reproduce the regression
-      extra_switch_cmds: additional commands to run when switch android version
+      extra_switch_cmd: additional command to run when switch android version
 
     Returns:
       True: culprit is inside Android
@@ -200,9 +199,8 @@ class CrosDiagnoser(object):
             new_value=self.config['new_value'],
             recompute_init_values=self.config['recompute_init_values'],
             noisy=self.noisy)
-        if extra_switch_cmds:
-          for cmd in extra_switch_cmds:
-            bisector.append_switch_command(cmd)
+        if extra_switch_cmd:
+          bisector.append_switch_command(extra_switch_cmd)
 
         android_old, android_new, self.noisy = bisector.narrow_down(
             self.states, 'bisect android prebuilt')
@@ -258,9 +256,8 @@ class CrosDiagnoser(object):
           new_value=self.config['new_value'],
           recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
-      if extra_switch_cmds:
-        for cmd in extra_switch_cmds:
-          bisector.append_switch_command(cmd)
+      if extra_switch_cmd:
+        bisector.append_switch_command(extra_switch_cmd)
 
       android_old, android_new, self.noisy = bisector.narrow_down(
           self.states, 'bisect android local build')
@@ -284,7 +281,7 @@ class CrosDiagnoser(object):
 
   def narrow_down_chrome(self,
                          eval_cmd,
-                         extra_switch_cmds=None,
+                         extra_switch_cmd=None,
                          chrome_binaries=None):
     """Bisect with Chrome localbuild.
 
@@ -292,7 +289,7 @@ class CrosDiagnoser(object):
 
     Args:
       eval_cmd: command to reproduce the regression
-      extra_switch_cmds: additional commands to run when switch chrome version
+      extra_switch_cmd: additional command to run when switch chrome version
       chrome_binaries: what chrome binaries to build and deploy. If None,
           default is chrome.
 
@@ -329,9 +326,8 @@ class CrosDiagnoser(object):
           new_value=self.config['new_value'],
           recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
-      if extra_switch_cmds:
-        for cmd in extra_switch_cmds:
-          bisector.append_switch_command(cmd)
+      if extra_switch_cmd:
+        bisector.append_switch_command(extra_switch_cmd)
 
       bisector.narrow_down(self.states, 'bisect chrome local build')
     except errors.VerifyOldBehaviorFailed:
@@ -345,12 +341,12 @@ class CrosDiagnoser(object):
       return False
     return True
 
-  def narrow_down_chromeos_localbuild(self, eval_cmd, extra_switch_cmds=None):
+  def narrow_down_chromeos_localbuild(self, eval_cmd, extra_switch_cmd=None):
     """Bisect with ChromeOS localbuild.
 
     Args:
       eval_cmd: command to reproduce the regression
-      extra_switch_cmds: additional commands to run when switch ChromeOS version
+      extra_switch_cmd: additional command to run when switch ChromeOS version
     """
     if self.config['bypass_chromeos_build']:
       logger.info('bypassed chromeos local build bisect')
@@ -372,9 +368,8 @@ class CrosDiagnoser(object):
         new_value=self.config['new_value'],
         recompute_init_values=self.config['recompute_init_values'],
         noisy=self.noisy)
-    if extra_switch_cmds:
-      for cmd in extra_switch_cmds:
-        bisector.append_switch_command(cmd)
+    if extra_switch_cmd:
+      bisector.append_switch_command(extra_switch_cmd)
 
     try:
       bisector.narrow_down(self.states, 'bisect chromeos local build')
