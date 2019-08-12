@@ -115,11 +115,14 @@ class CrosDiagnoser(object):
     else:
       bisector = wrapper.BisectorWrapper('bisect_cros_version',
                                          self.config['session'])
+      switch_cmd = ['./switch_cros_prebuilt.py']
+      if not self.config['disable_rootfs_verification']:
+        switch_cmd.append('--no_disable_rootfs_verification')
       bisector.init_if_necessary(
           old,
           new,
           init_args=['--dut', self.dut, '--board', self.config['board']],
-          switch_cmd=['./switch_cros_prebuilt.py'],
+          switch_cmd=switch_cmd,
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
           new_value=self.config['new_value'],
@@ -150,8 +153,13 @@ class CrosDiagnoser(object):
       short_version = cros_util.version_to_short(self.cros_old)
       if cros_util.query_dut_short_version(self.dut) == short_version:
         return
-    util.check_call('./switch_cros_prebuilt.py', '--board',
-                    self.config['board'], self.dut, self.cros_old)
+    cmd = [
+        './switch_cros_prebuilt.py', '--board', self.config['board'], self.dut,
+        self.cros_old
+    ]
+    if not self.config['disable_rootfs_verification']:
+      cmd.append('--no_disable_rootfs_verification')
+    util.check_call(*cmd)
 
   def narrow_down_android(self, eval_cmd, extra_switch_cmd=None):
     """Bisect with Android prebuilt and localbuild.
@@ -354,6 +362,9 @@ class CrosDiagnoser(object):
 
     bisector = wrapper.BisectorWrapper('bisect_cros_repo',
                                        self.config['session'])
+    switch_cmd = ['./switch_cros_localbuild.py']
+    if not self.config['disable_rootfs_verification']:
+      switch_cmd.append('--no_disable_rootfs_verification')
     bisector.init_if_necessary(
         self.cros_old,
         self.cros_new,
@@ -362,7 +373,7 @@ class CrosDiagnoser(object):
             '--chromeos_root', self.config['chromeos_root'],
             '--chromeos_mirror', self.config['chromeos_mirror']
         ],
-        switch_cmd=['./switch_cros_localbuild.py'],
+        switch_cmd=switch_cmd,
         eval_cmd=eval_cmd,
         old_value=self.config['old_value'],
         new_value=self.config['new_value'],
@@ -562,6 +573,7 @@ class DiagnoseCommandLineBase(object):
         bypass_chrome_build=opts.bypass_chrome_build,
         bypass_android_prebuilt=opts.bypass_android_prebuilt,
         bypass_android_build=opts.bypass_android_build,
+        disable_rootfs_verification=opts.disable_rootfs_verification,
     )
 
     self.states.init(config)
@@ -752,6 +764,12 @@ class DiagnoseCommandLineBase(object):
         '--bypass_android_build',
         action='store_true',
         help='Bypass chromeos local build bisect')
+    group.add_argument(
+        '--no-disable-rootfs-verification',
+        '--no_disable_rootfs_verification',
+        dest='disable_rootfs_verification',
+        action='store_false',
+        help="Don't disable rootfs verification after update is completed")
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser('run', help='Start auto bisection')
