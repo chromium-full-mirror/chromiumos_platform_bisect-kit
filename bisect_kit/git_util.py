@@ -239,7 +239,7 @@ def get_commit_metadata(git_repo, rev):
   """
   meta = {}
   data = util.check_output(
-      'git', 'cat-file', '-p', rev, cwd=git_repo, log_output=False)
+      'git', 'cat-file', '-p', rev, cwd=git_repo, log_stdout=False)
   header, meta['message'] = data.split('\n\n', 1)
   for line in header.splitlines():
     m = re.match(r'^tree (\w+)', line)
@@ -348,7 +348,7 @@ def get_file_from_revision(git_repo, rev, path):
     file content (str)
   """
   return util.check_output(
-      'git', 'show', '%s:%s' % (rev, path), cwd=git_repo, log_output=False)
+      'git', 'show', '%s:%s' % (rev, path), cwd=git_repo, log_stdout=False)
 
 
 def list_dir_from_revision(git_repo, rev, path):
@@ -371,7 +371,7 @@ def list_dir_from_revision(git_repo, rev, path):
       '--name-only',
       '%s:%s' % (rev, path),
       cwd=git_repo,
-      log_output=False).splitlines()
+      log_stdout=False).splitlines()
 
 
 def get_rev_by_time(git_repo, timestamp, branch, path=None):

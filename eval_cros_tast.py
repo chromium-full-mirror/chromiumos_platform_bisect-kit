@@ -107,7 +107,7 @@ def get_tast_bundle_info(opts, pattern=None):
   result = {}
   for bundle in bundles:
     cmd = ['tast', 'list'] + flags + ['-buildbundle=' + bundle] + args
-    json_text = cros_util.cros_sdk(opts.chromeos_root, *cmd, log_output=False)
+    json_text = cros_util.cros_sdk(opts.chromeos_root, *cmd, log_stdout=False)
     for entry in json.loads(json_text):
       result[entry['name']] = bundle
 

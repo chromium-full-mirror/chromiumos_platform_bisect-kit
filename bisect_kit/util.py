@@ -31,7 +31,7 @@ class Popen(object):
                args,
                stdout_callback=None,
                stderr_callback=None,
-               log_output=True,
+               log_stdout=True,
                **kwargs):
     """Initializes Popen.
 
@@ -39,7 +39,7 @@ class Popen(object):
       args: Command line arguments.
       stdout_callback: Callback function for stdout. Called once per line.
       stderr_callback: Callback function for stderr. Called once per line.
-      log_output: Whether write the output of the child process to log.
+      log_stdout: Whether write the stdout output of the child process to log.
       **kwargs: Additional arguments passing to subprocess.Popen.
     """
     if 'stdout' in kwargs:
@@ -49,7 +49,7 @@ class Popen(object):
 
     self.stdout_callback = stdout_callback
     self.stderr_callback = stderr_callback
-    self.log_output = log_output
+    self.log_stdout = log_stdout
     self.stdout_lines = []
     self.stderr_lines = []
     self.duration = -1
@@ -101,7 +101,7 @@ class Popen(object):
       if not line:
         ended += 1
         continue
-      if self.log_output:
+      if self.log_stdout or where == 'stderr':
         logger.debug('[%s] %s', where, line.rstrip('\n'))
       if self.stdout_callback and where == 'stdout':
         self.stdout_callback(line)
