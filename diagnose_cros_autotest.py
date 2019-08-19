@@ -263,6 +263,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
         util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
+        dut_os_version = cros_util.query_dut_short_version(dut)
 
         try:
           if diagnoser.narrow_down_android(eval_cmd):
@@ -273,6 +274,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           logger.exception('exception in android bisector before verification; '
                            'assume culprit is not inside android and continue')
         # Assume it's ok to leave random version of android prebuilt on DUT.
+
+        # Sanity check. The OS version should not change after android bisect.
+        assert dut_os_version == cros_util.query_dut_short_version(dut)
 
         eval_cmd = common_eval_cmd + ['--prebuilt']
 
@@ -296,6 +300,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         except Exception:
           logger.exception('exception in chrome bisector before verification; '
                            'assume culprit is not inside chrome and continue')
+
+        # Sanity check. The OS version should not change after chrome bisect.
+        assert dut_os_version == cros_util.query_dut_short_version(dut)
 
         eval_cmd = common_eval_cmd
         diagnoser.narrow_down_chromeos_localbuild(eval_cmd)

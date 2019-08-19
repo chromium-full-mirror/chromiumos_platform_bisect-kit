@@ -254,6 +254,7 @@ def main(args=None):
   if not cros_util.is_dut(opts.dut):
     logger.error('%r is not a valid DUT address', opts.dut)
     return FATAL
+  dut_os_version = cros_util.query_dut_short_version(opts.dut)
 
   is_cts = (
       opts.cts_revision or opts.cts_abi or opts.cts_prefix or opts.cts_module or
@@ -305,6 +306,9 @@ def main(args=None):
   except Exception:
     logger.exception('failed to parse test result')
     return FATAL
+
+  # Sanity check. The OS version should not change.
+  assert dut_os_version == cros_util.query_dut_short_version(opts.dut)
 
   if opts.metric:
     if not values:

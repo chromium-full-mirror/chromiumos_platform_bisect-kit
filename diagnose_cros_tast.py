@@ -137,6 +137,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             self.config['old'], self.config['new'], common_eval_cmd)
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
+        dut_os_version = cros_util.query_dut_short_version(dut)
 
         try:
           if diagnoser.narrow_down_android(common_eval_cmd):
@@ -148,6 +149,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                            'assume culprit is not inside android and continue')
         # Assume it's ok to leave random version of android prebuilt on DUT.
 
+        # Sanity check. The OS version should not change after android bisect.
+        assert dut_os_version == cros_util.query_dut_short_version(dut)
+
         try:
           if diagnoser.narrow_down_chrome(
               common_eval_cmd, chrome_binaries=chrome_binaries):
@@ -157,6 +161,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         except Exception:
           logger.exception('exception in chrome bisector before verification; '
                            'assume culprit is not inside chrome and continue')
+
+        # Sanity check. The OS version should not change after chrome bisect.
+        assert dut_os_version == cros_util.query_dut_short_version(dut)
 
         eval_cmd = common_eval_cmd + ['--tast_build']
         diagnoser.narrow_down_chromeos_localbuild(eval_cmd)

@@ -114,6 +114,7 @@ def main(args=None):
 
   opts.chrome_src = os.path.join(opts.chrome_root, 'src')
   assert os.path.exists(opts.chrome_src)
+  dut_os_version = cros_util.query_dut_short_version(opts.dut)
 
   rev = bisect_cr_localbuild_internal.guess_chrome_version(opts, opts.rev)
   config = dict(chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror)
@@ -146,6 +147,9 @@ def main(args=None):
       opts.dut,
       opts.target,
       nodeploy=opts.nodeploy)
+
+  # Sanity check. The OS version should not change.
+  assert dut_os_version == cros_util.query_dut_short_version(opts.dut)
 
 
 if __name__ == '__main__':
