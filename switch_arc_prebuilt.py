@@ -14,12 +14,14 @@ It is implemented by calling Android's push_to_device.py.
 from __future__ import print_function
 import argparse
 import logging
+import sys
 
 from bisect_kit import android_util
 from bisect_kit import arc_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 
@@ -60,6 +62,11 @@ def main(args=None):
     opts.flavor = arc_util.query_flavor(opts.dut)
     assert opts.flavor
   logger.info('use flavor=%s', opts.flavor)
+
+  if not cros_util.is_good_dut(opts.dut):
+    logger.fatal('%r is not a good DUT', opts.dut)
+    if not cros_lab_util.repair(opts.dut):
+      sys.exit(cli.EXIT_CODE_FATAL)
 
   arc_util.push_prebuilt_to_device(opts.dut, opts.flavor, opts.build_id)
 
