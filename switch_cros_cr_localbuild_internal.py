@@ -149,7 +149,9 @@ def main(args=None):
       nodeploy=opts.nodeploy)
 
   # Sanity check. The OS version should not change.
-  assert dut_os_version == cros_util.query_dut_short_version(opts.dut)
+  assert dut_os_version == cros_util.query_dut_short_version(opts.dut), \
+            'Someone else reflashed the DUT. ' \
+            'DUT locking is not respected? b/126141102'
 
 
 if __name__ == '__main__':

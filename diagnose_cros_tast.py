@@ -150,7 +150,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         # Assume it's ok to leave random version of android prebuilt on DUT.
 
         # Sanity check. The OS version should not change after android bisect.
-        assert dut_os_version == cros_util.query_dut_short_version(dut)
+        assert dut_os_version == cros_util.query_dut_short_version(dut), \
+            'Someone else reflashed the DUT. ' \
+            'DUT locking is not respected? b/126141102'
 
         try:
           if diagnoser.narrow_down_chrome(
@@ -163,7 +165,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                            'assume culprit is not inside chrome and continue')
 
         # Sanity check. The OS version should not change after chrome bisect.
-        assert dut_os_version == cros_util.query_dut_short_version(dut)
+        assert dut_os_version == cros_util.query_dut_short_version(dut), \
+            'Someone else reflashed the DUT. ' \
+            'DUT locking is not respected? b/126141102'
 
         eval_cmd = common_eval_cmd + ['--tast_build']
         diagnoser.narrow_down_chromeos_localbuild(eval_cmd)
