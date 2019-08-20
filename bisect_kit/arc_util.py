@@ -61,7 +61,8 @@ def _push_to_device(dut, push_script, args, android_root=None, flavor=None):
     util.check_call(*cmd, stderr_callback=collect_stderr)
 
   stderr = ''.join(stderr_lines)
-  if '*** Reboot required. ***' in stderr:
+  if ('*** Reboot required. ***' in stderr or
+      '*** Rebooting device. ***' in stderr):
     cros_util.wait_reboot_done(dut, boot_id)
 
 
