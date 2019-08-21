@@ -16,6 +16,7 @@ import argparse
 import logging
 import os
 import shutil
+import sys
 import tempfile
 
 from bisect_kit import cli
@@ -120,6 +121,7 @@ def main(args=None):
         info = cros_util.parse_autotest_control_file(control_file)
         names.append(info.name)
       util.show_similar_candidates('test_name', opts.test_name, names)
+      sys.exit(cli.EXIT_CODE_FATAL)
 
 
 if __name__ == '__main__':
