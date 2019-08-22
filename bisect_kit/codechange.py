@@ -809,7 +809,7 @@ class CodeManager(object):
       if matched_index is None:
         if i in (0, len(fixed_specs) - 1):
           logger.error('essential spec mismatch, unable to continue')
-          assert 0
+          assert 0, 'Bisector cannot deal with this version range.'
         else:
           logger.warning('%s do not match, skip', fixed_spec.name)
         continue
