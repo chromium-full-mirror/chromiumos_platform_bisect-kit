@@ -132,6 +132,10 @@ def match_trace_name(dashboard_name, result_name):
 
 
 def get_benchmark_values(json_path, metric):
+  if not os.path.exists(json_path):
+    logger.warning('benchmark result file not found: %s', json_path)
+    return None
+
   content = open(json_path).read()
   traces = parse_results_chart_json(content)
   for subtest_name, values in traces.items():
