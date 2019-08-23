@@ -244,8 +244,8 @@ class NoisyBinarySearch(object):
           raise errors.WrongAssumption(
               'unable to reproduce the value gap: '
               'expect delta=%f (%f%%); actual delta=%f (%f%%)' %
-              (expect_delta, abs(expect_delta / self.old_value), actual_delta,
-               abs(actual_delta / self.old_avg)))
+              (expect_delta, abs(expect_delta / self.old_value) * 100,
+               actual_delta, abs(actual_delta / self.old_avg) * 100))
         if self.threshold is None:
           self.threshold = (self.old_avg + self.new_avg) / 2
         self.rev_info[self.old_idx].reclassify(self.old_avg, self.threshold,
