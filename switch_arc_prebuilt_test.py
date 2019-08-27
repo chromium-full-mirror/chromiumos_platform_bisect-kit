@@ -16,6 +16,7 @@ import switch_arc_prebuilt
 class TestSwitchArcPrebuilt(unittest.TestCase):
   """Test switch_arc_prebuilt.py."""
 
+  @mock.patch('bisect_kit.cros_util.is_good_dut', lambda *_: True)
   @mock.patch('bisect_kit.cros_util.query_dut_lsb_release')
   @mock.patch('bisect_kit.arc_util.query_flavor')
   @mock.patch('bisect_kit.arc_util.push_prebuilt_to_device')
