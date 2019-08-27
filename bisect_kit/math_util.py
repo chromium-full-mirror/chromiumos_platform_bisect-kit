@@ -219,7 +219,7 @@ class ExtendedFloat(object):
     return ExtendedFloat(other).__div__(self)
 
   def __repr__(self):
-    return "ExtendedFloat(%f, %d)" % (self.mantissa, self.exponent)
+    return 'ExtendedFloat(%f, %d)' % (self.mantissa, self.exponent)
 
   def __cmp__(self, other):
     if not isinstance(other, ExtendedFloat):

@@ -125,7 +125,7 @@ class DummyDomain(core.BisectDomain):
         old=opts.old,
         new=opts.new)
 
-    revlist = map(str, range(opts.num))
+    revlist = map(str, list(range(opts.num)))
     return config, revlist
 
   def __init__(self, config):

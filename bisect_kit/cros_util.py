@@ -873,7 +873,7 @@ def check_if_need_recreate_chroot(stdout, stderr):
   """
   if re.search(
       r"The current version of portage supports EAPI '\d+'. "
-      "You must upgrade", stderr):
+      'You must upgrade', stderr):
     return 'EAPI version mismatch'
 
   if 'Chroot is too new. Consider running:' in stderr:

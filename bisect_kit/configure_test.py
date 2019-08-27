@@ -34,7 +34,7 @@ def scoped_file(folder, filename, content=''):
     full path of created file.
   """
   full_path = os.path.join(folder, filename)
-  with file(full_path, 'w') as f:
+  with open(full_path, 'w') as f:
     f.write(content)
   yield full_path
   os.unlink(full_path)
@@ -60,7 +60,7 @@ class TestConfigure(unittest.TestCase):
   def test_scoped_file(self):
     with scoped_file(self.cwddir, 'foo', 'abc') as path:
       assert os.path.exists(path)
-      self.assertEqual(file(path).read(), 'abc')
+      self.assertEqual(open(path).read(), 'abc')
     assert not os.path.exists(path)
 
   def test_search_config_file(self):
@@ -128,11 +128,11 @@ class TestConfigure(unittest.TestCase):
   def test_include(self):
     subdir = os.path.join(self.progdir, 'subdir')
     os.mkdir(subdir)
-    with scoped_file(self.progdir, 'a', '''
+    with scoped_file(self.progdir, 'a', """
         {"include":["subdir/b"]}
-        ''') as path, \
-            scoped_file(subdir, 'b', '''
-        {"options": {"foo": "bar"}}'''):
+        """) as path, \
+            scoped_file(subdir, 'b', """
+        {"options": {"foo": "bar"}}"""):
       config = configure.ConfigStore(path)
       config.load_config()
       self.assertEqual(config.get_option('foo'), 'bar')
@@ -141,24 +141,24 @@ class TestConfigure(unittest.TestCase):
     subdir = os.path.join(self.progdir, 'subdir')
     os.mkdir(subdir)
 
-    with scoped_file(self.progdir, 'a', '''
+    with scoped_file(self.progdir, 'a', """
         {"include": ["subdir/b.json"], "plugins": ["a.py"] }
-        ''') as path, \
-            scoped_file(self.progdir, 'a.py', textwrap.dedent('''
+        """) as path, \
+            scoped_file(self.progdir, 'a.py', textwrap.dedent("""
         from bisect_kit import configure_test
 
         def loaded():
           configure_test.aaa = 111
-        ''')), \
-            scoped_file(subdir, 'b.json', '''
+        """)), \
+            scoped_file(subdir, 'b.json', """
         {"plugins": ["b.py"]}
-        '''), \
-            scoped_file(subdir, 'b.py', textwrap.dedent('''
+        """), \
+            scoped_file(subdir, 'b.py', textwrap.dedent("""
         from bisect_kit import configure_test
 
         def loaded():
           configure_test.bbb = 222
-        ''')):
+        """)):
       config = configure.ConfigStore(path)
       config.load_config()
       config.load_plugins()

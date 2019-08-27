@@ -614,11 +614,11 @@ class DiagnoseCommandLineBase(object):
     parser_init = subparsers.add_parser('init', help='Initialize')
     group = parser_init.add_argument_group(
         title='Source tree path options',
-        description='''
+        description="""
         Specify the paths of chromeos/chrome/android mirror and checkout. They
         have the same default values as setup_cros_bisect.py, so usually you can
         omit them and it just works.
-        ''')
+        """)
     group.add_argument(
         '--mirror_base',
         metavar='MIRROR_BASE',

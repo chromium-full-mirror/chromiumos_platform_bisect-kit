@@ -83,8 +83,8 @@ class ChromeOSRepoDomain(core.BisectDomain):
       assert cros_util.is_dut(opts.dut)
     else:
       logger.info("Tips: unless you don't need to build, otherwise it's "
-                  "recommended to specify --dut in bisector instead of "
-                  "switcher and evaluator.")
+                  'recommended to specify --dut in bisector instead of '
+                  'switcher and evaluator.')
 
     if not opts.board:
       opts.board = cros_util.query_dut_board(opts.dut)

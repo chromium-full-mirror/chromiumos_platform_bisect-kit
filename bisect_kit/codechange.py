@@ -752,7 +752,7 @@ class CodeManager(object):
     if ideal_index is not None:
       candidates.append(ideal_index)
     if begin is not None:
-      candidates.extend(range(begin, end + 1))
+      candidates.extend(list(range(begin, end + 1)))
     if not candidates:
       logger.error('unable to match %s: all specs are after it', target.name)
       return None
@@ -923,7 +923,7 @@ class CodeManager(object):
     if not os.path.exists(cache_dir):
       os.makedirs(cache_dir)
     cache_filename = os.path.join(cache_dir, '%s,%s.json' % (old, new))
-    with file(cache_filename, 'w') as fp:
+    with open(cache_filename, 'w') as fp:
       json.dump(data, fp, indent=4, sort_keys=True)
 
   def load_action_groups_between_releases(self, old, new):
@@ -934,7 +934,7 @@ class CodeManager(object):
           'cached revlist not found: %s' % cache_filename)
 
     result = []
-    for data in json.load(file(cache_filename)):
+    for data in json.load(open(cache_filename)):
       result.append(ActionGroup.unserialize(data))
 
     return result

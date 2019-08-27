@@ -202,7 +202,7 @@ def query_git_rev(chrome_src, rev):
   if m:
     return query_git_rev_by_commit_position(chrome_src, 'master', m.group(1))
 
-  raise ValueError, 'unknown rev format: %s' % rev
+  raise ValueError('unknown rev format: %s' % rev)
 
 
 def simple_chrome_shell(chrome_src, board, *args, **kwargs):
@@ -322,7 +322,7 @@ class ChromeSpecManager(codechange.SpecManager):
 
     # 1. Create initial commit with DEPS file referring to master.
     init_timestamp = '2018-01-01T00:00:00'
-    meta_deps = textwrap.dedent('''
+    meta_deps = textwrap.dedent("""
     vars = {
       "checkout_src_internal": True,
     }
@@ -336,7 +336,7 @@ class ChromeSpecManager(codechange.SpecManager):
       "src",
       "tools_internal",
     ]
-    ''')
+    """)
     git_util.commit_file(
         meta_dir, 'DEPS', 'initial DEPS', meta_deps, commit_time=init_timestamp)
 

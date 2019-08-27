@@ -876,10 +876,10 @@ class BisectorCommandLine(object):
       description = self.domain_cls.help
     else:
       description = 'Bisector for %s' % self.domain_cls.__name__
-    description += textwrap.dedent('''
+    description += textwrap.dedent("""
         When running switcher and evaluator, it will set BISECT_REV environment
         variable, indicates current rev to switch/evaluate.
-    ''')
+    """)
 
     parser = argparse.ArgumentParser(
         prog=prog,
@@ -905,7 +905,7 @@ class BisectorCommandLine(object):
         'init',
         help='Initializes bisect session',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent('''
+        description=textwrap.dedent("""
           Besides arguments for 'init' command, you also need to set 'switch'
           and 'eval' command line via 'config' command.
             $ bisector config switch <switch command and arguments>
@@ -913,7 +913,7 @@ class BisectorCommandLine(object):
 
           The value of --noisy and --confidence could be changed by 'config'
           command after 'init' as well.
-        '''))
+        """))
     parser_init.add_argument(
         '--old',
         required=True,
@@ -965,7 +965,7 @@ class BisectorCommandLine(object):
         'run',
         help='Performs bisection',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent('''
+        description=textwrap.dedent("""
         This command does switch and eval to determine candidates having old or
         new behavior.
 
@@ -981,7 +981,7 @@ class BisectorCommandLine(object):
 
           Switch and run version "2.13" and "2.14" and then stop.
           $ %(prog)s 2.13 2.14
-        '''))
+        """))
     parser_run.add_argument(
         '-1', '--once', action='store_true', help='Only run one step')
     parser_run.add_argument(

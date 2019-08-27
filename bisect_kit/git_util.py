@@ -454,7 +454,7 @@ def get_history(git_repo,
     result.append((int(commit_time), git_rev))
 
   if padding:
-    assert before or after, "padding=True make no sense if they are both None"
+    assert before or after, 'padding=True make no sense if they are both None'
     if before is not None and get_rev_by_time(
         git_repo, before, branch, path=path):
       before = int(before)

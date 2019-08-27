@@ -34,7 +34,7 @@ class TestRepoOperation(unittest.TestCase):
     manifest_git_dir = os.path.join(self.gitbase, 'm')
     self.manifest_git = git_util_test.GitOperation(manifest_git_dir)
     self.manifest_git.init()
-    manifest = '''<!--?xml version="1.0" encoding="UTF-8"?-->
+    manifest = """<!--?xml version="1.0" encoding="UTF-8"?-->
     <manifest>
         <remote name="mydisk" fetch="file://%s"></remote>
         <default revision="refs/heads/master" remote="mydisk"></default>
@@ -42,7 +42,7 @@ class TestRepoOperation(unittest.TestCase):
         <project name="g2.git" path="dir2/g2" revision="%s"></project>
         <project name="g3.git" path="dir3/g3" groups="notdefault"></project>
     </manifest>
-    ''' % (self.gitbase, self.git2.commits[1])
+    """ % (self.gitbase, self.git2.commits[1])
     self.manifest_git.add_commit('2017-01-01T00:00:00', 'add manifest',
                                  'default.xml', manifest)
 
@@ -72,7 +72,7 @@ class TestManifestParser(unittest.TestCase):
 
   def test_parse_manifest_android(self):
     """Test features used by android manifest."""
-    manifest = r'''<?xml version="1.0" encoding="UTF-8"?>
+    manifest = r"""<?xml version="1.0" encoding="UTF-8"?>
     <manifest>
       <remote name="goog" fetch=".." />
       <default revision="master" remote="goog" />
@@ -82,7 +82,7 @@ class TestManifestParser(unittest.TestCase):
       <project path="frameworks/foo" name="platform/frameworks/foo"
                groups="notdefault" />
     </manifest>
-    '''
+    """
 
     manifest_url = 'https://example.com/manifest'
     manifest_dir = '/dummy/path'  # doesn't matter since io mocked
@@ -111,22 +111,22 @@ class TestManifestParser(unittest.TestCase):
 
       with self.assertRaises(errors.InternalError):
         root = p.parse_single_xml(
-            r'''<?xml version="1.0" encoding="UTF-8"?>
+            r"""<?xml version="1.0" encoding="UTF-8"?>
             <manifest>
               <include name="file.xml" />
             </manifest>
-            ''',
+            """,
             allow_include=False)
         p.process_parsed_result(root)
 
       with self.assertRaises(errors.InternalError):
         root = p.parse_single_xml(
-            r'''<?xml version="1.0" encoding="UTF-8"?>
+            r"""<?xml version="1.0" encoding="UTF-8"?>
             <manifest>
               <project path="src/scripts" name="chromiumos/platform/crosutils"
                        remote="goog" revision="foo" />
             </manifest>
-            ''',
+            """,
             allow_include=False)
         p.process_parsed_result(root)
 

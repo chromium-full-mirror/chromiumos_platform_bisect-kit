@@ -291,7 +291,7 @@ def main(args=None):
   counter = collections.Counter()
 
   runtime = []
-  for i in xrange(opts.repeat):
+  for i in range(opts.repeat):
     t0 = time.time()
     status = run_once(opts)
     t1 = time.time()

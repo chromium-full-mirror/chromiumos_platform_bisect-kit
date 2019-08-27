@@ -70,7 +70,7 @@ class ConfigStore(object):
     if not self.path:
       return
 
-    content = file(self.path).read()
+    content = open(self.path).read()
     # strip comments as they are not allowed in standard json
     content = re.sub(r'^\s*//.*', '', content, 0, re.M)
 
@@ -97,7 +97,7 @@ class ConfigStore(object):
       if not os.path.exists(path):
         raise ValueError('%s plugin %r: file not found' % (self.path, path))
       module = {}
-      exec file(path) in module  # pylint: disable=exec-used
+      exec open(path) in module  # pylint: disable=exec-used
       loaded_func = module.get('loaded', None)
       if loaded_func:
         loaded_func()

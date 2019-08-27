@@ -159,7 +159,7 @@ class States(object):
     """
     if not os.path.exists(self.session_file):
       return False
-    self.set_data(json.load(file(self.session_file)))
+    self.set_data(json.load(open(self.session_file)))
     return True
 
   def save(self):
@@ -168,7 +168,7 @@ class States(object):
       os.makedirs(dirname)
 
     tmp_fn = tempfile.mktemp()
-    with file(tmp_fn, 'w') as f:
+    with open(tmp_fn, 'w') as f:
       f.write(json.dumps(self.data, indent=4, sort_keys=True))
     # Move is an atomic operation, so the session file won't be corrupted due
     # to program terminated by any reason.

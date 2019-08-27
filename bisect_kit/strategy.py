@@ -523,7 +523,7 @@ class NoisyBinarySearch(object):
         weighting[j] = min(weighting[j], 1.0 - impact)
 
       # right to left
-      for j in reversed(range(max(0, i - impact_range + 1), i)):
+      for j in reversed(list(range(max(0, i - impact_range + 1), i))):
         if rev_info[j]['new'] or rev_info[j]['old']:
           break
         x = float(i - j) / impact_range

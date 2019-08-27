@@ -7,12 +7,12 @@
 from __future__ import print_function
 import difflib
 import logging
-import Queue
 import subprocess
 import threading
 import time
 
 import psutil
+from six.moves import queue
 
 from bisect_kit import errors
 
@@ -54,7 +54,7 @@ class Popen(object):
     self.stderr_lines = []
     self.duration = -1
     self.start = time.time()
-    self.queue = Queue.Queue(65536)
+    self.queue = queue.Queue(65536)
     if isinstance(args, str):
       logger.debug('cwd=%s, run %r', kwargs.get('cwd'), args)
     else:

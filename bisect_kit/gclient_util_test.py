@@ -20,7 +20,7 @@ class TestDepsParser(unittest.TestCase):
   """Tests gclient_util.DepsParser."""
 
   def test_parse_single_deps(self):
-    deps_content = textwrap.dedent('''\
+    deps_content = textwrap.dedent("""\
         vars = {
           'chromium_git': 'https://chromium.googlesource.com',
           'buildtools_revision': 'refs/heads/master',
@@ -49,7 +49,7 @@ class TestDepsParser(unittest.TestCase):
           'src/foo',
           'src/bar',
         ]
-    ''')
+    """)
 
     parser = gclient_util.DepsParser('/dummy', None)
     deps = parser.parse_single_deps(deps_content)
@@ -66,7 +66,7 @@ class TestDepsParser(unittest.TestCase):
     self.assertIn(('src/bar', 'DEPS'), deps.recursedeps)
 
   def test_parse_dep_type(self):
-    deps_content = textwrap.dedent('''\
+    deps_content = textwrap.dedent("""\
         deps = {
           'src/foo': {
             'packages': [
@@ -79,7 +79,7 @@ class TestDepsParser(unittest.TestCase):
             'condition': 'False',
           },
         }
-    ''')
+    """)
 
     parser = gclient_util.DepsParser('/dummy', None)
     deps = parser.parse_single_deps(deps_content)
@@ -88,7 +88,7 @@ class TestDepsParser(unittest.TestCase):
     self.assertEqual(len(deps.entries), 0)
 
   def test_parse_recursedeps(self):
-    deps_content = textwrap.dedent('''\
+    deps_content = textwrap.dedent("""\
         deps = {
           'src/foo': 'http://example.com/foo.git@refs/heads/master',
           'src/bar': 'http://example.com/bar.git@refs/heads/master',
@@ -98,7 +98,7 @@ class TestDepsParser(unittest.TestCase):
           'src/foo',
           ('src/bar', 'DEPS.bar'),
         ]
-    ''')
+    """)
 
     parser = gclient_util.DepsParser('/dummy', None)
     deps = parser.parse_single_deps(deps_content)
@@ -148,21 +148,21 @@ class TestBug123161903(unittest.TestCase):
     a_df77 = assistant_git.add_commit(1547073422, 'target', 'foo', '2')
     self.target = a_df77
 
-    src_internal_deps = textwrap.dedent('''\
+    src_internal_deps = textwrap.dedent("""\
         deps = {
           'src/assistant': {
             'url': 'http://example.com/assistant@%s',
             'condition': 'checkout_chromeos',
           }
         }
-    ''')
+    """)
     i_b4d4 = src_internal_git.add_commit(1547153329, '-1', 'DEPS',
                                          src_internal_deps % a_3dcc)
     _i_96a5 = src_internal_git.add_commit(1547162031, 'target1', 'DEPS',
                                           src_internal_deps % a_df77)
     i_e58c = src_internal_git.add_commit(1547225331, 'target1', 'foo', 'bar')
 
-    src_deps = textwrap.dedent('''\
+    src_deps = textwrap.dedent("""\
         deps = {
           'src-internal': 'http://example.com/src-internal@%s',
         }
@@ -170,7 +170,7 @@ class TestBug123161903(unittest.TestCase):
         recursedeps = [
           'src-internal',
         ]
-    ''')
+    """)
     src_git.add_commit(1500000000, 'foo', 'code', 'old')
     s_8ab4 = src_git.add_commit(1547157647, 'foo', 'DEPS', src_deps % i_b4d4)
     _s_e0d0 = src_git.add_commit(1547228986, 'foo', 'DEPS', src_deps % i_e58c)

@@ -75,7 +75,7 @@ class TestBisectStates(unittest.TestCase):
 
   def test_save_and_load(self):
     states = core.BisectStates(self.session_file)
-    revlist = map(str, range(10))
+    revlist = map(str, list(range(10)))
     states.init({}, revlist)
     states.config['foo'] = 'bar'
     states.save()
@@ -87,7 +87,7 @@ class TestBisectStates(unittest.TestCase):
 
   def test_reset(self):
     states = core.BisectStates(self.session_file)
-    revlist = map(str, range(10))
+    revlist = map(str, list(range(10)))
     states.init({}, revlist)
     states.config['foo'] = 'bar'
     states.save()

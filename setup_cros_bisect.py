@@ -170,11 +170,11 @@ def setup_chromeos_repos(opts, path_factory):
     os.mkdir(local_manifest_dir)
     with open(os.path.join(local_manifest_dir, 'manifest-versions.xml'),
               'w') as f:
-      f.write('''<?xml version="1.0" encoding="UTF-8"?>
+      f.write("""<?xml version="1.0" encoding="UTF-8"?>
           <manifest>
             <project name="chromeos/manifest-versions" remote="cros-internal" />
           </manifest>
-          ''')
+          """)
 
   logger.info('repo init for chromeos tree')
   repo_util.init(
@@ -213,7 +213,7 @@ def write_extra_manifest_to_mirror(repo_dir, removed):
   if not os.path.exists(local_manifest_dir):
     os.mkdir(local_manifest_dir)
   with open(os.path.join(local_manifest_dir, 'deleted-repos.xml'), 'w') as f:
-    f.write('''<?xml version="1.0" encoding="UTF-8"?>\n<manifest>\n''')
+    f.write("""<?xml version="1.0" encoding="UTF-8"?>\n<manifest>\n""")
     remotes = {}
     for path_spec in removed.values():
       scheme, netloc, remote_path = urlparse.urlsplit(path_spec.repo_url)[:3]
@@ -222,12 +222,12 @@ def write_extra_manifest_to_mirror(repo_dir, removed):
       if (scheme, netloc) not in remotes:
         remote_name = 'remote_for_deleted_repo_%s' % (scheme + netloc)
         remotes[scheme, netloc] = remote_name
-        f.write('''  <remote name="%s" fetch="%s" />\n''' %
+        f.write("""  <remote name="%s" fetch="%s" />\n""" %
                 (remote_name, '%s://%s' % (scheme, netloc)))
       f.write(
-          '''  <project name="%s" path="%s" remote="%s" revision="%s" />\n''' %
+          """  <project name="%s" path="%s" remote="%s" revision="%s" />\n""" %
           (remote_path, path_spec.path, remotes[scheme, netloc], path_spec.at))
-    f.write('''</manifest>\n''')
+    f.write("""</manifest>\n""")
 
 
 def generate_extra_manifest_for_deleted_repo(repo_dir, only_branch=None):
@@ -279,7 +279,7 @@ def setup_chrome_repos(opts, path_factory):
   latest_branch = query_chrome_latest_branch()
   logger.info('latest chrome branch is %d', latest_branch)
   assert latest_branch
-  spec = '''
+  spec = """
 solutions = [
   { "name"        : "buildspec",
     "url"         : "https://chrome-internal.googlesource.com/a/chrome/tools/buildspec.git",
@@ -291,7 +291,7 @@ solutions = [
 ]
 target_os = ['chromeos']
 cache_dir = %r
-''' % (latest_branch, chrome_cache)
+""" % (latest_branch, chrome_cache)
 
   with locking.lock_file(
       os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
