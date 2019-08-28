@@ -32,8 +32,7 @@ def create_argument_parser():
   parser = argparse.ArgumentParser(description=__doc__)
   common.add_common_arguments(parser)
   parser.add_argument(
-      'dut',
-      nargs='?',
+      '--dut',
       type=cli.argtype_notempty,
       metavar='DUT',
       default=configure.get('DUT', ''))

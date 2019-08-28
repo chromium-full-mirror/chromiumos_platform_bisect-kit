@@ -15,6 +15,7 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import errors
 from bisect_kit import locking
 from bisect_kit import repo_util
 
@@ -25,11 +26,10 @@ def create_argument_parser():
   parser = argparse.ArgumentParser()
   common.add_common_arguments(parser)
   parser.add_argument(
-      'dut',
-      nargs='?',
+      '--dut',
       type=cli.argtype_notempty,
       metavar='DUT',
-      default=configure.get('DUT', ''),
+      default=configure.get('DUT'),
       help='DUT address')
   parser.add_argument(
       'rev',
@@ -94,8 +94,15 @@ def main(args=None):
   opts = parser.parse_args(args)
   common.config_logging(opts)
 
+  if not opts.dut:
+    if not opts.nodeploy:
+      raise errors.ArgumentError('--dut',
+                                 'DUT can be omitted only if --nodeploy')
+    if not opts.flavor:
+      raise errors.ArgumentError('--flavor',
+                                 'flavor must be specified if no --dut')
+
   if not opts.flavor:
-    assert opts.dut
     opts.flavor = arc_util.query_flavor(opts.dut)
     assert opts.flavor
   logger.info('use flavor=%s', opts.flavor)

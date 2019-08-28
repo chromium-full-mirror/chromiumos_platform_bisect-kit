@@ -244,8 +244,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         util.check_call('./switch_cros_localbuild.py', '--nobuild',
                         '--chromeos_root', self.config['chromeos_root'],
                         '--chromeos_mirror', self.config['chromeos_mirror'],
-                        '--board', self.config['board'], dut,
-                        self.config['new'])
+                        '--board', self.config['board'], self.config['new'])
 
         diagnoser = diagnoser_cros.CrosDiagnoser(self.states, path_factory,
                                                  self.config, dut)

@@ -154,8 +154,8 @@ class CrosDiagnoser(object):
       if cros_util.query_dut_short_version(self.dut) == short_version:
         return
     cmd = [
-        './switch_cros_prebuilt.py', '--board', self.config['board'], self.dut,
-        self.cros_old
+        './switch_cros_prebuilt.py', '--board', self.config['board'], '--dut',
+        self.dut, self.cros_old
     ]
     if not self.config['disable_rootfs_verification']:
       cmd.append('--no_disable_rootfs_verification')
@@ -315,7 +315,7 @@ class CrosDiagnoser(object):
 
     logger.info('bisect chrome local build')
     session = '%s/%s' % (self.config['session'], self.cros_old)
-    switch_cmd = ['./switch_cros_cr_localbuild_internal.py', self.dut]
+    switch_cmd = ['./switch_cros_cr_localbuild_internal.py', '--dut', self.dut]
     if chrome_binaries:
       for target in chrome_binaries:
         switch_cmd += ['--target', target]

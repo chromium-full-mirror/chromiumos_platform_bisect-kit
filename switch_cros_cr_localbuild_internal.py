@@ -38,11 +38,10 @@ def create_argument_parser():
   parser = argparse.ArgumentParser()
   common.add_common_arguments(parser)
   parser.add_argument(
-      'dut',
-      nargs='?',
+      '--dut',
       type=cli.argtype_notempty,
       metavar='DUT',
-      default=configure.get('DUT', ''),
+      default=configure.get('DUT'),
       help='Address of DUT')
   parser.add_argument(
       'rev',
@@ -109,12 +108,20 @@ def main(args=None):
   opts = parser.parse_args(args)
   common.config_logging(opts)
 
+  if not opts.dut:
+    if not opts.nodeploy:
+      raise errors.ArgumentError('--dut',
+                                 'DUT can be omitted only if --nodeploy')
+    if not opts.board:
+      raise errors.ArgumentError('--board',
+                                 'board must be specified if no --dut')
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 
   opts.chrome_src = os.path.join(opts.chrome_root, 'src')
   assert os.path.exists(opts.chrome_src)
-  dut_os_version = cros_util.query_dut_short_version(opts.dut)
+  if opts.dut:
+    dut_os_version = cros_util.query_dut_short_version(opts.dut)
 
   rev = bisect_cr_localbuild_internal.guess_chrome_version(opts, opts.rev)
   config = dict(chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror)
@@ -149,9 +156,10 @@ def main(args=None):
       nodeploy=opts.nodeploy)
 
   # Sanity check. The OS version should not change.
-  assert dut_os_version == cros_util.query_dut_short_version(opts.dut), \
-            'Someone else reflashed the DUT. ' \
-            'DUT locking is not respected? b/126141102'
+  if opts.dut:
+    assert dut_os_version == cros_util.query_dut_short_version(opts.dut), \
+              'Someone else reflashed the DUT. ' \
+              'DUT locking is not respected? b/126141102'
 
 
 if __name__ == '__main__':

@@ -17,6 +17,7 @@ from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import repo_util
 from bisect_kit import util
 
@@ -27,11 +28,10 @@ def create_argument_parser():
   parser = argparse.ArgumentParser()
   common.add_common_arguments(parser)
   parser.add_argument(
-      'dut',
-      nargs='?',
+      '--dut',
       type=cli.argtype_notempty,
       metavar='DUT',
-      default=configure.get('DUT', ''),
+      default=configure.get('DUT'),
       help='DUT address')
   parser.add_argument(
       'rev',
@@ -205,6 +205,13 @@ def main(args=None):
   if opts.nobuild:
     opts.nodeploy = True
 
+  if not opts.dut:
+    if not opts.nodeploy:
+      raise errors.ArgumentError('--dut',
+                                 'DUT can be omitted only if --nodeploy')
+    if not opts.board:
+      raise errors.ArgumentError('--board',
+                                 'board must be specified if no --dut')
   if not opts.nodeploy:
     if not cros_util.is_good_dut(opts.dut):
       logger.fatal('%r is not a good DUT', opts.dut)
