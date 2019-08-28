@@ -240,6 +240,10 @@ def cmd_allocate_dut(opts):
       cros_lab_util.unlock_host(cros_lab_util.dut_host_name(opts.locked_dut))
 
 
+def cmd_repair_dut(opts):
+  cros_lab_util.repair(opts.dut)
+
+
 def main():
   common.init()
   parser = argparse.ArgumentParser()
@@ -316,6 +320,14 @@ def main():
   parser_allocate_dut.add_argument(
       '--locked_dut', help='Locked DUT name by last run')
   parser_allocate_dut.set_defaults(func=cmd_allocate_dut)
+
+  parser_repair_dut = subparsers.add_parser(
+      'repair_dut',
+      help='Repair a DUT in the lab',
+      description='Repair a DUT in the lab. '
+      'This is simply wrapper of "deploy repair" with additional checking.')
+  parser_repair_dut.add_argument('dut')
+  parser_repair_dut.set_defaults(func=cmd_repair_dut)
 
   parser_search_dut = subparsers.add_parser(
       'search_dut',
