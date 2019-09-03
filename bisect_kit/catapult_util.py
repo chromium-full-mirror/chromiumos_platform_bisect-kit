@@ -21,6 +21,8 @@ import math
 import os
 import re
 
+from bisect_kit import util
+
 logger = logging.getLogger(__name__)
 
 
@@ -147,4 +149,5 @@ def get_benchmark_values(json_path, metric):
       return None
     return values
   logger.error('metric %s not found in %s', metric, json_path)
+  util.show_similar_candidates('metric name', metric, traces.keys())
   return None
