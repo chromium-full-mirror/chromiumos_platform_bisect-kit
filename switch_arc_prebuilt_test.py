@@ -30,7 +30,7 @@ class TestSwitchArcPrebuilt(unittest.TestCase):
         'CHROMEOS_ARC_VERSION': flavor + '_' + bid
     }
 
-    switch_arc_prebuilt.main([dut, bid])
+    switch_arc_prebuilt.main(['--dut', dut, bid])
     push_prebuilt_to_device.assert_called_with(dut, flavor, bid)
 
 
