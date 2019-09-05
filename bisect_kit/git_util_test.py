@@ -286,6 +286,46 @@ class TestGitOperation(unittest.TestCase):
         git_util.get_rev_by_time(self.git_repo, '2017-02-03T00:00:00', None),
         commit_a)
 
+  def test_reset_hard(self):
+    path = os.path.join(self.git_repo, self.git.default_filename)
+    content = open(path).read()
+
+    # Nothing happend.
+    git_util.reset_hard(self.git_repo)
+    self.assertEqual(open(path).read(), content)
+
+    # Modified.
+    with open(path, 'w') as f:
+      f.write(content + 'other data')
+    git_util.reset_hard(self.git_repo)
+    self.assertEqual(open(path).read(), content)
+
+    # Deleted.
+    os.unlink(path)
+    git_util.reset_hard(self.git_repo)
+    self.assertEqual(open(path).read(), content)
+
+  def test_list_untracked(self):
+    self.assertEqual(git_util.list_untracked(self.git_repo), [])
+
+    def touch_file(path):
+      dirname = os.path.dirname(path)
+      if not os.path.exists(dirname):
+        os.makedirs(dirname)
+      with open(path, 'w') as f:
+        f.write('foobar')
+
+    file_untracked_1 = 'untracked-file'
+    file_untracked_2 = 'untracked-dir/untracked-file'
+    file_to_ignore = 'untracked-file-to-ignore'
+    touch_file(os.path.join(self.git_repo, file_untracked_1))
+    touch_file(os.path.join(self.git_repo, file_untracked_2))
+    touch_file(os.path.join(self.git_repo, file_to_ignore))
+
+    self.assertEqual(
+        set(git_util.list_untracked(self.git_repo, excludes=[file_to_ignore])),
+        set([file_untracked_1, file_untracked_2]))
+
   def test_get_history(self):
     timestamp = 1483286400  # 2017-01-02T00:00:00
     day = 86400

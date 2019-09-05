@@ -8,6 +8,7 @@ from __future__ import print_function
 import logging
 import os
 import re
+import shutil
 import subprocess
 import time
 
@@ -404,6 +405,68 @@ def get_rev_by_time(git_repo, timestamp, branch, path=None):
 
   result = util.check_output(*cmd, cwd=git_repo).strip()
   return result or None
+
+
+def reset_hard(git_repo):
+  """Restore modified and deleted files.
+
+  This is simply wrapper of "git reset --hard".
+
+  Args:
+    git_repo: path of git repo.
+  """
+  util.check_call('git', 'reset', '--hard', cwd=git_repo)
+
+
+def list_untracked(git_repo, excludes=None):
+  """List untracked files and directories.
+
+  Args:
+    git_repo: path of git repo.
+    excludes: files and/or directories to ignore, relative to git_repo
+
+  Returns:
+    list of paths, relative to git_repo
+  """
+  exclude_flags = []
+  if excludes:
+    for exclude in excludes:
+      assert not os.path.isabs(exclude), 'should be relative'
+      exclude_flags += ['--exclude', '/' + re.escape(exclude)]
+
+  result = []
+  for path in util.check_output(
+      'git',
+      'ls-files',
+      '--others',
+      '--exclude-standard',
+      *exclude_flags,
+      cwd=git_repo).splitlines():
+    # Remove the trailing slash, which means directory.
+    path = path.rstrip('/')
+    result.append(path)
+  return result
+
+
+def distclean(git_repo, excludes=None):
+  """Clean up git repo directory.
+
+  Restore modified and deleted files. Delete untracked files.
+
+  Args:
+    git_repo: path of git repo.
+    excludes: files and/or directories to ignore, relative to git_repo
+  """
+  reset_hard(git_repo)
+
+  # Delete untracked files.
+  for untracked in list_untracked(git_repo, excludes=excludes):
+    path = os.path.join(git_repo, untracked)
+    logger.debug('delete untracked: %s', path)
+    if os.path.isdir(path):
+      shutil.rmtree(path)
+    else:
+      os.unlink(path)
 
 
 def get_history(git_repo,

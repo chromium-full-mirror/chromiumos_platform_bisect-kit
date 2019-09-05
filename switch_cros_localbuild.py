@@ -101,7 +101,7 @@ def mark_as_stable(opts):
 
   # Get overlays listed in manifest file.
   known_projects = []
-  for path in repo_util.projects_in_manifest(opts.chromeos_root):
+  for path in repo_util.list_projects(opts.chromeos_root):
     known_projects.append(
         os.path.realpath(os.path.join(opts.chromeos_root, path)))
   logger.debug('known_projects %s', known_projects)
@@ -131,6 +131,8 @@ def mark_as_stable(opts):
 
 
 def cleanup(opts):
+  repo_util.cleanup_unexpected_files(opts.chromeos_root)
+
   logger.info('clean up previous result of "mark as stable"')
   repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
 

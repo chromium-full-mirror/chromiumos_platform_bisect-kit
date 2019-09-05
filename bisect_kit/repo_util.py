@@ -187,6 +187,63 @@ def get_manifest_groups(repo_dir):
   return info(repo_dir, 'Manifest groups')
 
 
+def list_projects(repo_dir):
+  """Repo list.
+
+  Args:
+    repo_dir: root directory of repo
+
+  Returns:
+    list of paths, relative to repo_dir
+  """
+  result = []
+  for line in util.check_output(
+      'repo', 'list', '--path-only', cwd=repo_dir).splitlines():
+    result.append(line)
+  return result
+
+
+def cleanup_unexpected_files(repo_dir):
+  """Clean up unexpected files in repo tree.
+
+  Note this is not fully equivalent to 'repo sync' from scratch because:
+    - This only handle git repo folders. In other words, directories under
+      repo_dir not inside any git repo will not be touched.
+    - It ignores files if matching gitignore pattern.
+  So we can keep cache files to speed up incremental build next time.
+
+  If you want truly clean tree, delete entire tree and repo sync directly
+  instead.
+
+  Args:
+    repo_dir: root directory of repo
+  """
+  projects = list_projects(repo_dir)
+
+  # When we clean up project X, we don't want to touch files under X's
+  # subprojects. Collect the nested project relationship here.
+  nested = {}
+  # By sorting, parent directory will loop before subdirectories.
+  for project_path in sorted(projects):
+    components = project_path.split(os.sep)
+    for i in range(len(components) - 1, 0, -1):
+      head = os.sep.join(components[:i])
+      tail = os.sep.join(components[i:])
+      if head in nested:
+        nested[head].append(tail)
+        break
+    nested[project_path] = []
+
+  for project_path in projects:
+    git_repo = os.path.join(repo_dir, project_path)
+    if not os.path.exists(git_repo):
+      # It should be harmless to ignore git repo nonexistence because 'repo
+      # sync' will restore them.
+      logger.warning('git repo not found: %s', git_repo)
+      continue
+    git_util.distclean(git_repo, nested[project_path])
+
+
 def _urljoin(base, url):
   # urlparse.urljoin doesn't recognize "persistent-https://" protocol.
   # Following hack replaces "persistent-https" by obsolete protocol "gopher"
@@ -278,18 +335,6 @@ class ManifestParser(object):
 
     return git_util.get_history_recursively(self.manifest_dir, path, start_time,
                                             end_time, parse_dependencies)
-
-
-def projects_in_manifest(repo_root):
-  manifest_dir = os.path.join(repo_root, '.repo', 'manifests')
-  manifest_file = os.path.join(repo_root, '.repo', 'manifest.xml')
-  parser = ManifestParser(manifest_dir)
-  manifest = open(manifest_file).read()
-  root = parser.parse_single_xml(manifest)
-  result = []
-  for node in root.findall('.//project'):
-    result.append(node.get('path', node.get('name')))
-  return result
 
 
 class RepoMirror(codechange.CodeStorage):
