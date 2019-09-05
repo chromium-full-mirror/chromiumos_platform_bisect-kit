@@ -319,6 +319,8 @@ class CrosDiagnoser(object):
     if chrome_binaries:
       for target in chrome_binaries:
         switch_cmd += ['--target', target]
+    if self.config['chrome_deploy_image']:
+      switch_cmd.append('--deploy_method=image')
     bisector = wrapper.BisectorWrapper('bisect_cr_localbuild_internal', session)
     try:
       bisector.init_if_necessary(
@@ -574,6 +576,7 @@ class DiagnoseCommandLineBase(object):
         bypass_android_prebuilt=opts.bypass_android_prebuilt,
         bypass_android_build=opts.bypass_android_build,
         disable_rootfs_verification=opts.disable_rootfs_verification,
+        chrome_deploy_image=opts.chrome_deploy_image,
     )
 
     self.states.init(config)
@@ -770,6 +773,10 @@ class DiagnoseCommandLineBase(object):
         dest='disable_rootfs_verification',
         action='store_false',
         help="Don't disable rootfs verification after update is completed")
+    group.add_argument(
+        '--chrome_deploy_image',
+        action='store_true',
+        help='Build and deploy ChromeOS image when bisect Chrome')
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser('run', help='Start auto bisection')

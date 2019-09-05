@@ -24,6 +24,26 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 
+def add_build_and_deploy_arguments(parser_group):
+  parser_group.add_argument(
+      '--goma_chromeos_dir',
+      type=cli.argtype_dir_path,
+      default=configure.get('GOMA_CHROMEOS_DIR'),
+      help='Goma-chromeos installed directory to mount into the Chrome OS '
+      'chroot')
+  parser_group.add_argument(
+      '--clobber-stateful',
+      '--clobber_stateful',
+      action='store_true',
+      help='Clobber stateful partition when performing update')
+  parser_group.add_argument(
+      '--no-disable-rootfs-verification',
+      '--no_disable_rootfs_verification',
+      dest='disable_rootfs_verification',
+      action='store_false',
+      help="Don't disable rootfs verification after update is completed")
+
+
 def create_argument_parser():
   parser = argparse.ArgumentParser()
   common.add_common_arguments(parser)
@@ -58,17 +78,6 @@ def create_argument_parser():
       default=configure.get('CHROMEOS_MIRROR', ''),
       help='ChromeOS repo mirror path')
   parser.add_argument(
-      '--clobber-stateful',
-      '--clobber_stateful',
-      action='store_true',
-      help='Clobber stateful partition when performing update')
-  parser.add_argument(
-      '--no-disable-rootfs-verification',
-      '--no_disable_rootfs_verification',
-      dest='disable_rootfs_verification',
-      action='store_false',
-      help="Don't disable rootfs verification after update is completed")
-  parser.add_argument(
       '--nobuild',
       action='store_true',
       help='Sync source code only; do not build; imply --noimage')
@@ -78,6 +87,10 @@ def create_argument_parser():
       help='Build packages only; do not build image; imply --nodeploy')
   parser.add_argument(
       '--nodeploy', action='store_true', help='Do not deploy after build')
+
+  group = parser.add_argument_group(title='Build and deploy options')
+  add_build_and_deploy_arguments(group)
+
   return parser
 
 
@@ -108,6 +121,7 @@ def mark_as_stable(opts):
   cmd = [
       'chromite/bin/cros_mark_as_stable',
       '-b', opts.board,
+      '--list_revisions',
       '--overlays', ':'.join(overlays),
       '--debug',
       '--all',
@@ -121,21 +135,42 @@ def cleanup(opts):
   repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
 
 
-def build(opts):
+def _build_packages(opts):
+  logger.info('build packages')
+
+  # chrome_root is only defined if called from chrome's switcher.
+  # This means using chromeos build_packages flow to build chrome during chrome
+  # bisection.
+  chrome_root = getattr(opts, 'chrome_root', None)
+
+  if not opts.goma_chromeos_dir:
+    default_goma_chromeos_dir = os.path.expanduser('~/goma-chromeos')
+    if os.path.exists(default_goma_chromeos_dir):
+      logger.debug('found %s available, use goma automatically',
+                   default_goma_chromeos_dir)
+      opts.goma_chromeos_dir = default_goma_chromeos_dir
+
+  cros_util.build_packages(
+      opts.chromeos_root,
+      opts.board,
+      chrome_root=chrome_root,
+      goma_dir=opts.goma_chromeos_dir,
+      afdo_use=True)
+
+
+def build(opts, do_mark_as_stable=True):
   # Used many times in this function, shorten it.
   chromeos_root = opts.chromeos_root
 
   # create chroot if necessary
-  if (not os.path.exists(os.path.join(chromeos_root, 'chroot')) and
-      not os.path.exists(os.path.join(chromeos_root, 'chroot.img'))):
-    util.check_output('chromite/bin/cros_sdk', '--create', cwd=chromeos_root)
+  cros_util.create_chroot(chromeos_root)
 
-  logger.info('mark as stable')
-  mark_as_stable(opts)
+  if do_mark_as_stable:
+    logger.info('mark as stable')
+    mark_as_stable(opts)
 
   if opts.noimage:
-    logger.info('build packages')
-    cros_util.build_packages(chromeos_root, opts.board)
+    _build_packages(opts)
     return None
 
   cached_name = 'bisect-%s' % opts.rev.replace('/', '_')
@@ -145,8 +180,7 @@ def build(opts):
 
   # If the given version is already built, reuse it.
   if not os.path.exists(os.path.join(chromeos_root, image_path)):
-    logger.info('build image')
-    cros_util.build_packages(chromeos_root, opts.board)
+    _build_packages(opts)
     built_image_folder = cros_util.build_image(chromeos_root, opts.board)
     image_name = os.path.basename(
         os.path.join(chromeos_root, built_image_folder))
@@ -154,6 +188,30 @@ def build(opts):
 
   assert os.path.exists(os.path.join(chromeos_root, image_path))
   return image_path
+
+
+def build_and_deploy(opts, do_mark_as_stable=True):
+  try:
+    image_path = build(opts, do_mark_as_stable=do_mark_as_stable)
+  except cros_util.NeedRecreateChrootException as e:
+    logger.warning('recreate chroot and retry again, reason: %s', e)
+    util.check_output(
+        'chromite/bin/cros_sdk', '--delete', cwd=opts.chromeos_root)
+    image_path = build(opts, do_mark_as_stable=do_mark_as_stable)
+
+  if opts.noimage or opts.nodeploy:
+    return 0
+
+  if cros_util.cros_flash_with_retry(
+      opts.chromeos_root,
+      opts.dut,
+      opts.board,
+      image_path,
+      clobber_stateful=opts.clobber_stateful,
+      disable_rootfs_verification=opts.disable_rootfs_verification,
+      repair_callback=cros_lab_util.repair):
+    return 0
+  return 1
 
 
 def switch(opts):
@@ -172,27 +230,7 @@ def switch(opts):
   if opts.nobuild:
     return 0
 
-  try:
-    image_path = build(opts)
-  except cros_util.NeedRecreateChrootException as e:
-    logger.warning('recreate chroot and retry again, reason: %s', e)
-    util.check_output(
-        'chromite/bin/cros_sdk', '--delete', cwd=opts.chromeos_root)
-    image_path = build(opts)
-
-  if opts.noimage or opts.nodeploy:
-    return 0
-
-  if cros_util.cros_flash_with_retry(
-      opts.chromeos_root,
-      opts.dut,
-      opts.board,
-      image_path,
-      clobber_stateful=opts.clobber_stateful,
-      disable_rootfs_verification=opts.disable_rootfs_verification,
-      repair_callback=cros_lab_util.repair):
-    return 0
-  return 1
+  return build_and_deploy(opts)
 
 
 def main(args=None):

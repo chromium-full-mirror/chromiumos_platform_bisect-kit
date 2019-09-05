@@ -799,6 +799,7 @@ def cros_sdk(chromeos_root, *args, **kwargs):
       log_stdout: Whether write the stdout output of the child process to log.
       stdin: standard input file handle for the command
       stderr_callback: Callback function for stderr. Called once per line.
+      goma_dir: Goma installed directory to mount into the chroot
   """
   envs = []
   for k, v in kwargs.get('env', {}).items():
@@ -811,6 +812,8 @@ def cros_sdk(chromeos_root, *args, **kwargs):
 
   if kwargs.get('chrome_root'):
     prefix += ['--chrome_root', kwargs['chrome_root']]
+  if kwargs.get('goma_dir'):
+    prefix += ['--goma_dir', kwargs['goma_dir']]
 
   prefix += envs + ['--']
 
@@ -829,6 +832,20 @@ def cros_sdk(chromeos_root, *args, **kwargs):
       log_stdout=kwargs.get('log_stdout', True),
       stdin=kwargs.get('stdin'),
       stderr_callback=kwargs.get('stderr_callback'))
+
+
+def create_chroot(chromeos_root):
+  """Creates ChromeOS chroot.
+
+  Args:
+    chromeos_root: chromeos tree root
+  """
+  if os.path.exists(os.path.join(chromeos_root, 'chroot')):
+    return
+  if os.path.exists(os.path.join(chromeos_root, 'chroot.img')):
+    return
+
+  util.check_output('chromite/bin/cros_sdk', '--create', cwd=chromeos_root)
 
 
 def copy_into_chroot(chromeos_root, src, dst):
@@ -890,28 +907,41 @@ def check_if_need_recreate_chroot(stdout, stderr):
   return None
 
 
-def build_packages(chromeos_root, board):
+def build_packages(chromeos_root,
+                   board,
+                   chrome_root=None,
+                   goma_dir=None,
+                   afdo_use=False):
   """Build ChromeOS packages.
 
   Args:
     chromeos_root: chromeos tree root
     board: ChromeOS board name
+    chrome_root: Chrome tree root. If specified, build chrome using the
+        provided tree
+    goma_dir: Goma installed directory to mount into the chroot. If specified,
+        build chrome with goma.
+    afdo_use: build chrome with AFDO optimization
   """
+  common_env = {
+      'USE': '-cros-debug chrome_internal',
+      'FEATURES': 'separatedebug',
+  }
   stderr_lines = []
   try:
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
+      env = common_env.copy()
+      env['FEATURES'] += ' -separatedebug splitdebug'
       cros_sdk(
           chromeos_root,
           './update_chroot',
           '--toolchain_boards',
           board,
-          env={
-              'USE': '-cros-debug chrome_internal',
-              'FEATURES': 'separatedebug -separatedebug splitdebug',
-          },
+          env=env,
           stderr_callback=stderr_lines.append)
-      cros_sdk(
-          chromeos_root,
+
+      env = common_env.copy()
+      cmd = [
           './build_packages',
           '--board',
           board,
@@ -919,11 +949,20 @@ def build_packages(chromeos_root, board):
           '--noworkon',
           '--skip_chroot_upgrade',
           '--accept_licenses=@CHROMEOS',
-          env={
-              'USE': '-cros-debug chrome_internal',
-              'FEATURES': 'separatedebug',
-          },
-          stderr_callback=stderr_lines.append)
+      ]
+      if goma_dir:
+        # Tell build_packages to start and stop goma
+        cmd.append('--run_goma')
+        env['USE_GOMA'] = 'true'
+      if afdo_use:
+        env['USE'] += ' afdo_use'
+      cros_sdk(
+          chromeos_root,
+          *cmd,
+          env=env,
+          chrome_root=chrome_root,
+          stderr_callback=stderr_lines.append,
+          goma_dir=goma_dir)
   except subprocess.CalledProcessError as e:
     # Detect failures due to incompatibility between chroot and source tree. If
     # so, notify the caller to recreate chroot and retry.

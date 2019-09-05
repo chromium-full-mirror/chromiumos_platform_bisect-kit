@@ -19,6 +19,7 @@ from __future__ import print_function
 import argparse
 import logging
 import os
+import sys
 
 from bisect_kit import cli
 from bisect_kit import common
@@ -29,6 +30,7 @@ from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util
 import bisect_cr_localbuild_master
+import switch_cros_localbuild
 
 logger = logging.getLogger(__name__)
 
@@ -64,12 +66,31 @@ def create_argument_parser():
       'Example value: "video_decode_accelerator_unittest". '
       'This option could be specified multiple times.')
   parser.add_argument(
+      '--deploy_method',
+      choices=['chrome_deploy', 'image'],
+      default='chrome_deploy',
+      help='Deploy method (default: %(default)s)')
+  parser.add_argument(
       '--nobuild',
       action='store_true',
       help='Sync source code only; do not build; imply --nodeploy')
   parser.add_argument(
       '--nodeploy', action='store_true', help='Do not deploy after build')
 
+  group = parser.add_argument_group(
+      title='Options for building chrome in chromeos sdk chroot')
+  group.add_argument(
+      '--noimage',
+      action='store_true',
+      help='Build packages only; do not build image; imply --nodeploy')
+  group.add_argument(
+      '--chromeos_root',
+      type=cli.argtype_dir_path,
+      metavar='CHROMEOS_ROOT',
+      default=configure.get('CHROMEOS_ROOT'),
+      help='ChromeOS tree root; only necessary if deploy_method is '
+      'cros_deploy or image')
+  switch_cros_localbuild.add_build_and_deploy_arguments(group)
   return parser
 
 
@@ -88,6 +109,11 @@ def main(args=None):
                                  'board must be specified if no --dut')
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
+  if opts.deploy_method != 'chrome_deploy':
+    if not opts.chromeos_root:
+      raise errors.ArgumentError(
+          '--chromeos_root',
+          'should be specified for --deploy_method=' + opts.deploy_method)
 
   opts.chrome_src = os.path.join(opts.chrome_root, 'src')
   assert os.path.exists(opts.chrome_src)
@@ -102,12 +128,21 @@ def main(args=None):
     return
 
   # TODO(kcwu): support local patch.
-  cr_util.build_and_deploy(
-      opts.chrome_src,
-      opts.board,
-      opts.dut,
-      opts.target,
-      nodeploy=opts.nodeploy)
+  if opts.deploy_method == 'chrome_deploy':
+    cr_util.build_and_deploy(
+        opts.chrome_src,
+        opts.board,
+        opts.dut,
+        opts.target,
+        nodeploy=opts.nodeploy)
+  elif opts.deploy_method == 'image':
+    try:
+      returncode = switch_cros_localbuild.build_and_deploy(
+          opts, do_mark_as_stable=False)
+    except Exception:
+      logger.exception('switch failed')
+      returncode = 1
+    sys.exit(returncode)
 
 
 if __name__ == '__main__':

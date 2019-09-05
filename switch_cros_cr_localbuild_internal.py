@@ -19,6 +19,7 @@ from __future__ import print_function
 import argparse
 import logging
 import os
+import sys
 
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -30,6 +31,7 @@ from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import util
 import bisect_cr_localbuild_internal
+import switch_cros_localbuild
 
 logger = logging.getLogger(__name__)
 
@@ -77,11 +79,31 @@ def create_argument_parser():
       'Example value: "video_decode_accelerator_unittest". '
       'This option could be specified multiple times.')
   parser.add_argument(
+      '--deploy_method',
+      choices=['chrome_deploy', 'image'],
+      default='chrome_deploy',
+      help='Deploy method (default: %(default)s)')
+  parser.add_argument(
       '--nobuild',
       action='store_true',
       help='Sync source code only; do not build; imply --nodeploy')
   parser.add_argument(
       '--nodeploy', action='store_true', help='Do not deploy after build')
+
+  group = parser.add_argument_group(
+      title='Options for building chrome in chromeos sdk chroot')
+  group.add_argument(
+      '--noimage',
+      action='store_true',
+      help='Build packages only; do not build image; imply --nodeploy')
+  group.add_argument(
+      '--chromeos_root',
+      type=cli.argtype_dir_path,
+      metavar='CHROMEOS_ROOT',
+      default=configure.get('CHROMEOS_ROOT'),
+      help='ChromeOS tree root; only necessary if deploy_method is '
+      'cros_deploy or image')
+  switch_cros_localbuild.add_build_and_deploy_arguments(group)
   return parser
 
 
@@ -117,21 +139,26 @@ def main(args=None):
                                  'board must be specified if no --dut')
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
+  if opts.deploy_method != 'chrome_deploy':
+    if not opts.chromeos_root:
+      raise errors.ArgumentError(
+          '--chromeos_root',
+          'should be specified for --deploy_method=' + opts.deploy_method)
 
   opts.chrome_src = os.path.join(opts.chrome_root, 'src')
   assert os.path.exists(opts.chrome_src)
   if opts.dut:
     dut_os_version = cros_util.query_dut_short_version(opts.dut)
 
-  rev = bisect_cr_localbuild_internal.guess_chrome_version(opts, opts.rev)
+  opts.rev = bisect_cr_localbuild_internal.guess_chrome_version(opts, opts.rev)
   config = dict(chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror)
 
   cache = gclient_util.GclientCache(opts.chrome_mirror)
   spec_manager = cr_util.ChromeSpecManager(config)
   code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
 
-  if cr_util.is_chrome_version(rev):
-    release_deps_file = spec_manager.get_release_deps(rev)
+  if cr_util.is_chrome_version(opts.rev):
+    release_deps_file = spec_manager.get_release_deps(opts.rev)
     path = os.path.join(spec_manager.spec_dir, release_deps_file)
     if not os.path.exists(path):
       raise errors.ArgumentError(
@@ -139,8 +166,8 @@ def main(args=None):
           '%s does not exists; run setup_cros_bisect.py sync first' % path)
 
   logger.info('switch source code')
-  code_manager.switch(rev)
-  _apply_additional_patch(opts.chrome_root, rev)
+  code_manager.switch(opts.rev)
+  _apply_additional_patch(opts.chrome_root, opts.rev)
 
   if opts.nobuild:
     return
@@ -148,12 +175,21 @@ def main(args=None):
   gclient_util.runhook(opts.chrome_root)
 
   # TODO(kcwu): support local patch.
-  cr_util.build_and_deploy(
-      opts.chrome_src,
-      opts.board,
-      opts.dut,
-      opts.target,
-      nodeploy=opts.nodeploy)
+  if opts.deploy_method == 'chrome_deploy':
+    cr_util.build_and_deploy(
+        opts.chrome_src,
+        opts.board,
+        opts.dut,
+        opts.target,
+        nodeploy=opts.nodeploy)
+  elif opts.deploy_method == 'image':
+    try:
+      returncode = switch_cros_localbuild.build_and_deploy(
+          opts, do_mark_as_stable=False)
+    except Exception:
+      logger.exception('switch failed')
+      returncode = 1
+    sys.exit(returncode)
 
   # Sanity check. The OS version should not change.
   if opts.dut:
