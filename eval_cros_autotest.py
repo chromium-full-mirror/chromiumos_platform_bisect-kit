@@ -167,6 +167,15 @@ def prepare_to_run_test(opts):
       cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge',
                          'net-misc/openssh')
 
+  # test_that may use this ssh key and ssh complains its permission is too open.
+  # chmod everytime just before run test_that because the permission may change
+  # after some git operations.
+  util.check_call(
+      'chmod',
+      'o-r,g-r',
+      'src/scripts/mod_for_test_scripts/ssh_keys/testing_rsa',
+      cwd=opts.chromeos_root)
+
   if opts.reinstall:
     util.ssh_cmd(opts.dut, 'rm', '-rf', '/usr/local/autotest')
 

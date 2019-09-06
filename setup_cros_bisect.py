@@ -253,13 +253,6 @@ def sync_chromeos_code(opts, path_factory):
   chromeos_tree = path_factory.get_chromeos_tree()
   repo_util.sync(chromeos_tree)
 
-  # test_that may use this ssh key and ssh complains its permission is too open
-  util.check_call(
-      'chmod',
-      'o-r,g-r',
-      'src/scripts/mod_for_test_scripts/ssh_keys/testing_rsa',
-      cwd=chromeos_tree)
-
 
 def query_chrome_latest_branch():
   result = None
