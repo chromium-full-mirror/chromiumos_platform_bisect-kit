@@ -144,11 +144,7 @@ def run_test(opts, bundle):
     cmd.append('-buildbundle=' + bundle)
   cmd += ['-resultsdir', results_dir, opts.dut, opts.test_name]
 
-  try:
-    cros_util.cros_sdk(opts.chromeos_root, *cmd)
-  except subprocess.CalledProcessError:
-    logger.fatal('failed to run tast, incorrect test name?')
-    return None
+  cros_util.cros_sdk(opts.chromeos_root, *cmd)
 
   return results_dir_output_chroot
 
@@ -224,9 +220,11 @@ def main(args=None):
     return SKIP
 
   bundle = tast_bundle_info[opts.test_name]
-  result_dir = run_test(opts, bundle)
-  if not result_dir:
-    return FATAL
+  try:
+    result_dir = run_test(opts, bundle)
+  except subprocess.CalledProcessError:
+    logger.error('failed to run tast; maybe build, ssh, or setup failures')
+    return SKIP
 
   try:
     passed, values = gather_test_result(opts, result_dir)
