@@ -320,7 +320,13 @@ class CrosDiagnoser(object):
       for target in chrome_binaries:
         switch_cmd += ['--target', target]
     if self.config['chrome_deploy_image']:
-      switch_cmd.append('--deploy_method=image')
+      switch_cmd += [
+          '--deploy_method=image',
+          '--chromeos_root',
+          self.config['chromeos_root'],
+      ]
+      if not self.config['disable_rootfs_verification']:
+        switch_cmd.append('--no_disable_rootfs_verification')
     bisector = wrapper.BisectorWrapper('bisect_cr_localbuild_internal', session)
     try:
       bisector.init_if_necessary(
