@@ -33,6 +33,13 @@ GS_BUILD_PATH = 'gs://chromeos-image-archive/{board}-release/{full_version}'
 GS_AUTOTEST_CLIENT_PATH = GS_BUILD_PATH + '/' + AUTOTEST_CLIENT_TARBALL
 GS_AUTOTEST_SERVER_PATH = GS_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL
 
+GS_SNAPSHOT_PATH = (
+    'gs://chromeos-image-archive/{board}-postsubmit/{snapshot_version}-*')
+GS_SNAPSHOT_AUTOTEST_CLIENT_PATH = (
+    GS_SNAPSHOT_PATH + '/' + AUTOTEST_CLIENT_TARBALL)
+GS_SNAPSHOT_AUTOTEST_SERVER_PATH = (
+    GS_SNAPSHOT_PATH + '/' + AUTOTEST_SERVER_TARBALL)
+
 
 def create_argument_parser():
   parser = argparse.ArgumentParser(description=__doc__)
@@ -63,13 +70,20 @@ def create_argument_parser():
 
 
 def switch(autotest_dir, board, version, test_name):
-  full_version = cros_util.version_to_full(board, version)
-  logger.info('Unpack autotest packages for %s %s', board, full_version)
-
-  autotest_client_path = GS_AUTOTEST_CLIENT_PATH.format(
-      board=board, full_version=full_version)
-  autotest_server_path = GS_AUTOTEST_SERVER_PATH.format(
-      board=board, full_version=full_version)
+  logger.info('Unpack autotest packages for %s %s', board, version)
+  if cros_util.is_cros_snapshot_version(version):
+    autotest_client_path = GS_SNAPSHOT_AUTOTEST_CLIENT_PATH.format(
+        board=board, snapshot_version=version)
+    autotest_server_path = GS_SNAPSHOT_AUTOTEST_SERVER_PATH.format(
+        board=board, snapshot_version=version)
+  else:
+    full_version = cros_util.version_to_full(board, version)
+    autotest_client_path = GS_AUTOTEST_CLIENT_PATH.format(
+        board=board, full_version=full_version)
+    autotest_server_path = GS_AUTOTEST_SERVER_PATH.format(
+        board=board, full_version=full_version)
+  logger.info('autotest_client_path %s', autotest_client_path)
+  logger.info('autotest_server_path %s', autotest_server_path)
 
   # TODO(kcwu): cache downloaded tarballs
   tmp_dir = tempfile.mkdtemp()

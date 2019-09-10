@@ -34,9 +34,11 @@ from bisect_kit import errors
 logger = logging.getLogger(__name__)
 
 
-def get_revlist(board, old, new):
+def get_revlist(board, old, new, use_snapshot=False):
   logger.info('get_revlist %s %s %s', board, old, new)
-  full_versions = cros_util.list_chromeos_prebuilt_versions(board, old, new)
+  logger.info('use_snapshot: %s', use_snapshot)
+  full_versions = cros_util.list_chromeos_prebuilt_versions(
+      board, old, new, use_snapshot=use_snapshot)
   short_versions = map(cros_util.version_to_short, full_versions)
 
   old_idx = short_versions.index(cros_util.version_to_short(old))
@@ -64,6 +66,10 @@ class ChromeOSVersionDomain(core.BisectDomain):
         default=configure.get('BOARD'),
         help='ChromeOS board name. Either --dut or --board need '
         'to be specified')
+    parser.add_argument(
+        '--experimental_use_snapshot',
+        action='store_true',
+        help='Use snapshot to bisect chromeos prebuild')
 
   @staticmethod
   def init(opts):
@@ -74,7 +80,11 @@ class ChromeOSVersionDomain(core.BisectDomain):
     if not opts.board:
       opts.board = cros_util.query_dut_board(opts.dut)
 
-    old, new, revlist = get_revlist(opts.board, opts.old, opts.new)
+    old, new, revlist = get_revlist(
+        opts.board,
+        opts.old,
+        opts.new,
+        use_snapshot=opts.experimental_use_snapshot)
     config = dict(dut=opts.dut, board=opts.board, old=old, new=new)
     return config, revlist
 
@@ -86,8 +96,13 @@ class ChromeOSVersionDomain(core.BisectDomain):
       env['DUT'] = self.config['dut']
     env['BOARD'] = self.config['board']
 
-    assert cros_util.is_cros_full_version(rev)
-    milestone, short_version = cros_util.version_split(rev)
+    assert cros_util.is_cros_full_version(
+        rev) or cros_util.is_cros_snapshot_version(rev)
+    if cros_util.is_cros_snapshot_version(rev):
+      milestone, short_version, _ = cros_util.snapshot_version_split(rev)
+    else:
+      milestone, short_version = cros_util.version_split(rev)
+
     env['MILESTONE'] = milestone
     env['CROS_SHORT_VERSION'] = short_version
     env['CROS_FULL_VERSION'] = rev

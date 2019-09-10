@@ -64,8 +64,12 @@ def create_argument_parser():
 
 def switch(opts):
   # TODO(kcwu): clear cache of cros flash
-  image_path = cros_util.prepare_prebuilt_image(opts.default_chromeos_root,
-                                                opts.board, opts.version)
+  if cros_util.is_cros_snapshot_version(opts.version):
+    image_path = cros_util.prepare_snapshot_image(opts.default_chromeos_root,
+                                                  opts.board, opts.version)
+  else:
+    image_path = cros_util.prepare_prebuilt_image(opts.default_chromeos_root,
+                                                  opts.board, opts.version)
 
   if cros_util.cros_flash_with_retry(
       opts.default_chromeos_root,

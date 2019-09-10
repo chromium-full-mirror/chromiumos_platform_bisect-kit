@@ -42,8 +42,17 @@ class TestCrosUtil(unittest.TestCase):
     self.assertTrue(cros_util.is_cros_version('1234.0.0'))
     self.assertTrue(cros_util.is_cros_version('R99-1234.0.0'))
 
+  def test_is_cros_snapshot_version(self):
+    self.assertFalse(cros_util.is_cros_snapshot_version('1234.0.0'))
+    self.assertFalse(cros_util.is_cros_snapshot_version('R99-1234.0.0'))
+    self.assertFalse(
+        cros_util.is_cros_snapshot_version('1234.0.2018_01_01_1259'))
+    self.assertFalse(cros_util.is_cros_snapshot_version('1234.0.0-23456'))
+    self.assertTrue(cros_util.is_cros_snapshot_version('R99-1234.0.0-23456'))
+
   def test_make_version_and_split(self):
     full_version = 'R33-1234.0.0'
+    snapshot_version = 'R78-12345.3.4-3456'
     milestone, short_version = cros_util.version_split(full_version)
 
     self.assertEqual(milestone, '33')
@@ -52,6 +61,17 @@ class TestCrosUtil(unittest.TestCase):
     self.assertEqual(
         cros_util.make_cros_full_version(milestone, short_version),
         full_version)
+
+    snapshot_version = 'R78-12345.3.4-3456'
+    milestone, short_version, snapshot_id = cros_util.snapshot_version_split(
+        snapshot_version)
+
+    self.assertEqual(milestone, '78')
+    self.assertEqual(short_version, '12345.3.4')
+    self.assertEqual(snapshot_id, '3456')
+    self.assertEqual(
+        cros_util.make_cros_snapshot_version(milestone, short_version,
+                                             snapshot_id), snapshot_version)
 
   def test_argtype_cros_version(self):
     self.assertEqual(cros_util.argtype_cros_version('9876.0.0'), '9876.0.0')
@@ -119,6 +139,14 @@ class TestCrosUtil(unittest.TestCase):
 
       self.assertEqual(cros_util.version_to_short('R64-10123.0.0'), '10123.0.0')
       self.assertEqual(cros_util.version_to_short('10123.0.0'), '10123.0.0')
+      self.assertEqual(
+          cros_util.version_to_short('R64-10123.0.0-45678'), '10123.0.0')
+
+      self.assertEqual(
+          cros_util.extract_major_version('R64-10123.0.0'), '10123')
+      self.assertEqual(cros_util.extract_major_version('10123.0.0'), '10123')
+      self.assertEqual(
+          cros_util.extract_major_version('R64-10123.0.0-45678'), '10123')
 
       self.assertEqual(
           cros_util.version_to_full('samus', 'R64-10123.0.0'), 'R64-10123.0.0')

@@ -7,11 +7,14 @@
 Terminology used in this module.
   short_version: ChromeOS version number without milestone, like "9876.0.0".
   full_version: ChromeOS version number with milestone, like "R62-9876.0.0".
+  snapshot_version: ChromeOS version number with milestone and snapshot id,
+                    like "R62-9876.0.0-12345".
   version: if not specified, it could be in short or full format.
 """
 
 from __future__ import print_function
 import ast
+import datetime
 import errno
 import json
 import logging
@@ -34,6 +37,7 @@ logger = logging.getLogger(__name__)
 re_chromeos_full_version = r'^R\d+-\d+\.\d+\.\d+$'
 re_chromeos_localbuild_version = r'^\d+\.\d+\.\d{4}_\d\d_\d\d_\d{4}$'
 re_chromeos_short_version = r'^\d+\.\d+\.\d+$'
+re_chromeos_snapshot_version = r'^R\d+-\d+\.\d+\.\d+-\d+$'
 
 gs_archive_path = 'gs://chromeos-image-archive/{board}-release'
 gs_release_path = (
@@ -87,23 +91,43 @@ def is_cros_version(s):
   return is_cros_short_version(s) or is_cros_full_version(s)
 
 
+def is_cros_snapshot_version(s):
+  """Determines if `s` is chromeos snapshot version"""
+  return bool(re.match(re_chromeos_snapshot_version, s))
+
+
 def make_cros_full_version(milestone, short_version):
   """Makes full_version from milestone and short_version"""
   assert milestone
   return 'R%s-%s' % (milestone, short_version)
 
 
-def version_split(full_version):
-  """Splits full_version into milestone and short_version"""
-  assert is_cros_full_version(full_version)
-  milestone, short_version = full_version.split('-')
+def make_cros_snapshot_version(milestone, short_version, snapshot_id):
+  """Makes snapshot version from milestone, short_version and snapshot id"""
+  return 'R%s-%s-%s' % (milestone, short_version, snapshot_id)
+
+
+def version_split(version):
+  """Splits full_version or snapshot_version into milestone and short_version"""
+  assert is_cros_full_version(version) or is_cros_snapshot_version(version)
+  if is_cros_snapshot_version(version):
+    return snapshot_version_split(version)[0:2]
+  milestone, short_version = version.split('-')
   return milestone[1:], short_version
 
 
+def snapshot_version_split(snapshot_version):
+  """Splits snapshot_version into milestone, short_version and snapshot_id"""
+  assert is_cros_snapshot_version(snapshot_version)
+  milestone, shot_version, snapshot_id = snapshot_version.split('-')
+  return milestone[1:], shot_version, snapshot_id
+
+
 def argtype_cros_version(s):
-  if not is_cros_version(s):
+  if (not is_cros_version(s)) and (not is_cros_snapshot_version(s)):
     msg = 'invalid cros version'
-    raise cli.ArgTypeError(msg, '9876.0.0 or R62-9876.0.0')
+    raise cli.ArgTypeError(msg,
+                           '9876.0.0, R62-9876.0.0 or R77-12369.0.0-11681')
   return s
 
 
@@ -172,6 +196,12 @@ def query_dut_short_version(host):
   is_cros_short_version() is false.
   """
   return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_VERSION')
+
+
+def query_dut_is_snapshot(host):
+  """Query if given DUT is a snapshot version."""
+  path = query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILDER_PATH', '')
+  return '-postsubmit' in path
 
 
 def query_dut_boot_id(host, connect_timeout=None):
@@ -295,6 +325,40 @@ def gsutil_ls(*args, **kwargs):
   return gsutil('ls', *args, **kwargs).splitlines()
 
 
+def gsutil_stat_update_time(*args, **kwargs):
+  """Returns the last modified time of a file or multiple files.
+
+  Args:
+    args: arguments passed to 'gsutil stat'.
+    kwargs: extra parameters for gsutil.
+
+  Returns:
+    A integer indicates the last modified timestamp.
+
+  Raises:
+    subprocess.CalledProcessError: gsutil failed, usually means path not found
+    errors.ExternalError: update time is not found
+  """
+  result = -1
+  # Currently we believe stat always returns a UTC time, and strptime also
+  # parses a UTC time by default.
+  time_format = '%a, %d %b %Y %H:%M:%S GMT'
+
+  for line in gsutil('stat', *args, **kwargs).splitlines():
+    if ':' not in line:
+      continue
+    key, value = map(str.strip, line.split(':', 1))
+    if key != 'Update time':
+      continue
+    dt = datetime.datetime.strptime(value, time_format)
+    unixtime = int(time.mktime(dt.utctimetuple()))
+    result = max(result, unixtime)
+
+  if result == -1:
+    raise errors.ExternalError("didn't find update time")
+  return result
+
+
 def query_milestone_by_version(board, short_version):
   """Query milestone by ChromeOS version number.
 
@@ -382,6 +446,20 @@ def recognize_version(board, version):
   return milestone, short_version
 
 
+def extract_major_version(version):
+  """Converts a version to its major version.
+
+  Args:
+    version: ChromsOS version number or snapshot version
+
+  Returns:
+    major version number in string format
+  """
+  version = version_to_short(version)
+  m = re.match(r'^(\d+)\.\d+\.\d+$', version)
+  return m.group(1)
+
+
 def version_to_short(version):
   """Convert ChromeOS version number to short format.
 
@@ -412,6 +490,39 @@ def version_to_full(board, version):
   milestone = query_milestone_by_version(board, version)
   assert milestone, 'incorrect board=%s or version=%s ?' % (board, version)
   return make_cros_full_version(milestone, version)
+
+
+def list_snapshots_from_image_archive(board, major_version):
+  """List ChromeOS snapshot image avaliable from gs://chromeos-image-archive.
+
+  Args:
+    board: ChromeOS board
+    major_version: ChromeOS major version
+
+  Returns:
+    list of (version, gs_path):
+      version: Chrome OS snapshot version
+      gs_path: gs path of test image
+  """
+
+  path = (
+      'gs://chromeos-image-archive/{board}-postsubmit/R*-{major_version}.0.0-*')
+  result = []
+  output = gsutil_ls(
+      '-d',
+      path.format(board=board, major_version=major_version),
+      ignore_errors=True)
+
+  for path in output:
+    if not path.endswith('/'):
+      continue
+    m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)', path)
+    if m:
+      snapshot_version = m.group(1)
+      test_image = 'image.zip'
+      gs_path = path + test_image
+      result.append((snapshot_version, gs_path))
+  return result
 
 
 def list_prebuilt_from_image_archive(board):
@@ -476,7 +587,8 @@ def list_chromeos_prebuilt_versions(board,
                                     old,
                                     new,
                                     only_good_build=True,
-                                    include_older_build=True):
+                                    include_older_build=True,
+                                    use_snapshot=False):
   """Lists ChromeOS version numbers with prebuilt between given range
 
   Args:
@@ -485,6 +597,7 @@ def list_chromeos_prebuilt_versions(board,
     new: end version (inclusive)
     only_good_build: only if test image is available
     include_older_build: include prebuilt in gs://chromeos-releases
+    use_snapshot: return snapshot versions if found
 
   Returns:
     list of sorted version numbers (in full format) between [old, new] range
@@ -493,15 +606,32 @@ def list_chromeos_prebuilt_versions(board,
   old = version_to_short(old)
   new = version_to_short(new)
 
-  rev_map = {}  # dict: short version -> (short or full version, gs line)
+  rev_map = {
+  }  # dict: short version -> list of (short/full or snapshot version, gs path)
   for full_version, gs_path in list_prebuilt_from_image_archive(board):
     short_version = version_to_short(full_version)
-    rev_map[short_version] = full_version, gs_path
+    rev_map[short_version] = [(full_version, gs_path)]
 
   if include_older_build and old not in rev_map:
     for short_version, gs_path in list_prebuilt_from_chromeos_releases(board):
       if short_version not in rev_map:
-        rev_map[short_version] = short_version, gs_path
+        rev_map[short_version] = [(short_version, gs_path)]
+
+  if use_snapshot:
+    for major_version in range(
+        int(extract_major_version(old)),
+        int(extract_major_version(new)) + 1):
+      short_version = '%s.0.0' % major_version
+      if not util.is_direct_relative_version(short_version, old):
+        continue
+      if not util.is_direct_relative_version(short_version, new):
+        continue
+      snapshots = list_snapshots_from_image_archive(board, str(major_version))
+      if snapshots:
+        # if snapshots found, we can append them after the release version,
+        # so the prebuilt image list of this version will be
+        # release_image, snapshot1, snapshot2,...
+        rev_map[short_version] += snapshots
 
   result = []
   for rev in sorted(rev_map, key=util.version_key_func):
@@ -512,28 +642,68 @@ def list_chromeos_prebuilt_versions(board,
     if not util.is_version_lesseq(rev, new):
       continue
 
-    version, gs_path = rev_map[rev]
+    for version, gs_path in rev_map[rev]:
 
-    # version_to_full() and gsutil_ls() may take long time if versions are a
-    # lot. This is acceptable because we usually bisect only short range.
+      # version_to_full() and gsutil_ls() may take long time if versions are a
+      # lot. This is acceptable because we usually bisect only short range.
 
-    if only_good_build:
-      gs_result = gsutil_ls(gs_path, ignore_errors=True)
-      if not gs_result:
-        logger.warning('%s is not a good build, ignore', version)
-        continue
-      assert len(gs_result) == 1
-      m = re.search(r'(R\d+-\d+\.\d+\.\d+)', gs_result[0])
-      if not m:
-        logger.warning('format of image path is unexpected: %s', gs_result[0])
-        continue
-      version = m.group(1)
-    elif is_cros_short_version(version):
-      version = version_to_full(board, version)
+      if only_good_build:
+        gs_result = gsutil_ls(gs_path, ignore_errors=True)
+        if not gs_result:
+          logger.warning('%s is not a good build, ignore', version)
+          continue
+        assert len(gs_result) == 1
+        m = re.search(r'(R\d+-\d+\.\d+\.\d+)', gs_result[0])
+        if not m:
+          logger.warning('format of image path is unexpected: %s', gs_result[0])
+          continue
+        if not is_cros_snapshot_version(version):
+          version = m.group(1)
+      elif is_cros_short_version(version):
+        version = version_to_full(board, version)
 
-    result.append(version)
+      result.append(version)
 
   return result
+
+
+def prepare_snapshot_image(chromeos_root, board, snapshot_version):
+  """Prepare chromeos snapshot image.
+
+  Args:
+    chromeos_root: chromeos tree root
+    board: ChromeOS board name
+    snapshot_version: ChromeOS snapshot version number
+
+  Returns:
+    local file path of test image relative to chromeos_root
+  """
+  assert is_cros_snapshot_version(snapshot_version)
+  milestone, short_version, snapshot_id = snapshot_version_split(
+      snapshot_version)
+  full_version = make_cros_full_version(milestone, short_version)
+  tmp_dir = os.path.join(
+      chromeos_root, 'tmp',
+      'ChromeOS-test-%s-%s-%s' % (full_version, board, snapshot_id))
+  if not os.path.exists(tmp_dir):
+    os.makedirs(tmp_dir)
+
+  gs_path = ('gs://chromeos-image-archive/{board}-postsubmit/' +
+             '{snapshot_version}-*/image.zip')
+  gs_path = gs_path.format(board=board, snapshot_version=snapshot_version)
+
+  files = gsutil_ls(gs_path, ignore_errors=True)
+  if len(files) == 1:
+    gs_path = files[0]
+    gsutil('cp', gs_path, tmp_dir)
+    image_path = os.path.relpath(
+        os.path.join(tmp_dir, test_image_filename), chromeos_root)
+    util.check_call(
+        'unzip', '-j', 'image.zip', test_image_filename, cwd=tmp_dir)
+    os.remove(os.path.join(tmp_dir, 'image.zip'))
+
+  assert image_path
+  return image_path
 
 
 def prepare_prebuilt_image(chromeos_root, board, version):
@@ -639,12 +809,21 @@ def cros_flash(chromeos_root,
   if version:
     # In the past, cros flash may fail with returncode=0
     # So let's have an extra check.
-    short_version = version_to_short(version)
-    dut_version = query_dut_short_version(host)
-    if dut_version != short_version:
-      raise errors.ExternalError(
-          'although cros flash succeeded, the OS version is unexpected: '
-          'actual=%s expect=%s' % (dut_version, short_version))
+    if is_cros_snapshot_version(version):
+      builder_path = query_dut_lsb_release(host).get(
+          'CHROMEOS_RELEASE_BUILDER_PATH', '')
+      expect_prefix = '%s-postsubmit/%s-' % (board, version)
+      if not builder_path.startswith(expect_prefix):
+        raise errors.ExternalError(
+            'although cros flash succeeded, the OS builder path is '
+            'unexpected: actual=%s expect=%s' % (builder_path, expect_prefix))
+    else:
+      expect_version = version_to_short(version)
+      dut_version = query_dut_short_version(host)
+      if dut_version != expect_version:
+        raise errors.ExternalError(
+            'although cros flash succeeded, the OS version is unexpected: '
+            'actual=%s expect=%s' % (dut_version, expect_version))
 
   # "cros flash" may terminate successfully but the DUT starts self-repairing
   # (b/130786578), so it's necessary to do sanity check.
@@ -701,6 +880,19 @@ def version_info(board, version):
       android_build_id: Android build id
       android_branch: Android branch, in format like 'git_nyc-mr1-arc'
   """
+  # TODO(zjchang): add implementation
+  if is_cros_snapshot_version(version):
+    logger.warning(
+        'The version_info function of a snapshot is not implemented ' +
+        'completely. Currently we do not provide enough information ' +
+        'for continuing Android and Chrome bisection, so we will ' +
+        'skip Android and Chrome relatead bisections.')
+    milestone, _, _ = snapshot_version_split(version)
+    return {
+        'milestone': milestone,
+        'cros_full_version': version,
+        'cros_short_version': version_to_short(version)
+    }
   info = {}
   full_version = version_to_full(board, version)
 
@@ -1120,28 +1312,122 @@ class ChromeOSSpecManager(codechange.SpecManager):
     self.config = config
     self.manifest_dir = os.path.join(self.config['chromeos_root'], '.repo',
                                      'manifests')
+    self.manifest_internal_dir = os.path.join(self.config['chromeos_mirror'],
+                                              'manifest-internal.git')
     self.historical_manifest_git_dir = os.path.join(
         self.config['chromeos_mirror'], 'chromeos/manifest-versions.git')
     if not os.path.exists(self.historical_manifest_git_dir):
       raise errors.InternalError('Manifest snapshots should be cloned into %s' %
                                  self.historical_manifest_git_dir)
 
-  def lookup_build_timestamp(self, rev):
-    assert is_cros_full_version(rev)
+  def lookup_snapshot_manifest_revisions(self, old, new):
+    """Get manifest commits between snapshot versions.
 
+    Returns:
+      list of (timestamp, commit_id, snapshot_id):
+        timestamp: integer unix timestamp
+        commit_id: a string indicates commit hash
+        snapshot_id: a string indicates snapshot id
+    """
+    assert is_cros_snapshot_version(old)
+    assert is_cros_snapshot_version(new)
+
+    gs_path = (
+        'gs://chromeos-image-archive/{board}-postsubmit/{version}-*/image.zip')
+    # Try to guess the commit time of a snapshot manifest, it is usually a few
+    # minutes different between snapshot manifest commit and image.zip
+    # generate.
+    try:
+      old_timestamp = gsutil_stat_update_time(
+          gs_path.format(board=self.config['board'], version=old)) - 86400
+    except subprocess.CalledProcessError:
+      old_timestamp = None
+    try:
+      new_timestamp = gsutil_stat_update_time(
+          gs_path.format(board=self.config['board'], version=new)) + 86400
+      # 1558657989 is snapshot_id 5982's commit time, this ensures every time
+      # we can find snapshot 5982
+      # snapshot_id <= 5982 has different commit message format, so we need
+      # to identify its id in different ways, see below comment for more info.
+      new_timestamp = max(new_timestamp, 1558657989 + 1)
+    except subprocess.CalledProcessError:
+      new_timestamp = None
+    result = []
+    _, _, old_snapshot_id = snapshot_version_split(old)
+    _, _, new_snapshot_id = snapshot_version_split(new)
+    repo = self.manifest_internal_dir
+    path = 'snapshot.xml'
+    branch = 'snapshot'
+    commits = git_util.get_history(
+        repo,
+        path,
+        branch,
+        after=old_timestamp,
+        before=new_timestamp,
+        with_subject=True)
+
+    # Unfortunately, we can not identify snapshot_id <= 5982 from its commit
+    # subject, as their subjects are all `Annealing manifest snapshot.`.
+    # So instead we count the snapshot_id manually.
+    count = 5982
+    # There are two snapshot_id = 2633 in commit history, ignore the former
+    # one.
+    ignore_list = ['95c8526a7f0798d02f692010669dcbd5a152439a']
+    # We examine the commits in reverse order as there are some testing
+    # commits before snapshot_id=2, this method works fine after
+    # snapshot 2, except snapshot 2633
+    for commit in reversed(commits):
+      msg = commit[2]
+      if commit[1] in ignore_list:
+        continue
+
+      match = re.match(r'^annealing manifest snapshot (\d+)', msg)
+      if match:
+        snapshot_id = match.group(1)
+      elif 'Annealing manifest snapshot' in msg:
+        snapshot_id = str(count)
+        count -= 1
+      else:
+        continue
+      if int(old_snapshot_id) <= int(snapshot_id) <= int(new_snapshot_id):
+        result.append((commit[0], commit[1], snapshot_id))
+    # We find commits in reversed order, now reverse it again to chronological
+    # order.
+    return list(reversed(result))
+
+  def lookup_build_timestamp(self, rev):
+    assert is_cros_full_version(rev) or is_cros_snapshot_version(rev)
+    if is_cros_full_version(rev):
+      return self.lookup_release_build_timestamp(rev)
+    else:
+      return self.lookup_snapshot_build_timestamp(rev)
+
+  def lookup_snapshot_build_timestamp(self, rev):
+    assert is_cros_snapshot_version(rev)
+    return int(self.lookup_snapshot_manifest_revisions(rev, rev)[0][0])
+
+  def lookup_release_build_timestamp(self, rev):
+    assert is_cros_full_version(rev)
     milestone, short_version = version_split(rev)
     path = os.path.join('buildspecs', milestone, short_version + '.xml')
     try:
       timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
                                            'refs/heads/master', path)
     except ValueError:
-      raise errors.InternalError(
-          '%s does not have %s' % (self.historical_manifest_git_dir, path))
+      raise errors.InternalError('%s does not have %s' %
+                                 (self.historical_manifest_git_dir, path))
     return timestamp
 
   def collect_float_spec(self, old, new):
     old_timestamp = self.lookup_build_timestamp(old)
     new_timestamp = self.lookup_build_timestamp(new)
+    # snapshot time is different from commit time
+    # usually it's a few minutes different
+    # 30 minutes should be safe in most cases
+    if is_cros_snapshot_version(old):
+      old_timestamp = old_timestamp - 1800
+    if is_cros_snapshot_version(new):
+      new_timestamp = new_timestamp + 1800
 
     path = os.path.join(self.manifest_dir, 'default.xml')
     if not os.path.islink(path) or os.readlink(path) != 'full.xml':
@@ -1158,6 +1444,59 @@ class ChromeOSSpecManager(codechange.SpecManager):
     return result
 
   def collect_fixed_spec(self, old, new):
+    assert is_cros_full_version(old) or is_cros_snapshot_version(old)
+    assert is_cros_full_version(new) or is_cros_snapshot_version(new)
+
+    # case 1: if both are snapshot, return a list of snapshot
+    if is_cros_snapshot_version(old) and is_cros_snapshot_version(new):
+      return self.collect_snapshot_specs(old, new)
+
+    # case 2: if both are release version
+    #         return a list of release version
+    if is_cros_full_version(old) and is_cros_full_version(new):
+      return self.collect_release_specs(old, new)
+
+    # case 3: return a list of release version and append a snapshot
+    #         before or at the end
+    result = self.collect_release_specs(old, new)
+    if is_cros_snapshot_version(old):
+      result = self.collect_release_specs(old, old) + result[1:]
+    elif is_cros_snapshot_version(new):
+      result = result[:-1] + self.collect_release_specs(new, new)
+    return result
+
+  def collect_snapshot_specs(self, old, new):
+    assert is_cros_snapshot_version(old)
+    assert is_cros_snapshot_version(new)
+
+    def guess_snapshot_version(board, snapshot_id, old, new):
+      if old.endswith('-' + snapshot_id):
+        return old
+      if new.endswith('-' + snapshot_id):
+        return new
+      gs_path = (
+          'gs://chromeos-image-archive/{board}-postsubmit/' +
+          'R*-{snapshot_id}-*'.format(board=board, snapshot_id=snapshot_id))
+      for line in gsutil_ls(gs_path, ignore_errors=True):
+        m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)\S+', line)
+        if m:
+          return m.group(1)
+      raise errors.ExternalError(
+          'guess_snapshot_version failed, board=%s snapshot_id=%s ' +
+          'old=%s new=%s', board, snapshot_id, old, new)
+
+    result = []
+    path = 'snapshot.xml'
+    revisions = self.lookup_snapshot_manifest_revisions(old, new)
+    for timestamp, git_rev, snapshot_id in revisions:
+      snapshot_version = guess_snapshot_version(self.config['board'],
+                                                snapshot_id, old, new)
+      result.append(
+          codechange.Spec(codechange.SPEC_FIXED, snapshot_version, timestamp,
+                          path))
+    return result
+
+  def collect_release_specs(self, old, new):
     assert is_cros_full_version(old)
     assert is_cros_full_version(new)
     old_milestone, old_short_version = version_split(old)
@@ -1199,12 +1538,17 @@ class ChromeOSSpecManager(codechange.SpecManager):
     return result
 
   def get_manifest(self, rev):
-    assert is_cros_full_version(rev)
-    milestone, short_version = version_split(rev)
-    path = os.path.join('buildspecs', milestone, '%s.xml' % short_version)
-    manifest = git_util.get_file_from_revision(self.historical_manifest_git_dir,
-                                               'refs/heads/master', path)
-
+    assert is_cros_full_version(rev) or is_cros_snapshot_version(rev)
+    if is_cros_full_version(rev):
+      milestone, short_version = version_split(rev)
+      path = os.path.join('buildspecs', milestone, '%s.xml' % short_version)
+      manifest = git_util.get_file_from_revision(
+          self.historical_manifest_git_dir, 'refs/heads/master', path)
+    else:
+      revisions = self.lookup_snapshot_manifest_revisions(rev, rev)
+      commit_id = revisions[0][1]
+      manifest = git_util.get_file_from_revision(self.manifest_internal_dir,
+                                                 commit_id, 'snapshot.xml')
     manifest_name = 'manifest_%s.xml' % rev
     manifest_path = os.path.join(self.manifest_dir, manifest_name)
     with open(manifest_path, 'w') as f:

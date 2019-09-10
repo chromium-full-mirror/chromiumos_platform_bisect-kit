@@ -474,7 +474,8 @@ def get_history(git_repo,
                 branch=None,
                 after=None,
                 before=None,
-                padding=False):
+                padding=False,
+                with_subject=False):
   """Get commit history of given path.
 
   `after` and `before` could be outside of lifetime of `path`. `padding` is
@@ -489,16 +490,21 @@ def get_history(git_repo,
     padding: If True, pads returned result with dummy record at exact 'after'
         and 'before' time, if 'path' existed at that time. Otherwise, only
         returns real commits.
+    with_subject: If True, return commit subject together
 
   Returns:
-    List of (timestamp, git hash); They are all events when `path` was added,
-    removed, modified, and start and end time if `padding` is true.
+    List of (timestamp, git hash, subject); or (timestamp, git hash) depends
+    on with_subject flag. They are all events when `path` was added, removed,
+    modified, and start and end time if `padding` is true. If `padding` and
+    `with_subject` are both true, 'dummy subject' will be returned as padding
+    history's subject.
 
     For each pair, at `timestamp`, the repo state is `git hash`. In other
     words, `timestamp` is not necessary the commit time of `git hash` for the
     padded entries.
   """
-  cmd = ['git', 'log', '--reverse', '--first-parent', '--format=%ct %H']
+  log_format = '%ct %H' if not with_subject else '%ct %H %s'
+  cmd = ['git', 'log', '--reverse', '--first-parent', '--format=' + log_format]
   if after:
     cmd += ['--after', str(after)]
   if before:
@@ -513,25 +519,33 @@ def get_history(git_repo,
 
   result = []
   for line in util.check_output(*cmd, cwd=git_repo).splitlines():
-    commit_time, git_rev = line.split()
-    result.append((int(commit_time), git_rev))
+    # array = [timestamp, git_rev, subject] or [timestamp, git_rev]
+    array = line.split(' ', 2)
+    array[0] = int(array[0])
+    result.append(tuple(array))
 
   if padding:
     assert before or after, 'padding=True make no sense if they are both None'
+    history = [0, '']
+    if with_subject:
+      history.append('dummy subject')
+
     if before is not None and get_rev_by_time(
         git_repo, before, branch, path=path):
       before = int(before)
       if not result or result[-1][0] != before:
         git_rev = get_rev_by_time(git_repo, before, branch)
         assert git_rev
-        result.append((before, git_rev))
+        history[0:2] = [before, git_rev]
+        result.append(tuple(history))
     if after is not None and get_rev_by_time(
         git_repo, after, branch, path=path):
       after = int(after)
       if not result or result[0][0] != after:
         git_rev = get_rev_by_time(git_repo, after, branch)
         assert git_rev
-        result.insert(0, (after, git_rev))
+        history[0:2] = [after, git_rev]
+        result.insert(0, tuple(history))
 
   return result
 

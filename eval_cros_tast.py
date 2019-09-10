@@ -186,7 +186,8 @@ def main(args=None):
     logger.error('%r is not a valid DUT address', opts.dut)
     return FATAL
 
-  if opts.with_private_bundles and not opts.tast_build:
+  is_snapshot = cros_util.query_dut_is_snapshot(opts.dut)
+  if opts.with_private_bundles and not opts.tast_build and not is_snapshot:
     version = cros_util.query_dut_short_version(opts.dut)
     if cros_util.is_cros_localbuild_version(version):
       logger.error(

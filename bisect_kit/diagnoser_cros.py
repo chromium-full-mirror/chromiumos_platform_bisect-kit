@@ -118,10 +118,14 @@ class CrosDiagnoser(object):
       switch_cmd = ['./switch_cros_prebuilt.py']
       if not self.config['disable_rootfs_verification']:
         switch_cmd.append('--no_disable_rootfs_verification')
+
+      init_args = ['--dut', self.dut, '--board', self.config['board']]
+      if self.config['experimental_use_snapshot']:
+        init_args.append('--experimental_use_snapshot')
       bisector.init_if_necessary(
           old,
           new,
-          init_args=['--dut', self.dut, '--board', self.config['board']],
+          init_args=init_args,
           switch_cmd=switch_cmd,
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
@@ -136,6 +140,12 @@ class CrosDiagnoser(object):
 
     self.old_info = cros_util.version_info(self.config['board'], self.cros_old)
     self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
+
+    if self.config['experimental_use_snapshot']:
+      logger.info(
+          'android and chrome bisection will be skipped in snapshot bisection')
+      return
+
     logger.info('old: cros %s, chrome %s, android %s',
                 self.old_info['cros_full_version'], self.old_info['cr_version'],
                 self.old_info.get('android_build_id'))
@@ -180,6 +190,12 @@ class CrosDiagnoser(object):
       False: culprit is not inside Android or unable to bisect
     """
     verified = False
+    # TODO(zjchang): remove when metadata is available for snapshot
+    if self.config['experimental_use_snapshot']:
+      logger.info('bypassed android bisect because snapshot does not ' +
+          'support it yet')
+      return verified
+
     if not need_android_bisect(self.old_info, self.new_info):
       return verified
 
@@ -310,6 +326,12 @@ class CrosDiagnoser(object):
       True: culprit is inside Chrome
       False: culprit is not inside Chrome or unable to bisect
     """
+    # TODO(zjchang): remove when metadata is available for snapshot
+    if self.config['experimental_use_snapshot']:
+      logger.info('bypassed chrome local build bisect because ' +
+          'snapshot does not support it yet')
+      return False
+
     if self.old_info['cr_version'] == self.new_info['cr_version']:
       logger.info('chrome version identical')
       return False
@@ -507,8 +529,9 @@ class DiagnoseCommandLineBase(object):
       # Board name cannot be deduced from auto allocated devices because they
       # may be provisioned with image of unexpected board.
       if not opts.board:
-        self.argument_parser.error('--board need to be specified if DUT is "%s"'
-                                   % cros_lab_util.LAB_DUT)
+        self.argument_parser.error(
+            '--board need to be specified if DUT is "%s"' %
+            cros_lab_util.LAB_DUT)
     else:
       if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)
@@ -588,6 +611,7 @@ class DiagnoseCommandLineBase(object):
         bypass_android_build=opts.bypass_android_build,
         disable_rootfs_verification=opts.disable_rootfs_verification,
         chrome_deploy_image=opts.chrome_deploy_image,
+        experimental_use_snapshot=opts.experimental_use_snapshot,
     )
 
     self.states.init(config)
@@ -788,6 +812,10 @@ class DiagnoseCommandLineBase(object):
         '--chrome_deploy_image',
         action='store_true',
         help='Build and deploy ChromeOS image when bisect Chrome')
+    group.add_argument(
+        '--experimental_use_snapshot',
+        action='store_true',
+        help='Use snapshot to bisect chromeos prebuilt')
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser('run', help='Start auto bisection')
