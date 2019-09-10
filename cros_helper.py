@@ -11,6 +11,7 @@ import functools
 import json
 import logging
 
+from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -244,9 +245,11 @@ def cmd_repair_dut(opts):
   cros_lab_util.repair(opts.dut)
 
 
+@cli.fatal_error_handler
 def main():
   common.init()
   parser = argparse.ArgumentParser()
+  cli.patching_argparser_exit(parser)
   common.add_common_arguments(parser)
   subparsers = parser.add_subparsers(
       dest='command', title='commands', metavar='<command>')

@@ -5,6 +5,7 @@
 """Test cli module."""
 
 from __future__ import print_function
+import argparse
 import unittest
 
 from bisect_kit import cli
@@ -73,6 +74,33 @@ class TestCli(unittest.TestCase):
   def test_lookup_signal_name(self):
     self.assertEqual(cli.lookup_signal_name(15), 'SIGTERM')
     self.assertEqual(cli.lookup_signal_name(99), 'Unknown')
+
+  def test_patching_argparser_exit(self):
+    parser = argparse.ArgumentParser()
+    cli.patching_argparser_exit(parser)
+    parser.add_argument('--value', type=int)
+    parser.add_argument('--necessary', required=True)
+
+    # Nothing happened.
+    parser.parse_args(['--necessary', 'foo'])
+
+    with self.assertRaises(SystemExit) as e:
+      parser.parse_args(['foo'])
+    self.assertEqual(e.exception.code, cli.EXIT_CODE_FATAL)
+
+    with self.assertRaises(SystemExit) as e:
+      parser.parse_args(['--necessary', 'foo', '--value', 'bar'])
+    self.assertEqual(e.exception.code, cli.EXIT_CODE_FATAL)
+
+  def test_fatal_error_handler(self):
+
+    @cli.fatal_error_handler
+    def test_func():
+      assert 0
+
+    with self.assertRaises(SystemExit) as e:
+      test_func()
+    self.assertEqual(e.exception.code, cli.EXIT_CODE_FATAL)
 
 
 if __name__ == '__main__':

@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 def create_argument_parser():
   parser = argparse.ArgumentParser()
+  cli.patching_argparser_exit(parser)
   common.add_common_arguments(parser)
   parser.add_argument(
       '--dut',
@@ -94,6 +95,7 @@ def create_argument_parser():
   return parser
 
 
+@cli.fatal_error_handler
 def main(args=None):
   common.init()
   parser = create_argument_parser()

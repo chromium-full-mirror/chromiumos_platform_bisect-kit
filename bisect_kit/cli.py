@@ -10,7 +10,9 @@ import logging
 import os
 import re
 import signal
+import sys
 
+from bisect_kit import errors
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -235,3 +237,42 @@ def format_returncode(returncode):
                                                            signame)
 
   return 'exited with code %d' % returncode
+
+
+def patching_argparser_exit(parser):
+  """Patching argparse.ArgumentParser.exit to exit with fatal exit code.
+
+  Args:
+    parser: argparse.ArgumentParser object
+  """
+  orig_exit = parser.exit
+
+  def exit_hack(status=0, message=None):
+    if status != 0:
+      status = EXIT_CODE_FATAL
+    orig_exit(status, message)
+
+  parser.exit = exit_hack
+
+
+def fatal_error_handler(func):
+  """Function decorator which exits with fatal code for fatal exceptions.
+
+  This is a helper for switcher and evaluator. It catches fatal exceptions and
+  exits with fatal exit code. The fatal exit code (128) is aligned with 'git
+  bisect'.
+
+  See also argparse_fatal_error().
+
+  Args:
+    func: wrapped function
+  """
+
+  def wrapper(*args, **kwargs):
+    try:
+      return func(*args, **kwargs)
+    except (AssertionError, errors.ExecutionFatalError, errors.ArgumentError):
+      logger.fatal('fatal exception, bisection should stop')
+      sys.exit(EXIT_CODE_FATAL)
+
+  return wrapper

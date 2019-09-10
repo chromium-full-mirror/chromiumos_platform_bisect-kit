@@ -36,6 +36,7 @@ GS_AUTOTEST_SERVER_PATH = GS_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL
 
 def create_argument_parser():
   parser = argparse.ArgumentParser(description=__doc__)
+  cli.patching_argparser_exit(parser)
   common.add_common_arguments(parser)
   parser.add_argument(
       '--chromeos_root',
@@ -101,6 +102,7 @@ def switch(autotest_dir, board, version, test_name):
   shutil.rmtree(tmp_dir)
 
 
+@cli.fatal_error_handler
 def main(args=None):
   common.init()
   parser = create_argument_parser()

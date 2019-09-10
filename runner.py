@@ -68,6 +68,7 @@ def create_argument_parser():
           only if any conditions meet.
       """),
       formatter_class=argparse.RawDescriptionHelpFormatter)
+  cli.patching_argparser_exit(parser)
   common.add_common_arguments(parser)
   group = parser.add_mutually_exclusive_group(required=True)
   group.add_argument(

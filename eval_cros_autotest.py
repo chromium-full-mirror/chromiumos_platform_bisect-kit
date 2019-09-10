@@ -42,6 +42,7 @@ EXIT_CODE_MAP = {
 
 def create_argument_parser():
   parser = argparse.ArgumentParser(description=__doc__)
+  cli.patching_argparser_exit(parser)
   common.add_common_arguments(parser)
   parser.add_argument(
       'dut',
@@ -254,6 +255,7 @@ def gather_test_result(opts, result_dir):
   return passed, values
 
 
+@cli.fatal_error_handler
 def main(args=None):
   common.init()
   parser = create_argument_parser()

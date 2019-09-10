@@ -329,7 +329,11 @@ def repair(dut):
       board = label[6:]
     if label.startswith('model:'):
       model = label[6:]
-  assert board and model
+  if not board or not model:
+    logger.error(
+        'Necessary information unavailable (board=%r model=%r), '
+        'unable to repair ', board, model)
+    return False
 
   try:
     # Should specify DUT hostname (without .cros suffix), otherwise it would

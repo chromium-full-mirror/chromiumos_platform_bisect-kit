@@ -248,7 +248,7 @@ class Dep(object):
       if self.dep_type == 'git':
         self.url = entry['url']
       else:
-        assert self.dep_type == 'cipd'
+        assert self.dep_type == 'cipd', 'unknown dep_type:' + self.dep_type
         self.packages = entry['packages']
 
     if self.dep_type == 'git':
