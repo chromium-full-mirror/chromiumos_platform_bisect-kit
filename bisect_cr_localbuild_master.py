@@ -32,6 +32,7 @@ from __future__ import print_function
 import logging
 import os
 
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
@@ -203,4 +204,4 @@ class ChromeSrcMasterDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLine(ChromeSrcMasterDomain).main()
+  bisector_cli.BisectorCommandLine(ChromeSrcMasterDomain).main()

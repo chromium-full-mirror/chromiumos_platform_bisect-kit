@@ -26,6 +26,7 @@ import logging
 
 from bisect_kit import android_util
 from bisect_kit import arc_util
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import configure
@@ -210,4 +211,4 @@ class AndroidRepoDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLine(AndroidRepoDomain).main()
+  bisector_cli.BisectorCommandLine(AndroidRepoDomain).main()

@@ -24,6 +24,7 @@ will be set:
 from __future__ import print_function
 import logging
 
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import configure
@@ -158,4 +159,4 @@ class ChromeOSRepoDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLine(ChromeOSRepoDomain).main()
+  bisector_cli.BisectorCommandLine(ChromeOSRepoDomain).main()

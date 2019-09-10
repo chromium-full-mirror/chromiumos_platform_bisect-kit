@@ -10,7 +10,7 @@ import subprocess
 import sys
 import StringIO
 
-from bisect_kit import cli
+from bisect_kit import bisector_cli
 from bisect_kit import core
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class BisectorWrapper(object):
     assert self.domain_cls
 
   def call(self, *args, **kwargs):
-    bisector = cli.BisectorCommandLine(self.domain_cls)
+    bisector = bisector_cli.BisectorCommandLine(self.domain_cls)
     full_args = self.args + list(args)
     logger.debug('call %s: %s', self.name, full_args)
     stdout_bak = sys.stdout
@@ -48,7 +48,7 @@ class BisectorWrapper(object):
       return fake_stdout.getvalue()
 
   def current_status(self):
-    bisector = cli.BisectorCommandLine(self.domain_cls)
+    bisector = bisector_cli.BisectorCommandLine(self.domain_cls)
     return bisector.current_status(session=self.session)
 
   def init_if_necessary(self,

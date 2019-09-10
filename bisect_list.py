@@ -28,6 +28,7 @@ from __future__ import print_function
 import logging
 import sys
 
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import core
 
@@ -61,4 +62,4 @@ class ListDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLine(ListDomain).main()
+  bisector_cli.BisectorCommandLine(ListDomain).main()

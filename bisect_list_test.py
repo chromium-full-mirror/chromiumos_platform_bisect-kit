@@ -10,7 +10,7 @@ import StringIO
 
 import mock
 
-from bisect_kit import cli
+from bisect_kit import bisector_cli
 import bisect_list
 
 
@@ -23,7 +23,7 @@ class TestListDomain(unittest.TestCase):
     # Testing ListDomain via BisectorCommandLineInterface, remember our purpose
     # is testing ListDomain, not bisector. Bisector logic should be tested
     # by its own unit test, not here.
-    bisector = cli.BisectorCommandLine(bisect_list.ListDomain)
+    bisector = bisector_cli.BisectorCommandLine(bisect_list.ListDomain)
 
     with mock.patch('sys.stdin', StringIO.StringIO('S\nM\nL\nXL\nXXL\n')):
       bisector.main('init', '--old', 'S', '--new', 'XXL')

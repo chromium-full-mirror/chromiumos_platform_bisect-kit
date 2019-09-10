@@ -11,7 +11,7 @@ import unittest
 
 import mock
 
-from bisect_kit import cli
+from bisect_kit import bisector_cli
 from bisect_kit import git_util_test
 import bisect_git
 
@@ -30,7 +30,7 @@ class TestGitDomain(unittest.TestCase):
 
   def test_basic(self):
     """Tests basic functionality."""
-    bisector = cli.BisectorCommandLine(bisect_git.GitDomain)
+    bisector = bisector_cli.BisectorCommandLine(bisect_git.GitDomain)
 
     self.git.create_commits(10)
     commits = self.git.commits

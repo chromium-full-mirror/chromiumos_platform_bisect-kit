@@ -24,6 +24,7 @@ import logging
 
 from bisect_kit import android_util
 from bisect_kit import arc_util
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
@@ -132,4 +133,4 @@ class AndroidBuildIDDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLine(AndroidBuildIDDomain).main()
+  bisector_cli.BisectorCommandLine(AndroidBuildIDDomain).main()

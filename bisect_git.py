@@ -16,6 +16,7 @@ from __future__ import print_function
 import logging
 import subprocess
 
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import core
 from bisect_kit import errors
@@ -79,4 +80,4 @@ class GitDomain(core.BisectDomain):
 
 
 if __name__ == '__main__':
-  cli.BisectorCommandLine(GitDomain).main()
+  bisector_cli.BisectorCommandLine(GitDomain).main()
