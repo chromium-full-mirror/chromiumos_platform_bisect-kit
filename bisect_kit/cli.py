@@ -272,7 +272,7 @@ def fatal_error_handler(func):
     try:
       return func(*args, **kwargs)
     except (AssertionError, errors.ExecutionFatalError, errors.ArgumentError):
-      logger.fatal('fatal exception, bisection should stop')
+      logger.exception('fatal exception, bisection should stop')
       sys.exit(EXIT_CODE_FATAL)
 
   return wrapper
