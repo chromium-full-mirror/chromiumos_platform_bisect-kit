@@ -155,8 +155,12 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             'DUT locking is not respected? b/126141102'
 
         try:
+          if self.config['chrome_deploy_image']:
+            eval_cmd = common_eval_cmd + ['--tast_build']
+          else:
+            eval_cmd = common_eval_cmd
           if diagnoser.narrow_down_chrome(
-              common_eval_cmd, chrome_binaries=chrome_binaries):
+              eval_cmd, chrome_binaries=chrome_binaries):
             return
         except errors.DiagnoseContradiction:
           raise
@@ -164,10 +168,11 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           logger.exception('exception in chrome bisector before verification; '
                            'assume culprit is not inside chrome and continue')
 
-        # Sanity check. The OS version should not change after chrome bisect.
-        assert dut_os_version == cros_util.query_dut_short_version(dut), \
-            'Someone else reflashed the DUT. ' \
-            'DUT locking is not respected? b/126141102'
+        if not self.config['chrome_deploy_image']:
+          # Sanity check. The OS version should not change after chrome bisect.
+          assert dut_os_version == cros_util.query_dut_short_version(dut), \
+              'Someone else reflashed the DUT. ' \
+              'DUT locking is not respected? b/126141102'
 
         eval_cmd = common_eval_cmd + ['--tast_build']
         diagnoser.narrow_down_chromeos_localbuild(eval_cmd)

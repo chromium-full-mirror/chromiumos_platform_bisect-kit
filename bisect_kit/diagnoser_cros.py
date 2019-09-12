@@ -149,6 +149,11 @@ class CrosDiagnoser(object):
     Args:
       force: always do 'cros flash' no matter the current version number of DUT
     """
+    util.check_call('./switch_cros_localbuild.py', '--chromeos_root',
+                    self.config['chromeos_root'], '--chromeos_mirror',
+                    self.config['chromeos_mirror'], '--board',
+                    self.config['board'], '--nobuild', self.cros_old)
+
     if not force:
       short_version = cros_util.version_to_short(self.cros_old)
       if cros_util.query_dut_short_version(self.dut) == short_version:
