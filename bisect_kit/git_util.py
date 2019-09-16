@@ -547,7 +547,8 @@ def get_history_recursively(git_repo, path, after, before, parser_callback):
 
   This function is file type neutral. `parser_callback(filename, content)` will
   be invoked to parse file content and should return list of filename of
-  dependencies.
+  dependencies. If `parser_callback` returns None (usually syntax error), the
+  commit is omitted.
 
   Args:
     git_repo: path of git repo
@@ -566,7 +567,10 @@ def get_history_recursively(git_repo, path, after, before, parser_callback):
   includes = {}
   for commit_time, git_rev in history:
     content = get_file_from_revision(git_repo, git_rev, path)
-    for include_name in parser_callback(path, content):
+    parse_result = parser_callback(path, content)
+    if parse_result is None:
+      continue
+    for include_name in parse_result:
       if include_name not in includes:
         includes[include_name] = set()
       includes[include_name].add(git_rev)

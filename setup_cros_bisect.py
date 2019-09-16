@@ -30,6 +30,7 @@ import subprocess
 import time
 import urllib2
 import urlparse
+import xml.etree.ElementTree
 
 from bisect_kit import common
 from bisect_kit import configure
@@ -123,7 +124,12 @@ def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
   removed = {}
   for _, git_rev in reversed(
       parser.enumerate_manifest_commits(last_sync_time, None, manifest_path)):
-    root = parser.parse_xml_recursive(git_rev, manifest_path)
+    try:
+      root = parser.parse_xml_recursive(git_rev, manifest_path)
+    except xml.etree.ElementTree.ParseError:
+      logger.warning('%s %s@%s syntax error, skip', manifest_dir, manifest_path,
+                     git_rev[:12])
+      continue
     if (only_branch and root.find('default') is not None and
         root.find('default').get('revision') != only_branch):
       break

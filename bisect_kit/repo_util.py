@@ -328,10 +328,16 @@ class ManifestParser(object):
   def enumerate_manifest_commits(self, start_time, end_time, path):
 
     def parse_dependencies(path, content):
-      del path  # unused
-      root = self.parse_single_xml(content, allow_include=True)
+      try:
+        root = self.parse_single_xml(content, allow_include=True)
+      except xml.etree.ElementTree.ParseError:
+        logger.warning('%s syntax error, skip', path)
+        return None
+
+      result = []
       for include in root.findall('.//include'):
-        yield include.get('name')
+        result.append(include.get('name'))
+      return result
 
     return git_util.get_history_recursively(self.manifest_dir, path, start_time,
                                             end_time, parse_dependencies)
