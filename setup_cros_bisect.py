@@ -111,8 +111,6 @@ def snapshot_or_copytree(src, dst):
 
 def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
   manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
-  git_util.fetch(manifest_dir)
-
   manifest_path = 'default.xml'
   manifest_full_path = os.path.join(manifest_dir, manifest_path)
   # hack for chromeos symlink
@@ -242,6 +240,7 @@ def generate_extra_manifest_for_deleted_repo(repo_dir, only_branch=None):
       repo_dir, last_sync_time, only_branch=only_branch)
   write_extra_manifest_to_mirror(repo_dir, removed)
   logger.info('since last sync, %d repo got removed', len(removed))
+  return len(removed)
 
 
 def sync_chromeos_code(opts, path_factory):
@@ -251,8 +250,13 @@ def sync_chromeos_code(opts, path_factory):
   chromeos_mirror = path_factory.get_chromeos_mirror()
 
   logger.info('repo sync for chromeos mirror')
-  generate_extra_manifest_for_deleted_repo(chromeos_mirror)
   repo_util.sync(chromeos_mirror)
+  # If there are repos deleted after last sync, generate custom manifest and
+  # sync again for those repos. So we can mirror commits just before the repo
+  # deletion.
+  if generate_extra_manifest_for_deleted_repo(chromeos_mirror) != 0:
+    logger.info('repo sync again')
+    repo_util.sync(chromeos_mirror)
   write_sync_time(chromeos_mirror, start_sync_time)
 
   logger.info('repo sync for chromeos tree')
@@ -376,12 +380,15 @@ def sync_android_code(opts, path_factory, branch):
   with locking.lock_file(
       os.path.join(android_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
     logger.info('repo sync for android mirror branch=%s', branch)
+    repo_util.sync(android_mirror, current_branch=True)
     # Android usually big jump between milestone releases and add/delete lots of
     # repos when switch releases. Because it's infeasible to bisect between such
     # big jump, the deleted repo is useless. In order to save disk, do not sync
     # repos deleted in other branches.
-    generate_extra_manifest_for_deleted_repo(android_mirror, only_branch=branch)
-    repo_util.sync(android_mirror, current_branch=True)
+    if generate_extra_manifest_for_deleted_repo(
+        android_mirror, only_branch=branch) != 0:
+      logger.info('repo sync again')
+      repo_util.sync(android_mirror, current_branch=True)
     write_sync_time(android_mirror, start_sync_time)
 
   logger.info('repo sync for android tree branch=%s', branch)
