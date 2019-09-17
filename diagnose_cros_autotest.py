@@ -106,7 +106,11 @@ def may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
   assert info, 'incorrect test name? %s' % test_name
   dirpath = os.path.dirname(info.path)
   for pypath in glob.glob(os.path.join(dirpath, '*.py')):
-    if 'ChromeBinaryTest' in open(pypath).read():
+    content = open(pypath).read()
+    # Checking these two functions is more accurate than 'ChromeBinaryTest'
+    # (b/141164895).
+    if ('run_chrome_test_binary' in content or
+        'get_chrome_binary_path' in content):
       return True
   return False
 
