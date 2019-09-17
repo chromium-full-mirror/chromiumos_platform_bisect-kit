@@ -26,15 +26,28 @@ logger = logging.getLogger(__name__)
 
 # What chrome binaries to build for given tast test.
 # This list is created manually by inspecting output of
-# 'grep -r bintest src/platform/tast-tests'
-# If you change them, build_and_deploy_chrome_helper.sh may need update
+# 'grep -r chrome.BinTestDir src/platform/tast-tests'
+# If you change them, deploy_chrome_helper.sh may need update
 # as well.
+# TODO(kcwu): we can get rid of this table once we migrated to build chrome
+#             using chromeos ebuild rules.
 CHROME_BINARIES_OF_TEST = [
     ('security.SandboxLinuxUnittests', ['sandbox_linux_unittests']),
+    ('camera.CaptureUnittests', ['capture_unittests']),
+    ('camera.DecodeAccelJPEG*', ['jpeg_decode_accelerator_unittest']),
+    ('camera.EncodeAccelJPEG*', ['jpeg_encode_accelerator_unittest']),
+    # Following three tests are renamed to camera.*, keep them for older
+    # chromeos version.
     ('video.CaptureUnittests', ['capture_unittests']),
     ('video.DecodeAccelJPEG*', ['jpeg_decode_accelerator_unittest']),
-    ('video.DecodeAccel*', ['video_decode_accelerator_unittest']),
     ('video.EncodeAccelJPEG*', ['jpeg_encode_accelerator_unittest']),
+    # TODO(kcwu): need special handling if video_decode_accelerator_unittest
+    #             is removed (crbug/933034)
+    ('video.DecodeAccel*', [
+        'video_decode_accelerator_tests',
+        'video_decode_accelerator_perf_tests',
+        'video_decode_accelerator_unittest',
+    ]),
     ('video.EncodeAccel*', ['video_encode_accelerator_unittest']),
 ]
 
