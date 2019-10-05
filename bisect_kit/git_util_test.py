@@ -64,16 +64,15 @@ class GitOperation(object):
         f.write(content)
       subprocess.check_call(['git', 'add', path], cwd=self.git_repo)
 
-    p = subprocess.Popen(
-        ['git', 'commit', '-q', '-F', '-', path],
-        stdin=subprocess.PIPE,
-        cwd=self.git_repo,
-        env=env)
+    p = subprocess.Popen(['git', 'commit', '-q', '-F', '-', path],
+                         stdin=subprocess.PIPE,
+                         cwd=self.git_repo,
+                         env=env)
     p.communicate(message)
     assert p.returncode == 0
 
-    git_rev = subprocess.check_output(
-        ['git', 'rev-parse', 'HEAD'], cwd=self.git_repo).strip()
+    git_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                      cwd=self.git_repo).strip()
     assert len(git_rev) == git_util.GIT_FULL_COMMIT_ID_LENGTH
     return git_rev
 
@@ -184,8 +183,8 @@ class TestGitOperation(unittest.TestCase):
 
   def test_get_commit_hash(self):
     tag_name = 'foo'
-    subprocess.check_call(
-        ['git', 'tag', tag_name, self.commits[2]], cwd=self.git_repo)
+    subprocess.check_call(['git', 'tag', tag_name, self.commits[2]],
+                          cwd=self.git_repo)
     self.assertEqual(
         git_util.get_commit_hash(self.git_repo, tag_name), self.commits[2])
 
@@ -268,13 +267,12 @@ class TestGitOperation(unittest.TestCase):
                         self.git.default_filename, 'commit B')
     subprocess.check_call(['git', 'checkout', 'master'], cwd=self.git_repo)
     # --no-edit: git may complain EDITOR is unset
-    subprocess.check_call(
-        ['git', 'merge', '--no-edit', branch_foo],
-        cwd=self.git_repo,
-        env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'))
+    subprocess.check_call(['git', 'merge', '--no-edit', branch_foo],
+                          cwd=self.git_repo,
+                          env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'))
 
-    commit_c = subprocess.check_output(
-        ['git', 'rev-parse', 'HEAD'], cwd=self.git_repo).strip()
+    commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                       cwd=self.git_repo).strip()
 
     # simple case
     self.assertEqual(
@@ -445,17 +443,24 @@ class TestGitOperation(unittest.TestCase):
 
     self.assertEqual(
         git_util.get_history_recursively(self.git_repo, 'c', time, time + 100,
-                                         parse),
-        [(time + 30, c3), (time + 90, c9), (time + 100, c9)])
+                                         parse), [(time + 30, c3),
+                                                  (time + 90, c9),
+                                                  (time + 100, c9)])
     self.assertEqual(
         git_util.get_history_recursively(self.git_repo, 'b', time, time + 100,
-                                         parse),
-        [(time + 20, c2), (time + 70, c7), (time + 90, c9), (time + 100, c9)])
+                                         parse), [(time + 20, c2),
+                                                  (time + 70, c7),
+                                                  (time + 90, c9),
+                                                  (time + 100, c9)])
     self.assertEqual(
         git_util.get_history_recursively(self.git_repo, 'a', time, time + 100,
-                                         parse),
-        [(time + 10, c1), (time + 40, c4), (time + 50, c5), (time + 60, c6),
-         (time + 80, c8), (time + 90, c9), (time + 100, c9)])
+                                         parse), [(time + 10, c1),
+                                                  (time + 40, c4),
+                                                  (time + 50, c5),
+                                                  (time + 60, c6),
+                                                  (time + 80, c8),
+                                                  (time + 90, c9),
+                                                  (time + 100, c9)])
 
   def test_get_history_recursively_ordering(self):
     # All commits have identical commit time.

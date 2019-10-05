@@ -709,8 +709,8 @@ def version_info(board, version):
   # Let's try both.
   metadata = None
   for metadata_filename in ['metadata.json', 'partial-metadata.json']:
-    path = gs_archive_path.format(board=board) + '/%s/%s' % (full_version,
-                                                             metadata_filename)
+    path = gs_archive_path.format(
+        board=board) + '/%s/%s' % (full_version, metadata_filename)
     metadata = gsutil('cat', path, ignore_errors=True)
     if metadata:
       o = json.loads(metadata)

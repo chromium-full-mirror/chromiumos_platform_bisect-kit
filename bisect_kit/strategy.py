@@ -740,9 +740,8 @@ class NoisyBinarySearch(object):
 
     # Non-zero probabilities sorted by prob (big to small), then index (small
     # to big)
-    sorted_prob = sorted(
-        ((i, p) for (i, p) in enumerate(self.prob) if p > 0),
-        key=lambda (i, p): (-p, i))
+    sorted_prob = sorted(((i, p) for (i, p) in enumerate(self.prob) if p > 0),
+                         key=lambda (i, p): (-p, i))
     cumulative = 0
     cut = None
     candidates = set()
@@ -851,8 +850,8 @@ class NoisyBinarySearch(object):
         show_candidate(i)
       return
 
-    prob_rank = sorted(
-        ((p, i) for i, p in enumerate(self.prob) if p > 0), reverse=True)
+    prob_rank = sorted(((p, i) for i, p in enumerate(self.prob) if p > 0),
+                       reverse=True)
     left, right = self.get_range(1.0 - self.confidence)
     interesting = set([left, right])
 

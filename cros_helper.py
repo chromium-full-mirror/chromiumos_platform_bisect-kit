@@ -76,8 +76,8 @@ def cmd_search_dut(opts):
 
     group = collections.defaultdict(dict)
     counter = collections.defaultdict(collections.Counter)
-    for host, info in cros_lab_util.list_host(labels=labels +
-                                              ['pool:' + pool]).items():
+    for host, info in cros_lab_util.list_host(
+        labels=labels + ['pool:' + pool]).items():
       if not match(info):
         continue
 

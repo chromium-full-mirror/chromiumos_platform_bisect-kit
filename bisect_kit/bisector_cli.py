@@ -530,11 +530,14 @@ class BisectorCommandLine(object):
     for entry in history:
       entry_time = datetime.datetime.fromtimestamp(int(entry['timestamp']))
       if entry.get('event', 'sample') == 'sample':
+        if entry.get('times', 1) > 1:
+          status = '%s*%d' % (entry['status'], entry['times'])
+        else:
+          status = entry['status']
         print('{datetime} {rev} {status} {values} {comment}'.format(
             datetime=entry_time,
             rev=entry['rev'],
-            status=entry['status'] + ('*%d' % entry['times']
-                                      if entry.get('times', 1) > 1 else ''),
+            status=status,
             values=entry.get('values', ''),
             comment=entry.get('comment', '')))
       else:
