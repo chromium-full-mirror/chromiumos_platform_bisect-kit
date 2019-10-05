@@ -169,7 +169,7 @@ def prepare_to_run_test(opts):
                          'net-misc/openssh')
 
   # test_that may use this ssh key and ssh complains its permission is too open.
-  # chmod everytime just before run test_that because the permission may change
+  # chmod every time just before run test_that because the permission may change
   # after some git operations.
   util.check_call(
       'chmod',

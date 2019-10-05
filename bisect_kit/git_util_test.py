@@ -290,7 +290,7 @@ class TestGitOperation(unittest.TestCase):
     path = os.path.join(self.git_repo, self.git.default_filename)
     content = open(path).read()
 
-    # Nothing happend.
+    # Nothing happened.
     git_util.reset_hard(self.git_repo)
     self.assertEqual(open(path).read(), content)
 

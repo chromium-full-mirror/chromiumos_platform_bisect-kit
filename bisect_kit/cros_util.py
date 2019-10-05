@@ -646,7 +646,7 @@ def cros_flash(chromeos_root,
           'although cros flash succeeded, the OS version is unexpected: '
           'actual=%s expect=%s' % (dut_version, short_version))
 
-  # "cros flash" may terminate sucessfully but the DUT starts self-repairing
+  # "cros flash" may terminate successfully but the DUT starts self-repairing
   # (b/130786578), so it's necessary to do sanity check.
   if not is_good_dut(host):
     raise errors.ExternalError(
