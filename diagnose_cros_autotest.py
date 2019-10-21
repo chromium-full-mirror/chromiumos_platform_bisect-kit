@@ -164,6 +164,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         cts_module=opts.cts_module,
         cts_test=opts.cts_test,
         cts_timeout=opts.cts_timeout,
+        cts_runronce=opts.cts_runonce,
         test_that_args=opts.args,
     )
 
