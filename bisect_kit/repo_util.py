@@ -12,6 +12,7 @@ from __future__ import print_function
 import logging
 import os
 import re
+import subprocess
 import urlparse
 import xml.etree.ElementTree
 
@@ -169,7 +170,15 @@ def info(repo_dir, query):
     repo_dir: root directory of repo
     query: key to query
   """
-  for line in util.check_output('repo', 'info', '.', cwd=repo_dir).splitlines():
+  try:
+    output = util.check_output('repo', 'info', '.', cwd=repo_dir)
+  except subprocess.CalledProcessError as e:
+    if 'Manifest branch:' not in e.output:
+      raise
+    # "repo info" may exit with error while the data we want is already
+    # printed. Ignore errors for such case.
+    output = e.output
+  for line in output.splitlines():
     key, value = map(str.strip, line.split(':'))
     if key == query:
       return value
