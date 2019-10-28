@@ -1474,21 +1474,21 @@ class ChromeOSSpecManager(codechange.SpecManager):
         return old
       if new.endswith('-' + snapshot_id):
         return new
-      gs_path = (
-          'gs://chromeos-image-archive/{board}-postsubmit/' +
-          'R*-{snapshot_id}-*'.format(board=board, snapshot_id=snapshot_id))
+      gs_path = ('gs://chromeos-image-archive/{board}-postsubmit/'
+                 'R*-{snapshot_id}-*'.format(
+                     board=board, snapshot_id=snapshot_id))
       for line in gsutil_ls(gs_path, ignore_errors=True):
         m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)\S+', line)
         if m:
           return m.group(1)
       raise errors.ExternalError(
-          'guess_snapshot_version failed, board=%s snapshot_id=%s ' +
-          'old=%s new=%s', board, snapshot_id, old, new)
+          'guess_snapshot_version failed, board=%s snapshot_id=%s '
+          'old=%s new=%s' % (board, snapshot_id, old, new))
 
     result = []
     path = 'snapshot.xml'
     revisions = self.lookup_snapshot_manifest_revisions(old, new)
-    for timestamp, git_rev, snapshot_id in revisions:
+    for timestamp, _git_rev, snapshot_id in revisions:
       snapshot_version = guess_snapshot_version(self.config['board'],
                                                 snapshot_id, old, new)
       result.append(
