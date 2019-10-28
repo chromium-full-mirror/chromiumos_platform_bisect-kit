@@ -193,7 +193,7 @@ class CrosDiagnoser(object):
     # TODO(zjchang): remove when metadata is available for snapshot
     if self.config['experimental_use_snapshot']:
       logger.info('bypassed android bisect because snapshot does not ' +
-          'support it yet')
+                  'support it yet')
       return verified
 
     if not need_android_bisect(self.old_info, self.new_info):
@@ -329,7 +329,7 @@ class CrosDiagnoser(object):
     # TODO(zjchang): remove when metadata is available for snapshot
     if self.config['experimental_use_snapshot']:
       logger.info('bypassed chrome local build bisect because ' +
-          'snapshot does not support it yet')
+                  'snapshot does not support it yet')
       return False
 
     if self.old_info['cr_version'] == self.new_info['cr_version']:
@@ -529,9 +529,8 @@ class DiagnoseCommandLineBase(object):
       # Board name cannot be deduced from auto allocated devices because they
       # may be provisioned with image of unexpected board.
       if not opts.board:
-        self.argument_parser.error(
-            '--board need to be specified if DUT is "%s"' %
-            cros_lab_util.LAB_DUT)
+        self.argument_parser.error('--board need to be specified if DUT is "%s"'
+                                   % cros_lab_util.LAB_DUT)
     else:
       if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)

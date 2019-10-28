@@ -126,8 +126,7 @@ def snapshot_version_split(snapshot_version):
 def argtype_cros_version(s):
   if (not is_cros_version(s)) and (not is_cros_snapshot_version(s)):
     msg = 'invalid cros version'
-    raise cli.ArgTypeError(msg,
-                           '9876.0.0, R62-9876.0.0 or R77-12369.0.0-11681')
+    raise cli.ArgTypeError(msg, '9876.0.0, R62-9876.0.0 or R77-12369.0.0-11681')
   return s
 
 
@@ -1414,8 +1413,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
       timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
                                            'refs/heads/master', path)
     except ValueError:
-      raise errors.InternalError('%s does not have %s' %
-                                 (self.historical_manifest_git_dir, path))
+      raise errors.InternalError(
+          '%s does not have %s' % (self.historical_manifest_git_dir, path))
     return timestamp
 
   def collect_float_spec(self, old, new):
