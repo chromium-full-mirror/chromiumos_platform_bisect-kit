@@ -164,7 +164,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         cts_module=opts.cts_module,
         cts_test=opts.cts_test,
         cts_timeout=opts.cts_timeout,
-        cts_runronce=opts.cts_runonce,
         test_that_args=opts.args,
     )
 
@@ -212,8 +211,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     ]:
       if self.config.get(arg_name) is not None:
         common_eval_cmd += ['--%s' % arg_name, str(self.config[arg_name])]
-    if self.config.get('cts_runonce'):
-      common_eval_cmd.append('--cts_runonce')
 
     return common_switch_cmd, common_eval_cmd
 
@@ -337,8 +334,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         help='CTS/GTS test name, like '
         '"android.hardware.cts.CameraTest#testDisplayOrientation"')
     group.add_argument('--cts_timeout', type=float, help='timeout, in seconds')
-    group.add_argument(
-        '--cts_runonce', action='store_true', help='run test only once')
 
     group = parser_init.add_argument_group(title='Options passed to test_that')
     group.add_argument(
