@@ -14,6 +14,7 @@ Terminology used in this module.
 
 from __future__ import print_function
 import ast
+import calendar
 import datetime
 import errno
 import json
@@ -406,7 +407,7 @@ def gsutil_stat_update_time(*args, **kwargs):
     if key != 'Update time':
       continue
     dt = datetime.datetime.strptime(value, time_format)
-    unixtime = int(time.mktime(dt.utctimetuple()))
+    unixtime = int(calendar.timegm(dt.utctimetuple()))
     result = max(result, unixtime)
 
   if result == -1:
