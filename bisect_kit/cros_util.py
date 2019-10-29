@@ -45,6 +45,11 @@ gs_release_path = (
 
 # Assume gsutil is in PATH.
 gsutil_bin = 'gsutil'
+bb_bin = 'bb'
+
+# Since snapshots with version >= 12618.0.0 have android and chrome version
+# info.
+snapshot_cutover_version = '12618.0.0'
 
 chromeos_root_inside_chroot = '/mnt/host/source'
 # relative to chromeos_root
@@ -121,6 +126,22 @@ def snapshot_version_split(snapshot_version):
   assert is_cros_snapshot_version(snapshot_version)
   milestone, shot_version, snapshot_id = snapshot_version.split('-')
   return milestone[1:], shot_version, snapshot_id
+
+
+def query_snapshot_buildbucket_id(board, snapshot_version):
+  """Query buildbucket id of a snapshot"""
+  assert is_cros_snapshot_version(snapshot_version)
+  path = ('gs://chromeos-image-archive/{board}-postsubmit'
+          '/{snapshot_version}-*/image.zip')
+  output = gsutil_ls(
+      '-d',
+      path.format(board=board, snapshot_version=snapshot_version),
+      ignore_errors=True)
+  for line in output:
+    m = re.match(r'.*-postsubmit/R\d+-\d+\.\d+\.\d+-\d+-(.+)/image\.zip', line)
+    if m:
+      return m.group(1)
+  return None
 
 
 def argtype_cros_version(s):
@@ -268,6 +289,41 @@ def gs_release_boardpath(board):
   return board.replace('_', '-')
 
 
+def bb(*args, **kwargs):
+  """bb command line wrapper.
+
+  Args:
+    args: command line arguments passed to bb
+    kwargs:
+      parse_json: if True, return json parsed object of output
+
+  Returns:
+    stdout of bb
+
+  Raises:
+    errors.ExternalError: bb failed to run
+    subprocess.CalledProcessError: command failed
+  """
+  stderr_lines = []
+  try:
+    result = util.check_output(
+        bb_bin, *args, stderr_callback=stderr_lines.append)
+    if kwargs.get('parse_json'):
+      result = json.loads(result)
+    return result
+  except subprocess.CalledProcessError as e:
+    stderr = ''.join(stderr_lines)
+    if 'interactive login is required' in stderr:
+      raise errors.ExternalError(
+          '%s command is permission denied, please run %s auth-login' %
+          (bb_bin, bb_bin))
+    raise
+  except OSError as e:
+    if e.errno == errno.ENOENT:
+      raise errors.ExternalError('%s command is not found' % bb_bin)
+    raise
+
+
 def gsutil(*args, **kwargs):
   """gsutil command line wrapper.
 
@@ -281,7 +337,7 @@ def gsutil(*args, **kwargs):
     stdout of gsutil
 
   Raises:
-    errors.InternalError: gsutil failed to run
+    errors.ExternalError: gsutil failed to run
     subprocess.CalledProcessError: command failed
   """
   stderr_lines = []
@@ -621,6 +677,10 @@ def list_chromeos_prebuilt_versions(board,
         int(extract_major_version(old)),
         int(extract_major_version(new)) + 1):
       short_version = '%s.0.0' % major_version
+      # If current version is smaller than cutover, ignore it as it might not
+      # contain enough information for continuing android and chrome bisection.
+      if not util.is_version_lesseq(snapshot_cutover_version, short_version):
+        continue
       if not util.is_direct_relative_version(short_version, old):
         continue
       if not util.is_direct_relative_version(short_version, new):
@@ -630,6 +690,8 @@ def list_chromeos_prebuilt_versions(board,
         # if snapshots found, we can append them after the release version,
         # so the prebuilt image list of this version will be
         # release_image, snapshot1, snapshot2,...
+        if short_version not in rev_map:
+          rev_map[short_version] = []
         rev_map[short_version] += snapshots
 
   result = []
@@ -879,18 +941,18 @@ def version_info(board, version):
       android_build_id: Android build id
       android_branch: Android branch, in format like 'git_nyc-mr1-arc'
   """
-  # TODO(zjchang): add implementation
   if is_cros_snapshot_version(version):
-    logger.warning(
-        'The version_info function of a snapshot is not implemented ' +
-        'completely. Currently we do not provide enough information ' +
-        'for continuing Android and Chrome bisection, so we will ' +
-        'skip Android and Chrome relatead bisections.')
-    milestone, _, _ = snapshot_version_split(version)
+    milestone, short_version, _ = snapshot_version_split(version)
+    buildbucket_id = query_snapshot_buildbucket_id(board, version)
+    data = bb('get', buildbucket_id, '-json', '-p', parse_json=True)
+    target_versions = data['output']['properties']['target_versions']
     return {
-        'milestone': milestone,
-        'cros_full_version': version,
-        'cros_short_version': version_to_short(version)
+        VERSION_KEY_MILESTONE: milestone,
+        VERSION_KEY_CROS_FULL_VERSION: version,
+        VERSION_KEY_CROS_SHORT_VERSION: short_version,
+        VERSION_KEY_CR_VERSION: target_versions['chromeVersion'],
+        VERSION_KEY_ANDROID_BUILD_ID: target_versions['androidVersion'],
+        VERSION_KEY_ANDROID_BRANCH: target_versions['androidBranchVersion'],
     }
   info = {}
   full_version = version_to_full(board, version)
