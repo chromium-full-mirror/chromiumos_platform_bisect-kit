@@ -6,8 +6,6 @@
 """Helper script to manipulate chromeos DUT or query info."""
 from __future__ import print_function
 import argparse
-import collections
-import functools
 import json
 import logging
 import random
@@ -49,99 +47,18 @@ def _get_label_by_prefix(info, prefix):
   return None
 
 
-def cmd_search_dut(opts):
-  labels = []
-  if opts.label:
-    labels += opts.label.split(',')
-
-  def match(info):
-    if not opts.condition:
-      return True
-
-    for label in info['Labels']:
-      for condition in opts.condition:
-        if ':' in condition:
-          keys = [condition]
-        else:
-          keys = [
-              'board:' + condition,
-              'model:' + condition,
-              'sku:' + condition,
-          ]
-        for key in keys:
-          if label.lower().startswith(key.lower()):
-            return True
-    return False
-
-  for pool in opts.pools.split(','):
-    print('pool:' + pool)
-
-    group = collections.defaultdict(dict)
-    counter = collections.defaultdict(collections.Counter)
-    for host, info in cros_lab_util.list_host(
-        labels=labels + ['pool:' + pool]).items():
-      if not match(info):
-        continue
-
-      model = _get_label_by_prefix(info, 'model')
-      if info.get('Locked'):
-        state = 'Locked'
-      else:
-        state = info['Status']
-      if state not in group[model]:
-        group[model][state] = {}
-      group[model][state][host] = info
-      counter[model][state] += 1
-
-    def availability(counter, model):
-      return -counter[model]['Ready']
-
-    for model in sorted(group, key=functools.partial(availability, counter)):
-      print('%s\t%s' % (model, dict(counter[model])))
-      for host, info in group[model].get('Ready', {}).items():
-        print('\t%s\t%s' % (host, _get_label_by_prefix(info, 'board')))
-        if not opts.all:
-          break
-    print('-' * 30)
-
-  if not opts.all:
-    print('Only list one host per model by default. Use --all to output all.')
-
-
 def cmd_lock_dut(opts):
   host = cros_lab_util.dut_host_name(opts.dut)
-  if cros_lab_util.is_skylab_dut(host):
-    logger.info('%s is a DUT in skylab', host)
-    logger.info('trying to lease %s', host)
-    if cros_lab_util.skylab_lease_dut(host, opts.duration):
-      logger.info('locked %s', host)
-    else:
-      raise Exception('unable to lock %s' % host)
-    return
-
-  if opts.session:
-    reason = cros_lab_util.make_lock_reason(opts.session)
+  logger.info('trying to lease %s', host)
+  if cros_lab_util.skylab_lease_dut(host, opts.duration):
+    logger.info('locked %s', host)
   else:
-    reason = opts.reason
-  cros_lab_util.lock_host(host, reason)
-  logger.info('%s locked', host)
+    raise Exception('unable to lock %s' % host)
 
 
 def cmd_unlock_dut(opts):
   host = cros_lab_util.dut_host_name(opts.dut)
-  if cros_lab_util.is_skylab_dut(host):
-    cros_lab_util.skylab_release_dut(host)
-    logger.info('%s unlocked', host)
-    return
-  hosts = cros_lab_util.list_host(host=host)
-  assert hosts, 'host=%s does not exist' % host
-  info = hosts[host]
-  assert info['Locked'], '%s is not locked?' % host
-  if opts.session:
-    reason = cros_lab_util.make_lock_reason(opts.session)
-    assert info['Lock Reason'] == reason
-
-  cros_lab_util.unlock_host(host)
+  cros_lab_util.skylab_release_dut(host)
   logger.info('%s unlocked', host)
 
 
@@ -156,21 +73,6 @@ def do_allocate_dut(opts):
   if not opts.model and not opts.sku:
     raise errors.ArgumentError('--model or --sku', 'need to be specified')
 
-  if opts.locked_dut:
-    assert not cros_lab_util.is_skylab_dut(opts.locked_dut)
-    return do_allocate_dut_autotest_lab(opts)
-
-  try:
-    return do_allocate_dut_skylab(opts)
-  except errors.NoDutAvailable:
-    logger.warning(
-        'failed to allocate DUT from skylab, fallback to autotest lab')
-    cros_lab_util.seek_host(
-        opts.pools.split(','), opts.model, opts.sku, opts.label)
-    return do_allocate_dut_autotest_lab(opts)
-
-
-def do_allocate_dut_skylab(opts):
   dimensions = ['dut_state:ready', 'label-pool:DUT_POOL_QUOTA']
   if opts.model:
     dimensions.append('label-model:' + opts.model)
@@ -198,85 +100,6 @@ def do_allocate_dut_skylab(opts):
   return 'wait', None
 
 
-def do_allocate_dut_autotest_lab(opts):
-  reason = cros_lab_util.make_lock_reason(opts.session)
-  waiting = None
-  if opts.locked_dut:
-    host = cros_lab_util.dut_host_name(opts.locked_dut)
-    logger.info('check current status of previous locked host %s', host)
-    hosts = cros_lab_util.list_host(host=host)
-    if not hosts:
-      logger.warning('we have ever locked %s but it disappeared now', host)
-      waiting = None
-    else:
-      waiting = hosts[host]
-
-      logger.info('current status=%r, locked=%s, by=%s, reason=%r',
-                  waiting['Status'], waiting.get('Locked'),
-                  waiting.get('Locked by'), waiting.get('Lock Reason'))
-      if not waiting['Locked'] or waiting['Lock Reason'] != reason:
-        # Special case: not locked by us, so do not unlock it.
-        opts.locked_dut = None
-        raise errors.ExternalError(
-            '%s should be locked by us with reason=%r' % (host, reason))
-
-      if waiting['Status'] == cros_lab_util.READY_STATE:
-        return 'ready', host
-      elif waiting['Status'] in cros_lab_util.BAD_STATES:
-        logger.warning('locked host=%s, became %s; give it up', host,
-                       waiting['Status'])
-        waiting = None
-
-  # No matter we have locked a host or not, check if any other hosts are
-  # available.
-  candidates = cros_lab_util.seek_host(
-      opts.pools.split(','), opts.model, opts.sku, opts.label)
-
-  for info in candidates:
-    if info['Locked']:
-      continue
-
-    to_lock = False
-    if info['Status'] == cros_lab_util.READY_STATE:
-      if waiting:
-        logger.info(
-            'although we locked and are waiting for %s, '
-            'we found another host=%s is ready', waiting['Host'], info['Host'])
-      to_lock = True
-    elif info['Status'] in cros_lab_util.GOOD_STATES and not waiting:
-      to_lock = True
-
-    if not to_lock:
-      continue
-
-    after_lock = cros_lab_util.lock_host(info['Host'], reason)
-
-    if after_lock['Status'] == cros_lab_util.READY_STATE:
-      # Lucky, became ready just before we lock.
-      return 'ready', after_lock['Host']
-
-    if waiting:
-      logger.info('but %s became %s just before we lock it', after_lock['Host'],
-                  after_lock['Status'])
-      cros_lab_util.unlock_host(after_lock['Host'])
-      continue
-
-    logger.info('locked %s and wait it ready', after_lock['Host'])
-    return 'wait', after_lock['Host']
-
-  if waiting:
-    logger.info('continue to wait %s', waiting['Host'])
-    return 'wait', waiting['Host']
-
-  if not candidates:
-    raise errors.NoDutAvailable('all are in bad states')
-
-  logger.info(
-      'we did not lock any hosts, but are waiting %d hosts in '
-      'transient states', len(candidates))
-  return 'wait', None
-
-
 def cmd_allocate_dut(opts):
   locked_dut = None
   try:
@@ -293,10 +116,6 @@ def cmd_allocate_dut(opts):
         'text': str(e),
     }
     print(json.dumps(result))
-  finally:
-    # For any reasons, if we locked a new DUT, unlock the previous one.
-    if opts.locked_dut and opts.locked_dut != locked_dut:
-      cros_lab_util.unlock_host(cros_lab_util.dut_host_name(opts.locked_dut))
 
 
 def cmd_repair_dut(opts):
@@ -384,8 +203,6 @@ def main():
   parser_allocate_dut.add_argument(
       '--label', '-b', help='Additional required labels, comma separated')
   parser_allocate_dut.add_argument(
-      '--locked_dut', help='Locked DUT name by last run')
-  parser_allocate_dut.add_argument(
       '--time_limit',
       type=int,
       default=15 * 60,
@@ -403,34 +220,6 @@ def main():
       'This is simply wrapper of "deploy repair" with additional checking.')
   parser_repair_dut.add_argument('dut')
   parser_repair_dut.set_defaults(func=cmd_repair_dut)
-
-  parser_search_dut = subparsers.add_parser(
-      'search_dut',
-      help='Search DUT with conditions',
-      description='Search hosts in the lab. Grouped by model and ordered by '
-      'availability. When your test could be run on many models, this command '
-      'help you to decide what model to use.')
-  parser_search_dut.add_argument(
-      '--pools',
-      default='performance,crosperf,suites',
-      help='Pools to search, comma separated. The searching will be performed '
-      'for each pool.')
-  parser_search_dut.add_argument(
-      '--label',
-      '-b',
-      help='Additional required labels, comma separated. '
-      'If more than one, all need to be satisfied.')
-  parser_search_dut.add_argument(
-      '--all',
-      action='store_true',
-      help='List all DUTs; (list only one DUT per board by default)')
-  parser_search_dut.add_argument(
-      'condition',
-      nargs='*',
-      help='Conditions, ex. board name, model name, sku name, etc. If more '
-      'than one is specified, matching any one is sufficient. If none is '
-      'specified, all hosts will be listed.')
-  parser_search_dut.set_defaults(func=cmd_search_dut)
 
   opts = parser.parse_args()
   common.config_logging(opts)

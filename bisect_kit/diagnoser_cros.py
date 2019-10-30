@@ -10,7 +10,6 @@ import json
 import logging
 import os
 import random
-import subprocess
 import time
 
 from bisect_kit import cli
@@ -28,20 +27,6 @@ logger = logging.getLogger(__name__)
 
 
 def grab_dut(config):
-  # Try skylab first.
-  try:
-    if config.get('allocated_dut'):
-      host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
-      if cros_lab_util.is_skylab_dut(host_name):
-        return grab_dut_skylab(config)
-    else:
-      return grab_dut_skylab(config)
-  except (errors.NoDutAvailable, subprocess.CalledProcessError):
-    logger.exception('failed to grab dut from skylab, fallback to autotest lab')
-  return grab_dut_autotest_lab(config)
-
-
-def grab_dut_skylab(config):
   if config.get('allocated_dut'):
     host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
     logger.info('try to lease the same host (%s) as last run', host_name)
@@ -73,35 +58,6 @@ def grab_dut_skylab(config):
 
   logger.info('leased %s (bot_id=%s)', host, bot['bot_id'])
   return host
-
-
-def grab_dut_autotest_lab(config):
-  if config.get('allocated_dut'):
-    host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
-    logger.info('try to lock the same host (%s) as last run', host_name)
-    candidates = cros_lab_util.list_host(host=host_name).values()
-  else:
-    # TODO(kcwu): support extra dependency labels
-    candidates = cros_lab_util.seek_host(
-        pools=config.get('pools', '').split(','),
-        model=config['model'],
-        sku=config['sku'])
-
-  if (not candidates or candidates[0]['Status'] != 'Ready' or
-      candidates[0]['Locked']):
-    logger.error('unable to allocate dut')
-    return None
-
-  host_name = candidates[0]['Host']
-  reason = cros_lab_util.make_lock_reason(config['session'])
-  info = cros_lab_util.lock_host(host_name, reason)
-  if info['Status'] != 'Ready':
-    cros_lab_util.unlock_host(host_name)
-    raise Exception(
-        'unexpected host status=%s, a race condition?' % info['Status'])
-
-  logger.info('allocated host %s', host_name)
-  return host_name
 
 
 class DiagnoseStates(core.States):
