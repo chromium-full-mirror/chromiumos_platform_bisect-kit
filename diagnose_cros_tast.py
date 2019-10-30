@@ -52,34 +52,6 @@ CHROME_BINARIES_OF_TEST = [
 ]
 
 
-def grab_dut(config):
-  reason = cros_lab_util.make_lock_reason(config['session'])
-  if config.get('allocated_dut'):
-    host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
-    logger.info('try to lock the same host (%s) as last run', host_name)
-    candidates = cros_lab_util.list_host(host=host_name).values()
-  else:
-    candidates = cros_lab_util.seek_host(
-        pools=config.get('pools', '').split(','),
-        model=config['model'],
-        sku=config['sku'])
-
-  if (not candidates or candidates[0]['Status'] != 'Ready' or
-      candidates[0]['Locked']):
-    logger.error('unable to allocate dut')
-    return None
-
-  host_name = candidates[0]['Host']
-  info = cros_lab_util.lock_host(host_name, reason)
-  if info['Status'] != 'Ready':
-    cros_lab_util.unlock_host(host_name)
-    raise Exception(
-        'unexpected host status=%s, a race condition?' % info['Status'])
-
-  logger.info('allocated host %s', host_name)
-  return host_name
-
-
 def determine_chrome_binaries(test_name):
   for name_pattern, binaries in CHROME_BINARIES_OF_TEST:
     if fnmatch.fnmatch(test_name, name_pattern):
@@ -130,8 +102,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
       chrome_binaries = determine_chrome_binaries(self.config['test_name'])
 
-      with cros_lab_util.dut_manager(self.config['dut'],
-                                     lambda: grab_dut(self.config)) as dut:
+      with cros_lab_util.dut_manager(
+          self.config['dut'],
+          lambda: diagnoser_cros.grab_dut(self.config)) as dut:
         if not dut:
           raise errors.NoDutAvailable('unable to allocate DUT')
         if not cros_util.is_good_dut(dut):

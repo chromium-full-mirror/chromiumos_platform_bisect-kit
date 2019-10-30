@@ -15,6 +15,12 @@ from bisect_kit import errors
 class TestCrosLab(unittest.TestCase):
   """Test functions in cros_lab_util module."""
 
+  def test_normalize_sku_name(self):
+    self.assertEqual(cros_lab_util.normalize_sku_name('foo_16GB'), 'foo_16GB')
+    self.assertEqual(cros_lab_util.normalize_sku_name('foo_16Gb'), 'foo_16GB')
+    self.assertEqual(
+        cros_lab_util.normalize_sku_name('something_else'), 'something_else')
+
   def test_dut_manager(self):
     allocator = mock.Mock(return_value='allocated_dut')
     with mock.patch('bisect_kit.cros_lab_util.unlock_host') as mock_unlock:

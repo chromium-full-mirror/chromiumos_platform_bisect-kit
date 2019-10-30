@@ -16,6 +16,10 @@ import cros_helper
 
 # Make sure we mocked all calls to atest.
 @mock.patch('bisect_kit.cros_lab_util.atest_cmd', None)
+@mock.patch('bisect_kit.cros_lab_util.is_skylab_dut',
+            mock.MagicMock(return_value=False))
+@mock.patch('cros_helper.do_allocate_dut_skylab',
+            mock.MagicMock(side_effect=errors.NoDutAvailable))
 class TestCmdAllocateDut(unittest.TestCase):
   """Test cmd_allocate_dut.
 

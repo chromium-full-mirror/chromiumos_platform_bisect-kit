@@ -30,6 +30,10 @@ class NoDutAvailable(Exception):
   """Unable to allocate DUT from lab."""
 
 
+class DutLeaseException(Exception):
+  """Issues of skylab DUT lease."""
+
+
 class WrongAssumption(Exception):
   """Wrong assumption.
 

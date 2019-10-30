@@ -71,36 +71,6 @@ def get_test_dependency_labels(config):
   return extra_labels
 
 
-def grab_dut(config):
-  reason = cros_lab_util.make_lock_reason(config['session'])
-  if config.get('allocated_dut'):
-    host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
-    logger.info('try to lock the same host (%s) as last run', host_name)
-    candidates = cros_lab_util.list_host(host=host_name).values()
-  else:
-    extra_labels = get_test_dependency_labels(config)
-    candidates = cros_lab_util.seek_host(
-        pools=config.get('pools', '').split(','),
-        model=config['model'],
-        sku=config['sku'],
-        extra_labels=extra_labels)
-
-  if (not candidates or candidates[0]['Status'] != 'Ready' or
-      candidates[0]['Locked']):
-    logger.error('unable to allocate dut')
-    return None
-
-  host_name = candidates[0]['Host']
-  info = cros_lab_util.lock_host(host_name, reason)
-  if info['Status'] != 'Ready':
-    cros_lab_util.unlock_host(host_name)
-    raise Exception(
-        'unexpected host status=%s, a race condition?' % info['Status'])
-
-  logger.info('allocated host %s', host_name)
-  return host_name
-
-
 def may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
   info = cros_util.get_autotest_test_info(autotest_dir, test_name)
   assert info, 'incorrect test name? %s' % test_name
@@ -231,10 +201,12 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       else:
         chrome_binaries = None
 
-      with cros_lab_util.dut_manager(self.config['dut'],
-                                     lambda: grab_dut(self.config)) as dut:
+      with cros_lab_util.dut_manager(
+          self.config['dut'],
+          lambda: diagnoser_cros.grab_dut(self.config)) as dut:
         if not dut:
           raise errors.NoDutAvailable('unable to allocate DUT')
+
         if not cros_util.is_good_dut(dut):
           if not cros_lab_util.repair(dut):
             raise errors.ExternalError('Not a good DUT and unable to repair')

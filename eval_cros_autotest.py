@@ -92,11 +92,6 @@ def create_argument_parser():
   group.add_argument(
       '--args',
       help='Extra args passed to "test_that --args"; Overrides the default')
-  group.add_argument(
-      '--board',
-      metavar='BOARD',
-      default=configure.get('BOARD'),
-      help='ChromeOS board name')
 
   group = parser.add_argument_group(title='Options for CTS/GTS tests')
   group.add_argument('--cts_revision', help='CTS revision, like "9.0_r3"')
@@ -209,7 +204,7 @@ def run_test(opts):
     test_that_bin = '/usr/bin/test_that'
   cmd = [
       test_that_bin, opts.dut, opts.test_name, '--debug', '--results_dir',
-      results_dir, '--board', opts.board
+      results_dir
   ]
   if opts.prebuilt:
     cmd += ['--autotest_dir', prebuilt_autotest_dir]

@@ -10,6 +10,8 @@ import collections
 import functools
 import json
 import logging
+import random
+import time
 
 from bisect_kit import cli
 from bisect_kit import common
@@ -108,6 +110,15 @@ def cmd_search_dut(opts):
 
 def cmd_lock_dut(opts):
   host = cros_lab_util.dut_host_name(opts.dut)
+  if cros_lab_util.is_skylab_dut(host):
+    logger.info('%s is a DUT in skylab', host)
+    logger.info('trying to lease %s', host)
+    if cros_lab_util.skylab_lease_dut(host, opts.duration):
+      logger.info('locked %s', host)
+    else:
+      raise Exception('unable to lock %s' % host)
+    return
+
   if opts.session:
     reason = cros_lab_util.make_lock_reason(opts.session)
   else:
@@ -118,6 +129,10 @@ def cmd_lock_dut(opts):
 
 def cmd_unlock_dut(opts):
   host = cros_lab_util.dut_host_name(opts.dut)
+  if cros_lab_util.is_skylab_dut(host):
+    cros_lab_util.skylab_release_dut(host)
+    logger.info('%s unlocked', host)
+    return
   hosts = cros_lab_util.list_host(host=host)
   assert hosts, 'host=%s does not exist' % host
   info = hosts[host]
@@ -141,6 +156,49 @@ def do_allocate_dut(opts):
   if not opts.model and not opts.sku:
     raise errors.ArgumentError('--model or --sku', 'need to be specified')
 
+  if opts.locked_dut:
+    assert not cros_lab_util.is_skylab_dut(opts.locked_dut)
+    return do_allocate_dut_autotest_lab(opts)
+
+  try:
+    return do_allocate_dut_skylab(opts)
+  except errors.NoDutAvailable:
+    logger.warning(
+        'failed to allocate DUT from skylab, fallback to autotest lab')
+    cros_lab_util.seek_host(
+        opts.pools.split(','), opts.model, opts.sku, opts.label)
+    return do_allocate_dut_autotest_lab(opts)
+
+
+def do_allocate_dut_skylab(opts):
+  dimensions = ['dut_state:ready', 'label-pool:DUT_POOL_QUOTA']
+  if opts.model:
+    dimensions.append('label-model:' + opts.model)
+  if opts.sku:
+    dimensions.append('label-hwid_sku:' +
+                      cros_lab_util.normalize_sku_name(opts.sku))
+
+  t0 = time.time()
+  while time.time() - t0 < opts.time_limit:
+    # Query every time because each iteration takes 10+ miuntes
+    bots = cros_lab_util.swarming_bots_list(dimensions, is_busy=False)
+    if not bots:
+      bots = cros_lab_util.swarming_bots_list(dimensions)
+    if not bots:
+      raise errors.NoDutAvailable(
+          'no bots satisfy constraints; incorrect model/sku? %s' % dimensions)
+
+    bot = random.choice(bots)
+    host = bot['dimensions']['dut_name'][0]
+    logger.info('trying to lease %s', host)
+    if cros_lab_util.skylab_lease_dut(host, opts.duration):
+      logger.info('leased %s (bot_id=%s)', host, bot['bot_id'])
+      return 'ready', host
+
+  return 'wait', None
+
+
+def do_allocate_dut_autotest_lab(opts):
   reason = cros_lab_util.make_lock_reason(opts.session)
   waiting = None
   if opts.locked_dut:
@@ -289,10 +347,15 @@ def main():
       help='Lock a DUT in the lab',
       description='Lock a DUT in the lab. '
       'This is simply wrapper of "atest" with additional checking.')
-  group = parser_lock_dut.add_mutually_exclusive_group(required=True)
+  # "skylab lease-dut" doesn't take reason, so this is not required=True.
+  group = parser_lock_dut.add_mutually_exclusive_group()
   group.add_argument('--session', help='session name; for creating lock reason')
   group.add_argument('--reason', help='specify lock reason manually')
   parser_lock_dut.add_argument('dut')
+  parser_lock_dut.add_argument(
+      '--duration',
+      type=float,
+      help='duration in seconds; will be round to minutes')
   parser_lock_dut.set_defaults(func=cmd_lock_dut)
 
   parser_unlock_dut = subparsers.add_parser(
@@ -322,6 +385,15 @@ def main():
       '--label', '-b', help='Additional required labels, comma separated')
   parser_allocate_dut.add_argument(
       '--locked_dut', help='Locked DUT name by last run')
+  parser_allocate_dut.add_argument(
+      '--time_limit',
+      type=int,
+      default=15 * 60,
+      help='Time limit to attempt lease in seconds (default: %(default)s)')
+  parser_allocate_dut.add_argument(
+      '--duration',
+      type=float,
+      help='lease duration in seconds; will be round to minutes')
   parser_allocate_dut.set_defaults(func=cmd_allocate_dut)
 
   parser_repair_dut = subparsers.add_parser(
