@@ -223,8 +223,13 @@ def _verify_dut_locked_by_me(status):
   return True
 
 
-def skylab_lease_dut(dut_name, duration=None):
+def skylab_lease_dut(dut_name, duration=None, timeout=None):
   """Lease DUT from skylab.
+
+  Args:
+    dut_name: DUT name
+    duration: lease duration, in seconds. Default is LEASE_DURATION if None.
+    timeout: lease wait limit, in seconds.
 
   Returns:
     dict of lease status if successful, otherwise None
@@ -242,7 +247,8 @@ def skylab_lease_dut(dut_name, duration=None):
         '%d' % (duration // 60),
         dut_name,
         stdout_callback=stdout_lines.append,
-        stderr_callback=stderr_lines.append)
+        stderr_callback=stderr_lines.append,
+        timeout=timeout)
     orphan_task = False
   except subprocess.CalledProcessError:
     stderr = ''.join(stderr_lines)

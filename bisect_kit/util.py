@@ -19,6 +19,14 @@ from bisect_kit import errors
 logger = logging.getLogger(__name__)
 
 
+class TimeoutExpired(Exception):
+  """Timeout expired.
+
+  This may be raised by blocking calls like Popen.wait(), check_call(),
+  check_output(), etc.
+  """
+
+
 class Popen(object):
   """Wrapper of subprocess.Popen. Support output logging.
 
@@ -88,15 +96,32 @@ class Popen(object):
       self.queue.put((where, line))
     self.queue.put((where, ''))
 
-  def wait(self):
+  def wait(self, timeout=None):
     """Waits child process.
 
     Returns:
       return code.
     """
+    t0 = time.time()
     ended = 0
     while ended < 2:
-      where, line = self.queue.get()
+      if timeout is not None:
+        try:
+          remaining_time = timeout - (time.time() - t0)
+          if remaining_time > 0:
+            where, line = self.queue.get(block=True, timeout=remaining_time)
+          else:
+            # We follow queue.get's behavior to raise queue.Empty, so it's
+            # always queue.Empty when time is up, no matter remaining_time is
+            # negative or positive.
+            raise queue.Empty
+        except queue.Empty:
+          logger.debug('child process time out (%.1f seconds), kill it',
+                       timeout)
+          self.p.kill()
+          raise TimeoutExpired
+      else:
+        where, line = self.queue.get(block=True)
       # line includes '\n', will be '' if EOF.
       if not line:
         ended += 1
@@ -141,8 +166,13 @@ def call(*args, **kwargs):
   Returns:
     Exit code of sub-process.
   """
+  timeout = kwargs.get('timeout')
+  # TODO(kcwu): let current function capture this optional parameter after
+  #             migrated to python3
+  if 'timeout' in kwargs:
+    del kwargs['timeout']
   p = Popen(args, **kwargs)
-  return p.wait()
+  return p.wait(timeout=timeout)
 
 
 def check_output(*args, **kwargs):
@@ -161,8 +191,13 @@ def check_output(*args, **kwargs):
   def collect_stdout(line):
     stdout_lines.append(line)
 
+  timeout = kwargs.get('timeout')
+  # TODO(kcwu): let current function capture this optional parameter after
+  #             migrated to python3
+  if 'timeout' in kwargs:
+    del kwargs['timeout']
   p = Popen(args, stdout_callback=collect_stdout, **kwargs)
-  p.wait()
+  p.wait(timeout=timeout)
   stdout = ''.join(stdout_lines)
   if p.returncode != 0:
     raise subprocess.CalledProcessError(p.returncode, args, stdout)
@@ -178,8 +213,13 @@ def check_call(*args, **kwargs):
   Raises:
     subprocess.CalledProcessError if the exit code is non-zero.
   """
+  timeout = kwargs.get('timeout')
+  # TODO(kcwu): let current function capture this optional parameter after
+  #             migrated to python3
+  if 'timeout' in kwargs:
+    del kwargs['timeout']
   p = Popen(args, **kwargs)
-  p.wait()
+  p.wait(timeout=timeout)
   if p.returncode != 0:
     raise subprocess.CalledProcessError(p.returncode, args)
 

@@ -16,6 +16,7 @@ from bisect_kit import common
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ def do_allocate_dut(opts):
   if not opts.model and not opts.sku:
     raise errors.ArgumentError('--model or --sku', 'need to be specified')
 
+  t0 = time.time()
   dimensions = ['dut_state:ready', 'label-pool:DUT_POOL_QUOTA']
   if opts.model:
     dimensions.append('label-model:' + opts.model)
@@ -80,8 +82,7 @@ def do_allocate_dut(opts):
     dimensions.append('label-hwid_sku:' +
                       cros_lab_util.normalize_sku_name(opts.sku))
 
-  t0 = time.time()
-  while time.time() - t0 < opts.time_limit:
+  while True:
     # Query every time because each iteration takes 10+ miuntes
     bots = cros_lab_util.swarming_bots_list(dimensions, is_busy=False)
     if not bots:
@@ -93,10 +94,19 @@ def do_allocate_dut(opts):
     bot = random.choice(bots)
     host = bot['dimensions']['dut_name'][0]
     logger.info('trying to lease %s', host)
-    if cros_lab_util.skylab_lease_dut(host, opts.duration):
-      logger.info('leased %s (bot_id=%s)', host, bot['bot_id'])
-      return 'ready', host
+    remaining_time = opts.time_limit - (time.time() - t0)
+    if remaining_time <= 0:
+      break
+    try:
+      if cros_lab_util.skylab_lease_dut(
+          host, opts.duration, timeout=remaining_time):
+        logger.info('leased %s (bot_id=%s)', host, bot['bot_id'])
+        return 'ready', host
+    except util.TimeoutExpired:
+      break
+    time.sleep(1)
 
+  logger.warning('unable to lease DUT in time limit')
   return 'wait', None
 
 
@@ -202,10 +212,12 @@ def main():
   parser_allocate_dut.add_argument('--sku', help='allocation criteria')
   parser_allocate_dut.add_argument(
       '--label', '-b', help='Additional required labels, comma separated')
+  # Pubsub ack deadline is 10 minutes (b/143663659). Default 9 minutes with 1
+  # minute buffer.
   parser_allocate_dut.add_argument(
       '--time_limit',
       type=int,
-      default=15 * 60,
+      default=9 * 60,
       help='Time limit to attempt lease in seconds (default: %(default)s)')
   parser_allocate_dut.add_argument(
       '--duration',
