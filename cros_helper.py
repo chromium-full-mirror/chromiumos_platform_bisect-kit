@@ -48,19 +48,19 @@ def _get_label_by_prefix(info, prefix):
   return None
 
 
-def cmd_lock_dut(opts):
+def cmd_lease_dut(opts):
   host = cros_lab_util.dut_host_name(opts.dut)
   logger.info('trying to lease %s', host)
   if cros_lab_util.skylab_lease_dut(host, opts.duration):
-    logger.info('locked %s', host)
+    logger.info('leased %s', host)
   else:
-    raise Exception('unable to lock %s' % host)
+    raise Exception('unable to lease %s' % host)
 
 
-def cmd_unlock_dut(opts):
+def cmd_release_dut(opts):
   host = cros_lab_util.dut_host_name(opts.dut)
   cros_lab_util.skylab_release_dut(host)
-  logger.info('%s unlocked', host)
+  logger.info('%s released', host)
 
 
 def do_allocate_dut(opts):
@@ -69,7 +69,7 @@ def do_allocate_dut(opts):
   Returns:
     (todo, host)
       todo: 'ready' or 'wait'
-      host: locked host name
+      host: leased host name
   """
   if not opts.model and not opts.sku:
     raise errors.ArgumentError('--model or --sku', 'need to be specified')
@@ -111,11 +111,16 @@ def do_allocate_dut(opts):
 
 
 def cmd_allocate_dut(opts):
-  locked_dut = None
+  leased_dut = None
   try:
     todo, host = do_allocate_dut(opts)
-    locked_dut = host + '.cros' if host else None
-    result = {'result': todo, 'locked_dut': locked_dut}
+    leased_dut = host + '.cros' if host else None
+    # TODO(kcwu): remove "locked_dut" after bkr updated
+    result = {
+        'result': todo,
+        'locked_dut': leased_dut,
+        'leased_dut': leased_dut
+    }
     print(json.dumps(result))
   except Exception as e:
     logger.exception('cmd_allocate_dut failed')
@@ -171,6 +176,30 @@ def main():
   parser_reboot.add_argument('dut')
   parser_reboot.set_defaults(func=cmd_reboot)
 
+  parser_lease_dut = subparsers.add_parser(
+      'lease_dut',
+      help='Lease a DUT in the lab',
+      description='Lease a DUT in the lab. '
+      'This is implemented by `skylab lease-dut` with additional checking.')
+  # "skylab lease-dut" doesn't take reason, so this is not required=True.
+  parser_lease_dut.add_argument('--session', help='session name')
+  parser_lease_dut.add_argument('dut')
+  parser_lease_dut.add_argument(
+      '--duration',
+      type=float,
+      help='duration in seconds; will be round to minutes')
+  parser_lease_dut.set_defaults(func=cmd_lease_dut)
+
+  parser_release_dut = subparsers.add_parser(
+      'release_dut',
+      help='Release a DUT in the lab',
+      description='Release a DUT in the lab. '
+      'This is implemented by `skylab release-dut` with additional checking.')
+  parser_release_dut.add_argument('--session', help='session name')
+  parser_release_dut.add_argument('dut')
+  parser_release_dut.set_defaults(func=cmd_release_dut)
+
+  # TODO(kcwu): remove `lock_dut` and `unlock_dut` after bkr updated
   parser_lock_dut = subparsers.add_parser(
       'lock_dut',
       help='Lock a DUT in the lab',
@@ -185,7 +214,7 @@ def main():
       '--duration',
       type=float,
       help='duration in seconds; will be round to minutes')
-  parser_lock_dut.set_defaults(func=cmd_lock_dut)
+  parser_lock_dut.set_defaults(func=cmd_lease_dut)
 
   parser_unlock_dut = subparsers.add_parser(
       'unlock_dut',
@@ -195,15 +224,14 @@ def main():
   parser_unlock_dut.add_argument(
       '--session', help='session name; for checking lock reason before unlock')
   parser_unlock_dut.add_argument('dut')
-  parser_unlock_dut.set_defaults(func=cmd_unlock_dut)
+  parser_unlock_dut.set_defaults(func=cmd_release_dut)
 
   parser_allocate_dut = subparsers.add_parser(
       'allocate_dut',
       help='Allocate a DUT in the lab',
-      description='Allocate a DUT in the lab. It will lock a DUT in the lab '
-      'for bisecting. If no DUT is available (ready), it will lock one. The '
-      'caller (bisect-kit runner) of this command should keep note of the '
-      'locked DUT name and retry this command again later.')
+      description='Allocate a DUT in the lab. It will lease a DUT in the lab '
+      'for bisecting. The caller (bisect-kit runner) of this command should '
+      'retry this command again later if no DUT available now.')
   parser_allocate_dut.add_argument(
       '--session', required=True, help='session name')
   parser_allocate_dut.add_argument(

@@ -210,14 +210,14 @@ def is_skylab_dut(dut_name):
   return bool(bots)
 
 
-def _verify_dut_locked_by_me(status):
+def is_dut_leased_by_me(status):
   if not status['is_leased']:
-    logger.debug('%s current task: %s, is not locked', status['dut_name'],
+    logger.debug('%s current task: %s, is not leased', status['dut_name'],
                  status['task_name'])
     return False
 
   if not status['is_leased_by_me']:
-    logger.debug('%s is not locked by me', status['dut_name'])
+    logger.debug('%s is not leased by me', status['dut_name'])
     return False
 
   return True
@@ -271,7 +271,7 @@ def skylab_lease_dut(dut_name, duration=None, timeout=None):
   for _ in range(10):
     time.sleep(5)
     status = query_lease_status(dut_name)
-    if _verify_dut_locked_by_me(status):
+    if is_dut_leased_by_me(status):
       break
   else:
     raise errors.DutLeaseException('lease verification failed: %s' % status)
@@ -286,7 +286,7 @@ def skylab_release_dut(dut_name):
   Args:
     dut_name: DUT name
   """
-  if not _verify_dut_locked_by_me(query_lease_status(dut_name)):
+  if not is_dut_leased_by_me(query_lease_status(dut_name)):
     raise errors.DutLeaseException(
         '%s is not leased, or not leased by me' % dut_name)
 
@@ -295,7 +295,7 @@ def skylab_release_dut(dut_name):
   # wait the state propagated
   for _ in range(10):
     time.sleep(5)
-    if not _verify_dut_locked_by_me(query_lease_status(dut_name)):
+    if not is_dut_leased_by_me(query_lease_status(dut_name)):
       break
   else:
     raise errors.DutLeaseException('release verification failed')
@@ -474,7 +474,7 @@ def dut_manager(dut, allocator):
   """Context manager to handle host allocation.
 
   If `dut` is magic value, ":lab:", the context manager will call `allocator`
-  to allocate a host and unlock the host upon leaving the scope.
+  to allocate a host and release the host upon leaving the scope.
 
   For other value of `dut`, the context manager simply yields `dut` and does
   nothing else.
@@ -484,7 +484,7 @@ def dut_manager(dut, allocator):
     allocator: host allocation callback function
 
   Returns:
-    context manager, which lock and unlock host if necessary
+    context manager, which lease and release host if necessary
   """
   if dut == LAB_DUT:
     host = allocator()
@@ -497,7 +497,7 @@ def dut_manager(dut, allocator):
       with dut_lease_manager(host + '.cros'):
         yield host + '.cros'
     finally:
-      logger.info('auto unlock DUT %s', host)
+      logger.info('auto release DUT %s', host)
       skylab_release_dut(host)
   else:
     with dut_lease_manager(dut):
