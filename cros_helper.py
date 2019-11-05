@@ -101,7 +101,12 @@ def do_allocate_dut(opts):
       if cros_lab_util.skylab_lease_dut(
           host, opts.duration, timeout=remaining_time):
         logger.info('leased %s (bot_id=%s)', host, bot['bot_id'])
-        return 'ready', host
+        dut = host + '.cros'
+        if cros_util.is_good_dut(dut):
+          return 'ready', host
+        logger.warning('the leased DUT is broken; '
+                       'return it and lease another one later')
+        cros_lab_util.skylab_release_dut(host)
     except util.TimeoutExpired:
       break
     time.sleep(1)
