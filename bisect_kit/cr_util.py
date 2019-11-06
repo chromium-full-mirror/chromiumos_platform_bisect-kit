@@ -28,6 +28,31 @@ logger = logging.getLogger(__name__)
 
 RE_CHROME_VERSION = r'^\d+\.\d+\.\d+\.\d+$'
 
+CHROME_BINARIES = ['chrome', 'chrome_sandbox', 'nacl_helper']
+# This list is created manually by inspecting
+# src/third_party/chromiumos-overlay/chromeos-base/chrome-binary-tests/
+# chrome-binary-tests-0.0.1.ebuild
+# If you change the list, deploy_chrome_helper.sh may need update as well.
+# TODO(kcwu): we can get rid of this table once we migrated to build chrome
+#             using chromeos ebuild rules.
+CHROME_TEST_BINARIES = [
+    'capture_unittests',
+    'dawn_end2end_tests',
+    'dawn_unittests',
+    'jpeg_decode_accelerator_unittest',
+    'jpeg_encode_accelerator_unittest',
+    'ozone_gl_unittests',
+    'sandbox_linux_unittests',
+    'vaapi_unittest',
+    'video_decode_accelerator_perf_tests',
+    'video_decode_accelerator_tests',
+    'video_encode_accelerator_unittest',
+    'wayland_client_perftests',
+
+    # Removed binaries. Keep them here for users to bisect old versions.
+    'video_decode_accelerator_unittest',
+]
+
 
 def is_chrome_version(s):
   """Is a chrome version string?"""
@@ -223,10 +248,35 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
   if kwargs.get('internal'):
     prefix.append('--internal')
 
-  env = kwargs.get('env', [])
+  env = kwargs.get('env')
   cmd = prefix + ['--'] + list(args)
 
-  util.check_call(*cmd, cwd=chrome_src, env=env)
+  return util.check_output(*cmd, cwd=chrome_src, env=env)
+
+
+def get_chrome_test_binaries(chrome_src, board):
+  result = []
+  env = os.environ.copy()
+  # This work around http://crbug.com/658104, which depot_tool can't find GN
+  # path correctly.
+  env['CHROMIUM_BUILDTOOLS_PATH'] = os.path.abspath(
+      os.path.join(chrome_src, 'buildtools'))
+  out_dir = os.path.join('out_%s' % board, 'Release')
+  available_targets = simple_chrome_shell(
+      chrome_src,
+      board,
+      'buildtools/linux64/gn',
+      'ls',
+      '--type=executable',
+      '--as=output',
+      out_dir,
+      internal=True,
+      env=env).splitlines()
+  for binary in CHROME_TEST_BINARIES:
+    if binary not in available_targets:
+      continue
+    result.append(binary)
+  return result
 
 
 def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
@@ -240,7 +290,7 @@ def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
     nodeploy: if True, only build, do not deploy
   """
   if not targets:
-    targets = ['chrome', 'chrome_sandbox', 'nacl_helper']
+    targets = CHROME_BINARIES
 
   logger.info('build %s', targets)
   env = os.environ.copy()

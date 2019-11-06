@@ -27,7 +27,7 @@ for TARGET in $TARGETS; do
             # automatically
             deploy_chrome --force --build-dir=$out_dir --to=$DUT
             ;;
-        *_unittest|*_unittests|*_tests)
+        *test|*tests)
             chmod o+x $out_dir/$TARGET
             if ssh $DUT [ ! -d $AUTOTEST_TEST_BINARY_PATH ]; then
                 echo "Warning: $AUTOTEST_TEST_BINARY_PATH does not exist" >&2

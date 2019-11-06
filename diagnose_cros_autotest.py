@@ -13,42 +13,18 @@ Sometimes the script failed to figure out the final CL for various reasons, it
 will cut down the search range as narrow as it can.
 """
 from __future__ import print_function
-import fnmatch
-import glob
 import logging
 import os
 
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import cr_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import errors
 from bisect_kit import util
 import setup_cros_bisect
 
 logger = logging.getLogger(__name__)
-
-# What chrome binaries to build for given autotest.
-# This dict is created manually by inspecting output of
-# 'grep -r ChromeBinaryTest autotest/files/client/site_tests'
-# If you change this dict, build_and_deploy_chrome_helper.sh may need update
-# as well.
-CHROME_BINARIES_OF_TEST = {
-    'graphics_Chrome.ozone_gl_unittests': ['ozone_gl_unittests'],
-    'security_SandboxLinuxUnittests': ['sandbox_linux_unittests'],
-    'video_HangoutHardwarePerf*': [
-        'video_decode_accelerator_unittest',
-        'video_encode_accelerator_unittest',
-    ],
-    'video_JDAPerf*': ['jpeg_decode_accelerator_unittest'],
-    'video_JEAPerf': ['jpeg_encode_accelerator_unittest'],
-    'video_JpegDecodeAccelerator': ['jpeg_decode_accelerator_unittest'],
-    'video_JpegEncodeAccelerator': ['jpeg_encode_accelerator_unittest'],
-    'video_VDAPerf*': ['video_decode_accelerator_unittest'],
-    'video_VDASanity': ['video_decode_accelerator_unittest'],
-    'video_VEAPerf*': ['video_encode_accelerator_unittest'],
-    'video_VideoDecodeAccelerator*': ['video_decode_accelerator_unittest'],
-    'video_VideoEncodeAccelerator*': ['video_encode_accelerator_unittest'],
-}
 
 
 def get_test_dependency_labels(config):
@@ -69,37 +45,6 @@ def get_test_dependency_labels(config):
     extra_labels.append(label)
 
   return extra_labels
-
-
-def may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
-  info = cros_util.get_autotest_test_info(autotest_dir, test_name)
-  assert info, 'incorrect test name? %s' % test_name
-  dirpath = os.path.dirname(info.path)
-  for pypath in glob.glob(os.path.join(dirpath, '*.py')):
-    content = open(pypath).read()
-    # Checking these two functions is more accurate than 'ChromeBinaryTest'
-    # (b/141164895).
-    if ('run_chrome_test_binary' in content or
-        'get_chrome_binary_path' in content):
-      return True
-  return False
-
-
-def determine_chrome_binaries(chromeos_root, test_name):
-  chrome_binaries = None
-  for name_pattern, binaries in CHROME_BINARIES_OF_TEST.items():
-    if fnmatch.fnmatch(test_name, name_pattern):
-      chrome_binaries = binaries
-      break
-
-  autotest_dir = os.path.join(chromeos_root, cros_util.prebuilt_autotest_dir)
-  if chrome_binaries:
-    logger.info('This test depends on chrome binary: %s', chrome_binaries)
-  elif may_depend_on_extra_chrome_binaries(autotest_dir, test_name):
-    raise errors.InternalError(
-        '%s code used ChromeBinaryTest but the binary is unknown; '
-        'please update CHROME_BINARIES_OF_TEST table' % test_name)
-  return chrome_binaries
 
 
 class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
@@ -196,8 +141,10 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       common_switch_cmd, common_eval_cmd = self._build_cmds()
 
       if self.config['test_name']:
-        chrome_binaries = determine_chrome_binaries(
-            self.config['chromeos_root'], self.config['test_name'])
+        chrome_src = os.path.join(self.config['chrome_root'], 'src')
+        chrome_binaries = (
+            cr_util.CHROME_BINARIES + cr_util.get_chrome_test_binaries(
+                chrome_src, self.config['board']))
       else:
         chrome_binaries = None
 

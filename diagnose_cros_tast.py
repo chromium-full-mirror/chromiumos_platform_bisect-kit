@@ -13,51 +13,17 @@ Sometimes the script failed to figure out the final CL for various reasons, it
 will cut down the search range as narrow as it can.
 """
 from __future__ import print_function
-import fnmatch
 import logging
+import os
 
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import cr_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import errors
 import setup_cros_bisect
 
 logger = logging.getLogger(__name__)
-
-# What chrome binaries to build for given tast test.
-# This list is created manually by inspecting output of
-# 'grep -r chrome.BinTestDir src/platform/tast-tests'
-# If you change them, deploy_chrome_helper.sh may need update
-# as well.
-# TODO(kcwu): we can get rid of this table once we migrated to build chrome
-#             using chromeos ebuild rules.
-CHROME_BINARIES_OF_TEST = [
-    ('security.SandboxLinuxUnittests', ['sandbox_linux_unittests']),
-    ('camera.CaptureUnittests', ['capture_unittests']),
-    ('camera.DecodeAccelJPEG*', ['jpeg_decode_accelerator_unittest']),
-    ('camera.EncodeAccelJPEG*', ['jpeg_encode_accelerator_unittest']),
-    # Following three tests are renamed to camera.*, keep them for older
-    # chromeos version.
-    ('video.CaptureUnittests', ['capture_unittests']),
-    ('video.DecodeAccelJPEG*', ['jpeg_decode_accelerator_unittest']),
-    ('video.EncodeAccelJPEG*', ['jpeg_encode_accelerator_unittest']),
-    # TODO(kcwu): need special handling if video_decode_accelerator_unittest
-    #             is removed (crbug/933034)
-    ('video.DecodeAccel*', [
-        'video_decode_accelerator_tests',
-        'video_decode_accelerator_perf_tests',
-        'video_decode_accelerator_unittest',
-    ]),
-    ('video.EncodeAccel*', ['video_encode_accelerator_unittest']),
-]
-
-
-def determine_chrome_binaries(test_name):
-  for name_pattern, binaries in CHROME_BINARIES_OF_TEST:
-    if fnmatch.fnmatch(test_name, name_pattern):
-      logger.info('This test depends on chrome binary: %s', binaries)
-      return binaries
-  return None
 
 
 class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
@@ -100,7 +66,10 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           self.config['session'])
       common_eval_cmd = self._build_cmds()
 
-      chrome_binaries = determine_chrome_binaries(self.config['test_name'])
+      chrome_src = os.path.join(self.config['chrome_root'], 'src')
+      chrome_binaries = (
+          cr_util.CHROME_BINARIES + cr_util.get_chrome_test_binaries(
+              chrome_src, self.config['board']))
 
       with cros_lab_util.dut_manager(
           self.config['dut'],
