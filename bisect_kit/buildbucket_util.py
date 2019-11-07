@@ -1,0 +1,186 @@
+# -*- coding: utf-8 -*-
+# Copyright 2019 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Buildbucket api utility.
+"""
+
+from distutils.spawn import find_executable
+import httplib
+import json
+import logging
+import os
+import time
+
+# from third_party
+from google.protobuf.field_mask_pb2 import FieldMask
+from google.protobuf.message import DecodeError
+from infra_libs.buildbucket.proto.build_pb2 import Build
+from infra_libs.buildbucket.proto.rpc_pb2 import GetBuildRequest
+from infra_libs.buildbucket.proto.rpc_pb2 import ScheduleBuildRequest
+
+from bisect_kit import errors
+from bisect_kit import util
+
+logger = logging.getLogger(__name__)
+
+
+class BuildbucketApi(object):
+  """A wrapper of buildbucket apis.
+
+  This is a singleton class, it returns a same instance everytime.
+  """
+  _instance = None
+  _build_fields = [
+      'status', 'update_time', 'created_by', 'builder', 'create_time',
+      'critical', 'start_time', 'input', 'output', 'end_time', 'id'
+  ]
+  base_domain = 'cr-buildbucket.appspot.com'
+  base_domain_url = 'https://cr-buildbucket.appspot.com/'
+  base_api_path = '/prpc/buildbucket.v2.Builds/'
+  token_cache = os.path.expanduser('~/.isolated_oauth')
+
+  def __new__(cls):
+    if cls._instance is None:
+      cls._instance = object.__new__(cls)
+    return cls._instance
+
+  def __init__(self):
+    """Find swarming folder and its auth script."""
+    self._token = None
+    swarming_py = find_executable('swarming.py')
+    if swarming_py is None:
+      raise errors.InternalError('swarming.py is not found in path, ' +
+                                 'please check if swarming.py is installed, ' +
+                                 ' go/lab-tools for more information.')
+
+    folder = os.path.dirname(os.path.realpath(swarming_py))
+    self.swarming_auth = os.path.join(folder, 'auth.py')
+    if not os.path.exists(self.swarming_auth):
+      raise errors.InternalError('auth.py not found in swarming folder: %s' %
+                                 folder)
+
+  def _get_token(self):
+    """Returns access_token saved in cache file.
+
+    Currently this function loads cache from swarming login,
+    which is in `~/.isolated_oauth`.
+
+    Returns:
+      access_token: token loaded from token cache.
+
+    Raises:
+      errors.InternalError: If token cache file is not found
+    """
+    if self._token is None:
+      if not os.path.exists(self.token_cache):
+        raise errors.InternalError(
+            'buildbucket api cannot find ' +
+            'token cache file, please run %s manually to login.' %
+            self.swarming_auth)
+      data = json.load(open(self.token_cache))['data']
+      self._token = data[0]['credential']['access_token']
+    return self._token
+
+  def _get_header(self):
+    """Returns a header includes token for api request."""
+    return {
+        'Content-Type': 'application/prpc; encoding=binary',
+        'Authorization': 'Bearer %s' % self._get_token()
+    }
+
+  def _refresh_token(self):
+    """Trigger swarming's auth library to renew access_token"""
+    util.check_call(self.swarming_auth, 'check', '--service', self.base_domain)
+    self._token = None
+
+  def _post(self, api, request, return_class, retried=False):
+    """Post a rpc request to buildbucket server.
+
+    Args:
+      api: A string indicates api name in `buildbucket.v2.Builds`.
+      request: A protobuf object.
+      return_class: A protobuf class that catches api's return.
+      retried: If False, will try to login if api fails.
+
+    Returns:
+      A `return_class` object.
+
+    Raises:
+      errors.ExternalError: api request fail
+    """
+    conn = httplib.HTTPSConnection(self.base_domain, timeout=5)
+    conn.request('POST', self.base_api_path + api, request.SerializeToString(),
+                 self._get_header())
+    response = conn.getresponse()
+    response_content = response.read()
+    try:
+      result = return_class()
+      result.ParseFromString(response_content)
+    except DecodeError:
+      if response_content == 'Invalid OAuth token' and not retried:
+        self._refresh_token()
+        return self._post(api, request, return_class, True)
+      else:
+        logger.exception('Error in buildbucket post: %s', response_content)
+        raise errors.ExternalError('buildbucket api response: ' +
+                                   response_content)
+    return result
+
+  def get(self, buildbucket_id):
+    """Get a build object by its buildbucket id.
+
+    Args:
+      buildbucket_id: An integer indicates buildbucket id.
+
+    Returns:
+      A Build object if success.
+
+    Raises:
+      errors.InternalError: If argument format incorrect.
+      errors.ExternalError: If api request fail.
+    """
+    assert isinstance(buildbucket_id, int)
+    field_mask = FieldMask(paths=self._build_fields)
+    request = GetBuildRequest(id=buildbucket_id, fields=field_mask)
+    return self._post('GetBuild', request, Build)
+
+  def schedule_build(self, board, manifest_xml):
+    """Schedule a build job in buildbucket.
+
+    Args:
+      board: ChromeOS board name
+      manifest_xml: A full manifest xml for building chromeOS
+
+    Returns:
+      A Build object if success.
+
+    Raises:
+      errors.ExternalError: If api request fail.
+    """
+    properties = {
+        '$chromeos/failures': {
+            'disable_silences': True,
+        },
+        '$chromeos/cros_source': manifest_xml,
+        '$kitchen': {
+            'devshell': True,
+            'git_auth': True,
+        },
+        'build_target': {
+            'name': board,
+        },
+        'builder_name': '%s-bisect' % board,
+        'recipe': 'build_target',
+    }
+
+    builder = {
+        'project': 'chromeos',
+        'builder': '%s-bisect' % board,
+        'bucket': 'bisect',
+    }
+
+    request = ScheduleBuildRequest(
+        template_build_id=int(time.time()), builder=builder)
+    request.properties.update(properties)
+    return self._post('ScheduleBuild', request, Build)
