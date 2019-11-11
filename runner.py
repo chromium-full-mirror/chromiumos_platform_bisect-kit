@@ -135,7 +135,6 @@ def create_argument_parser():
       action='store_true',
       help="Don't stop earlier if we know ratio will meet or not by calculation"
   )
-  #parser.add_argument('--time_limit')
   group.add_argument(
       '--terminate_output',
       metavar='REGEX',

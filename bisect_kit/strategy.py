@@ -74,7 +74,7 @@ def trend_score(prev_from, prev_to, now_from, now_to):
 class NoisyBinarySearch(object):
   """Binary search algorithm supporting noisy signal.
 
-  Example usage:
+  Examples:
     bsearch = NoisyBinarySearch(rev_info, observation='old=1/10,new=9/10')
     while not bsearch.is_done():
       bsearch.update(idx, get_result(rev_info[idx]))
