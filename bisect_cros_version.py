@@ -109,17 +109,29 @@ class ChromeOSVersionDomain(core.BisectDomain):
     env['CROS_VERSION'] = rev
 
   def fill_candidate_summary(self, summary, interesting_indexes):
+
+    def find_next_short_version(summary, old_short):
+      found_old = False
+      for rev_info in summary['rev_info']:
+        rev_short = cros_util.version_to_short(rev_info['rev'])
+        if rev_short == old_short:
+          found_old = True
+        elif found_old:
+          return rev_short
+      return None
+
     url_template = 'https://crosland.corp.google.com/log/%s..%s'
     if 'current_range' in summary:
       old, new = summary['current_range']
       old_short = cros_util.version_to_short(old)
       new_short = cros_util.version_to_short(new)
-      summary['links'] = [
-          {
-              'name': 'change_list',
-              'url': url_template % (old_short, new_short),
-          },
-      ]
+      if old_short == new_short:
+        new_short = find_next_short_version(summary, old_short)
+
+      new_link = {'name': 'change_list'}
+      if new_short:
+        new_link['url'] = url_template % (old_short, new_short)
+      summary['links'] = [new_link]
 
     for i in interesting_indexes:
       if i == 0:
@@ -127,10 +139,11 @@ class ChromeOSVersionDomain(core.BisectDomain):
       rev_info = summary['rev_info'][i]
       old_short = cros_util.version_to_short(summary['rev_info'][i - 1]['rev'])
       new_short = cros_util.version_to_short(rev_info['rev'])
-      link = url_template % (old_short, new_short)
-      rev_info.update({
-          'actions': [dict(link=link)],
-      })
+      if old_short != new_short:
+        link = url_template % (old_short, new_short)
+        rev_info.update({
+            'actions': [dict(link=link)],
+        })
 
 
 if __name__ == '__main__':

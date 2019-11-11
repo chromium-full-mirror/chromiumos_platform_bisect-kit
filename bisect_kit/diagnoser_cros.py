@@ -176,11 +176,6 @@ class CrosDiagnoser(object):
     self.old_info = cros_util.version_info(self.config['board'], self.cros_old)
     self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
 
-    if self.config['experimental_use_snapshot']:
-      logger.info(
-          'android and chrome bisection will be skipped in snapshot bisection')
-      return
-
     logger.info('old: cros %s, chrome %s, android %s',
                 self.old_info['cros_full_version'], self.old_info['cr_version'],
                 self.old_info.get('android_build_id'))
@@ -225,12 +220,6 @@ class CrosDiagnoser(object):
       False: culprit is not inside Android or unable to bisect
     """
     verified = False
-    # TODO(zjchang): remove when metadata is available for snapshot
-    if self.config['experimental_use_snapshot']:
-      logger.info('bypassed android bisect because snapshot does not ' +
-                  'support it yet')
-      return verified
-
     if not need_android_bisect(self.old_info, self.new_info):
       return verified
 
@@ -358,12 +347,6 @@ class CrosDiagnoser(object):
       True: culprit is inside Chrome
       False: culprit is not inside Chrome or unable to bisect
     """
-    # TODO(zjchang): remove when metadata is available for snapshot
-    if self.config['experimental_use_snapshot']:
-      logger.info('bypassed chrome local build bisect because ' +
-                  'snapshot does not support it yet')
-      return False
-
     if self.old_info['cr_version'] == self.new_info['cr_version']:
       logger.info('chrome version identical')
       return False

@@ -506,6 +506,9 @@ def version_to_full(board, version):
   Returns:
     version number in full format
   """
+  if is_cros_snapshot_version(version):
+    milestone, short_version, _ = snapshot_version_split(version)
+    return make_cros_full_version(milestone, short_version)
   if is_cros_full_version(version):
     return version
   milestone = query_milestone_by_version(board, version)
@@ -643,14 +646,27 @@ def list_chromeos_prebuilt_versions(board,
         int(extract_major_version(old)),
         int(extract_major_version(new)) + 1):
       short_version = '%s.0.0' % major_version
+      next_short_version = '%s.0.0' % (major_version + 1)
       # If current version is smaller than cutover, ignore it as it might not
       # contain enough information for continuing android and chrome bisection.
       if not util.is_version_lesseq(snapshot_cutover_version, short_version):
         continue
+
+      # Given the fact that snapshots are images between two release versions.
+      # Adding snapshots of 12345.0.0 should be treated as adding commits
+      # between [12345.0.0, 12346.0.0).
+      # So in the following lines we check two facts:
+      # 1) If 12346.0.0(next_short_version) is a version between old and new
+      if not util.is_direct_relative_version(next_short_version, old):
+        continue
+      if not util.is_direct_relative_version(next_short_version, new):
+        continue
+      # 2) If 12345.0.0(short_version) is a version between old and new
       if not util.is_direct_relative_version(short_version, old):
         continue
       if not util.is_direct_relative_version(short_version, new):
         continue
+
       snapshots = list_snapshots_from_image_archive(board, str(major_version))
       if snapshots:
         # if snapshots found, we can append them after the release version,
@@ -719,18 +735,21 @@ def prepare_snapshot_image(chromeos_root, board, snapshot_version):
              '{snapshot_version}-*/image.zip')
   gs_path = gs_path.format(board=board, snapshot_version=snapshot_version)
 
+  full_path = os.path.join(tmp_dir, test_image_filename)
+  rel_path = os.path.relpath(full_path, chromeos_root)
+  if os.path.exists(full_path):
+    return rel_path
+
   files = gsutil_ls(gs_path, ignore_errors=True)
   if len(files) == 1:
     gs_path = files[0]
     gsutil('cp', gs_path, tmp_dir)
-    image_path = os.path.relpath(
-        os.path.join(tmp_dir, test_image_filename), chromeos_root)
     util.check_call(
         'unzip', '-j', 'image.zip', test_image_filename, cwd=tmp_dir)
     os.remove(os.path.join(tmp_dir, 'image.zip'))
+    return rel_path
 
-  assert image_path
-  return image_path
+  assert False
 
 
 def prepare_prebuilt_image(chromeos_root, board, version):
@@ -759,6 +778,11 @@ def prepare_prebuilt_image(chromeos_root, board, version):
   else:
     tmp_dir = os.path.join(chromeos_root, 'tmp',
                            'ChromeOS-test-%s-%s' % (full_version, board))
+    full_path = os.path.join(tmp_dir, test_image_filename)
+    rel_path = os.path.relpath(full_path, chromeos_root)
+    if os.path.exists(full_path):
+      return rel_path
+
     if not os.path.exists(tmp_dir):
       os.makedirs(tmp_dir)
     # gs://chromeos-releases may have more old images than
@@ -776,8 +800,7 @@ def prepare_prebuilt_image(chromeos_root, board, version):
         # TODO(kcwu): delete tmp
         gsutil('cp', gs_path, tmp_dir)
         util.check_call('tar', 'Jxvf', fn, cwd=tmp_dir)
-        image_path = os.path.relpath(
-            os.path.join(tmp_dir, test_image_filename), chromeos_root)
+        image_path = os.path.relpath(full_path, chromeos_root)
         break
 
   assert image_path
@@ -1486,11 +1509,13 @@ class ChromeOSSpecManager(codechange.SpecManager):
 
     # case 3: return a list of release version and append a snapshot
     #         before or at the end
-    result = self.collect_release_specs(old, new)
+    result = self.collect_release_specs(
+        version_to_full(self.config['board'], old),
+        version_to_full(self.config['board'], new))
     if is_cros_snapshot_version(old):
-      result = self.collect_release_specs(old, old) + result[1:]
+      result = self.collect_snapshot_specs(old, old) + result[1:]
     elif is_cros_snapshot_version(new):
-      result = result[:-1] + self.collect_release_specs(new, new)
+      result = result[:-1] + self.collect_snapshot_specs(new, new)
     return result
 
   def collect_snapshot_specs(self, old, new):

@@ -152,6 +152,9 @@ class TestCrosUtil(unittest.TestCase):
           cros_util.version_to_full('samus', 'R64-10123.0.0'), 'R64-10123.0.0')
       self.assertEqual(
           cros_util.version_to_full('samus', '10123.0.0'), 'R64-10123.0.0')
+      self.assertEqual(
+          cros_util.version_to_full('samus', 'R64-10123.0.0-12345'),
+          'R64-10123.0.0')
 
   def test_version_info(self):
     sample = open(testing.get_testdata_path('partial-metadata.json')).read()
