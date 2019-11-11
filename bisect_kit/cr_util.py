@@ -279,7 +279,12 @@ def get_chrome_test_binaries(chrome_src, board):
   return result
 
 
-def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
+def build_and_deploy(chrome_src,
+                     board,
+                     dut,
+                     targets,
+                     with_tests=True,
+                     nodeploy=False):
   """Build and deploy Chrome binaries to ChromeOS DUT
 
   Args:
@@ -287,10 +292,13 @@ def build_and_deploy(chrome_src, board, dut, targets, nodeploy=False):
     board: ChromeOS board name
     dut: DUT address
     targets: ninja targets. Default to build chrome.
+    with_tests: build test binaries as well if targets is not specified
     nodeploy: if True, only build, do not deploy
   """
   if not targets:
     targets = CHROME_BINARIES
+    if with_tests:
+      targets += get_chrome_test_binaries(chrome_src, board)
 
   logger.info('build %s', targets)
   env = os.environ.copy()

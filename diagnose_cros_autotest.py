@@ -18,7 +18,6 @@ import os
 
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
-from bisect_kit import cr_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import errors
 from bisect_kit import util
@@ -140,14 +139,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           self.config['session'])
       common_switch_cmd, common_eval_cmd = self._build_cmds()
 
-      if self.config['test_name']:
-        chrome_src = os.path.join(self.config['chrome_root'], 'src')
-        chrome_binaries = (
-            cr_util.CHROME_BINARIES + cr_util.get_chrome_test_binaries(
-                chrome_src, self.config['board']))
-      else:
-        chrome_binaries = None
-
       with cros_lab_util.dut_manager(
           self.config['dut'],
           lambda: diagnoser_cros.grab_dut(self.config)) as dut:
@@ -202,11 +193,12 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         eval_cmd = common_eval_cmd + ['--prebuilt']
 
-        if chrome_binaries:
+        chrome_with_tests = bool(self.config['test_name'])  # not CTS/GTS
+        if chrome_with_tests:
           # Now, the version of autotest on the DUT is unknown and may be even
           # not installed. Invoke the test once here, so
           #   - make sure autotest-deps is installed, with expected version
-          #   - autotest-deps is installed first, so our chrome_binaries
+          #   - autotest-deps is installed first, so our chrome test binaries
           #     won't be reset to default version during bisection.
           # It's acceptable to spend extra time to run test once because
           #   - only few tests do so
@@ -215,7 +207,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         try:
           if diagnoser.narrow_down_chrome(
-              eval_cmd, chrome_binaries=chrome_binaries):
+              eval_cmd, with_tests=chrome_with_tests):
             return
         except errors.DiagnoseContradiction:
           raise

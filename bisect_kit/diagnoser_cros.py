@@ -343,10 +343,8 @@ class CrosDiagnoser(object):
         return verified
     return verified
 
-  def narrow_down_chrome(self,
-                         eval_cmd,
-                         extra_switch_cmd=None,
-                         chrome_binaries=None):
+  def narrow_down_chrome(self, eval_cmd, extra_switch_cmd=None,
+                         with_tests=True):
     """Bisect with Chrome localbuild.
 
     It's known that the version of ChromeOS has old behavior.
@@ -354,8 +352,7 @@ class CrosDiagnoser(object):
     Args:
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch chrome version
-      chrome_binaries: what chrome binaries to build and deploy. If None,
-          default is chrome.
+      with_tests: build test binaries as well
 
     Returns:
       True: culprit is inside Chrome
@@ -378,9 +375,8 @@ class CrosDiagnoser(object):
     logger.info('bisect chrome local build')
     session = '%s/%s' % (self.config['session'], self.cros_old)
     switch_cmd = ['./switch_cros_cr_localbuild_internal.py', '--dut', self.dut]
-    if chrome_binaries:
-      for target in chrome_binaries:
-        switch_cmd += ['--target', target]
+    if not with_tests:
+      switch_cmd.append('--without_tests')
     if self.config['chrome_deploy_image']:
       switch_cmd += [
           '--deploy_method=image',

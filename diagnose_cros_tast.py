@@ -14,11 +14,9 @@ will cut down the search range as narrow as it can.
 """
 from __future__ import print_function
 import logging
-import os
 
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
-from bisect_kit import cr_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import errors
 import setup_cros_bisect
@@ -66,11 +64,6 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           self.config['session'])
       common_eval_cmd = self._build_cmds()
 
-      chrome_src = os.path.join(self.config['chrome_root'], 'src')
-      chrome_binaries = (
-          cr_util.CHROME_BINARIES + cr_util.get_chrome_test_binaries(
-              chrome_src, self.config['board']))
-
       with cros_lab_util.dut_manager(
           self.config['dut'],
           lambda: diagnoser_cros.grab_dut(self.config)) as dut:
@@ -114,8 +107,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             eval_cmd = common_eval_cmd + ['--tast_build']
           else:
             eval_cmd = common_eval_cmd
-          if diagnoser.narrow_down_chrome(
-              eval_cmd, chrome_binaries=chrome_binaries):
+          if diagnoser.narrow_down_chrome(eval_cmd):
             return
         except errors.DiagnoseContradiction:
           raise

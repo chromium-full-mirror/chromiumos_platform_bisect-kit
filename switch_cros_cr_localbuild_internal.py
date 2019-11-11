@@ -73,12 +73,21 @@ def create_argument_parser():
       type=cli.argtype_dir_path,
       default=configure.get('CHROME_MIRROR', ''),
       help='gclient cache dir')
-  parser.add_argument(
+
+  group = parser.add_mutually_exclusive_group()
+  group.add_argument(
       '--target',
       action='append',
       help='Binary to build and deploy, like unittest or fuzzers. '
       'Example value: "video_decode_accelerator_unittest". '
       'This option could be specified multiple times.')
+  group.add_argument(
+      '--without_tests',
+      action='store_false',
+      dest='with_tests',
+      help='(if --target is not specified) '
+      'Besides chrome, build test binaries as well.')
+
   parser.add_argument(
       '--deploy_method',
       choices=['chrome_deploy', 'image'],
@@ -183,6 +192,7 @@ def main(args=None):
         opts.board,
         opts.dut,
         opts.target,
+        opts.with_tests,
         nodeploy=opts.nodeploy)
   elif opts.deploy_method == 'image':
     try:
