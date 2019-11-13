@@ -24,6 +24,7 @@ import re
 import subprocess
 import time
 
+from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import cr_util
@@ -46,7 +47,6 @@ gs_release_path = (
 
 # Assume gsutil is in PATH.
 gsutil_bin = 'gsutil'
-bb_bin = 'bb'
 
 # Since snapshots with version >= 12618.0.0 have android and chrome version
 # info.
@@ -288,41 +288,6 @@ def gs_release_boardpath(board):
     normalized board name
   """
   return board.replace('_', '-')
-
-
-def bb(*args, **kwargs):
-  """bb command line wrapper.
-
-  Args:
-    args: command line arguments passed to bb
-    kwargs:
-      parse_json: if True, return json parsed object of output
-
-  Returns:
-    stdout of bb
-
-  Raises:
-    errors.ExternalError: bb failed to run
-    subprocess.CalledProcessError: command failed
-  """
-  stderr_lines = []
-  try:
-    result = util.check_output(
-        bb_bin, *args, stderr_callback=stderr_lines.append)
-    if kwargs.get('parse_json'):
-      result = json.loads(result)
-    return result
-  except subprocess.CalledProcessError as e:
-    stderr = ''.join(stderr_lines)
-    if 'interactive login is required' in stderr:
-      raise errors.ExternalError(
-          '%s command is permission denied, please run %s auth-login' %
-          (bb_bin, bb_bin))
-    raise
-  except OSError as e:
-    if e.errno == errno.ENOENT:
-      raise errors.ExternalError('%s command is not found' % bb_bin)
-    raise
 
 
 def gsutil(*args, **kwargs):
@@ -943,10 +908,11 @@ def version_info(board, version):
       android_branch: Android branch, in format like 'git_nyc-mr1-arc'
   """
   if is_cros_snapshot_version(version):
+    api = buildbucket_util.BuildbucketApi()
     milestone, short_version, _ = snapshot_version_split(version)
     buildbucket_id = query_snapshot_buildbucket_id(board, version)
-    data = bb('get', buildbucket_id, '-json', '-p', parse_json=True)
-    target_versions = data['output']['properties']['target_versions']
+    data = api.get(int(buildbucket_id)).output.properties
+    target_versions = data['target_versions']
     return {
         VERSION_KEY_MILESTONE: milestone,
         VERSION_KEY_CROS_FULL_VERSION: version,
