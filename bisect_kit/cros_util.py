@@ -471,7 +471,7 @@ def extract_major_version(version):
   """Converts a version to its major version.
 
   Args:
-    version: ChromsOS version number or snapshot version
+    version: ChromeOS version number or snapshot version
 
   Returns:
     major version number in string format
@@ -514,7 +514,7 @@ def version_to_full(board, version):
 
 
 def list_snapshots_from_image_archive(board, major_version):
-  """List ChromeOS snapshot image avaliable from gs://chromeos-image-archive.
+  """List ChromeOS snapshot image available from gs://chromeos-image-archive.
 
   Args:
     board: ChromeOS board
