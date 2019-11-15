@@ -382,15 +382,23 @@ def lease_keeper(dut_name, quit_event):
   """
 
   try:
+    previous_status = {}
     while True:
-      previous_lease = query_lease_status(dut_name)
-      if not (previous_lease['is_leased'] and
-              previous_lease['is_leased_by_me']):
-        raise errors.DutLeaseException(
-            'the DUT is expected to be leased by me, but not: %s' %
-            previous_lease)
+      lease_status = query_lease_status(dut_name)
+      if not (lease_status['is_leased'] and lease_status['is_leased_by_me']):
+        if previous_status and previous_status.get('task_id'):
+          task_url = ('https://chromeos-swarming.appspot.com/task?id=%s' %
+                      previous_status['task_id'])
+          raise errors.DutLeaseException(
+              'the DUT was leased by me %s , but now is not unexpectedly: %s' %
+              (task_url, lease_status))
+        else:
+          raise errors.DutLeaseException(
+              'the DUT is expected to be leased by me, but not: %s' %
+              lease_status)
+      previous_status = lease_status
 
-      expire_time = previous_lease['start_time'] + previous_lease['duration']
+      expire_time = lease_status['start_time'] + lease_status['duration']
       # We need buffer time (like querying lease status, network latency, etc.)
       # before actual lease request, 100 must be enough.
       to_lease_again = expire_time - 100
@@ -410,14 +418,14 @@ def lease_keeper(dut_name, quit_event):
       logger.info("Previous lease is near expiration, let's lease again")
       this_lease = skylab_lease_dut(dut_name)
       if not this_lease:
-        raise errors.DutLeaseException('failed to lease again')
+        raise errors.DutLeaseException('unable to extend the lease')
 
       # leased, but need to verify in case of race condition
-      tasks = swarming_bot_tasks(previous_lease['bot_id'], limit=5)
+      tasks = swarming_bot_tasks(lease_status['bot_id'], limit=5)
       assert len(tasks) >= 2
       assert tasks[0]['task_id'] == this_lease['task_id']
       for i, task in enumerate(tasks[1:], 1):
-        if task['task_id'] == previous_lease['task_id']:
+        if task['task_id'] == lease_status['task_id']:
           if i > 1:
             logger.error('detected race condition')
             logger.error('cancel our recent lease task')
@@ -432,7 +440,7 @@ def lease_keeper(dut_name, quit_event):
         raise errors.DutLeaseException(
             'not found previous lease task in task list')
   except errors.DutLeaseException:
-    logger.exception('failed to lease again')
+    logger.exception('bad lease state, abort')
     # SIGINT will be translated to KeyboardInterrupt.
     os.kill(os.getpid(), signal.SIGINT)
     return
