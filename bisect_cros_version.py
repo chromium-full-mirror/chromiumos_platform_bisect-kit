@@ -69,7 +69,7 @@ class ChromeOSVersionDomain(core.BisectDomain):
     parser.add_argument(
         '--experimental_use_snapshot',
         action='store_true',
-        help='Use snapshot to bisect chromeos prebuild')
+        help='Use snapshot to bisect chromeos prebuilt')
 
   @staticmethod
   def init(opts):

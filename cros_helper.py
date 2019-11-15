@@ -83,7 +83,7 @@ def do_allocate_dut(opts):
                       cros_lab_util.normalize_sku_name(opts.sku))
 
   while True:
-    # Query every time because each iteration takes 10+ miuntes
+    # Query every time because each iteration takes 10+ minutes
     bots = cros_lab_util.swarming_bots_list(dimensions, is_busy=False)
     if not bots:
       bots = cros_lab_util.swarming_bots_list(dimensions)
