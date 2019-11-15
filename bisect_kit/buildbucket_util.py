@@ -57,8 +57,8 @@ class BuildbucketApi(object):
     folder = os.path.dirname(os.path.realpath(swarming_py))
     self.swarming_auth = os.path.join(folder, 'auth.py')
     if not os.path.exists(self.swarming_auth):
-      raise errors.InternalError('auth.py not found in swarming folder: %s' %
-                                 folder)
+      raise errors.InternalError(
+          'auth.py not found in swarming folder: %s' % folder)
 
   def _get_token(self):
     """Returns access_token saved in cache file.
