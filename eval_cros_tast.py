@@ -202,12 +202,17 @@ def main(args=None):
   # Remove the "tast." prefix prepended by autotest.
   opts.test_name = re.sub(r'^tast\.', '', opts.test_name)
 
-  tast_bundle_info = get_tast_bundle_info(opts, opts.test_name)
-  if not tast_bundle_info:
-    tast_bundle_info = get_tast_bundle_info(opts)
-    util.show_similar_candidates('test name', opts.test_name,
-                                 list(tast_bundle_info))
-    return FATAL
+  try:
+    tast_bundle_info = get_tast_bundle_info(opts, opts.test_name)
+    if not tast_bundle_info:
+      tast_bundle_info = get_tast_bundle_info(opts)
+      util.show_similar_candidates('test name', opts.test_name,
+                                   list(tast_bundle_info))
+      return FATAL
+  except subprocess.CalledProcessError:
+    logger.exception(
+        'failed to get tast bundle info, assume it is temporary; SKIP')
+    return SKIP
 
   if len(tast_bundle_info) != 1 or opts.test_name not in tast_bundle_info:
     # For example, tast in chroot after 12205.0.0 is IPC incompatible with
