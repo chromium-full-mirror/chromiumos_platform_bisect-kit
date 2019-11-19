@@ -1147,6 +1147,12 @@ def check_if_need_recreate_chroot(stdout, stderr):
   if "undefined reference to 'std::__1::basic_string" in stdout:
     return 'might be due to compiler change'
 
+  if re.search(r'NOT merged due to\n.*file collisions', stdout):
+    # For example, kernel uprev from 3.x to 4.x, they are two separate packages
+    # and conflict with each other. Other possible cases are package renaming or
+    # refactoring. Let's recreate chroot to work around them.
+    return 'failed to install package due to file collision'
+
   return None
 
 
