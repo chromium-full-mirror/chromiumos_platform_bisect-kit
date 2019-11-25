@@ -378,7 +378,8 @@ class RepoMirror(codechange.CodeStorage):
 
   def _load_project_list(self, project_root):
     repo_project_list = os.path.join(project_root, '.repo', 'project.list')
-    return open(repo_project_list).readlines()
+    with open(repo_project_list) as f:
+      return f.readlines()
 
   def _save_project_list(self, project_root, lines):
     repo_project_list = os.path.join(project_root, '.repo', 'project.list')

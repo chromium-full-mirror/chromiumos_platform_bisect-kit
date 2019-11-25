@@ -737,10 +737,14 @@ class NoisyBinarySearch(object):
     if confidence is None:
       confidence = self.confidence
 
+    def order_by_prob(x):
+      index, prob = x
+      return -prob, index
+
     # Non-zero probabilities sorted by prob (big to small), then index (small
     # to big)
     sorted_prob = sorted(((i, p) for (i, p) in enumerate(self.prob) if p > 0),
-                         key=lambda (i, p): (-p, i))
+                         key=order_by_prob)
     cumulative = 0
     cut = None
     candidates = set()

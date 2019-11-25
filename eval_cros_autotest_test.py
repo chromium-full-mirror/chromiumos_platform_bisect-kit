@@ -16,7 +16,8 @@ class TestEvalCrosAutotest(unittest.TestCase):
   """Test eval_cros_autotest."""
 
   def test_parse_test_report_log(self):
-    result = open(testing.get_testdata_path('test_report.log')).read()
+    with open(testing.get_testdata_path('test_report.log')) as f:
+      result = f.read()
     self.assertEqual(
         eval_cros_autotest.parse_test_report_log(result,
                                                  'seconds_kernel_to_login'),

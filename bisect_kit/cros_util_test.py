@@ -10,7 +10,11 @@ import logging
 import subprocess
 import unittest
 
-import mock
+try:
+  from unittest import mock
+except ImportError:
+  # TODO(kcwu): remove once migrated to python3
+  import mock
 
 from bisect_kit import cli
 from bisect_kit import cros_util
@@ -81,7 +85,8 @@ class TestCrosUtil(unittest.TestCase):
       cros_util.argtype_cros_version('foobar')
 
   def test_lsb_release(self):
-    sample = open(testing.get_testdata_path('lsb-release')).read()
+    with open(testing.get_testdata_path('lsb-release')) as f:
+      sample = f.read()
     with mock.patch('bisect_kit.util.check_output', return_value=sample):
       dummy_dut = 'dummy'
       self.assertTrue(cros_util.is_dut(dummy_dut))
@@ -157,7 +162,8 @@ class TestCrosUtil(unittest.TestCase):
           'R64-10123.0.0')
 
   def test_version_info(self):
-    sample = open(testing.get_testdata_path('partial-metadata.json')).read()
+    with open(testing.get_testdata_path('partial-metadata.json')) as f:
+      sample = f.read()
     with mock.patch.object(cros_util, 'gsutil', return_value=sample):
       info = cros_util.version_info('caroline', '9462.0.0')
       self.assertEqual(info[cros_util.VERSION_KEY_CROS_SHORT_VERSION],

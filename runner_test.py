@@ -8,7 +8,11 @@ from __future__ import print_function
 import argparse
 import unittest
 
-import mock
+try:
+  from unittest import mock
+except ImportError:
+  # TODO(kcwu): remove once migrated to python3
+  import mock
 
 import runner
 from bisect_kit import common

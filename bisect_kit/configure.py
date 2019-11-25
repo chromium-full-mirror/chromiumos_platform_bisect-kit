@@ -12,6 +12,8 @@ import os
 import re
 import sys
 
+import six
+
 logger = logging.getLogger(__name__)
 
 SUPPRESS_CONFIG = 'none'
@@ -70,7 +72,8 @@ class ConfigStore(object):
     if not self.path:
       return
 
-    content = open(self.path).read()
+    with open(self.path) as f:
+      content = f.read()
     # strip comments as they are not allowed in standard json
     content = re.sub(r'^\s*//.*', '', content, 0, re.M)
 
@@ -97,7 +100,9 @@ class ConfigStore(object):
       if not os.path.exists(path):
         raise ValueError('%s plugin %r: file not found' % (self.path, path))
       module = {}
-      exec open(path) in module  # pylint: disable=exec-used
+      with open(path) as f:
+        code = compile(f.read(), path, 'exec')
+        six.exec_(code, module)
       loaded_func = module.get('loaded', None)
       if loaded_func:
         loaded_func()

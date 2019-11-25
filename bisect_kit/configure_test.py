@@ -12,7 +12,11 @@ import tempfile
 import textwrap
 import unittest
 
-import mock
+try:
+  from unittest import mock
+except ImportError:
+  # TODO(kcwu): remove once migrated to python3
+  import mock
 
 from bisect_kit import common
 from bisect_kit import configure
@@ -60,7 +64,8 @@ class TestConfigure(unittest.TestCase):
   def test_scoped_file(self):
     with scoped_file(self.cwddir, 'foo', 'abc') as path:
       assert os.path.exists(path)
-      self.assertEqual(open(path).read(), 'abc')
+      with open(path) as f:
+        self.assertEqual(f.read(), 'abc')
     assert not os.path.exists(path)
 
   def test_search_config_file(self):

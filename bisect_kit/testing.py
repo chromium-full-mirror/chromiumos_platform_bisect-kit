@@ -6,9 +6,13 @@
 
 from __future__ import print_function
 import os
-
 import contextlib
-import mock
+
+try:
+  from unittest import mock
+except ImportError:
+  # TODO(kcwu): remove once migrated to python3
+  import mock
 
 
 def get_testdata_path(filename=None):
@@ -40,6 +44,7 @@ def mock_function_by_file(module, name, filename):
   Returns:
     context manager, which mocks the said function within its scope.
   """
-  data = open(get_testdata_path(filename)).read()
+  with open(get_testdata_path(filename)) as f:
+    data = f.read()
   with mock.patch.object(module, name, return_value=data):
     yield

@@ -440,7 +440,8 @@ def list_board_names(chromeos_root):
     if not name:
       name_file = os.path.join(overlay, 'profiles', 'repo_name')
       if os.path.exists(name_file):
-        name = open(name_file).read().strip()
+        with open(name_file) as f:
+          name = f.read().strip()
 
     if name:
       name = re.sub(r'-private$', '', name)
@@ -1305,7 +1306,8 @@ def parse_autotest_control_file(path):
     AutotestControlInfo object
   """
   variables = {}
-  code = ast.parse(open(path).read())
+  with open(path) as f:
+    code = ast.parse(f.read())
   for stmt in code.body:
     # Skip if not simple "NAME = *" assignment.
     if not (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and
@@ -1631,7 +1633,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
     if spec.spec_type == codechange.SPEC_FIXED:
       manifest_name = self.get_manifest(spec.name)
       manifest_path = os.path.join(self.manifest_dir, manifest_name)
-      content = open(manifest_path).read()
+      with open(manifest_path) as f:
+        content = f.read()
       root = parser.parse_single_xml(content, allow_include=False)
     else:
       root = parser.parse_xml_recursive(spec.name, spec.path)

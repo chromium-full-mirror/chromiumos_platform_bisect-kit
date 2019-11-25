@@ -36,7 +36,8 @@ class TestCommon(unittest.TestCase):
     common.config_logging(opts)
 
     logger.debug('test')
-    self.assertIn('test', open(self.log_file).read())
+    with open(self.log_file) as f:
+      self.assertIn('test', f.read())
 
 
 if __name__ == '__main__':

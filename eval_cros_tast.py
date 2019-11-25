@@ -153,7 +153,8 @@ def run_test(opts, bundle):
 def gather_test_result(opts, result_dir):
   error_path = os.path.join(result_dir, 'run_error.txt')
   if os.path.exists(error_path):
-    message = open(error_path).read()
+    with open(error_path) as f:
+      message = f.read()
     raise Exception('tast global error: %s' % message)
 
   results_path = os.path.join(result_dir, 'results.json')

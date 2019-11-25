@@ -139,7 +139,8 @@ def get_benchmark_values(json_path, metric):
     logger.warning('benchmark result file not found: %s', json_path)
     return None
 
-  content = open(json_path).read()
+  with open(json_path) as f:
+    content = f.read()
   traces = parse_results_chart_json(content)
   for subtest_name, values in traces.items():
     if not match_trace_name(metric, subtest_name):

@@ -162,9 +162,10 @@ def prepare_to_run_test(opts):
   # versions earlier than R73-11445.0.0.
   ssh_path = os.path.join(opts.chromeos_root, 'chroot/usr/bin/ssh')
   if os.path.exists(ssh_path):
-    if 'file descriptor passing not supported' in open(ssh_path).read():
-      cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge',
-                         'net-misc/openssh')
+    with open(ssh_path) as f:
+      if b'file descriptor passing not supported' in f.read():
+        cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge',
+                           'net-misc/openssh')
 
   # test_that may use this ssh key and ssh complains its permission is too open.
   # chmod every time just before run test_that because the permission may change
@@ -237,7 +238,8 @@ def run_test(opts):
 
 def gather_test_result(opts, result_dir):
   result_log_path = os.path.join(result_dir, 'test_report.log')
-  result_log = open(result_log_path).read()
+  with open(result_log_path) as f:
+    result_log = f.read()
 
   passed, values = parse_test_report_log(result_log, opts.metric)
   if opts.metric and not values:

@@ -68,7 +68,7 @@ class GitOperation(object):
                          stdin=subprocess.PIPE,
                          cwd=self.git_repo,
                          env=env)
-    p.communicate(message)
+    p.communicate(message.encode('utf-8'))
     assert p.returncode == 0
 
     git_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
@@ -173,9 +173,11 @@ class TestGitOperation(unittest.TestCase):
 
   def test_checkout_version(self):
     full_path = os.path.join(self.git_repo, self.git.default_filename)
-    self.assertEqual(open(full_path).read(), 'commit 5')
+    with open(full_path) as f:
+      self.assertEqual(f.read(), 'commit 5')
     git_util.checkout_version(self.git_repo, self.commits[1])
-    self.assertEqual(open(full_path).read(), 'commit 2')
+    with open(full_path) as f:
+      self.assertEqual(f.read(), 'commit 2')
 
   def test_get_commit_log(self):
     self.assertIn('commit 2',
@@ -286,22 +288,26 @@ class TestGitOperation(unittest.TestCase):
 
   def test_reset_hard(self):
     path = os.path.join(self.git_repo, self.git.default_filename)
-    content = open(path).read()
+    with open(path) as f:
+      content = f.read()
 
     # Nothing happened.
     git_util.reset_hard(self.git_repo)
-    self.assertEqual(open(path).read(), content)
+    with open(path) as f:
+      self.assertEqual(f.read(), content)
 
     # Modified.
     with open(path, 'w') as f:
       f.write(content + 'other data')
     git_util.reset_hard(self.git_repo)
-    self.assertEqual(open(path).read(), content)
+    with open(path) as f:
+      self.assertEqual(f.read(), content)
 
     # Deleted.
     os.unlink(path)
     git_util.reset_hard(self.git_repo)
-    self.assertEqual(open(path).read(), content)
+    with open(path) as f:
+      self.assertEqual(f.read(), content)
 
   def test_list_untracked(self):
     self.assertEqual(git_util.list_untracked(self.git_repo), [])

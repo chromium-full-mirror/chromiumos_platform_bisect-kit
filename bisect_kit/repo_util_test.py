@@ -10,7 +10,11 @@ import shutil
 import tempfile
 import unittest
 
-import mock
+try:
+  from unittest import mock
+except ImportError:
+  # TODO(kcwu): remove once migrated to python3
+  import mock
 
 from bisect_kit import errors
 from bisect_kit import git_util_test
