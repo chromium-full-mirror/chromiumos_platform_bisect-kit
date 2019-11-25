@@ -750,6 +750,7 @@ def prepare_snapshot_image(chromeos_root, board, snapshot_version):
     return rel_path
 
   assert False
+  return None
 
 
 def prepare_prebuilt_image(chromeos_root, board, version):
@@ -1467,8 +1468,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
     assert is_cros_full_version(rev) or is_cros_snapshot_version(rev)
     if is_cros_full_version(rev):
       return self.lookup_release_build_timestamp(rev)
-    else:
-      return self.lookup_snapshot_build_timestamp(rev)
+    return self.lookup_snapshot_build_timestamp(rev)
 
   def lookup_snapshot_build_timestamp(self, rev):
     assert is_cros_snapshot_version(rev)

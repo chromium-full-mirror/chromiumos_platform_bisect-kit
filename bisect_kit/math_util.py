@@ -10,6 +10,8 @@ import copy
 import math
 import sys
 
+import six
+
 
 def log(x):
   """Wrapper of log(x) handling zero and negative value."""
@@ -72,7 +74,7 @@ class EntropyStats(object):
 
     So we can maintain sum=|S| and sum_log=|\sum_i { p_i*log p_i }| for
     incremental update.
-  """
+  """  # pylint: disable=docstring-trailing-quotes
 
   def __init__(self, p):
     """Initializes EntropyStats.
@@ -209,14 +211,19 @@ class ExtendedFloat(object):
 
   __rmul__ = __mul__
 
-  def __div__(self, other):
+  def __truediv__(self, other):
     if not isinstance(other, ExtendedFloat):
       other = ExtendedFloat(other)
     return ExtendedFloat(self.mantissa / other.mantissa,
                          self.exponent - other.exponent)
 
-  def __rdiv__(self, other):
+  def __rtruediv__(self, other):
     return ExtendedFloat(other).__div__(self)
+
+  # TODO(kcwu): remove __div__ and __rdiv__ once we migrated to python3
+  if six.PY2:
+    __div__ = __truediv__
+    __rdiv__ = __rtruediv__
 
   def __repr__(self):
     return 'ExtendedFloat(%f, %d)' % (self.mantissa, self.exponent)

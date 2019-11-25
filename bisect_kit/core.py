@@ -103,7 +103,7 @@ class RevInfo(object):
 
   def reclassify(self, old_avg, threshold, new_avg):
     """Reclassify status by values."""
-    assert self['init'] == len(self.values) > 0
+    assert self['init'] == len(self.values) and self.values
     assert self['old'] + self['new'] == 0
     for avg in self.averages():
       if old_avg < new_avg:

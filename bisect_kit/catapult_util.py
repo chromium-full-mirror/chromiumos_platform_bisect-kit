@@ -44,7 +44,7 @@ def extract_values_from_trace(name, trace):
   """
   if 'type' not in trace:
     logger.warning('trace %s: unknown type', name)
-    return
+    return None
 
   if trace['type'] == 'scalar':
     values = [trace.get('value')]
@@ -52,7 +52,7 @@ def extract_values_from_trace(name, trace):
     values = trace.get('values')
   else:
     logger.warning('trace %s: type=%s is not supported', name, trace['type'])
-    return
+    return None
 
   if not values or values[0] is None:
     if trace.get('none_value_reason'):
@@ -149,5 +149,5 @@ def get_benchmark_values(json_path, metric):
       return None
     return values
   logger.error('metric %s not found in %s', metric, json_path)
-  util.show_similar_candidates('metric name', metric, traces.keys())
+  util.show_similar_candidates('metric name', metric, list(traces.keys()))
   return None

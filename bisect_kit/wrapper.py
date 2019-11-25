@@ -8,7 +8,8 @@ import importlib
 import logging
 import subprocess
 import sys
-import StringIO
+
+import six
 
 from bisect_kit import bisector_cli
 from bisect_kit import core
@@ -40,12 +41,13 @@ class BisectorWrapper(object):
     stdout_bak = sys.stdout
     try:
       if kwargs.get('capture_output'):
-        sys.stdout = fake_stdout = StringIO.StringIO()
+        sys.stdout = fake_stdout = six.StringIO()
       bisector.main(*full_args, prog=self.name)
     finally:
       sys.stdout = stdout_bak
     if kwargs.get('capture_output'):
       return fake_stdout.getvalue()
+    return None
 
   def current_status(self):
     bisector = bisector_cli.BisectorCommandLine(self.domain_cls)

@@ -28,9 +28,9 @@ import logging
 import os
 import subprocess
 import time
-import urllib2
-import urlparse
 import xml.etree.ElementTree
+
+from six.moves import urllib
 
 from bisect_kit import common
 from bisect_kit import configure
@@ -220,7 +220,8 @@ def write_extra_manifest_to_mirror(repo_dir, removed):
     f.write("""<?xml version="1.0" encoding="UTF-8"?>\n<manifest>\n""")
     remotes = {}
     for path_spec in removed.values():
-      scheme, netloc, remote_path = urlparse.urlsplit(path_spec.repo_url)[:3]
+      scheme, netloc, remote_path = urllib.parse.urlsplit(
+          path_spec.repo_url)[:3]
       assert remote_path[0] == '/'
       remote_path = remote_path[1:]
       if (scheme, netloc) not in remotes:
@@ -266,7 +267,7 @@ def sync_chromeos_code(opts, path_factory):
 
 def query_chrome_latest_branch():
   result = None
-  r = urllib2.urlopen('https://omahaproxy.appspot.com/all')
+  r = urllib.request.urlopen('https://omahaproxy.appspot.com/all')
   for row in csv.DictReader(r):
     if row['true_branch'].isdigit():
       result = max(result, int(row['true_branch']))

@@ -6,9 +6,9 @@
 
 from __future__ import print_function
 import unittest
-import StringIO
 
 import mock
+import six
 
 from bisect_kit import bisector_cli
 import bisect_list
@@ -25,7 +25,7 @@ class TestListDomain(unittest.TestCase):
     # by its own unit test, not here.
     bisector = bisector_cli.BisectorCommandLine(bisect_list.ListDomain)
 
-    with mock.patch('sys.stdin', StringIO.StringIO('S\nM\nL\nXL\nXXL\n')):
+    with mock.patch('sys.stdin', six.StringIO('S\nM\nL\nXL\nXXL\n')):
       bisector.main('init', '--old', 'S', '--new', 'XXL')
 
     bisector.main('config', 'switch', '/bin/false')

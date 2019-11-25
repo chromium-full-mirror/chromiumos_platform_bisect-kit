@@ -14,7 +14,8 @@ import pprint
 import shutil
 import sys
 import tempfile
-import urlparse
+
+from six.moves import urllib
 
 from bisect_kit import codechange
 from bisect_kit import git_util
@@ -402,7 +403,7 @@ class TimeSeriesTree(object):
     assert timestamp not in self.snapshots
     self.snapshots[timestamp] = deps
 
-    for child_entry in set(self.alive_children.keys() + children_entries):
+    for child_entry in set(list(self.alive_children.keys()) + children_entries):
       # `child_entry` is added at `timestamp`
       if child_entry not in self.alive_children:
         self.alive_children[child_entry] = timestamp, deps
@@ -423,7 +424,7 @@ class TimeSeriesTree(object):
                              self.alive_children[child_entry][0], timestamp))
           self.alive_children[child_entry] = timestamp, deps
 
-  def no_more_snapshot(self, deps):
+  def no_more_snapshot(self):
     """Indicates all snapshots are added.
 
     add_snapshot() should not be invoked after no_more_snapshot().
@@ -657,7 +658,7 @@ class DepsParser(object):
           content, parent_vars=parent_vars, parent_path=parent_path)
       tstree.add_snapshot(timestamp, deps, deps.recursedeps)
 
-    tstree.no_more_snapshot(deps)
+    tstree.no_more_snapshot()
 
     for subtree in tstree.subtrees:
       path, deps_file = subtree.entry
@@ -686,7 +687,7 @@ class GclientCache(codechange.CodeStorage):
 
   def _url_to_cache_dir(self, url):
     # ref: depot_tools' git_cache.Mirror.UrlToCacheDir
-    parsed = urlparse.urlparse(url)
+    parsed = urllib.parse.urlparse(url)
     norm_url = parsed.netloc + parsed.path
     if norm_url.endswith('.git'):
       norm_url = norm_url[:-len('.git')]

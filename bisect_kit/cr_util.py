@@ -13,7 +13,8 @@ import shutil
 import subprocess
 import textwrap
 import time
-import urllib2
+
+from six.moves import urllib
 
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -212,7 +213,7 @@ def query_git_rev(chrome_src, rev):
       # Failed due to source code not synced yet? Anyway, query by web api
       url = 'https://omahaproxy.appspot.com/deps.json?version=' + rev
       logger.debug('fetch %s', url)
-      content = urllib2.urlopen(url).read()
+      content = urllib.request.urlopen(url).read()
       obj = json.loads(content)
       rev = obj['chromium_commit']
       if not git_util.is_git_rev(rev):

@@ -60,10 +60,10 @@ def fetch_android_build_data(url):
   # Following code is just serving as demo purpose. You should modify or hook
   # it with your own implementation.
   logger.warn('fetch_android_build_data need to be hooked')
-  import urllib2
+  from six.moves import urllib
   try:
-    return urllib2.urlopen(url).read()
-  except urllib2.URLError as e:
+    return urllib.request.urlopen(url).read()
+  except urllib.request.URLError as e:
     logger.exception('failed to fetch "%s"', url)
     raise errors.ExternalError(str(e))
 

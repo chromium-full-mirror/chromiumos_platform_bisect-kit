@@ -125,8 +125,7 @@ class CrosDiagnoser(object):
   def _verified_chromeos_prebuilt(self):
     if self.config['bypass_chromeos_prebuilt']:
       return 'assume'
-    else:
-      return 'verified'
+    return 'verified'
 
   def narrow_down_chromeos_prebuilt(self,
                                     old,

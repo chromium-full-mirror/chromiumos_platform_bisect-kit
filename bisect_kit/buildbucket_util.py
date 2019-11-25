@@ -6,7 +6,6 @@
 """
 
 from distutils.spawn import find_executable
-import httplib
 import json
 import logging
 import os
@@ -14,6 +13,8 @@ import re
 import shutil
 import tempfile
 import time
+
+from six.moves import http_client
 
 # from third_party
 from google.protobuf.field_mask_pb2 import FieldMask
@@ -143,7 +144,7 @@ class BuildbucketApi(object):
     Raises:
       errors.ExternalError: api request fail
     """
-    conn = httplib.HTTPSConnection(self.buildbucket_domain, timeout=5)
+    conn = http_client.HTTPSConnection(self.buildbucket_domain, timeout=5)
     conn.request('POST', self.buildbucket_api_path + api,
                  request.SerializeToString(), self._get_header())
     response = conn.getresponse()

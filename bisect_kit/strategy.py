@@ -253,12 +253,12 @@ class NoisyBinarySearch(object):
         self.rev_info[self.new_idx].reclassify(self.old_avg, self.threshold,
                                                self.new_avg)
 
-    if self._state == self.STARTED:
-      if self.prob is None:
-        self._rebuild()
-        self._estimate_model()
-        assert self.prob
-      return self._state
+    assert self._state == self.STARTED, 'unexpected state: %s' % self._state
+    if self.prob is None:
+      self._rebuild()
+      self._estimate_model()
+      assert self.prob
+    return self._state
 
   def add_sample(self, idx, status=None, **kwargs):
     sample = dict(status=status, **kwargs)
@@ -659,8 +659,7 @@ class NoisyBinarySearch(object):
     avg = math_util.average(values)
     if self.old_avg < self.new_avg:
       return 'old' if avg < self.threshold else 'new'
-    else:
-      return 'new' if avg < self.threshold else 'old'
+    return 'new' if avg < self.threshold else 'old'
 
   def _update(self, idx, result):
     """Incremental update by one more test result.

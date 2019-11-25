@@ -13,8 +13,9 @@ import logging
 import os
 import re
 import subprocess
-import urlparse
 import xml.etree.ElementTree
+
+from six.moves import urllib
 
 from bisect_kit import codechange
 from bisect_kit import errors
@@ -263,7 +264,7 @@ def _urljoin(base, url):
   assert not url.startswith(dummy_scheme)
   base = re.sub('^' + new_scheme, dummy_scheme, base)
   url = re.sub('^' + new_scheme, dummy_scheme, url)
-  result = urlparse.urljoin(base, url)
+  result = urllib.parse.urljoin(base, url)
   result = re.sub('^' + dummy_scheme, new_scheme, result)
   return result
 
@@ -305,7 +306,7 @@ class ManifestParser(object):
     for remote in root.findall('.//remote'):
       name = remote.get('name')
       fetch_url = _urljoin(self.manifest_url, remote.get('fetch'))
-      if urlparse.urlparse(fetch_url).path not in ('', '/'):
+      if urllib.parse.urlparse(fetch_url).path not in ('', '/'):
         # TODO(kcwu): support remote url with sub folders
         raise errors.InternalError(
             'only support git repo at root path of remote server: %s' %
@@ -361,7 +362,7 @@ class RepoMirror(codechange.CodeStorage):
   def _url_to_cache_dir(self, url):
     # Here we assume remote fetch url is always at root of server url, so we can
     # simply treat whole path as repo project name.
-    path = urlparse.urlparse(url).path
+    path = urllib.parse.urlparse(url).path
     assert path[0] == '/'
     return '%s.git' % path[1:]
 

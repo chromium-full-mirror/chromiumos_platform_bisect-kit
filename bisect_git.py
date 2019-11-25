@@ -43,11 +43,11 @@ class GitDomain(core.BisectDomain):
     try:
       opts.old = git_util.get_commit_hash(opts.git_repo, opts.old)
     except ValueError as e:
-      raise errors.ArgumentError('--old', e.message)
+      raise errors.ArgumentError('--old', str(e))
     try:
       opts.new = git_util.get_commit_hash(opts.git_repo, opts.new)
     except ValueError as e:
-      raise errors.ArgumentError('--new', e.message)
+      raise errors.ArgumentError('--new', str(e))
 
     config = dict(git_repo=opts.git_repo)
     revlist = git_util.get_revlist(opts.git_repo, opts.old, opts.new)
