@@ -112,7 +112,7 @@ def get_build_ids_between(branch, flavor, start, end):
     url = BUILD_IDS_BETWEEN_URL_TEMPLATE.format(
         branch=branch, start=start, end=tmp_end)
     query_result = json.loads(fetch_android_build_data(url).decode('utf-8'))
-    found_new = set(map(int, query_result['ids'])) - build_id_set
+    found_new = set(int(x) for x in query_result['ids']) - build_id_set
     if not found_new:
       break
     build_id_set.update(found_new)
@@ -120,7 +120,7 @@ def get_build_ids_between(branch, flavor, start, end):
 
   logger.debug('Found %d builds in the range.', len(build_id_set))
 
-  return map(str, sorted(build_id_set))
+  return [str(bid) for bid in sorted(build_id_set)]
 
 
 def lunch(android_root, flavor, *args, **kwargs):

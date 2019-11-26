@@ -39,7 +39,7 @@ def get_revlist(board, old, new, use_snapshot=False):
   logger.info('use_snapshot: %s', use_snapshot)
   full_versions = cros_util.list_chromeos_prebuilt_versions(
       board, old, new, use_snapshot=use_snapshot)
-  short_versions = map(cros_util.version_to_short, full_versions)
+  short_versions = [cros_util.version_to_short(v) for v in full_versions]
 
   old_idx = short_versions.index(cros_util.version_to_short(old))
   new_idx = short_versions.index(cros_util.version_to_short(new))

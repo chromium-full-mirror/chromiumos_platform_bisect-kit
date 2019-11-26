@@ -76,7 +76,7 @@ class RevInfo(object):
 
     In other words, one (average) value for each sample.
     """
-    return map(math_util.average, self.values)
+    return [math_util.average(v) for v in self.values]
 
   def add_sample(self,
                  status=None,

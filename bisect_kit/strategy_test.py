@@ -262,7 +262,7 @@ class TestNoisyBinarySearch(unittest.TestCase):
         count: Number of eval.
         guess: Best guess.
     """
-    rev_info = map(core.RevInfo, map(str, list(range(size))))
+    rev_info = [core.RevInfo(str(i)) for i in range(size)]
     bsearch = strategy.NoisyBinarySearch(
         rev_info,
         confidence=confidence,

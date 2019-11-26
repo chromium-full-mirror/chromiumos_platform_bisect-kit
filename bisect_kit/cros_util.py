@@ -368,7 +368,8 @@ def gsutil_stat_update_time(*args, **kwargs):
   for line in gsutil('stat', *args, **kwargs).splitlines():
     if ':' not in line:
       continue
-    key, value = map(str.strip, line.split(':', 1))
+    key, value = line.split(':', 1)
+    key, value = key.strip(), value.strip()
     if key != 'Update time':
       continue
     dt = datetime.datetime.strptime(value, time_format)

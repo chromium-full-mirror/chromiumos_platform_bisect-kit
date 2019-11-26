@@ -246,7 +246,7 @@ def main(args=None):
       logger.warning('no values found; SKIP')
       return SKIP
 
-    print('BISECT_RESULT_VALUES=', ' '.join(map(str, values)))
+    print('BISECT_RESULT_VALUES=', ' '.join(str(v) for v in values))
     logger.info('values=%s', values)
     # The exit code doesn't matter.
     return OLD

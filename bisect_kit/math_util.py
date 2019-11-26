@@ -84,7 +84,7 @@ class EntropyStats(object):
       p: A list of probability value. Could be unnormalized.
     """
     self.sum = sum(p)
-    self.sum_log = sum(map(_xlogx, p))
+    self.sum_log = sum(_xlogx(x) for x in p)
 
   def entropy(self):
     """Returns cross entropy."""

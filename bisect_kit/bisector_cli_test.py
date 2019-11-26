@@ -19,7 +19,6 @@ except ImportError:
   # TODO(kcwu): remove once migrated to python3
   import mock
 
-
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
@@ -48,7 +47,7 @@ class DummyDomain(core.BisectDomain):
         old=opts.old,
         new=opts.new)
 
-    revlist = map(str, list(range(opts.num)))
+    revlist = [str(i) for i in range(opts.num)]
     return config, revlist
 
   def __init__(self, config):

@@ -47,7 +47,7 @@ class ListDomain(core.BisectDomain):
   @staticmethod
   def init(opts):
     config = {}
-    revlist = map(str.strip, sys.stdin.readlines())
+    revlist = [line.strip() for line in sys.stdin.readlines()]
     return config, revlist
 
   def __init__(self, config):

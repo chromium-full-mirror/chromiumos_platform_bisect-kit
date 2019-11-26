@@ -40,7 +40,7 @@ def _collect_bisect_result_values(values, line):
   m = re.match(r'^BISECT_RESULT_VALUES=(.+)', line)
   if m:
     try:
-      values.extend(map(float, m.group(1).split()))
+      values.extend([float(v) for v in m.group(1).split()])
     except ValueError:
       raise errors.InternalError(
           'BISECT_RESULT_VALUES should be list of floats: %r' % m.group(1))
@@ -398,11 +398,14 @@ class BisectorCommandLine(object):
     except errors.WrongAssumption:
       pass
     else:
-      old, new = map(self.states.idx2rev, [old_idx, new_idx])
+      old = self.states.idx2rev(old_idx)
+      new = self.states.idx2rev(new_idx)
       summary.update({
           'current_range': (old, new),
-          'highlight_range':
-              map(self.states.idx2rev, [highlight_old_idx, highlight_new_idx]),
+          'highlight_range': [
+              self.states.idx2rev(highlight_old_idx),
+              self.states.idx2rev(highlight_new_idx)
+          ],
           'prob':
               self.strategy.get_prob(),
           'remaining_steps':
@@ -435,7 +438,8 @@ class BisectorCommandLine(object):
 
     if 'current_range' in summary:
       old, new = summary['current_range']
-      old_idx, new_idx = map(self.states.data['revlist'].index, [old, new])
+      old_idx = self.states.data['revlist'].index(old)
+      new_idx = self.states.data['revlist'].index(new)
       print('Range: (%s, %s], %s revs left' % (old, new, (new_idx - old_idx)))
       if summary.get('remaining_steps'):
         print('(roughly %d steps)' % summary['remaining_steps'])

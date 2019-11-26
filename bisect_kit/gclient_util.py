@@ -156,9 +156,8 @@ def write_gclient_entries(gclient_dir, projects):
   """Writes .gclient_entries."""
   repo_project_list = os.path.join(gclient_dir, '.gclient_entries')
   content = 'entries = {\n'
-  for item in sorted(projects.items()):
-    path, repo_url = map(pprint.pformat, item)
-    content += '  %s: %s,\n' % (path, repo_url)
+  for path, repo_url in sorted(projects.items()):
+    content += '  %s: %s,\n' % (pprint.pformat(path), pprint.pformat(repo_url))
   content += '}\n'
   with open(repo_project_list, 'w') as f:
     f.write(content)

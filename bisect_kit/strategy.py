@@ -300,7 +300,7 @@ class NoisyBinarySearch(object):
     for term in observation.split(','):
       m = re.match(r'^(old|new)=(\d+)/(\d+)$', term)
       assert m
-      new_behavior, trial = map(int, m.group(2, 3))
+      new_behavior, trial = int(m.group(2)), int(m.group(3))
       assert 0 <= new_behavior <= trial
 
       if m.group(1) == 'new':
@@ -565,7 +565,7 @@ class NoisyBinarySearch(object):
     min_prob = math_util.least([old_p, 1 - old_p, new_p, 1 - new_p])**(
         total_old + total_new) * math_util.least(prob)
     if min_prob < sys.float_info.min:
-      prob = map(math_util.ExtendedFloat, prob)
+      prob = [math_util.ExtendedFloat(p) for p in prob]
       old_p = math_util.ExtendedFloat(old_p)
       new_p = math_util.ExtendedFloat(new_p)
 
@@ -611,7 +611,7 @@ class NoisyBinarySearch(object):
     prob = [x / sum_prob for x in prob]
 
     # Convert back to float.
-    prob = map(float, prob)
+    prob = [float(p) for p in prob]
     return prob
 
   def _rebuild(self):
@@ -921,7 +921,7 @@ class NoisyBinarySearch(object):
   def _next_idx_entropy(old_p, new_p, prob):
     """Determines next index to binary search according to information gain."""
     assert prob
-    orig_stats = math_util.EntropyStats(map(float, prob))
+    orig_stats = math_util.EntropyStats([float(p) for p in prob])
     new_stats = orig_stats.multiply(old_p)
     old_stats = orig_stats.multiply(1.0 - old_p)
 
