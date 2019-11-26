@@ -132,6 +132,40 @@ class TestExtendedFloat(unittest.TestCase):
     self.assertNotEqual(self.small_ex, self.zero)
     self.assertNotEqual(self.tiny_ex, self.zero)
 
+  def test_eq(self):
+    # Use assertTrue() instead of rich assert functions in order to invoke the
+    # intended operator.
+    self.assertTrue(ExtendedFloat(0) == ExtendedFloat(0))
+    self.assertTrue(ExtendedFloat(1) == ExtendedFloat(1))
+    self.assertTrue(ExtendedFloat(16) == ExtendedFloat(1, 4))
+    self.assertTrue(ExtendedFloat(-20) == ExtendedFloat(-20))
+    self.assertTrue(ExtendedFloat(1) == 1)
+    # pylint: disable=misplaced-comparison-constant
+    self.assertTrue(1 == ExtendedFloat(1))
+
+  def test_ne(self):
+    # Use assertTrue() instead of rich assert functions in order to invoke the
+    # intended operator.
+    self.assertTrue(ExtendedFloat(1) != ExtendedFloat(-1))
+    self.assertTrue(ExtendedFloat(1) != ExtendedFloat(0))
+
+  def test_lt(self):
+    # Use assertTrue() instead of rich assert functions in order to invoke the
+    # intended operator.
+    self.assertTrue(ExtendedFloat(0) < ExtendedFloat(2))
+    self.assertTrue(ExtendedFloat(0) < ExtendedFloat(10))
+    self.assertTrue(ExtendedFloat(-10) < ExtendedFloat(10))
+    self.assertTrue(ExtendedFloat(-10) < ExtendedFloat(0))
+    self.assertTrue(ExtendedFloat(-8) < ExtendedFloat(-2))
+    self.assertTrue(ExtendedFloat(0.125) < ExtendedFloat(0.25))
+    self.assertTrue(ExtendedFloat(0) < ExtendedFloat(0.25))
+    self.assertTrue(ExtendedFloat(0.5) < ExtendedFloat(0.6))
+
+    self.assertTrue(ExtendedFloat(0.5) < ExtendedFloat(1))
+    self.assertTrue(ExtendedFloat(-1) < ExtendedFloat(-0.5))
+    self.assertTrue(ExtendedFloat(-0.25) < ExtendedFloat(-0.125))
+    self.assertTrue(ExtendedFloat(-0.6) < ExtendedFloat(-0.5))
+
   def test_neg(self):
     self.assertEqual(-self.zero, 0)
     self.assertEqual(-(-1 * self.zero), 0)

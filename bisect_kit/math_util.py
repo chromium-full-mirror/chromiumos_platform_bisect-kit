@@ -7,6 +7,7 @@
 from __future__ import print_function
 
 import copy
+import functools
 import math
 import sys
 
@@ -118,6 +119,7 @@ class EntropyStats(object):
     return other
 
 
+@functools.total_ordering
 class ExtendedFloat(object):
   """Custom floating point number with larger range of exponent.
 
@@ -218,7 +220,7 @@ class ExtendedFloat(object):
                          self.exponent - other.exponent)
 
   def __rtruediv__(self, other):
-    return ExtendedFloat(other).__div__(self)
+    return ExtendedFloat(other).__truediv__(self)
 
   # TODO(kcwu): remove __div__ and __rdiv__ once we migrated to python3
   if six.PY2:
@@ -228,8 +230,23 @@ class ExtendedFloat(object):
   def __repr__(self):
     return 'ExtendedFloat(%f, %d)' % (self.mantissa, self.exponent)
 
-  def __cmp__(self, other):
+  def __eq__(self, other):
     if not isinstance(other, ExtendedFloat):
       other = ExtendedFloat(other)
-    diff = self - other
-    return cmp(diff.mantissa, 0)
+    return self.mantissa == other.mantissa and self.exponent == other.exponent
+
+  def __lt__(self, other):
+    if not isinstance(other, ExtendedFloat):
+      other = ExtendedFloat(other)
+    if self.mantissa * other.mantissa <= 0:
+      return self.mantissa < other.mantissa
+
+    if self.exponent == other.exponent:
+      return self.mantissa < other.mantissa
+
+    if self.mantissa > 0:
+      return self.exponent < other.exponent
+    return self.exponent > other.exponent
+
+  def __round__(self, ndigits):
+    return round(float(self), ndigits)
