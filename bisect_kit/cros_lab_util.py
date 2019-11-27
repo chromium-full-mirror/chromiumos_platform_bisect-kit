@@ -15,7 +15,8 @@ import signal
 import subprocess
 import threading
 import time
-import urllib
+
+from six.moves import urllib
 
 from bisect_kit import errors
 from bisect_kit import util
@@ -146,7 +147,8 @@ def swarming_bots_list(dimensions, is_busy=None):
 
   if query:
     # doseq=True because dimensions could be multiple.
-    method += '?' + urllib.urlencode(query, doseq=True)
+    # pylint: disable=redundant-keyword-arg
+    method += '?' + urllib.parse.urlencode(query, doseq=True)
 
   bots = []
   for bot in swarming_query(method).get('items', []):

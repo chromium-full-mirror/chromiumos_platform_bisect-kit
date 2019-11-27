@@ -15,6 +15,7 @@ import shutil
 import sys
 import tempfile
 
+import six
 from six.moves import urllib
 
 from bisect_kit import codechange
@@ -143,7 +144,9 @@ def load_gclient_entries(gclient_dir):
   """Loads .gclient_entries."""
   repo_project_list = os.path.join(gclient_dir, '.gclient_entries')
   scope = {}
-  exec open(repo_project_list) in scope  # pylint: disable=exec-used
+  with open(repo_project_list) as f:
+    code = compile(f.read(), repo_project_list, 'exec')
+    six.exec_(code, scope)
   entries = scope.get('entries', {})
 
   # normalize path: remove trailing slash
@@ -205,6 +208,7 @@ _PLATFORM_MAPPING = {
     'cygwin': 'win',
     'darwin': 'mac',
     'linux2': 'linux',
+    'linux': 'linux',
     'win32': 'win',
     'aix6': 'aix',
 }
@@ -520,7 +524,7 @@ class DepsParser(object):
     global_scope = dict(Var=var_function)
     local_scope = {}
     try:
-      exec (content, global_scope, local_scope)  # pylint: disable=exec-used
+      six.exec_(content, global_scope, local_scope)
     except SyntaxError:
       raise
 
