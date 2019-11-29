@@ -8,6 +8,8 @@ from __future__ import print_function
 import argparse
 import unittest
 
+import six
+
 from bisect_kit import cli
 
 
@@ -49,7 +51,7 @@ class TestCli(unittest.TestCase):
     self.assertEqual(argtype('123*5'), ('123', 5))
 
     # Make sure there is multiplier example in the message.
-    with self.assertRaisesRegexp(cli.ArgTypeError, r'\d+\*\d+'):
+    with six.assertRaisesRegex(self, cli.ArgTypeError, r'\d+\*\d+'):
       argtype('hello')
 
   def test_argtype_path(self):
@@ -66,10 +68,10 @@ class TestCli(unittest.TestCase):
   def test_check_executable(self):
     self.assertEqual(cli.check_executable('/bin/true'), None)
 
-    self.assertRegexpMatches(cli.check_executable('/'), r'Not a file')
-    self.assertRegexpMatches(cli.check_executable('LICENSE'), r'chmod')
-    self.assertRegexpMatches(cli.check_executable('what'), r'PATH')
-    self.assertRegexpMatches(cli.check_executable('eval-manually.sh'), r'\./')
+    six.assertRegex(self, cli.check_executable('/'), r'Not a file')
+    six.assertRegex(self, cli.check_executable('LICENSE'), r'chmod')
+    six.assertRegex(self, cli.check_executable('what'), r'PATH')
+    six.assertRegex(self, cli.check_executable('eval-manually.sh'), r'\./')
 
   def test_lookup_signal_name(self):
     self.assertEqual(cli.lookup_signal_name(15), 'SIGTERM')

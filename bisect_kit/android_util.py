@@ -62,7 +62,7 @@ def fetch_android_build_data(url):
   logger.warn('fetch_android_build_data need to be hooked')
   from six.moves import urllib
   try:
-    return urllib.request.urlopen(url).read()
+    return urllib.request.urlopen(url).read().decode('utf8')
   except urllib.request.URLError as e:
     logger.exception('failed to fetch "%s"', url)
     raise errors.ExternalError(str(e))
@@ -82,7 +82,7 @@ def is_good_build(branch, flavor, build_id):
   """
 
   url = BUILD_INFO_URL_TEMPLATE.format(branch=branch, build_id=build_id)
-  build = json.loads(fetch_android_build_data(url).decode('utf-8'))
+  build = json.loads(fetch_android_build_data(url))
   for target in build[0]['targets']:
     if target['target']['name'] == flavor and target.get('successful'):
       return True
@@ -111,7 +111,7 @@ def get_build_ids_between(branch, flavor, start, end):
   while True:
     url = BUILD_IDS_BETWEEN_URL_TEMPLATE.format(
         branch=branch, start=start, end=tmp_end)
-    query_result = json.loads(fetch_android_build_data(url).decode('utf-8'))
+    query_result = json.loads(fetch_android_build_data(url))
     found_new = set(int(x) for x in query_result['ids']) - build_id_set
     if not found_new:
       break

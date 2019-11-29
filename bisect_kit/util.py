@@ -12,6 +12,7 @@ import threading
 import time
 
 import psutil
+import six
 from six.moves import queue
 
 from bisect_kit import errors
@@ -30,6 +31,9 @@ class TimeoutExpired(Exception):
 class Popen(object):
   """Wrapper of subprocess.Popen. Support output logging.
 
+  The default is text mode with utf8 encoding. This is different to
+  subprocess.Popen, which is default binary.
+
   Attributes:
     duration: Wall time of program execution in seconds.
     returncode: The child return code.
@@ -40,6 +44,7 @@ class Popen(object):
                stdout_callback=None,
                stderr_callback=None,
                log_stdout=True,
+               binary=None,
                **kwargs):
     """Initializes Popen.
 
@@ -47,6 +52,7 @@ class Popen(object):
       args: Command line arguments.
       stdout_callback: Callback function for stdout. Called once per line.
       stderr_callback: Callback function for stderr. Called once per line.
+      binary: binary mode; default is False
       log_stdout: Whether write the stdout output of the child process to log.
       **kwargs: Additional arguments passing to subprocess.Popen.
     """
@@ -55,9 +61,24 @@ class Popen(object):
     if 'stderr' in kwargs:
       raise ValueError('stderr argument not allowed, it will be overridden.')
 
+    if binary:
+      assert not kwargs.get('encoding')
+      self.binary_mode = True
+      self.encoding = None
+      self.log_stdout = False
+    else:
+      self.binary_mode = False
+      self.encoding = kwargs.get('encoding', 'utf8')
+      self.log_stdout = log_stdout
+
+    if six.PY2:
+      if 'encoding' in kwargs:
+        del kwargs['encoding']
+    else:
+      kwargs['encoding'] = self.encoding
+
     self.stdout_callback = stdout_callback
     self.stderr_callback = stderr_callback
-    self.log_stdout = log_stdout
     self.stdout_lines = []
     self.stderr_lines = []
     self.duration = -1
@@ -126,12 +147,14 @@ class Popen(object):
       if not line:
         ended += 1
         continue
-      if self.log_stdout or where == 'stderr':
-        logger.debug('[%s] %s', where, line.rstrip('\n'))
       if self.stdout_callback and where == 'stdout':
         self.stdout_callback(line)
       if self.stderr_callback and where == 'stderr':
         self.stderr_callback(line)
+      if self.log_stdout or where == 'stderr':
+        if self.binary_mode:
+          line = line.decode('utf8', errors='replace')
+        logger.debug('[%s] %s', where, line.rstrip('\n'))
     self.p.wait()
     self.duration = time.time() - self.start
     logger.debug('returncode %d', self.returncode)
