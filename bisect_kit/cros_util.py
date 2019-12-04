@@ -1554,9 +1554,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)\S+', line)
         if m:
           return m.group(1)
-      raise errors.ExternalError(
-          'guess_snapshot_version failed, board=%s snapshot_id=%s '
-          'old=%s new=%s' % (board, snapshot_id, old, new))
+      return None
 
     result = []
     path = 'snapshot.xml'
@@ -1564,9 +1562,12 @@ class ChromeOSSpecManager(codechange.SpecManager):
     for timestamp, _git_rev, snapshot_id in revisions:
       snapshot_version = guess_snapshot_version(self.config['board'],
                                                 snapshot_id, old, new)
-      result.append(
-          codechange.Spec(codechange.SPEC_FIXED, snapshot_version, timestamp,
-                          path))
+      if snapshot_version:
+        result.append(
+            codechange.Spec(codechange.SPEC_FIXED, snapshot_version, timestamp,
+                            path))
+      else:
+        logger.warning('snapshot id %s is not found, ignore', snapshot_id)
     return result
 
   def collect_release_specs(self, old, new):
