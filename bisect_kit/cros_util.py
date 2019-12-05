@@ -531,6 +531,11 @@ def list_snapshots_from_image_archive(board, major_version):
       gs_path: gs path of test image
   """
 
+  def extract_snapshot_id(result):
+    m = re.match(r'^R\d+-\d+\.\d+\.\d+-(\d+)', result[0])
+    assert m
+    return int(m.group(1))
+
   path = (
       'gs://chromeos-image-archive/{board}-postsubmit/R*-{major_version}.0.0-*')
   result = []
@@ -539,7 +544,7 @@ def list_snapshots_from_image_archive(board, major_version):
       path.format(board=board, major_version=major_version),
       ignore_errors=True)
 
-  for path in output:
+  for path in sorted(output):
     if not path.endswith('/'):
       continue
     m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)', path)
@@ -547,7 +552,13 @@ def list_snapshots_from_image_archive(board, major_version):
       snapshot_version = m.group(1)
       test_image = 'image.zip'
       gs_path = path + test_image
+      # we should skip if there is duplicate snapshot
+      if result and result[-1][0] == snapshot_version:
+        continue
       result.append((snapshot_version, gs_path))
+
+  # sort by its snapshot_id
+  result.sort(key=extract_snapshot_id)
   return result
 
 
