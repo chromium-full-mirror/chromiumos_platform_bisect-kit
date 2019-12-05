@@ -743,7 +743,7 @@ def prepare_snapshot_image(chromeos_root, board, snapshot_version):
     return rel_path
 
   files = gsutil_ls(gs_path, ignore_errors=True)
-  if len(files) == 1:
+  if len(files) >= 1:
     gs_path = files[0]
     gsutil('cp', gs_path, tmp_dir)
     util.check_call(
