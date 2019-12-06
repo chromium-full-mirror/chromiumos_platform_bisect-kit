@@ -67,9 +67,9 @@ class ChromeOSVersionDomain(core.BisectDomain):
         help='ChromeOS board name. Either --dut or --board need '
         'to be specified')
     parser.add_argument(
-        '--experimental_use_snapshot',
+        '--disable_snapshot',
         action='store_true',
-        help='Use snapshot to bisect chromeos prebuilt')
+        help='Disable snapshot for bisect chromeos prebuilt')
 
   @staticmethod
   def init(opts):
@@ -81,10 +81,7 @@ class ChromeOSVersionDomain(core.BisectDomain):
       opts.board = cros_util.query_dut_board(opts.dut)
 
     old, new, revlist = get_revlist(
-        opts.board,
-        opts.old,
-        opts.new,
-        use_snapshot=opts.experimental_use_snapshot)
+        opts.board, opts.old, opts.new, use_snapshot=not opts.disable_snapshot)
     config = dict(dut=opts.dut, board=opts.board, old=old, new=new)
     return config, revlist
 

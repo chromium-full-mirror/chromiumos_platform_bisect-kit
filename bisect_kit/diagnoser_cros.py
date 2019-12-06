@@ -154,8 +154,8 @@ class CrosDiagnoser(object):
         switch_cmd.append('--no_disable_rootfs_verification')
 
       init_args = ['--dut', self.dut, '--board', self.config['board']]
-      if self.config['experimental_use_snapshot']:
-        init_args.append('--experimental_use_snapshot')
+      if self.config['disable_snapshot']:
+        init_args.append('--disable_snapshot')
       bisector.init_if_necessary(
           old,
           new,
@@ -623,7 +623,7 @@ class DiagnoseCommandLineBase(object):
         bypass_android_build=opts.bypass_android_build,
         disable_rootfs_verification=opts.disable_rootfs_verification,
         chrome_deploy_image=opts.chrome_deploy_image,
-        experimental_use_snapshot=opts.experimental_use_snapshot,
+        disable_snapshot=opts.disable_snapshot,
     )
 
     self.states.init(config)
@@ -825,9 +825,9 @@ class DiagnoseCommandLineBase(object):
         action='store_true',
         help='Build and deploy ChromeOS image when bisect Chrome')
     group.add_argument(
-        '--experimental_use_snapshot',
+        '--disable_snapshot',
         action='store_true',
-        help='Use snapshot to bisect chromeos prebuilt')
+        help='Disable snapshot for bisect chromeos prebuilt')
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser('run', help='Start auto bisection')
