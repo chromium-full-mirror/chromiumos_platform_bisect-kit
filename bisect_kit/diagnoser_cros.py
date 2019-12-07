@@ -176,10 +176,12 @@ class CrosDiagnoser(object):
     self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
 
     logger.info('old: cros %s, chrome %s, android %s',
-                self.old_info['cros_full_version'], self.old_info['cr_version'],
+                self.old_info.get('cros_full_version'),
+                self.old_info.get('cr_version'),
                 self.old_info.get('android_build_id'))
     logger.info('new: cros %s, chrome %s, android %s',
-                self.new_info['cros_full_version'], self.new_info['cr_version'],
+                self.new_info.get('cros_full_version'),
+                self.new_info.get('cr_version'),
                 self.new_info.get('android_build_id'))
 
   def switch_chromeos_to_old(self, force=False):

@@ -954,9 +954,9 @@ def version_info(board, version):
         VERSION_KEY_MILESTONE: milestone,
         VERSION_KEY_CROS_FULL_VERSION: version,
         VERSION_KEY_CROS_SHORT_VERSION: short_version,
-        VERSION_KEY_CR_VERSION: target_versions['chromeVersion'],
-        VERSION_KEY_ANDROID_BUILD_ID: target_versions['androidVersion'],
-        VERSION_KEY_ANDROID_BRANCH: target_versions['androidBranchVersion'],
+        VERSION_KEY_CR_VERSION: target_versions.get('chromeVersion'),
+        VERSION_KEY_ANDROID_BUILD_ID: target_versions.get('androidVersion'),
+        VERSION_KEY_ANDROID_BRANCH: target_versions.get('androidBranchVersion'),
     }
   info = {}
   full_version = version_to_full(board, version)
