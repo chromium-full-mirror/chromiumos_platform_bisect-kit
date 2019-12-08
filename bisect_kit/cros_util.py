@@ -24,6 +24,8 @@ import re
 import subprocess
 import time
 
+from google.protobuf import json_format
+
 from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -949,7 +951,7 @@ def version_info(board, version):
     milestone, short_version, _ = snapshot_version_split(version)
     buildbucket_id = query_snapshot_buildbucket_id(board, version)
     data = api.get(int(buildbucket_id)).output.properties
-    target_versions = data['target_versions']
+    target_versions = json_format.MessageToDict(data['target_versions'])
     return {
         VERSION_KEY_MILESTONE: milestone,
         VERSION_KEY_CROS_FULL_VERSION: version,
