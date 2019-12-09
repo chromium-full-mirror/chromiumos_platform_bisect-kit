@@ -1548,7 +1548,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
     if is_cros_snapshot_version(old):
       result = self.collect_snapshot_specs(old, old) + result[1:]
     elif is_cros_snapshot_version(new):
-      result = result[:-1] + self.collect_snapshot_specs(new, new)
+      result += self.collect_snapshot_specs(new, new)
     return result
 
   def collect_snapshot_specs(self, old, new):
