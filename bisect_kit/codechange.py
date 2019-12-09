@@ -951,16 +951,17 @@ class CodeManager(object):
     return action_group.summary(self.code_storage)
 
   def switch(self, rev):
+    rev_old, action_groups = self.get_intra_and_diff(rev)
+    self.spec_manager.sync_disk_state(rev_old)
+    apply_actions(self.code_storage, action_groups, self.root_dir)
+
+  def get_intra_and_diff(self, rev):
     # easy case
     if not re.match(_re_intra_rev, rev):
-      self.spec_manager.sync_disk_state(rev)
-      return
+      return rev, []
 
     rev_old, rev_new, idx = parse_intra_rev(rev)
     action_groups = self.load_action_groups_between_releases(rev_old, rev_new)
     assert 0 <= idx <= len(action_groups)
     action_groups = action_groups[:idx]
-
-    self.spec_manager.sync_disk_state(rev_old)
-
-    apply_actions(self.code_storage, action_groups, self.root_dir)
+    return rev_old, action_groups

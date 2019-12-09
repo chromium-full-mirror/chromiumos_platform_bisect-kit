@@ -273,9 +273,12 @@ def _urljoin(base, url):
 class ManifestParser(object):
   """Enumerates historical manifest files and parses them."""
 
-  def __init__(self, manifest_dir):
+  def __init__(self, manifest_dir, load_remote=True):
     self.manifest_dir = manifest_dir
-    self.manifest_url = get_manifest_url(self.manifest_dir)
+    if load_remote:
+      self.manifest_url = get_manifest_url(self.manifest_dir)
+    else:
+      self.manifest_url = None
 
   def parse_single_xml(self, content, allow_include=False):
     root = xml.etree.ElementTree.fromstring(content)
@@ -286,16 +289,87 @@ class ManifestParser(object):
 
   def parse_xml_recursive(self, git_rev, path):
     content = git_util.get_file_from_revision(self.manifest_dir, git_rev, path)
-    root = self.parse_single_xml(content, allow_include=True)
-
+    root = xml.etree.ElementTree.fromstring(content)
+    default = None
+    notice = None
+    remotes = {}
+    manifest_server = None
     result = xml.etree.ElementTree.Element('manifest')
+
     for node in root:
       if node.tag == 'include':
-        for subnode in self.parse_xml_recursive(git_rev, node.get('name')):
-          result.append(subnode)
+        nodes = self.parse_xml_recursive(git_rev, node.get('name'))
       else:
-        result.append(node)
+        nodes = [node]
+
+      for subnode in nodes:
+        if subnode.tag == 'default':
+          if default is not None and not self.element_equal(default, subnode):
+            raise errors.ExternalError('duplicated <default> %s and %s' %
+                                       (self.element_to_string(default),
+                                        self.element_to_string(subnode)))
+          if default is None:
+            default = subnode
+            result.append(subnode)
+        elif subnode.tag == 'remote':
+          name = subnode.get('name')
+          if name in remotes and not self.element_equal(remotes[name], subnode):
+            raise errors.ExternalError('duplicated <remote> %s and %s' %
+                                       (self.element_to_string(default),
+                                        self.element_to_string(subnode)))
+          if name not in remotes:
+            remotes[name] = subnode
+            result.append(subnode)
+        elif subnode.tag == 'notice':
+          if notice is not None and not self.element_equal(notice, subnode):
+            raise errors.ExternalError('duplicated <notice>')
+          if notice is None:
+            notice = subnode
+            result.append(subnode)
+        elif subnode.tag == 'manifest-server':
+          if manifest_server is not None:
+            raise errors.ExternalError('duplicated <manifest-server>')
+          manifest_server = subnode
+          result.append(subnode)
+        else:
+          result.append(subnode)
     return result
+
+  def element_to_string(self, element):
+    return xml.etree.ElementTree.tostring(element).strip()
+
+  @classmethod
+  def get_project_path(cls, project):
+    path = project.get('path')
+    # default path is its name
+    if not path:
+      path = project.get('name')
+    return path
+
+  @classmethod
+  def get_project_revision(cls, project, default):
+    if default is None:
+      default = {}
+    return project.get('revision', default.get('revision'))
+
+  def element_equal(self, element1, element2):
+    """Return if two xml elements are same
+
+    Args:
+      element1: An xml element
+      element2: An xml element
+    """
+    if element1.tag != element2.tag:
+      return False
+    if element1.text != element2.text:
+      return False
+    if element1.attrib != element2.attrib:
+      return False
+    if len(element1) != len(element2):
+      return False
+    return all(
+        self.element_equal(node1, node2)
+        for node1, node2 in zip(element1, element2))
 
   def process_parsed_result(self, root):
     result = {}
@@ -323,9 +397,8 @@ class ManifestParser(object):
         logger.warning('nested project %s.%s is not supported and ignored',
                        project.get('name'), subproject.get('name'))
 
-      # default path is its name
-      path = project.get('path', project.get('name'))
-      revision = project.get('revision', default.get('revision'))
+      path = self.get_project_path(project)
+      revision = self.get_project_revision(project, default)
 
       remote_name = project.get('remote', default.get('remote'))
       if remote_name not in remote_fetch_map:
@@ -404,3 +477,148 @@ class RepoMirror(codechange.CodeStorage):
       lines.remove(line)
 
     self._save_project_list(project_root, lines)
+
+
+class Manifest(object):
+  """This class handles a manifest and is able to patch projects."""
+
+  def __init__(self, manifest_internal_dir):
+    self.xml = None
+    self.manifest_internal_dir = manifest_internal_dir
+    self.modified = set()
+    self.parser = ManifestParser(manifest_internal_dir)
+
+  def load_from_string(self, xml_string):
+    """Load manifest xml from a string.
+
+    Args:
+      xml_string: An xml string.
+    """
+    self.xml = xml.etree.ElementTree.fromstring(xml_string)
+
+  def load_from_timestamp(self, timestamp):
+    """Load manifest xml snapshot by a timestamp.
+
+    The function will load a latest manifest before or equal to the timestamp.
+
+    Args:
+      timestamp: A unix timestamp.
+    """
+    commits = git_util.get_history(
+        self.manifest_internal_dir, before=timestamp + 1)
+    commit = commits[-1][1]
+    self.xml = self.parser.parse_xml_recursive(commit, 'full.xml')
+
+  def to_string(self):
+    """Dump current xml to a string.
+
+    Returns:
+      A string of xml.
+    """
+    return xml.etree.ElementTree.tostring(self.xml)
+
+  def is_static_manifest(self):
+    """Return true if there is any project without revision in the xml.
+
+    Returns:
+      A boolean, True if every project has a revision.
+    """
+    count = 0
+    for project in self.xml.findall('.//project'):
+      # check argument directly instead of getting value from default tag
+      if not project.get('revision'):
+        count += 1
+        path = self.parser.get_project_path(project)
+        logger.warning('path: %s has no revision' % path)
+    return count == 0
+
+  def remove_project_revision(self):
+    """Remove revision argument from all projects"""
+    for project in self.xml.findall('.//project'):
+      if 'revision' in project:
+        del project['revision']
+
+  def count_path(self, path):
+    """Count projects that path is given path.
+
+    Returns:
+      An integer, indicates the number of projects.
+    """
+    result = 0
+    for project in self.xml.findall('.//project'):
+      if project.get('path') == path:
+        result += 1
+    return result
+
+  def apply_commit(self, path, revision, overwrite=True):
+    """Set revision to a project by path.
+
+    Args:
+      path: A project's path.
+      revision: A git commit id.
+      overwrite: Overwrite flag, the project won't change if overwrite=False
+                 and it was modified before.
+    """
+    if path in self.modified and not overwrite:
+      return
+    self.modified.add(path)
+
+    count = 0
+    for project in self.xml.findall('.//project'):
+      if self.parser.get_project_path(project) == path:
+        count += 1
+        project.set('revision', revision)
+
+    if count != 1:
+      logger.warning('found %d path: %s in manifest', count, path)
+
+  def apply_upstream(self, path, upstream):
+    """Set upstream to a project by path.
+
+    Args:
+      path: A project's path.
+      upstream: A git upstream.
+    """
+    for project in self.xml.findall('.//project'):
+      if self.parser.get_project_path(project) == path:
+        project.set('upstream', upstream)
+
+  def apply_action_groups(self, action_groups):
+    """Apply multiple action groups to xml.
+
+    If there are multiple actions in one repo, only last one is applied.
+
+    Args:
+      action_groups: A list of action groups.
+    """
+    # Apply in reversed order with overwrite=False,
+    # so each repo is on the state of last action.
+    for action_group in reversed(action_groups):
+      for action in reversed(action_group.actions):
+        if isinstance(action, codechange.GitCheckoutCommit):
+          self.apply_commit(action.path, action.rev, overwrite=False)
+        if isinstance(action, codechange.GitAddRepo):
+          self.apply_commit(action.path, action.rev, overwrite=False)
+        if isinstance(action, codechange.GitRemoveRepo):
+          assert self.count_path(action.path) == 0
+          self.modified.add(action.path)
+    return
+
+  def apply_manifest(self, manifest):
+    """Apply another manifest to current xml.
+
+    By default, all the projects in manifest will be applied and won't
+    overwrite modified projects.
+
+    Args:
+      manifest: A Manifest object.
+    """
+    default = manifest.xml.get('default')
+    for project in manifest.xml.findall('.//project'):
+      path = self.parser.get_project_path(project)
+      revision = self.parser.get_project_revision(project, default)
+      if path and revision:
+        self.apply_commit(path, revision, overwrite=False)
+        upstream = project.get('upstream')
+        if upstream:
+          self.apply_upstream(path, upstream)

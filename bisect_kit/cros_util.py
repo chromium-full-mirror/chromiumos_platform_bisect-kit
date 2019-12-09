@@ -1658,17 +1658,20 @@ class ChromeOSSpecManager(codechange.SpecManager):
       commit_id = revisions[0][1]
       manifest = git_util.get_file_from_revision(self.manifest_internal_dir,
                                                  commit_id, 'snapshot.xml')
+    return manifest
+
+  def get_manifest_file(self, rev):
+    assert is_cros_full_version(rev) or is_cros_snapshot_version(rev)
     manifest_name = 'manifest_%s.xml' % rev
     manifest_path = os.path.join(self.manifest_dir, manifest_name)
     with open(manifest_path, 'w') as f:
-      f.write(manifest)
-
+      f.write(self.get_manifest(rev))
     return manifest_name
 
   def parse_spec(self, spec):
     parser = repo_util.ManifestParser(self.manifest_dir)
     if spec.spec_type == codechange.SPEC_FIXED:
-      manifest_name = self.get_manifest(spec.name)
+      manifest_name = self.get_manifest_file(spec.name)
       manifest_path = os.path.join(self.manifest_dir, manifest_name)
       with open(manifest_path) as f:
         content = f.read()
@@ -1683,7 +1686,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             'fixed spec %r has unexpected floating entries' % spec.name)
 
   def sync_disk_state(self, rev):
-    manifest_name = self.get_manifest(rev)
+    manifest_name = self.get_manifest_file(rev)
 
     # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
     # manifest. 'repo sync -m' is not enough
