@@ -162,7 +162,7 @@ def prepare_to_run_test(opts):
   # versions earlier than R73-11445.0.0.
   ssh_path = os.path.join(opts.chromeos_root, 'chroot/usr/bin/ssh')
   if os.path.exists(ssh_path):
-    with open(ssh_path) as f:
+    with open(ssh_path, 'rb') as f:
       if b'file descriptor passing not supported' in f.read():
         cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge',
                            'net-misc/openssh')

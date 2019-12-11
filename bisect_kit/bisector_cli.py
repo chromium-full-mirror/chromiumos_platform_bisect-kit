@@ -849,6 +849,10 @@ class BisectorCommandLine(object):
     opts = parser.parse_args(args or None)
     common.config_logging(opts)
 
+    # It's optional by default since python3.
+    if not opts.command:
+      parser.error('command is missing')
+
     self._create_states(session=opts.session, session_base=opts.session_base)
     if opts.command not in ('init', 'reset', 'config'):
       self.states.load()

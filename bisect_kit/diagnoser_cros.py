@@ -853,6 +853,9 @@ class DiagnoseCommandLineBase(object):
   def main(self, args=None):
     opts = self.argument_parser.parse_args(args)
     common.config_logging(opts)
+    # It's optional by default since python3.
+    if not opts.command:
+      self.argument_parser.error('command is missing')
 
     session_base = configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE)
     session_file = os.path.join(session_base, opts.session,

@@ -30,6 +30,7 @@ import subprocess
 import time
 import xml.etree.ElementTree
 
+import six
 from six.moves import urllib
 
 from bisect_kit import common
@@ -266,9 +267,11 @@ def sync_chromeos_code(opts, path_factory):
 
 
 def query_chrome_latest_branch():
-  result = None
+  result = 0
   r = urllib.request.urlopen('https://omahaproxy.appspot.com/all')
-  for row in csv.DictReader(r):
+  # TODO(kcwu): use io.TextIOWrapper after migrated to python3
+  content = r.read().decode('utf8')
+  for row in csv.DictReader(six.StringIO(content)):
     if row['true_branch'].isdigit():
       result = max(result, int(row['true_branch']))
   return result
@@ -616,6 +619,9 @@ def main():
   opts = parser.parse_args()
   common.config_logging(opts)
 
+  # It's optional by default since python3.
+  if not opts.command:
+    parser.error('command is missing')
   opts.func(opts)
 
 

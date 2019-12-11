@@ -213,7 +213,7 @@ def query_git_rev(chrome_src, rev):
       # Failed due to source code not synced yet? Anyway, query by web api
       url = 'https://omahaproxy.appspot.com/deps.json?version=' + rev
       logger.debug('fetch %s', url)
-      content = urllib.request.urlopen(url).read()
+      content = urllib.request.urlopen(url).read().decode('utf8')
       obj = json.loads(content)
       rev = obj['chromium_commit']
       if not git_util.is_git_rev(rev):
@@ -461,7 +461,7 @@ class ChromeSpecManager(codechange.SpecManager):
   def enumerate_ancestor(self, new):
     releases_dir = os.path.join(self.spec_dir, 'releases')
     result = []
-    for rev in sorted(os.listdir(releases_dir), key=util.version_key_func):
+    for rev in os.listdir(releases_dir):
       # 74.0.3696.0/DEPS is bad and rejected by gclient (crbug/929544)
       if rev in ['74.0.3696.0']:
         continue
@@ -469,7 +469,7 @@ class ChromeSpecManager(codechange.SpecManager):
         continue
       if is_version_lesseq(rev, new) and is_direct_relative_version(rev, new):
         result.append(rev)
-    return result
+    return sorted(result, key=util.version_key_func)
 
   def collect_fixed_spec(self, old, new):
     logger.info('collect_fixed_spec')
