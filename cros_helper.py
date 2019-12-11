@@ -268,6 +268,10 @@ def main():
 
   opts = parser.parse_args()
   common.config_logging(opts)
+
+  # It's optional by default since python3.
+  if not opts.command:
+    parser.error('command is missing')
   opts.func(opts)
 
 
