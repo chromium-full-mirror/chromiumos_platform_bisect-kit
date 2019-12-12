@@ -61,11 +61,17 @@ class BisectorWrapper(object):
                         eval_cmd,
                         old_value=None,
                         new_value=None,
+                        term_old=None,
+                        term_new=None,
                         recompute_init_values=False,
                         noisy=None):
     status = self.current_status()
     if not status['inited']:
       common_init_args = ['--old', old, '--new', new]
+      if term_old:
+        common_init_args += ['--term_old', term_old]
+      if term_new:
+        common_init_args += ['--term_new', term_new]
       if noisy:
         common_init_args += ['--noisy', noisy]
       if old_value is not None:

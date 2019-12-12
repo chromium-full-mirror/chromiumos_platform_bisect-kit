@@ -100,6 +100,7 @@ class NoisyBinarySearch(object):
                new_idx=None,
                old_value=None,
                new_value=None,
+               term_map=None,
                recompute_init_values=False,
                oracle=None,
                observation=None,
@@ -144,6 +145,7 @@ class NoisyBinarySearch(object):
       new_idx: Index of rev, which has new behavior.
       old_value: For value bisection, the value of old version.
       new_value: For value bisection, the value of new version.
+      term_map: Alternative term for states
       recompute_init_values: For value bisection, recompute values of old and
         new versions.
       oracle: The oracle model of probability distribution.
@@ -162,6 +164,7 @@ class NoisyBinarySearch(object):
     self.new_idx = new_idx
     self.old_value = old_value
     self.new_value = new_value
+    self.term_map = term_map or {}
     self.recompute_init_values = recompute_init_values
     self.oracle = oracle
     if oracle:
@@ -797,15 +800,21 @@ class NoisyBinarySearch(object):
       # P(try N times and old behavior occurs 0 times)
       p = self.old_p**self.rev_info[self.old_idx]['new']
       if p < 1.0 - self.verify_confidence:
-        raise errors.VerifyOldBehaviorFailed(self.rev_info[self.old_idx].rev,
-                                             self.rev_info[self.old_idx]['new'])
+        raise errors.VerifyOldBehaviorFailed(
+            self.rev_info[self.old_idx].rev,
+            self.rev_info[self.old_idx]['new'],
+            term_old=self.term_map.get('old', 'old'),
+            term_new=self.term_map.get('new', 'new'))
 
     if self.rev_info[self.new_idx]['new'] == 0:
       # P(try N times and new behavior occurs 0 times)
       p = (1 - self.new_p)**self.rev_info[self.new_idx]['old']
       if p < 1.0 - self.verify_confidence:
-        raise errors.VerifyNewBehaviorFailed(self.rev_info[self.new_idx].rev,
-                                             self.rev_info[self.new_idx]['old'])
+        raise errors.VerifyNewBehaviorFailed(
+            self.rev_info[self.new_idx].rev,
+            self.rev_info[self.new_idx]['old'],
+            term_old=self.term_map.get('old', 'old'),
+            term_new=self.term_map.get('new', 'new'))
 
   def check_proceed_with_skip(self, idx):
     """Checks if we should proceed after skips.

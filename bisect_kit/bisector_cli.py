@@ -196,10 +196,15 @@ class BisectorCommandLine(object):
   def config(self):
     return self.states.config
 
-  def _format_status(self, status):
-    if status in ('old', 'new'):
-      return '%s behavior' % status
-    return status
+  def _get_term_map(self):
+    return {
+        'old': self.config['term_old'],
+        'new': self.config['term_new'],
+    }
+
+  def _format_result_counter(self, result_counter):
+    return core.RevInfo.format_result_counter(result_counter,
+                                              self._get_term_map())
 
   def cmd_reset(self, _opts):
     """Resets bisect session and clean up saved result."""
@@ -239,6 +244,8 @@ class BisectorCommandLine(object):
     config.update(
         confidence=opts.confidence,
         noisy=opts.noisy,
+        term_old=opts.term_old,
+        term_new=opts.term_new,
         old_value=opts.old_value,
         new_value=opts.new_value,
         recompute_init_values=opts.recompute_init_values)
@@ -330,6 +337,7 @@ class BisectorCommandLine(object):
       assert self.config.get('switch')
       assert self.config.get('eval')
 
+      term_map = self._get_term_map()
       prev_rev = None
       force = opts.force
       for idx, rev in self._next_idx_iter(opts, force):
@@ -343,12 +351,11 @@ class BisectorCommandLine(object):
         step, sample = self._switch_and_eval(rev, prev_rev=prev_rev)
         self.states.add_history('sample', **sample)
         self.states.save()
+        status = term_map.get(sample['status'], sample['status'])
         if 'values' in sample:
-          logger.info('rev=%s status => %s: %s', rev,
-                      self._format_status(sample['status']), sample['values'])
+          logger.info('rev=%s status => %s: %s', rev, status, sample['values'])
         else:
-          logger.info('rev=%s status => %s', rev,
-                      self._format_status(sample['status']))
+          logger.info('rev=%s status => %s', rev, status)
         force = False
 
         # Bail out if bisection range is unlikely true.
@@ -455,7 +462,7 @@ class BisectorCommandLine(object):
       if self.strategy.is_noisy() and summary.get('prob'):
         detail.append('%.4f%%' % (summary['prob'][i] * 100))
       if rev_info['result_counter']:
-        detail.append(str(rev_info['result_counter']))
+        detail.append(self._format_result_counter(rev_info['result_counter']))
       values = sorted(rev_info['values'])
       if len(values) == 1:
         detail.append('%.3f' % values[0])
@@ -475,7 +482,11 @@ class BisectorCommandLine(object):
             print('\t%s' % action['link'])
 
   def _strategy_factory(self):
-    rev_info = self.states.load_rev_info()
+    term_map = {
+        'old': self.config['term_old'],
+        'new': self.config['term_new'],
+    }
+    rev_info = self.states.load_rev_info(term_map)
     assert rev_info
     return strategy.NoisyBinarySearch(
         rev_info,
@@ -483,6 +494,7 @@ class BisectorCommandLine(object):
         self.states.rev2idx(self.config['new']),
         old_value=self.config['old_value'],
         new_value=self.config['new_value'],
+        term_map=term_map,
         recompute_init_values=self.config['recompute_init_values'],
         confidence=self.config['confidence'],
         observation=self.config['noisy'])
@@ -589,12 +601,12 @@ class BisectorCommandLine(object):
 
   def cmd_new(self, opts):
     """Tells bisect engine the said revs have "new" behavior."""
-    logger.info('set [%s] as new', opts.revs)
+    logger.info('set [%s] as %s', opts.revs, self.config['term_new'])
     self._add_revs_status_helper(opts.revs, 'new')
 
   def cmd_old(self, opts):
     """Tells bisect engine the said revs have "old" behavior."""
-    logger.info('set [%s] as old', opts.revs)
+    logger.info('set [%s] as %s', opts.revs, self.config['term_old'])
     self._add_revs_status_helper(opts.revs, 'old')
 
   def cmd_skip(self, opts):
@@ -649,6 +661,12 @@ class BisectorCommandLine(object):
         raise errors.ArgumentError(
             'noisy value',
             'expected 1 value, %d values given' % len(opts.value))
+      self.states.config[opts.key] = opts.value[0]
+
+    elif opts.key in ('term_old', 'term_new'):
+      if len(opts.value) != 1:
+        raise errors.ArgumentError(
+            opts.key, 'expected 1 value, %d values given' % len(opts.value))
       self.states.config[opts.key] = opts.value[0]
 
     else:
@@ -711,6 +729,14 @@ class BisectorCommandLine(object):
         type=self.domain_cls.revtype,
         help='End of bisect range, which has new behavior')
     parser_init.add_argument(
+        '--term_old',
+        default='OLD',
+        help='Alternative term for "old" state (default: %(default)r)')
+    parser_init.add_argument(
+        '--term_new',
+        default='NEW',
+        help='Alternative term for "new" state (default: %(default)r)')
+    parser_init.add_argument(
         '--noisy',
         help='Enable noisy binary search and specify prior result. '
         'For example, "old=1/10,new=2/3" means old fail rate is 1/10 '
@@ -740,7 +766,9 @@ class BisectorCommandLine(object):
         'config', help='Configures additional setting')
     parser_config.add_argument(
         'key',
-        choices=['switch', 'eval', 'confidence', 'noisy'],
+        choices=[
+            'switch', 'eval', 'confidence', 'noisy', 'term_old', 'term_new'
+        ],
         metavar='key',
         help='What config to change. choices=[%(choices)s]')
     parser_config.add_argument(

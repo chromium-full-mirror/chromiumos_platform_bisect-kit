@@ -164,6 +164,8 @@ class CrosDiagnoser(object):
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
           new_value=self.config['new_value'],
+          term_old=self.config['term_old'],
+          term_new=self.config['term_new'],
           recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
       if extra_switch_cmd:
@@ -251,6 +253,8 @@ class CrosDiagnoser(object):
             eval_cmd=eval_cmd,
             old_value=self.config['old_value'],
             new_value=self.config['new_value'],
+            term_old=self.config['term_old'],
+            term_new=self.config['term_new'],
             recompute_init_values=self.config['recompute_init_values'],
             noisy=self.noisy)
         if extra_switch_cmd:
@@ -308,6 +312,8 @@ class CrosDiagnoser(object):
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
           new_value=self.config['new_value'],
+          term_old=self.config['term_old'],
+          term_new=self.config['term_new'],
           recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
       if extra_switch_cmd:
@@ -382,6 +388,8 @@ class CrosDiagnoser(object):
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
           new_value=self.config['new_value'],
+          term_old=self.config['term_old'],
+          term_new=self.config['term_new'],
           recompute_init_values=self.config['recompute_init_values'],
           noisy=self.noisy)
       if extra_switch_cmd:
@@ -427,6 +435,8 @@ class CrosDiagnoser(object):
         eval_cmd=eval_cmd,
         old_value=self.config['old_value'],
         new_value=self.config['new_value'],
+        term_old=self.config['term_old'],
+        term_new=self.config['term_new'],
         recompute_init_values=self.config['recompute_init_values'],
         noisy=self.noisy)
     if extra_switch_cmd:
@@ -579,6 +589,26 @@ class DiagnoseCommandLineBase(object):
         self.argument_parser.error(
             '--recompute_init_values is provided but --metric is not')
 
+    if (opts.term_old is None and opts.term_new is not None or
+        opts.term_old is not None and opts.term_new is None):
+      self.argument_parser.error(
+          '--term_old and --term_new must be both specified or both blank')
+    if not opts.term_old:
+      if opts.metric:
+        if opts.old_value < opts.new_value:
+          opts.term_old = 'LOW'
+          opts.term_new = 'HIGH'
+        else:
+          opts.term_old = 'HIGH'
+          opts.term_new = 'LOW'
+      else:
+        if opts.fail_to_pass:
+          opts.term_old = 'FAIL'
+          opts.term_new = 'PASS'
+        else:
+          opts.term_old = 'PASS'
+          opts.term_new = 'FAIL'
+
   def init_hook(self, opts):
     pass  # implemented by subclass if necessary
 
@@ -609,6 +639,8 @@ class DiagnoseCommandLineBase(object):
         board=opts.board,
         old=opts.old,
         new=opts.new,
+        term_old=opts.term_old,
+        term_new=opts.term_new,
         test_name=opts.test_name,
         fail_to_pass=opts.fail_to_pass,
         metric=opts.metric,
@@ -756,6 +788,8 @@ class DiagnoseCommandLineBase(object):
         type=cros_util.argtype_cros_version,
         required=True,
         help='ChromeOS version with new behavior')
+    group.add_argument('--term_old', help='Alternative term for "old" state')
+    group.add_argument('--term_new', help='Alternative term for "new" state')
 
     group = parser_init.add_argument_group(
         title='Options for normal autotest tests')

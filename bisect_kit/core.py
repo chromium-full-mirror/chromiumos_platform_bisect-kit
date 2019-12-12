@@ -32,9 +32,10 @@ class RevInfo(object):
     eval_time: total duration of eval step for such revision
   """
 
-  def __init__(self, rev):
+  def __init__(self, rev, term_map=None):
     self.rev = rev
 
+    self.term_map = term_map or {}
     self.result_counter = {}
     self.values = []
     self.switch_time = 0
@@ -59,16 +60,27 @@ class RevInfo(object):
     if value == 0:
       del self.result_counter[key]
 
+  @classmethod
+  def format_result_counter(cls, result_counter, term_map):
+    result = []
+    for status, count in result_counter.items():
+      status = term_map.get(status, status)
+      result.append('%s:%s' % (status, count))
+    return ', '.join(result)
+
+  def counter_string(self):
+    return self.format_result_counter(self.result_counter, self.term_map)
+
   def summary(self):
     """Summary of the result of this revision."""
     averages = sorted(self.averages())
     if not averages:
-      return '%s' % self.result_counter
+      return self.counter_string()
     if len(averages) == 1:
-      return '%s %.3f' % (self.result_counter, averages[0])
+      return '%s %.3f' % (self.counter_string(), averages[0])
 
     return '%s n=%d,avg=%.3f,median=%.3f,min=%.3f,max=%.3f' % (
-        self.result_counter, len(averages), math_util.average(averages),
+        self.counter_string(), len(averages), math_util.average(averages),
         averages[len(averages) // 2], averages[0], averages[-1])
 
   def averages(self):
@@ -235,10 +247,10 @@ class BisectStates(States):
     for i, rev in enumerate(self.data['revlist']):
       self.rev_index[rev] = i
 
-  def load_rev_info(self):
+  def load_rev_info(self, term_map=None):
     rev_info = []
     for rev in self.data['revlist']:
-      rev_info.append(RevInfo(rev))
+      rev_info.append(RevInfo(rev, term_map=term_map))
     for entry in self.data['history']:
       if entry.get('event', 'sample') != 'sample':
         continue
