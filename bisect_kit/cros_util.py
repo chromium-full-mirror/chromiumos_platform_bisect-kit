@@ -1199,6 +1199,19 @@ def build_packages(chromeos_root,
         build chrome with goma.
     afdo_use: build chrome with AFDO optimization
   """
+
+  def has_build_package_argument(argument):
+    stderr_lines = []
+    try:
+      util.check_call(
+          'src/scripts/build_packages',
+          '--help',
+          cwd=chromeos_root,
+          stderr_callback=stderr_lines.append)
+    except subprocess.CalledProcessError:
+      help_output = ''.join(stderr_lines)
+    return '--[no]%s' % argument in help_output
+
   common_env = {
       'USE': '-cros-debug chrome_internal',
       'FEATURES': 'separatedebug',
@@ -1226,6 +1239,15 @@ def build_packages(chromeos_root,
           '--skip_chroot_upgrade',
           '--accept_licenses=@CHROMEOS',
       ]
+
+      # `use_any_chrome` flag is default on and will force to use a chrome
+      # prebuilt even if the version doesn't match.
+
+      # As this argument is landed in 12681, we should check if the argument
+      # exists before adding this.
+      if has_build_package_argument('use_any_chrome'):
+        cmd.append('--nouse_any_chrome')
+
       if goma_dir:
         # Tell build_packages to start and stop goma
         cmd.append('--run_goma')
