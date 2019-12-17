@@ -41,8 +41,14 @@ def get_revlist(board, old, new, use_snapshot=False):
       board, old, new, use_snapshot=use_snapshot)
   short_versions = [cros_util.version_to_short(v) for v in full_versions]
 
-  old_idx = short_versions.index(cros_util.version_to_short(old))
-  new_idx = short_versions.index(cros_util.version_to_short(new))
+  if cros_util.is_cros_snapshot_version(old):
+    old_idx = full_versions.index(old)
+  else:
+    old_idx = short_versions.index(cros_util.version_to_short(old))
+  if cros_util.is_cros_snapshot_version(new):
+    new_idx = full_versions.index(new)
+  else:
+    new_idx = short_versions.index(cros_util.version_to_short(new))
   return full_versions[old_idx], full_versions[new_idx], full_versions
 
 
