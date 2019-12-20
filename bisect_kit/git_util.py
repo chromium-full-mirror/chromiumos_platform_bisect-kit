@@ -470,7 +470,7 @@ def distclean(git_repo, excludes=None):
 
 
 def get_history(git_repo,
-                path,
+                path=None,
                 branch=None,
                 after=None,
                 before=None,
@@ -512,10 +512,11 @@ def get_history(git_repo,
   if branch:
     assert not is_git_rev(branch)
     cmd += [branch]
-  # '--' is necessary otherwise if `path` is removed in current revision, git
-  # will complain it's an ambiguous argument which may be path or something
-  # else (like git branch name, tag name, etc.)
-  cmd += ['--', path]
+  if path:
+    # '--' is necessary otherwise if `path` is removed in current revision, git
+    # will complain it's an ambiguous argument which may be path or something
+    # else (like git branch name, tag name, etc.)
+    cmd += ['--', path]
 
   result = []
   for line in util.check_output(*cmd, cwd=git_repo).splitlines():

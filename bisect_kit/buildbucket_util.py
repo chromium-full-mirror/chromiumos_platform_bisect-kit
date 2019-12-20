@@ -20,6 +20,7 @@ from six.moves import http_client
 from google.protobuf.field_mask_pb2 import FieldMask
 from google.protobuf.message import DecodeError
 from infra_libs.buildbucket.proto.build_pb2 import Build
+from infra_libs.buildbucket.proto.common_pb2 import Status
 from infra_libs.buildbucket.proto.rpc_pb2 import GetBuildRequest
 from infra_libs.buildbucket.proto.rpc_pb2 import ScheduleBuildRequest
 
@@ -180,12 +181,13 @@ class BuildbucketApi(object):
     request = GetBuildRequest(id=buildbucket_id, fields=field_mask)
     return self._post('GetBuild', request, Build)
 
-  def schedule_build(self, board, manifest_xml):
+  def schedule_build(self, board, manifest_xml, bucket='cq'):
     """Schedule a build job in buildbucket.
 
     Args:
       board: ChromeOS board name
       manifest_xml: A full manifest xml for building chromeOS
+      bucket: A bucket name of buildbucket that will handle this build
 
     Returns:
       A Build object if success.
@@ -211,17 +213,53 @@ class BuildbucketApi(object):
         'build_target': {
             'name': board,
         },
-        'builder_name': '%s-bisect' % board,
+        'builder_name': '%s-%s' % (board, bucket),
         'recipe': 'build_target',
     }
 
     builder = {
         'project': 'chromeos',
-        'builder': '%s-bisect' % board,
-        'bucket': 'bisect',
+        'builder': '%s-%s' % (board, bucket),
+        'bucket': bucket,
     }
 
+    # Currently, buildbucket cannot accept build request without git commit.
+    # So we assign a template_build_id here, builder will copy the git commit
+    # from template by default.
     request = ScheduleBuildRequest(
-        template_build_id=int(time.time()), builder=builder)
+        template_build_id=8896314228974782576, builder=builder)
     request.properties.update(properties)
     return self._post('ScheduleBuild', request, Build)
+
+  def is_running(self, buildbucket_id):
+    """Check if a build is in running or scheduled status.
+
+    Args:
+      buildbucket_id: buildbucket build id
+
+    Returns:
+      True if the build is running or scheduled.
+
+    Raises:
+      errors.ExternalError: If api request fail.
+    """
+    assert isinstance(buildbucket_id, int)
+    waiting_status = [Status.Value('SCHEDULED'), Status.Value('STARTED')]
+    status = self.get(buildbucket_id).status
+    return status in waiting_status
+
+  def is_success(self, buildbucket_id):
+    """Check if a build is successed.
+
+    Args:
+      buildbucket_id: buildbucket build id
+
+    Returns:
+      True if the build is successed.
+
+    Raises:
+      errors.ExternalError: If api request fail.
+    """
+    assert isinstance(buildbucket_id, int)
+    status = self.get(buildbucket_id)
+    return status == Status.Value('SUCCESS')
