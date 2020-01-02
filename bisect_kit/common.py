@@ -9,15 +9,6 @@ import logging
 import logging.config
 import os
 
-# better_exceptions can print beautiful detail for unhandled exceptions, like
-# value of variables on the stack frames. This is helpful for debugging and
-# optional.
-try:
-  # pylint: disable=unused-import
-  import better_exceptions
-except ImportError:
-  pass
-
 from bisect_kit import configure
 
 logger = logging.getLogger(__name__)
