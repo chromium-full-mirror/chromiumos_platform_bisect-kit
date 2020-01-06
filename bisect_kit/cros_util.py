@@ -538,22 +538,23 @@ def list_snapshots_from_image_archive(board, major_version):
     assert m
     return int(m.group(1))
 
-  path = (
-      'gs://chromeos-image-archive/{board}-postsubmit/R*-{major_version}.0.0-*')
+  short_version = '%s.0.0' % major_version
+  milestone = query_milestone_by_version(board, short_version)
+  if not milestone:
+    milestone = '*'
+
+  path = ('gs://chromeos-image-archive/{board}-postsubmit/R{milestone}-'
+          '{short_version}-*/image.zip')
   result = []
   output = gsutil_ls(
-      '-d',
-      path.format(board=board, major_version=major_version),
+      path.format(
+          board=board, milestone=milestone, short_version=short_version),
       ignore_errors=True)
 
-  for path in sorted(output):
-    if not path.endswith('/'):
-      continue
-    m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)', path)
+  for gs_path in sorted(output):
+    m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)', gs_path)
     if m:
       snapshot_version = m.group(1)
-      test_image = 'image.zip'
-      gs_path = path + test_image
       # we should skip if there is duplicate snapshot
       if result and result[-1][0] == snapshot_version:
         continue
@@ -705,7 +706,7 @@ def list_chromeos_prebuilt_versions(board,
       # version_to_full() and gsutil_ls() may take long time if versions are a
       # lot. This is acceptable because we usually bisect only short range.
 
-      if only_good_build:
+      if only_good_build and not is_cros_snapshot_version(version):
         gs_result = gsutil_ls(gs_path, ignore_errors=True)
         if not gs_result:
           logger.warning('%s is not a good build, ignore', version)
@@ -715,8 +716,7 @@ def list_chromeos_prebuilt_versions(board,
         if not m:
           logger.warning('format of image path is unexpected: %s', gs_result[0])
           continue
-        if not is_cros_snapshot_version(version):
-          version = m.group(1)
+        version = m.group(1)
       elif is_cros_short_version(version):
         version = version_to_full(board, version)
 
