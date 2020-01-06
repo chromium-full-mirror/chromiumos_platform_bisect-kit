@@ -623,6 +623,27 @@ def list_prebuilt_from_chromeos_releases(board):
   return result
 
 
+def has_test_image(board, version):
+  if is_cros_snapshot_version(version):
+    return bool(query_snapshot_buildbucket_id(board, version))
+
+  full_version = version_to_full(board, version)
+  short_version = version_to_short(version)
+  paths = [
+      gs_archive_path.format(board=board) +
+      '/%s/chromiumos_test_image.tar.xz' % full_version,
+      gs_release_path.format(
+          channel='*',
+          boardpath=gs_release_boardpath(board),
+          short_version=short_version),
+  ]
+
+  for path in paths:
+    if gsutil_ls(path, ignore_errors=True):
+      return True
+  return False
+
+
 def list_chromeos_prebuilt_versions(board,
                                     old,
                                     new,

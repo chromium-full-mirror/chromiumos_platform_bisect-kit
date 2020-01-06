@@ -85,6 +85,12 @@ class ChromeOSVersionDomain(core.BisectDomain):
       assert cros_util.is_dut(opts.dut)
     if not opts.board:
       opts.board = cros_util.query_dut_board(opts.dut)
+    if not cros_util.has_test_image(opts.board, opts.old):
+      raise errors.ArgumentError(
+          '--old', '%s has no image for %s' % (opts.board, opts.old))
+    if not cros_util.has_test_image(opts.board, opts.new):
+      raise errors.ArgumentError(
+          '--new', '%s has no image for %s' % (opts.board, opts.new))
 
     old, new, revlist = get_revlist(
         opts.board, opts.old, opts.new, use_snapshot=not opts.disable_snapshot)

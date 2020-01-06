@@ -570,6 +570,13 @@ class DiagnoseCommandLineBase(object):
     if cros_util.is_cros_short_version(opts.new):
       opts.new = cros_util.version_to_full(opts.board, opts.new)
 
+    if not cros_util.has_test_image(opts.board, opts.old):
+      self.argument_parser.error(
+          '--old: %s has no image for %s' % (opts.board, opts.old))
+    if not cros_util.has_test_image(opts.board, opts.new):
+      self.argument_parser.error(
+          '--new: %s has no image for %s' % (opts.board, opts.new))
+
     if opts.metric:
       if opts.old_value is None:
         self.argument_parser.error('--old_value is not provided')
