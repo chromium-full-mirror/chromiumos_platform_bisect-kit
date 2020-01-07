@@ -439,7 +439,8 @@ class BisectorCommandLine(object):
 
   def show_summary(self, summary, interesting_indexes, verbose=False):
     for link in summary.get('links', []):
-      print('%s: %s' % (link['name'], link['url']))
+      if 'name' in link and 'url' in link:
+        print('%s: %s' % (link['name'], link['url']))
       if 'note' in link:
         print(link['note'])
 
