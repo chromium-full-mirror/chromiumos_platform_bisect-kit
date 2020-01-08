@@ -529,7 +529,7 @@ class Manifest(object):
       if not project.get('revision'):
         count += 1
         path = self.parser.get_project_path(project)
-        logger.warning('path: %s has no revision' % path)
+        logger.warning('path: %s has no revision', path)
     return count == 0
 
   def remove_project_revision(self):

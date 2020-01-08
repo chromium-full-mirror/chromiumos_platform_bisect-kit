@@ -14,7 +14,6 @@ import shutil
 import socket
 import ssl
 import tempfile
-import time
 
 from six.moves import http_client
 
