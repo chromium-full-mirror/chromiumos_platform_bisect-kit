@@ -11,6 +11,8 @@ import logging
 import os
 import re
 import shutil
+import socket
+import ssl
 import tempfile
 import time
 
@@ -130,14 +132,13 @@ class BuildbucketApi(object):
     util.check_call(self.auth_py, 'check', '--service', domain)
     self._token = None
 
-  def _post(self, api, request, return_class, retried=False):
+  def _post(self, api, request, return_class):
     """Post a rpc request to buildbucket server.
 
     Args:
       api: A string indicates api name in `buildbucket.v2.Builds`.
       request: A protobuf object.
       return_class: A protobuf class that catches api's return.
-      retried: If False, will try to login if api fails.
 
     Returns:
       A `return_class` object.
@@ -145,23 +146,33 @@ class BuildbucketApi(object):
     Raises:
       errors.ExternalError: api request fail
     """
-    conn = http_client.HTTPSConnection(self.buildbucket_domain, timeout=5)
-    conn.request('POST', self.buildbucket_api_path + api,
-                 request.SerializeToString(), self._get_header())
-    response = conn.getresponse()
-    response_content = response.read()
-    try:
-      result = return_class()
-      result.ParseFromString(response_content)
-    except DecodeError:
-      if response_content == 'Invalid OAuth token' and not retried:
-        self._refresh_token(self.buildbucket_domain_url)
-        return self._post(api, request, return_class, True)
-      else:
-        logger.exception('Error in buildbucket post: %s', response_content)
-        raise errors.ExternalError('buildbucket api response: ' +
-                                   response_content)
-    return result
+    max_retries = 5
+    logged_in = False
+    while max_retries > 0:
+      try:
+        conn = http_client.HTTPSConnection(self.buildbucket_domain, timeout=10)
+        conn.request('POST', self.buildbucket_api_path + api,
+                     request.SerializeToString(), self._get_header())
+        response = conn.getresponse()
+        response_content = response.read()
+        result = return_class()
+        result.ParseFromString(response_content)
+        return result
+      except DecodeError:
+        response_content = response_content.decode('utf-8')
+        if response_content == 'Invalid OAuth token' and not logged_in:
+          self._refresh_token(self.buildbucket_domain_url)
+          logged_in = True
+        else:
+          logger.exception('Error in buildbucket post: %s', response_content)
+          raise errors.ExternalError('buildbucket api response: ' +
+                                     response_content)
+      except (socket.timeout, ssl.SSLError):
+        if max_retries <= 0:
+          raise
+      max_retries -= 1
+
+    raise errors.ExternalError('buildbucket api %s failed' % api)
 
   def get(self, buildbucket_id):
     """Get a build object by its buildbucket id.
