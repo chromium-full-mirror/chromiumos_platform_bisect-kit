@@ -412,7 +412,7 @@ def query_milestone_by_version(board, short_version):
         continue
       return m.group(1)
 
-  logger.error('unable to query milestone of %s for %s', short_version, board)
+  logger.debug('unable to query milestone of %s for %s', short_version, board)
   return None
 
 
