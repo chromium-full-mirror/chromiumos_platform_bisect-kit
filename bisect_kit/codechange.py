@@ -617,7 +617,8 @@ class CodeManager(object):
       list of Action object (unordered)
     """
     actions = []
-    for path in set(prev_float.entries) | set(next_float.entries):
+    is_removed = set()
+    for path in sorted(set(prev_float.entries) | set(next_float.entries)):
 
       # Add repo
       if path not in prev_float:
@@ -651,6 +652,8 @@ class CodeManager(object):
 
       # At next_float.timestamp.
       if path not in next_float:
+        if path in is_removed:
+          continue
         # remove repo
         next_at = None
         sub_repos = [p for p in prev_float.entries if p.startswith(path + '/')]
@@ -658,7 +661,9 @@ class CodeManager(object):
         # Remove deeper repo first
         for path2 in sorted(sub_repos, reverse=True):
           group.add(GitRemoveRepo(next_float.timestamp, path2))
+          is_removed.add(path2)
         group.add(GitRemoveRepo(next_float.timestamp, path))
+        is_removed.add(path)
         for path2 in sorted(set(sub_repos) & set(next_float.entries)):
           group.add(
               GitAddRepo(next_float.timestamp, path2,
