@@ -24,6 +24,7 @@ Typical usage:
 from __future__ import print_function
 import argparse
 import csv
+import glob
 import logging
 import os
 import subprocess
@@ -530,6 +531,23 @@ def cmd_delete(opts):
       delete_tree(android_tree)
 
   os.rmdir(os.path.join(opts.work_base, opts.session))
+
+  # remove caches
+  chromeos_root = os.getenv('DEFAULT_CHROMEOS_ROOT')
+  if chromeos_root:
+    path = os.path.join(chromeos_root, 'devserver/static')
+    if os.path.exists(path):
+      logger.info('remove cache: %s', path)
+      util.call('cros', 'clean', '--flash', cwd=path)
+
+    for path in glob.glob(os.path.join(chromeos_root, 'chroot/tmp/*')):
+      logger.info('remove cache: %s', path)
+      delete_tree(path)
+
+  for path in glob.glob(
+      os.path.join(path_factory.get_chrome_cache(), '_cache_*')):
+    logger.info('remove cache: %s', path)
+    delete_tree(path)
 
 
 def create_parser():
