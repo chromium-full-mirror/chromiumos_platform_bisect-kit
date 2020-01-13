@@ -537,7 +537,9 @@ class ChromeSpecManager(codechange.SpecManager):
         metadata = git_util.get_commit_metadata(git_repo, path_spec.at)
         if 'parent' not in metadata:
           break
-        if 'chrome-release-bot@chromium.org' not in metadata['committer']:
+        bot_email = 'chrome-release-bot@chromium.org'
+        if (bot_email not in metadata['committer'] and
+            bot_email not in metadata['author']):
           break
 
         path_spec.at = metadata['parent'][0]
