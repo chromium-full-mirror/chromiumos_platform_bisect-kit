@@ -285,9 +285,12 @@ def unserialize_action(data):
 class ActionGroup(object):
   """Atomic group of Action objects
 
-  This models atomic commits (for example, gerrit topic, or circular
-  CQ-DEPEND). Otherwise, one ActionGroup usually consists only one Action
-  object.
+  This models atomic actions, ex:
+    - repo added/removed in the same manifest commit
+    - commits appears at the same time due to repo add
+    - gerrit topic
+    - circular CQ-DEPEND (Cq-Depend)
+  Otherwise, one ActionGroup usually consists only one Action object.
   """
 
   def __init__(self, timestamp, comment=None):
@@ -606,7 +609,7 @@ class CodeManager(object):
     self.spec_manager = spec_manager
     self.code_storage = code_storage
 
-  def generate_actions_between_specs(self, prev_float, next_float):
+  def generate_action_groups_between_specs(self, prev_float, next_float):
     """Generates actions between two float specs.
 
     Args:
@@ -614,10 +617,13 @@ class CodeManager(object):
       next_float: end of spec object (inclusive)
 
     Returns:
-      list of Action object (unordered)
+      list of ActionGroup object (ordered)
     """
-    actions = []
+    groups = []
+    last_group = ActionGroup(next_float.timestamp)
     is_removed = set()
+    # Sort alphabetically, so parent directories are handled before children
+    # directories.
     for path in sorted(set(prev_float.entries) | set(next_float.entries)):
 
       # Add repo
@@ -627,7 +633,7 @@ class CodeManager(object):
         else:
           next_at = self.code_storage.get_rev_by_time(next_float, path,
                                                       next_float.timestamp)
-        actions.append(
+        last_group.add(
             GitAddRepo(next_float.timestamp, path, next_float[path].repo_url,
                        next_at))
         continue
@@ -644,9 +650,18 @@ class CodeManager(object):
         till_at = self.code_storage.get_rev_by_time(prev_float, path,
                                                     next_float.timestamp)
 
-        actions.extend(
-            self.code_storage.get_actions_between_two_commit(
-                prev_float, path, prev_at, till_at))
+        actions = self.code_storage.get_actions_between_two_commit(
+            prev_float, path, prev_at, till_at)
+
+        # Assume commits with the same timestamp as manifest/DEPS change are
+        # atomic.
+        if actions and actions[-1].timestamp == next_float.timestamp:
+          last_group.add(actions.pop())
+
+        for action in actions:
+          group = ActionGroup(action.timestamp)
+          group.add(action)
+          groups.append(group)
       else:
         prev_at = till_at = prev_float[path].at
 
@@ -657,18 +672,16 @@ class CodeManager(object):
         # remove repo
         next_at = None
         sub_repos = [p for p in prev_float.entries if p.startswith(path + '/')]
-        group = ActionGroup(next_float.timestamp, comment='remove %s' % path)
         # Remove deeper repo first
         for path2 in sorted(sub_repos, reverse=True):
-          group.add(GitRemoveRepo(next_float.timestamp, path2))
+          last_group.add(GitRemoveRepo(next_float.timestamp, path2))
           is_removed.add(path2)
-        group.add(GitRemoveRepo(next_float.timestamp, path))
+        last_group.add(GitRemoveRepo(next_float.timestamp, path))
         is_removed.add(path)
         for path2 in sorted(set(sub_repos) & set(next_float.entries)):
-          group.add(
+          last_group.add(
               GitAddRepo(next_float.timestamp, path2,
                          next_float[path2].repo_url, prev_float[path2].at))
-        actions.append(group)
 
       elif next_float[path].is_static():
         # pinned to certain commit on different branch
@@ -691,11 +704,14 @@ class CodeManager(object):
                                                     next_float.timestamp)
 
       if next_at and next_at != till_at:
-        actions.append(
+        last_group.add(
             GitCheckoutCommit(next_float.timestamp, path,
                               next_float[path].repo_url, next_at))
 
-    return actions
+    groups.sort(key=lambda x: x.timestamp)
+    if last_group.actions:
+      groups.append(last_group)
+    return groups
 
   def synthesize_fixed_spec(self, float_spec, timestamp):
     """Synthesizes fixed spec from float spec of given time.
@@ -717,27 +733,6 @@ class CodeManager(object):
 
     name = '%s@%s' % (float_spec.path, timestamp)
     return Spec(SPEC_FIXED, name, timestamp, float_spec.path, result)
-
-  def reorder_actions(self, actions):
-    """Reorder and cluster actions.
-
-    Args:
-      actions: list of Action or ActionGroup objects
-
-    Returns:
-      list of ActionGroup objects
-    """
-    # TODO(kcwu): support atomic commits across repos
-    actions.sort(key=lambda x: x.timestamp)
-    result = []
-    for action in actions:
-      if isinstance(action, ActionGroup):
-        group = action
-      else:
-        group = ActionGroup(action.timestamp)
-        group.add(action)
-      result.append(group)
-    return result
 
   def match_spec(self, target, specs, start_index=0):
     threshold = 3600
@@ -861,15 +856,15 @@ class CodeManager(object):
 
     # step 2, synthesize all fixed specs in the range from float specs.
     specs = float_specs + [fixed_specs[-1]]
-    actions = []
+    action_groups = []
     logger.debug('len(specs)=%d', len(specs))
     for i in range(len(specs) - 1):
       prev_float = specs[i]
       next_float = specs[i + 1]
       logger.debug('[%d], between %s (%s) and %s (%s)', i, prev_float.name,
                    prev_float.timestamp, next_float.name, next_float.timestamp)
-      actions += self.generate_actions_between_specs(prev_float, next_float)
-    action_groups = self.reorder_actions(actions)
+      action_groups += self.generate_action_groups_between_specs(
+          prev_float, next_float)
 
     spec = self.synthesize_fixed_spec(float_specs[0], fixed_specs[0].timestamp)
     synthesized = [spec.copy()]
