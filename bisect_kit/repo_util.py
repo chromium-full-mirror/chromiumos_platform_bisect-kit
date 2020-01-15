@@ -56,6 +56,16 @@ def find_repo_root(path):
   return path
 
 
+def _get_repo_sync_env():
+  # b/120757273 Even we have set git cookies, git still occasionally asks for
+  # username/password for unknown reasons. Then it hangs forever because we are
+  # a script. Here we work around the issue by setting GIT_ASKPASS and fail the
+  # auth. The failure is usually harmless because bisect-kit will retry.
+  env = os.environ.copy()
+  env['GIT_ASKPASS'] = '/usr/bin/true'
+  return env
+
+
 def init(repo_dir,
          manifest_url,
          manifest_branch=None,
@@ -90,7 +100,7 @@ def init(repo_dir,
     cmd += ['--reference', reference]
   if mirror:
     cmd.append('--mirror')
-  util.check_call(*cmd, cwd=repo_dir)
+  util.check_call(*cmd, cwd=repo_dir, env=_get_repo_sync_env())
 
 
 def cleanup_repo_generated_files(repo_dir, manifest_name='default.xml'):
@@ -150,7 +160,7 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=False):
     cmd += ['--manifest-name', manifest_name]
   if current_branch:
     cmd += ['--current-branch']
-  util.check_call(*cmd, cwd=repo_dir)
+  util.check_call(*cmd, cwd=repo_dir, env=_get_repo_sync_env())
 
 
 def abandon(repo_dir, branch_name):
