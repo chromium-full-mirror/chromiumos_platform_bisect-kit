@@ -215,7 +215,8 @@ class AndroidSpecManager(codechange.SpecManager):
     self.manifest_dir = os.path.join(self.config['android_root'], '.repo',
                                      'manifests')
 
-  def collect_float_spec(self, old, new):
+  def collect_float_spec(self, old, new, fixed_specs=None):
+    del fixed_specs  # unused
     result = []
     path = 'default.xml'
 

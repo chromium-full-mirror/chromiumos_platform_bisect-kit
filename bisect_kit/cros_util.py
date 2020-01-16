@@ -1545,7 +1545,22 @@ class ChromeOSSpecManager(codechange.SpecManager):
           '%s does not have %s' % (self.historical_manifest_git_dir, path))
     return timestamp
 
-  def collect_float_spec(self, old, new):
+  def collect_float_spec(self, old, new, fixed_specs=None):
+    assert fixed_specs
+    branch = None
+
+    old_branches = git_util.get_branches(
+        self.manifest_dir, commit=fixed_specs[0].revision)
+    new_branches = git_util.get_branches(
+        self.manifest_dir, commit=fixed_specs[-1].revision)
+    branches = list(set(old_branches) & set(new_branches))
+    if branches:
+      branch = branches[0]
+    else:
+      logger.warning(
+          'unable to determine float spec branch, '
+          'old = %s, new = %s', old_branches, new_branches)
+
     old_timestamp = self.lookup_build_timestamp(old)
     new_timestamp = self.lookup_build_timestamp(new)
     # snapshot time is different from commit time
@@ -1565,7 +1580,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
     path = 'full.xml'
     parser = repo_util.ManifestParser(self.manifest_dir)
     for timestamp, git_rev in parser.enumerate_manifest_commits(
-        old_timestamp, new_timestamp, path):
+        old_timestamp, new_timestamp, path, branch=branch):
       result.append(
           codechange.Spec(codechange.SPEC_FLOAT, git_rev, timestamp, path))
     return result
@@ -1705,6 +1720,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
       if not spec.is_static():
         raise ValueError(
             'fixed spec %r has unexpected floating entries' % spec.name)
+    spec.revision = root.get('revision')
 
   def sync_disk_state(self, rev):
     manifest_name = self.get_manifest_file(rev)
