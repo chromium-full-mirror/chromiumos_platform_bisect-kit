@@ -585,9 +585,26 @@ class CodeStorage(object):
     # a local checkout), there is no need to convert the name.
     return git_util.get_rev_by_time(git_root, timestamp, spec[path].at)
 
-  def get_actions_between_two_commit(self, spec, path, old, new):
+  def get_actions_between_two_commit(self,
+                                     spec,
+                                     path,
+                                     old,
+                                     new,
+                                     ignore_not_ancestor=False):
     git_root = self.cached_git_root(spec[path].repo_url)
     result = []
+    # not in the same branch, regard as an atomic operation
+    # this situation happens when
+    # 1. new is branched from old and
+    # 2. commit timestamp is not reliable(i.e. commit time != merged time)
+    # old and new might not have ancestor relation
+    if ignore_not_ancestor and old != new and not git_util.is_ancestor_commit(
+        git_root, old, new):
+      timestamp = git_util.get_commit_time(git_root, new)
+      result.append(
+          GitCheckoutCommit(timestamp, path, spec[path].repo_url, new))
+      return result
+
     for timestamp, git_rev in git_util.list_commits_between_commits(
         git_root, old, new):
       result.append(
@@ -637,6 +654,15 @@ class CodeManager(object):
     groups = []
     last_group = ActionGroup(next_float.timestamp)
     is_removed = set()
+
+    # `branch_between_float_specs` is currently a chromeos-only logic,
+    # and branch behavior is not verified for android and chrome now.
+    is_chromeos_branched = False
+    if hasattr(self.spec_manager, 'branch_between_float_specs'
+              ) and self.spec_manager.branch_between_float_specs(
+                  prev_float, next_float):
+      is_chromeos_branched = True
+
     # Sort alphabetically, so parent directories are handled before children
     # directories.
     for path in sorted(set(prev_float.entries) | set(next_float.entries)):
@@ -653,20 +679,43 @@ class CodeManager(object):
                        next_at))
         continue
 
-      # Existing path is floating, enumerates commits until next spec.
-      #
-      #                prev_at                 till_at
-      # prev branch ---> o --------> o --------> o --------> o --------> ...
-      #                       ^                        ^
-      #                 prev_float.timestamp        next_float.timestamp
+      # Existing path is floating.
       if not prev_float[path].is_static():
+        # Enumerates commits until next spec. Get `prev_at` and `till_at`
+        # by prev_float and next_float's timestamp.
+        #
+        # 1. Non-branched case:
+        #
+        #                prev_at                 till_at
+        # prev branch ---> o --------> o --------> o --------> o --------> ...
+        #                       ^                        ^
+        #                 prev_float.timestamp        next_float.timestamp
+        #
+        # building an image between prev_at and till_at should follow
+        # prev_float's spec.
+        #
+        # 2. Branched case:
+        #
+        #                     till_at
+        #              /------->o---------->
+        #             /            ^ next_float.timestamp
+        #            / prev_at
+        # ---------->o---------------------->
+        #                ^prev_float.timestamp
+        #
+        # building an image between prev_at and till_at should follow
+        # next_float's spec.
+        #
         prev_at = self.code_storage.get_rev_by_time(prev_float, path,
                                                     prev_float.timestamp)
-        till_at = self.code_storage.get_rev_by_time(prev_float, path,
-                                                    next_float.timestamp)
-
+        if is_chromeos_branched:
+          till_at = self.code_storage.get_rev_by_time(next_float, path,
+                                                      next_float.timestamp)
+        else:
+          till_at = self.code_storage.get_rev_by_time(prev_float, path,
+                                                      next_float.timestamp)
         actions = self.code_storage.get_actions_between_two_commit(
-            prev_float, path, prev_at, till_at)
+            prev_float, path, prev_at, till_at, ignore_not_ancestor=True)
 
         # Assume commits with the same timestamp as manifest/DEPS change are
         # atomic.

@@ -269,6 +269,29 @@ class TestCrosUtil(unittest.TestCase):
                   'foo', '9995.0.0', '9999.0.0', only_good_build=True),
               ['R63-9995.0.0', 'R63-9997.0.0', 'R63-9999.0.0'])
 
+  def test_detect_branch_level(self):
+    ref_prefix = [
+        '',
+        'refs/head/',
+        'refs/remotes/cros/',
+        'refs/remotes/origin/',
+    ]
+    tests = [
+        ['master', 1],
+        ['release-R64-10176.B', 2],
+        ['release-R56-9000.B', 2],
+        ['stabilize-3881.0.B', 2],
+        ['firmware-octopus-11297.83.B', 3],
+        ['stabilize-10323.67.B', 3],
+        ['stabilize-9000.87.0.B', 3],
+        ['factory-atlas-11907.B-master', 0],
+    ]
+
+    for prefix in ref_prefix:
+      for test in tests:
+        self.assertEqual(
+            cros_util.detect_branch_level(prefix + test[0]), test[1])
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -1429,6 +1429,33 @@ def get_autotest_test_info(autotest_dir, test_name):
   return None
 
 
+def detect_branch_level(branch):
+  """Given a branch name of manifest-internal, detect it's branch level.
+
+  level1: if ChromeOS version is x.0.0
+  level2: if ChromeOS version is x.x.0
+  level3: if ChromeOS version is x.x.x
+  Where x is an non-zero integer.
+
+  Args:
+    branch: branch name or ref name in manifest-internal
+
+  Returns:
+    An integer indicates the branch level, or zero if not detectable.
+  """
+  level1 = r'^(refs\/\S+(\/\S+)?/)?master$'
+  level2 = r'^\S+-(\d+)(\.0)?\.B$'
+  level3 = r'^\S+-(\d+)\.(\d+)(\.0)?\.B$'
+
+  if re.match(level1, branch):
+    return 1
+  if re.match(level2, branch):
+    return 2
+  if re.match(level3, branch):
+    return 3
+  return 0
+
+
 class ChromeOSSpecManager(codechange.SpecManager):
   """Repo manifest related operations.
 
@@ -1544,6 +1571,28 @@ class ChromeOSSpecManager(codechange.SpecManager):
       raise errors.InternalError(
           '%s does not have %s' % (self.historical_manifest_git_dir, path))
     return timestamp
+
+  def detect_float_spec_branch_level(self, spec):
+    results = [
+        detect_branch_level(branch) for branch in git_util.get_branches(
+            self.manifest_dir, commit=spec.name)
+    ]
+    results = [x for x in results if x > 0]
+    return min(results) if results else 0
+
+  def branch_between_float_specs(self, old_spec, new_spec):
+    if old_spec.spec_type != codechange.SPEC_FLOAT:
+      return False
+    if new_spec.spec_type != codechange.SPEC_FLOAT:
+      return False
+
+    level_old = self.detect_float_spec_branch_level(old_spec)
+    level_new = self.detect_float_spec_branch_level(new_spec)
+
+    if not level_old or not level_new:
+      logger.warning('branch level detect failed, assume master')
+      return False
+    return level_old != level_new
 
   def collect_float_spec(self, old, new, fixed_specs=None):
     assert fixed_specs

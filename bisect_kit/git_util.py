@@ -321,7 +321,7 @@ def get_commit_hash(git_repo, rev):
   return git_rev
 
 
-def get_commit_time(git_repo, rev, path):
+def get_commit_time(git_repo, rev, path=None):
   """Get git commit timestamp.
 
   Args:
@@ -332,8 +332,10 @@ def get_commit_time(git_repo, rev, path):
   Returns:
     timestamp (int)
   """
-  line = util.check_output(
-      'git', 'log', '-1', '--format=%ct', rev, '--', path, cwd=git_repo)
+  cmd = ['git', 'log', '-1', '--format=%ct', rev]
+  if path:
+    cmd += ['--', path]
+  line = util.check_output(*cmd, cwd=git_repo)
   return int(line)
 
 
