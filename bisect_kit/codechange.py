@@ -160,14 +160,23 @@ class Spec(object):
     timestamp: timestamp of this spec
     path: path of spec
     entries: paths to PathSpec dict
+    revision: a commit id of manifest-internal indicates the manifest revision,
+        this argument is not used in DEPS.
   """
 
-  def __init__(self, spec_type, name, timestamp, path, entries=None):
+  def __init__(self,
+               spec_type,
+               name,
+               timestamp,
+               path,
+               entries=None,
+               revision=None):
     self.spec_type = spec_type
     self.name = name
     self.timestamp = timestamp
     self.path = path
     self.entries = entries
+    self.revision = revision
 
   def copy(self):
     return copy.deepcopy(self)
@@ -474,11 +483,17 @@ class SpecManager(object):
     - gclient sync and repo sync
   """
 
-  def collect_float_spec(self, old, new):
+  def collect_float_spec(self, old, new, fixed_specs=None):
     """Collects float Spec between two versions.
 
     This method may fetch spec from network. However, it should not switch tree
     version state.
+
+    Args:
+      old: old version
+      new: new version
+      fixed_specs: fixed specs from collect_fixed_spec(old, new) for Chrome OS
+          or None for others
     """
     raise NotImplementedError
 
@@ -840,18 +855,30 @@ class CodeManager(object):
     Returns:
       list of rev string
     """
-    logger.info('build_revlist: old = %s, new = %s', old, new)
+    _, _, revlist = self.get_specs_and_revlist(old, new)
+    return revlist
+
+  def get_specs_and_revlist(self, old, new):
+    """Build revlist.
+
+    Returns:
+      (parsed fixed_specs, parsed float_specs, list of rev string)
+    """
+    logger.info('get_specs_and_revlist: old = %s, new = %s', old, new)
     revlist = []
 
     # step 1, find all float and fixed specs in the given range.
     fixed_specs = self.spec_manager.collect_fixed_spec(old, new)
     assert fixed_specs
-    float_specs = self.spec_manager.collect_float_spec(old, new)
+    for spec in fixed_specs:
+      self.spec_manager.parse_spec(spec)
+
+    float_specs = self.spec_manager.collect_float_spec(old, new, fixed_specs)
     assert float_specs
     while float_specs[-1].timestamp > fixed_specs[-1].timestamp:
       float_specs.pop()
     assert float_specs
-    for spec in float_specs + fixed_specs:
+    for spec in float_specs:
       self.spec_manager.parse_spec(spec)
 
     # step 2, synthesize all fixed specs in the range from float specs.
@@ -915,7 +942,7 @@ class CodeManager(object):
           this_action_groups)
     revlist.append(fixed_specs[associated_pairs[-1][0]].name)
 
-    return revlist
+    return fixed_specs, float_specs, revlist
 
   def save_action_groups_between_releases(self, old, new, action_groups):
     data = [ag.serialize() for ag in action_groups]

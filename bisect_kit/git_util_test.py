@@ -114,6 +114,39 @@ class TestGitOperation(unittest.TestCase):
   def tearDown(self):
     shutil.rmtree(self.git_repo)
 
+  def prepare_merged_repository(self):
+    # Generates following commit graph:
+    #  |
+    #  *  commit C (merge A B)  (2017-02-05)
+    #  |\
+    #  | *  commit B on branch foo (2017-02-02)
+    #  * |  commit A (2017-02-01)
+    #  |/
+    #  *  commits[4] (2017-01-05)
+    #  |
+    branch_foo = 'foo'
+    subprocess.check_call(['git', 'branch', branch_foo], cwd=self.git_repo)
+    commit_a = self.git.add_commit('2017-02-01T00:00:00', 'commit A', 'file2',
+                                   'commit A')
+    subprocess.check_call(['git', 'checkout', branch_foo], cwd=self.git_repo)
+    commit_b = self.git.add_commit('2017-02-02T00:00:00', 'commit B',
+                                   self.git.default_filename, 'commit B')
+    subprocess.check_call(['git', 'checkout', 'master'], cwd=self.git_repo)
+    # --no-edit: git may complain EDITOR is unset
+    subprocess.check_call(['git', 'merge', '--no-edit', branch_foo],
+                          cwd=self.git_repo,
+                          env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'))
+
+    if six.PY2:
+      commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                         cwd=self.git_repo)
+    else:
+      commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                         cwd=self.git_repo,
+                                         encoding='utf8')
+    commit_c = commit_c.strip()
+    return [commit_a, commit_b, commit_c]
+
   def test_git_init(self):
     # reinit existing git folder
     self.assertTrue(git_util.is_git_root(self.git_repo))
@@ -262,36 +295,7 @@ class TestGitOperation(unittest.TestCase):
         self.commits[2])
 
   def test_get_rev_by_time_merge(self):
-    # Generates following commit graph:
-    #  |
-    #  *  commit C (merge A B)  (2017-02-05)
-    #  |\
-    #  | *  commit B on branch foo (2017-02-02)
-    #  * |  commit A (2017-02-01)
-    #  |/
-    #  *  commits[4] (2017-01-05)
-    #  |
-    branch_foo = 'foo'
-    subprocess.check_call(['git', 'branch', branch_foo], cwd=self.git_repo)
-    commit_a = self.git.add_commit('2017-02-01T00:00:00', 'commit A', 'file2',
-                                   'commit A')
-    subprocess.check_call(['git', 'checkout', branch_foo], cwd=self.git_repo)
-    self.git.add_commit('2017-02-02T00:00:00', 'commit B',
-                        self.git.default_filename, 'commit B')
-    subprocess.check_call(['git', 'checkout', 'master'], cwd=self.git_repo)
-    # --no-edit: git may complain EDITOR is unset
-    subprocess.check_call(['git', 'merge', '--no-edit', branch_foo],
-                          cwd=self.git_repo,
-                          env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'))
-
-    if six.PY2:
-      commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-                                         cwd=self.git_repo)
-    else:
-      commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-                                         cwd=self.git_repo,
-                                         encoding='utf8')
-    commit_c = commit_c.strip()
+    commit_a, _, commit_c = self.prepare_merged_repository()
 
     # simple case
     self.assertEqual(
@@ -302,6 +306,21 @@ class TestGitOperation(unittest.TestCase):
     self.assertEqual(
         git_util.get_rev_by_time(self.git_repo, '2017-02-03T00:00:00', None),
         commit_a)
+
+  def test_get_branches(self):
+    commit_a, commit_b, commit_c = self.prepare_merged_repository()
+    self.assertCountEqual(
+        git_util.get_branches(self.git_repo),
+        ['refs/heads/foo', 'refs/heads/master'])
+    self.assertCountEqual(
+        git_util.get_branches(self.git_repo, commit=commit_a),
+        ['refs/heads/master'])
+    self.assertCountEqual(
+        git_util.get_branches(self.git_repo, commit=commit_b),
+        ['refs/heads/foo', 'refs/heads/master'])
+    self.assertCountEqual(
+        git_util.get_branches(self.git_repo, commit=commit_c),
+        ['refs/heads/master'])
 
   def test_reset_hard(self):
     path = os.path.join(self.git_repo, self.git.default_filename)

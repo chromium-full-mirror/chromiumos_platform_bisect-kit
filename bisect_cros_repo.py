@@ -106,18 +106,17 @@ class ChromeOSRepoDomain(core.BisectDomain):
 
     spec_manager = cros_util.ChromeOSSpecManager(config)
     cache = repo_util.RepoMirror(opts.chromeos_mirror)
+    code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager,
+                                          cache)
 
     # Make sure all repos in between are cached
-    float_specs = spec_manager.collect_float_spec(opts.old, opts.new)
+    _, float_specs, revlist = code_manager.get_specs_and_revlist(
+        opts.old, opts.new)
     for spec in reversed(float_specs):
-      spec_manager.parse_spec(spec)
       if cache.are_spec_commits_available(spec):
         continue
       spec_manager.sync_disk_state(spec.name)
 
-    code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager,
-                                          cache)
-    revlist = code_manager.build_revlist(opts.old, opts.new)
     return config, revlist
 
   def __init__(self, config):

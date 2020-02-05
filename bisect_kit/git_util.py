@@ -551,7 +551,12 @@ def get_history(git_repo,
   return result
 
 
-def get_history_recursively(git_repo, path, after, before, parser_callback):
+def get_history_recursively(git_repo,
+                            path,
+                            after,
+                            before,
+                            parser_callback,
+                            branch=None):
   """Get commit history of given path and its dependencies.
 
   In comparison to get_history(), get_history_recursively also takes
@@ -571,12 +576,13 @@ def get_history_recursively(git_repo, path, after, before, parser_callback):
     after: limit history after given time (inclusive)
     before: limit history before given time (inclusive)
     parser_callback: callback to parse file content. See above comment.
+    branch: branch name or ref name
 
   Returns:
     list of (commit timestamp, git hash)
   """
   history = get_history(
-      git_repo, path, after=after, before=before, padding=True)
+      git_repo, path, after=after, before=before, padding=True, branch=branch)
 
   # Collect include information of each commit.
   includes = {}
@@ -609,8 +615,13 @@ def get_history_recursively(git_repo, path, after, before, parser_callback):
   # Recursion and merge.
   result = list(history)
   for include, appeared, disappeared in dependencies:
-    result += get_history_recursively(git_repo, include, appeared, disappeared,
-                                      parser_callback)
+    result += get_history_recursively(
+        git_repo,
+        include,
+        appeared,
+        disappeared,
+        parser_callback,
+        branch=branch)
 
   # Sort and dedup.
   result2 = []
@@ -620,6 +631,29 @@ def get_history_recursively(git_repo, path, after, before, parser_callback):
     result2.append(x)
 
   return result2
+
+
+def get_branches(git_repo, all_branches=True, commit=None):
+  """Get branches of a repository.
+
+  Args:
+    git_repo: path of git repo
+    all_branches: return remote branches if is set to True
+    commit: return branches containing this commit if is not None
+
+  Returns:
+    list of branch names
+  """
+  cmd = ['git', 'branch', '--format=%(refname)']
+  if all_branches:
+    cmd += ['-a']
+  if commit:
+    cmd += ['--contains', commit]
+
+  result = []
+  for line in util.check_output(*cmd, cwd=git_repo).splitlines():
+    result.append(line.strip())
+  return result
 
 
 def list_commits_between_commits(git_repo, old, new):

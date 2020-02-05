@@ -422,7 +422,8 @@ class ChromeSpecManager(codechange.SpecManager):
         if path.startswith('src/chromeos/assistant/libassistant/src/'):
           del spec.entries[path]
 
-  def collect_float_spec(self, old, new):
+  def collect_float_spec(self, old, new, fixed_specs=None):
+    del fixed_specs  # unused
     logger.info('collect_float_spec')
     old_timestamp = self.lookup_build_timestamp(old)
     new_timestamp = self.lookup_build_timestamp(new)

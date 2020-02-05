@@ -419,7 +419,7 @@ class ManifestParser(object):
       result[path] = codechange.PathSpec(path, repo_url, revision)
     return result
 
-  def enumerate_manifest_commits(self, start_time, end_time, path):
+  def enumerate_manifest_commits(self, start_time, end_time, path, branch=None):
 
     def parse_dependencies(path, content):
       try:
@@ -433,8 +433,13 @@ class ManifestParser(object):
         result.append(include.get('name'))
       return result
 
-    return git_util.get_history_recursively(self.manifest_dir, path, start_time,
-                                            end_time, parse_dependencies)
+    return git_util.get_history_recursively(
+        self.manifest_dir,
+        path,
+        start_time,
+        end_time,
+        parse_dependencies,
+        branch=branch)
 
 
 class RepoMirror(codechange.CodeStorage):
