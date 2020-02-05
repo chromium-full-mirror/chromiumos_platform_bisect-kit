@@ -119,40 +119,34 @@ class ChromeOSVersionDomain(core.BisectDomain):
 
   def fill_candidate_summary(self, summary, interesting_indexes):
 
-    def find_next_short_version(summary, old_short):
-      found_old = False
-      for rev_info in summary['rev_info']:
-        rev_short = cros_util.version_to_short(rev_info['rev'])
-        if rev_short == old_short:
-          found_old = True
-        elif found_old:
-          return rev_short
-      return None
+    def version_to_url_parameter(ver):
+      if cros_util.is_cros_snapshot_version(ver):
+        return cros_util.snapshot_version_split(ver)[2]
+      return cros_util.version_to_short(ver)
 
     url_template = 'https://crosland.corp.google.com/log/%s..%s'
     if 'current_range' in summary:
       old, new = summary['current_range']
-      old_short = cros_util.version_to_short(old)
-      new_short = cros_util.version_to_short(new)
-      if old_short == new_short:
-        new_short = find_next_short_version(summary, old_short)
-
-      new_link = {'name': 'change_list'}
-      if new_short:
-        new_link['url'] = url_template % (old_short, new_short)
-      summary['links'] = [new_link]
+      old_parameter = version_to_url_parameter(old)
+      new_parameter = version_to_url_parameter(new)
+      summary['links'] = [
+          {
+              'name': 'change_list',
+              'url': url_template % (old_parameter, new_parameter),
+          },
+      ]
 
     for i in interesting_indexes:
       if i == 0:
         continue
       rev_info = summary['rev_info'][i]
-      old_short = cros_util.version_to_short(summary['rev_info'][i - 1]['rev'])
-      new_short = cros_util.version_to_short(rev_info['rev'])
-      if old_short != new_short:
-        link = url_template % (old_short, new_short)
-        rev_info.update({
-            'actions': [dict(link=link)],
-        })
+      old_parameter = version_to_url_parameter(
+          summary['rev_info'][i - 1]['rev'])
+      new_parameter = version_to_url_parameter(rev_info['rev'])
+      link = url_template % (old_parameter, new_parameter)
+      rev_info.update({
+          'actions': [dict(link=link)],
+      })
 
 
 if __name__ == '__main__':
