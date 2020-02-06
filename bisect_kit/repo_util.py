@@ -62,7 +62,7 @@ def _get_repo_sync_env():
   # a script. Here we work around the issue by setting GIT_ASKPASS and fail the
   # auth. The failure is usually harmless because bisect-kit will retry.
   env = os.environ.copy()
-  env['GIT_ASKPASS'] = '/usr/bin/true'
+  env['GIT_ASKPASS'] = '/bin/true'
   return env
 
 
