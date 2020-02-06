@@ -1597,12 +1597,27 @@ class ChromeOSSpecManager(codechange.SpecManager):
   def collect_float_spec(self, old, new, fixed_specs=None):
     assert fixed_specs
     branch = None
+    old_branches = []
+    new_branches = []
 
-    old_branches = git_util.get_branches(
-        self.manifest_dir, commit=fixed_specs[0].revision)
-    new_branches = git_util.get_branches(
-        self.manifest_dir, commit=fixed_specs[-1].revision)
-    branches = list(set(old_branches) & set(new_branches))
+    # There is no revision tag in snapshot's xml
+    if fixed_specs[0].revision:
+      old_branches = git_util.get_branches(
+          self.manifest_dir, commit=fixed_specs[0].revision)
+    if fixed_specs[-1].revision:
+      new_branches = git_util.get_branches(
+          self.manifest_dir, commit=fixed_specs[-1].revision)
+
+    # 1. if both are not snapshot, do AND operation
+    # 2. if new is snapshot, branch = master
+    # 3. if old is snapshot but new is not, respect new's branch
+    if fixed_specs[0].revision and fixed_specs[-1].revision:
+      branches = list(set(old_branches) & set(new_branches))
+    elif not fixed_specs[-1].revision:
+      branches = ['refs/remotes/origin/master']
+    else:
+      branches = new_branches
+
     if branches:
       branch = branches[0]
     else:
