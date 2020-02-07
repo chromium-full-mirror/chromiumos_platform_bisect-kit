@@ -67,6 +67,7 @@ VERSION_KEY_MILESTONE = 'milestone'
 VERSION_KEY_CR_VERSION = 'cr_version'
 VERSION_KEY_ANDROID_BUILD_ID = 'android_build_id'
 VERSION_KEY_ANDROID_BRANCH = 'android_branch'
+CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
 
 
 class NeedRecreateChrootException(Exception):
@@ -1454,6 +1455,27 @@ def detect_branch_level(branch):
   if re.match(level3, branch):
     return 3
   return 0
+
+
+def get_crosland_link(old, new):
+  """Generates crosland link between two versions.
+
+  Args:
+    old: ChromeOS version
+    new: ChromeOS version
+
+  Returns:
+    A crosland url.
+  """
+
+  def version_to_url_parameter(ver):
+    if is_cros_snapshot_version(ver):
+      return snapshot_version_split(ver)[2]
+    return version_to_short(ver)
+
+  old_parameter = version_to_url_parameter(old)
+  new_parameter = version_to_url_parameter(new)
+  return CROSLAND_URL_TEMPLATE % (old_parameter, new_parameter)
 
 
 class ChromeOSSpecManager(codechange.SpecManager):

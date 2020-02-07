@@ -136,13 +136,10 @@ class ChromeOSRepoDomain(core.BisectDomain):
       old, new = summary['current_range']
       old_base, _, _ = codechange.parse_intra_rev(old)
       _, new_next, _ = codechange.parse_intra_rev(new)
-      old_short = cros_util.version_to_short(old_base)
-      new_short = cros_util.version_to_short(new_next)
-      url_template = 'https://crosland.corp.google.com/log/%s..%s'
       summary['links'] = [
           {
               'name': 'change_list',
-              'url': url_template % (old_short, new_short),
+              'url': cros_util.get_crosland_link(old_base, new_next),
           },
       ]
 

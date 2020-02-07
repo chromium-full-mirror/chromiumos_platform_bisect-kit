@@ -292,6 +292,25 @@ class TestCrosUtil(unittest.TestCase):
         self.assertEqual(
             cros_util.detect_branch_level(prefix + test[0]), test[1])
 
+  def test_get_crosland_link(self):
+    template = cros_util.CROSLAND_URL_TEMPLATE
+    self.assertEqual(
+        cros_util.get_crosland_link('R82-12872.0.0-27636',
+                                    'R82-12872.0.0-27637'),
+        template % ('27636', '27637'))
+    self.assertEqual(
+        cros_util.get_crosland_link('R82-12872.0.0', 'R82-12872.0.0-27637'),
+        template % ('12872.0.0', '27637'))
+    self.assertEqual(
+        cros_util.get_crosland_link('12872.0.0', 'R82-12872.0.0-27637'),
+        template % ('12872.0.0', '27637'))
+    self.assertEqual(
+        cros_util.get_crosland_link('R82-12872.0.0-27637', 'R82-12873.0.0'),
+        template % ('27637', '12873.0.0'))
+    self.assertEqual(
+        cros_util.get_crosland_link('R82-12872.0.0-27637', '12873.0.0'),
+        template % ('27637', '12873.0.0'))
+
 
 if __name__ == '__main__':
   unittest.main()

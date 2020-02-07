@@ -119,20 +119,12 @@ class ChromeOSVersionDomain(core.BisectDomain):
 
   def fill_candidate_summary(self, summary, interesting_indexes):
 
-    def version_to_url_parameter(ver):
-      if cros_util.is_cros_snapshot_version(ver):
-        return cros_util.snapshot_version_split(ver)[2]
-      return cros_util.version_to_short(ver)
-
-    url_template = 'https://crosland.corp.google.com/log/%s..%s'
     if 'current_range' in summary:
       old, new = summary['current_range']
-      old_parameter = version_to_url_parameter(old)
-      new_parameter = version_to_url_parameter(new)
       summary['links'] = [
           {
               'name': 'change_list',
-              'url': url_template % (old_parameter, new_parameter),
+              'url': cros_util.get_crosland_link(old, new),
           },
       ]
 
@@ -140,10 +132,8 @@ class ChromeOSVersionDomain(core.BisectDomain):
       if i == 0:
         continue
       rev_info = summary['rev_info'][i]
-      old_parameter = version_to_url_parameter(
-          summary['rev_info'][i - 1]['rev'])
-      new_parameter = version_to_url_parameter(rev_info['rev'])
-      link = url_template % (old_parameter, new_parameter)
+      link = cros_util.get_crosland_link(summary['rev_info'][i - 1]['rev'],
+                                         rev_info['rev'])
       rev_info.update({
           'actions': [dict(link=link)],
       })
