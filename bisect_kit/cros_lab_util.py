@@ -441,11 +441,14 @@ def lease_keeper(dut_name, quit_event):
         skylab_release_dut(dut_name)
         raise errors.DutLeaseException(
             'not found previous lease task in task list')
-  except errors.DutLeaseException:
-    logger.exception('bad lease state, abort')
+  except (errors.DutLeaseException, errors.ExternalError,
+          subprocess.CalledProcessError):
+    logger.exception('swarming api failed or bad lease state, abort')
     # SIGINT will be translated to KeyboardInterrupt.
     os.kill(os.getpid(), signal.SIGINT)
-    return
+  except Exception:
+    logger.exception('unhandled exception in lease keeper, abort')
+    os.kill(os.getpid(), signal.SIGINT)
 
 
 @contextlib.contextmanager
