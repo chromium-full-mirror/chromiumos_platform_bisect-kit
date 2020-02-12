@@ -420,9 +420,14 @@ class CrosDiagnoser(object):
 
     bisector = wrapper.BisectorWrapper('bisect_cros_repo',
                                        self.config['session'])
-    switch_cmd = ['./switch_cros_localbuild.py']
+    if not self.config['buildbucket_build_chromeos']:
+      switch_cmd = ['./switch_cros_localbuild.py']
+    else:
+      switch_cmd = ['./switch_cros_localbuild_internal.py']
+
     if not self.config['disable_rootfs_verification']:
       switch_cmd.append('--no_disable_rootfs_verification')
+
     bisector.init_if_necessary(
         self.cros_old,
         self.cros_new,
@@ -665,6 +670,7 @@ class DiagnoseCommandLineBase(object):
         disable_rootfs_verification=opts.disable_rootfs_verification,
         chrome_deploy_image=opts.chrome_deploy_image,
         disable_snapshot=opts.disable_snapshot,
+        buildbucket_build_chromeos=opts.buildbucket_build_chromeos,
     )
 
     self.states.init(config)
@@ -871,6 +877,10 @@ class DiagnoseCommandLineBase(object):
         '--disable_snapshot',
         action='store_true',
         help='Disable snapshot for bisect chromeos prebuilt')
+    group.add_argument(
+        '--buildbucket_build_chromeos',
+        action='store_true',
+        help='Use buildbucket to build ChromeOS')
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser('run', help='Start auto bisection')
