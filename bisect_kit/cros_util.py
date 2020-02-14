@@ -1657,13 +1657,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
     if is_cros_snapshot_version(new):
       new_timestamp = new_timestamp + 1800
 
-    path = os.path.join(self.manifest_dir, 'default.xml')
-    if not os.path.islink(path) or os.readlink(path) != 'full.xml':
-      raise errors.InternalError(
-          'default.xml not symlink to full.xml is not supported')
-
+    # TODO(zjchang): add logic to combine symlink target's (full.xml) history
     result = []
-    path = 'full.xml'
+    path = 'default.xml'
     parser = repo_util.ManifestParser(self.manifest_dir)
     for timestamp, git_rev in parser.enumerate_manifest_commits(
         old_timestamp, new_timestamp, path, branch=branch):

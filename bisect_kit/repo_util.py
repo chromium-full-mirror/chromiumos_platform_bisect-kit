@@ -522,7 +522,7 @@ class Manifest(object):
     commits = git_util.get_history(
         self.manifest_internal_dir, before=timestamp + 1)
     commit = commits[-1][1]
-    self.xml = self.parser.parse_xml_recursive(commit, 'full.xml')
+    self.xml = self.parser.parse_xml_recursive(commit, 'default.xml')
 
   def to_string(self):
     """Dump current xml to a string.

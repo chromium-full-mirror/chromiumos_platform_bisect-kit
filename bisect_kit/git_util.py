@@ -339,6 +339,28 @@ def get_commit_time(git_repo, rev, path=None):
   return int(line)
 
 
+def is_symbolic_link(git_repo, rev, path):
+  """Check if a file is symbolic link.
+
+  Args:
+    git_repo: path of git repo
+    rev: git commit id
+    path: file path
+
+  Returns:
+    True if the specified file is a symbolic link in repo.
+  """
+  for line in util.check_output(
+      'git', 'ls-tree', '-r', rev, cwd=git_repo).splitlines():
+    # format: 120000 blob 8735a8c1dd96ede39a21d983d5c96792fd15c1a5 default.xml
+    splitted = line.split()
+    if len(splitted) >= 4 and splitted[3] == path:
+      return splitted[0] == '120000'
+
+  raise ValueError(
+      'file %s is not found in repo:%s rev:%s' % (path, git_repo, rev))
+
+
 def get_file_from_revision(git_repo, rev, path):
   """Get file content of given revision.
 
@@ -350,8 +372,11 @@ def get_file_from_revision(git_repo, rev, path):
   Returns:
     file content (str)
   """
-  return util.check_output(
+  result = util.check_output(
       'git', 'show', '%s:%s' % (rev, path), cwd=git_repo, log_stdout=False)
+  if is_symbolic_link(git_repo, rev, path):
+    return get_file_from_revision(git_repo, rev, result)
+  return result
 
 
 def list_dir_from_revision(git_repo, rev, path):
