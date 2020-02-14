@@ -633,7 +633,8 @@ def get_history_recursively(git_repo,
           appeared = commit_time
       else:
         if appeared:
-          dependencies.append((include, appeared, commit_time))
+          # dependency file exists in time range [appeared, commit_time)
+          dependencies.append((include, appeared, commit_time - 1))
           appeared = None
 
     if appeared is not None:
