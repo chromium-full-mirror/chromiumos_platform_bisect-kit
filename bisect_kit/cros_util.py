@@ -105,6 +105,24 @@ def is_cros_snapshot_version(s):
   return bool(re.match(re_chromeos_snapshot_version, s))
 
 
+def is_cros_version_lesseq(ver1, ver2):
+  """Determines if ver1 is less or equal to ver2.
+
+  Args:
+    ver1: a Chrome OS version in short, full, or snapshot format.
+    ver2: a Chrome OS version in short, full, or snapshot format.
+
+  Returns:
+    True if ver1 is smaller than ver2.
+  """
+  assert is_cros_version(ver1) or is_cros_snapshot_version(ver1)
+  assert is_cros_version(ver2) or is_cros_snapshot_version(ver2)
+
+  ver1 = [int(x) for x in re.split(r'[.-]', ver1) if not x.startswith('R')]
+  ver2 = [int(x) for x in re.split(r'[.-]', ver2) if not x.startswith('R')]
+  return ver1 <= ver2
+
+
 def make_cros_full_version(milestone, short_version):
   """Makes full_version from milestone and short_version"""
   assert milestone
@@ -665,8 +683,8 @@ def list_chromeos_prebuilt_versions(board,
     list of sorted version numbers (in full format) between [old, new] range
     (inclusive).
   """
-  old = version_to_short(old)
-  new = version_to_short(new)
+  old_short = version_to_short(old)
+  new_short = version_to_short(new)
 
   rev_map = {
   }  # dict: short version -> list of (short/full or snapshot version, gs path)
@@ -674,7 +692,7 @@ def list_chromeos_prebuilt_versions(board,
     short_version = version_to_short(full_version)
     rev_map[short_version] = [(full_version, gs_path)]
 
-  if include_older_build and old not in rev_map:
+  if include_older_build and old_short not in rev_map:
     for short_version, gs_path in list_prebuilt_from_chromeos_releases(board):
       if short_version not in rev_map:
         rev_map[short_version] = [(short_version, gs_path)]
@@ -695,14 +713,14 @@ def list_chromeos_prebuilt_versions(board,
       # between [12345.0.0, 12346.0.0).
       # So in the following lines we check two facts:
       # 1) If 12346.0.0(next_short_version) is a version between old and new
-      if not util.is_direct_relative_version(next_short_version, old):
+      if not util.is_direct_relative_version(next_short_version, old_short):
         continue
-      if not util.is_direct_relative_version(next_short_version, new):
+      if not util.is_direct_relative_version(next_short_version, new_short):
         continue
       # 2) If 12345.0.0(short_version) is a version between old and new
-      if not util.is_direct_relative_version(short_version, old):
+      if not util.is_direct_relative_version(short_version, old_short):
         continue
-      if not util.is_direct_relative_version(short_version, new):
+      if not util.is_direct_relative_version(short_version, new_short):
         continue
 
       snapshots = list_snapshots_from_image_archive(board, str(major_version))
@@ -716,11 +734,11 @@ def list_chromeos_prebuilt_versions(board,
 
   result = []
   for rev in sorted(rev_map, key=util.version_key_func):
-    if not util.is_direct_relative_version(new, rev):
+    if not util.is_direct_relative_version(new_short, rev):
       continue
-    if not util.is_version_lesseq(old, rev):
+    if not util.is_version_lesseq(old_short, rev):
       continue
-    if not util.is_version_lesseq(rev, new):
+    if not util.is_version_lesseq(rev, new_short):
       continue
 
     for version, gs_path in rev_map[rev]:
@@ -742,7 +760,9 @@ def list_chromeos_prebuilt_versions(board,
       elif is_cros_short_version(version):
         version = version_to_full(board, version)
 
-      result.append(version)
+      if is_cros_version_lesseq(old, version) and is_cros_version_lesseq(
+          version, new):
+        result.append(version)
 
   return result
 
