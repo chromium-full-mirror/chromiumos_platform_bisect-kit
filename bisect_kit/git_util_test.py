@@ -33,7 +33,13 @@ class GitOperation(object):
 
     subprocess.check_call(['git', 'init', '-q'], cwd=self.git_repo)
 
-  def add_commit(self, commit_time, message, path, content, author_time=None):
+  def add_commit(self,
+                 commit_time,
+                 message,
+                 path,
+                 content,
+                 link_target=None,
+                 author_time=None):
     """Adds a commit to the test git repo.
 
     This is for testing, so it is simplified that only allow changing one file
@@ -44,6 +50,7 @@ class GitOperation(object):
       message: commit message
       path: file path of this commit, relative to git root
       content: file content; 'git rm' if None
+      link_target: create a symbolic link path link to target,
       author_time: author time. Default to commit time if not specified.
 
     Returns:
@@ -56,7 +63,11 @@ class GitOperation(object):
 
     full_path = os.path.join(self.git_repo, path)
 
-    if content is None:
+    if link_target:
+      assert content is None
+      subprocess.check_call(['ln', '-s', link_target, path], cwd=self.git_repo)
+      subprocess.check_call(['git', 'add', path], cwd=self.git_repo)
+    elif content is None:
       subprocess.check_call(['git', 'rm', path], cwd=self.git_repo)
     else:
       dirname = os.path.dirname(full_path)
@@ -517,6 +528,17 @@ class TestGitOperation(unittest.TestCase):
     self.assertEqual(
         git_util.get_history_recursively(self.git_repo, 'foo', time, time,
                                          lambda *_: []), commits)
+
+  def test_is_symbolic_link(self):
+    time = 1500000000
+    commit1 = self.git.add_commit(time, 'msg', 'foo', 'foo')
+    commit2 = self.git.add_commit(time + 1, 'msg', 'bar', 'bar')
+    commit3 = self.git.add_commit(time + 2, 'msg', 'bar', None)
+    commit4 = self.git.add_commit(
+        time + 3, 'msg', 'bar', None, link_target='foo')
+
+    self.assertFalse(git_util.is_symbolic_link(self.git_repo, commit2, 'bar'))
+    self.assertTrue(git_util.is_symbolic_link(self.git_repo, commit4, 'bar'))
 
 
 class TestGitUtil(unittest.TestCase):
