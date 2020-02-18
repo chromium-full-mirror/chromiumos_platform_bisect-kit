@@ -646,7 +646,8 @@ class DepsParser(object):
           branch=at,
           after=after,
           before=before,
-          padding=True)
+          padding_begin=True,
+          padding_end=True)
     assert history
 
     # If not equal, it means the file was deleted but is still referenced by

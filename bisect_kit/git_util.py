@@ -504,7 +504,8 @@ def get_history(git_repo,
                 branch=None,
                 after=None,
                 before=None,
-                padding=False,
+                padding_begin=False,
+                padding_end=False,
                 with_subject=False):
   """Get commit history of given path.
 
@@ -517,9 +518,10 @@ def get_history(git_repo,
     branch: branch name or ref name
     after: limit history after given time (inclusive)
     before: limit history before given time (inclusive)
-    padding: If True, pads returned result with dummy record at exact 'after'
-        and 'before' time, if 'path' existed at that time. Otherwise, only
-        returns real commits.
+    padding_begin: If True, pads returned result with dummy record at exact
+        'after' time, if 'path' existed at that time.
+    padding_end: If True, pads returned result with dummy record at exact
+        'before' time, if 'path' existed at that time.
     with_subject: If True, return commit subject together
 
   Returns:
@@ -555,22 +557,24 @@ def get_history(git_repo,
     array[0] = int(array[0])
     result.append(tuple(array))
 
-  if padding:
-    assert before or after, 'padding=True make no sense if they are both None'
+  if padding_begin or padding_end:
     history = [0, '']
     if with_subject:
       history.append('dummy subject')
 
-    if before is not None and get_rev_by_time(
-        git_repo, before, branch, path=path):
+  if padding_end:
+    assert before, 'padding_end=True make no sense if before=None'
+    if get_rev_by_time(git_repo, before, branch, path=path):
       before = int(before)
       if not result or result[-1][0] != before:
         git_rev = get_rev_by_time(git_repo, before, branch)
         assert git_rev
         history[0:2] = [before, git_rev]
         result.append(tuple(history))
-    if after is not None and get_rev_by_time(
-        git_repo, after, branch, path=path):
+
+  if padding_begin:
+    assert after, 'padding_begin=True make no sense if after=None'
+    if get_rev_by_time(git_repo, after, branch, path=path):
       after = int(after)
       if not result or result[0][0] != after:
         git_rev = get_rev_by_time(git_repo, after, branch)
@@ -586,6 +590,7 @@ def get_history_recursively(git_repo,
                             after,
                             before,
                             parser_callback,
+                            padding_end=True,
                             branch=None):
   """Get commit history of given path and its dependencies.
 
@@ -606,13 +611,20 @@ def get_history_recursively(git_repo,
     after: limit history after given time (inclusive)
     before: limit history before given time (inclusive)
     parser_callback: callback to parse file content. See above comment.
+    padding_end: If True, pads returned result with dummy record at exact
+        'after' time, if 'path' existed at that time.
     branch: branch name or ref name
 
   Returns:
     list of (commit timestamp, git hash)
   """
   history = get_history(
-      git_repo, path, after=after, before=before, padding=True, branch=branch)
+      git_repo,
+      path,
+      after=after,
+      before=before,
+      padding_begin=True,
+      branch=branch)
 
   # Collect include information of each commit.
   includes = {}
@@ -652,11 +664,19 @@ def get_history_recursively(git_repo,
         appeared,
         disappeared,
         parser_callback,
+        padding_end=False,
         branch=branch)
 
-  # Sort and dedup.
+  # Sort and padding.
+  result.sort(key=lambda x: x[0])
+  if padding_end:
+    pad = (before,)
+    pad += result[-1][1:]
+    result.append(pad)
+
+  # Dedup.
   result2 = []
-  for x in sorted(result, key=lambda x: x[0]):
+  for x in result:
     if result2 and result2[-1] == x:
       continue
     result2.append(x)

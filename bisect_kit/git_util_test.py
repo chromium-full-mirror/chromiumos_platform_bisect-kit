@@ -413,7 +413,8 @@ class TestGitOperation(unittest.TestCase):
             self.git.default_filename,
             after=timestamp + 100,
             before=timestamp + day * 2 + 100,
-            padding=True), [
+            padding_begin=True,
+            padding_end=True), [
                 (timestamp + 100, self.commits[1]),
                 (timestamp + day * 1, self.commits[2]),
                 (timestamp + day * 2, self.commits[3]),
@@ -460,7 +461,8 @@ class TestGitOperation(unittest.TestCase):
             self.git.default_filename,
             after=time - 10,
             before=time + 10,
-            padding=True), [
+            padding_begin=True,
+            padding_end=True), [
                 (time, self.commits[0]),
                 (time + 10, self.commits[0]),
             ])
@@ -471,7 +473,8 @@ class TestGitOperation(unittest.TestCase):
             self.git.default_filename,
             after=time - 10,
             before=time - 5,
-            padding=True), [])
+            padding_begin=True,
+            padding_end=True), [])
 
     self.assertEqual(
         git_util.get_history(
@@ -479,7 +482,8 @@ class TestGitOperation(unittest.TestCase):
             'not-exist-file',
             after=time - 10,
             before=time + 10,
-            padding=True), [])
+            padding_begin=True,
+            padding_end=True), [])
 
   def test_get_history_recursively(self):
     time = 1500000000
@@ -508,6 +512,7 @@ class TestGitOperation(unittest.TestCase):
                                                   (time + 70, c7),
                                                   (time + 90, c9),
                                                   (time + 100, c9)])
+
     self.assertEqual(
         git_util.get_history_recursively(self.git_repo, 'a', time, time + 100,
                                          parse), [(time + 10, c1),
@@ -517,6 +522,40 @@ class TestGitOperation(unittest.TestCase):
                                                   (time + 80, c8),
                                                   (time + 90, c9),
                                                   (time + 100, c9)])
+
+  def test_get_history_recursively2(self):
+
+    def parse(_, content):
+      return content.split()
+
+    time = 1500000000
+    c1 = self.git.add_commit(time + 10, 'msg', 'f2', '')
+    c2 = self.git.add_commit(time + 20, 'msg', 'f3', '')
+    c3 = self.git.add_commit(time + 30, 'msg', 'f1', 'f2 f3')
+    c4 = self.git.add_commit(time + 40, 'msg', 'f2', ' ')
+
+    self.assertEqual(
+        git_util.get_history_recursively(self.git_repo, 'f1', time, time + 100,
+                                         parse), [(time + 30, c3),
+                                                  (time + 40, c4),
+                                                  (time + 100, c4)])
+
+    c5 = self.git.add_commit(time + 50, 'msg', 'f3', ' ')
+    self.assertEqual(
+        git_util.get_history_recursively(self.git_repo, 'f1', time, time + 100,
+                                         parse), [(time + 30, c3),
+                                                  (time + 40, c4),
+                                                  (time + 50, c5),
+                                                  (time + 100, c5)])
+
+    c6 = self.git.add_commit(time + 60, 'msg', 'f2', '  ')
+    self.assertEqual(
+        git_util.get_history_recursively(self.git_repo, 'f1', time, time + 100,
+                                         parse), [(time + 30, c3),
+                                                  (time + 40, c4),
+                                                  (time + 50, c5),
+                                                  (time + 60, c6),
+                                                  (time + 100, c6)])
 
   def test_get_history_recursively_ordering(self):
     # All commits have identical commit time.
