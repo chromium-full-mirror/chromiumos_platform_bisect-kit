@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import shutil
+import stat
 import subprocess
 import time
 
@@ -349,13 +350,15 @@ def is_symbolic_link(git_repo, rev, path):
 
   Returns:
     True if the specified file is a symbolic link in repo.
+
+  Raises:
+    ValueError if not found
   """
-  for line in util.check_output(
-      'git', 'ls-tree', '-r', rev, cwd=git_repo).splitlines():
-    # format: 120000 blob 8735a8c1dd96ede39a21d983d5c96792fd15c1a5 default.xml
-    splitted = line.split()
-    if len(splitted) >= 4 and splitted[3] == path:
-      return splitted[0] == '120000'
+  # format: 120000 blob 8735a8c1dd96ede39a21d983d5c96792fd15c1a5 default.xml
+  splitted = util.check_output(
+      'git', 'ls-tree', rev, '--full-name', path, cwd=git_repo).split()
+  if len(splitted) >= 4 and splitted[3] == path:
+    return stat.S_ISLNK(int(splitted[0], 8))
 
   raise ValueError(
       'file %s is not found in repo:%s rev:%s' % (path, git_repo, rev))

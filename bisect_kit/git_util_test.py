@@ -65,6 +65,9 @@ class GitOperation(object):
 
     if link_target:
       assert content is None
+      dirname = os.path.dirname(full_path)
+      if not os.path.exists(dirname):
+        os.makedirs(dirname)
       subprocess.check_call(['ln', '-s', link_target, path], cwd=self.git_repo)
       subprocess.check_call(['git', 'add', path], cwd=self.git_repo)
     elif content is None:
@@ -536,9 +539,16 @@ class TestGitOperation(unittest.TestCase):
     commit3 = self.git.add_commit(time + 2, 'msg', 'bar', None)
     commit4 = self.git.add_commit(
         time + 3, 'msg', 'bar', None, link_target='foo')
+    commit5 = self.git.add_commit(
+        time + 4, 'msg', 'dir/baz', None, link_target='foo')
 
     self.assertFalse(git_util.is_symbolic_link(self.git_repo, commit2, 'bar'))
     self.assertTrue(git_util.is_symbolic_link(self.git_repo, commit4, 'bar'))
+    with self.assertRaises(ValueError):
+      self.assertFalse(
+          git_util.is_symbolic_link(self.git_repo, commit4, 'dir/baz'))
+    self.assertTrue(
+        git_util.is_symbolic_link(self.git_repo, commit5, 'dir/baz'))
 
 
 class TestGitUtil(unittest.TestCase):
