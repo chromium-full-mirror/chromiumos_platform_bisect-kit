@@ -171,7 +171,8 @@ class States(object):
     """
     if not os.path.exists(self.session_file):
       return False
-    self.set_data(json.load(open(self.session_file)))
+    with open(self.session_file) as f:
+      self.set_data(json.load(f))
     return True
 
   def save(self):

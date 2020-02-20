@@ -159,11 +159,12 @@ def gather_test_result(opts, result_dir):
 
   results_path = os.path.join(result_dir, 'results.json')
   passed = None
-  for result in json.load(open(results_path)):
-    if result['name'] != opts.test_name:
-      logger.warning('unexpected test ran: %s', result['name'])
-      continue
-    passed = result['errors'] is None
+  with open(results_path) as f:
+    for result in json.load(f):
+      if result['name'] != opts.test_name:
+        logger.warning('unexpected test ran: %s', result['name'])
+        continue
+      passed = result['errors'] is None
   if passed is None:
     raise Exception('no test result for "%s"?' % opts.test_name)
 

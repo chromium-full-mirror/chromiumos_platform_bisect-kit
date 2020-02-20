@@ -115,7 +115,8 @@ class BuildbucketApi(object):
         raise errors.InternalError(
             'buildbucket api cannot find ' +
             'token cache file, please run %s manually to login.' % self.auth_py)
-      data = json.load(open(self.token_cache))['data']
+      with open(self.token_cache) as f:
+        data = json.load(f)['data']
       self._token = data[0]['credential']['access_token']
     return self._token
 

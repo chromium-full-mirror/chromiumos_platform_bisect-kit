@@ -116,6 +116,7 @@ class Popen(object):
     for line in iter(child_file.readline, ''):
       self.queue.put((where, line))
     self.queue.put((where, ''))
+    child_file.close()
 
   def wait(self, timeout=None):
     """Waits child process.

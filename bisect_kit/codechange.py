@@ -1011,8 +1011,9 @@ class CodeManager(object):
           'cached revlist not found: %s' % cache_filename)
 
     result = []
-    for data in json.load(open(cache_filename)):
-      result.append(ActionGroup.unserialize(data))
+    with open(cache_filename) as f:
+      for data in json.load(f):
+        result.append(ActionGroup.unserialize(data))
 
     return result
 

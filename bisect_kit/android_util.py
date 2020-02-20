@@ -196,7 +196,8 @@ def lookup_build_timestamp(flavor, build_id):
   tmp_fn = tempfile.mktemp()
   try:
     fetch_artifact(flavor, build_id, 'BUILD_INFO', tmp_fn)
-    data = json.load(open(tmp_fn))
+    with open(tmp_fn) as f:
+      data = json.load(f)
     return int(data['sync_start_time'])
   finally:
     if os.path.exists(tmp_fn):

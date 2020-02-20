@@ -354,7 +354,8 @@ def query_lease_status(dut_name):
 
   service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
   if service_account_json:
-    service_account_data = json.load(open(service_account_json))
+    with open(service_account_json) as f:
+      service_account_data = json.load(f)
     user = service_account_data['client_email']
   else:
     user = os.environ['USER']
