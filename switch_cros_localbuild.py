@@ -165,8 +165,8 @@ def build(opts, do_mark_as_stable=True):
   # Used many times in this function, shorten it.
   chromeos_root = opts.chromeos_root
 
-  # create chroot if necessary
-  cros_util.create_chroot(chromeos_root)
+  # create and hotfix chroot if necessary
+  cros_util.prepare_chroot(chromeos_root)
 
   if do_mark_as_stable:
     logger.info('mark as stable')

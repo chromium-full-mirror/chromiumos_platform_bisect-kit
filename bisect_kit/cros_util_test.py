@@ -7,6 +7,7 @@
 from __future__ import print_function
 import fnmatch
 import logging
+import os
 import subprocess
 import unittest
 
@@ -412,6 +413,17 @@ class TestCrosUtil(unittest.TestCase):
     self.assertEqual(
         cros_util.get_crosland_link('R82-12872.0.0-27637', '12873.0.0'),
         template % ('27637', '12873.0.0'))
+
+  def test_convert_path_outside_chroot(self):
+    with mock.patch.dict(os.environ, {'USER': 'foouser'}):
+      self.assertEqual(
+          cros_util.convert_path_outside_chroot('/path/to/root',
+                                                '/path/to/file'),
+          '/path/to/root/chroot/path/to/file')
+      self.assertEqual(
+          cros_util.convert_path_outside_chroot('/path/to/root',
+                                                '~/path/to/file'),
+          '/path/to/root/chroot/home/foouser/path/to/file')
 
 
 if __name__ == '__main__':
