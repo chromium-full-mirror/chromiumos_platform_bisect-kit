@@ -1444,7 +1444,12 @@ def get_autotest_test_info(autotest_dir, test_name):
     AutotestControlInfo object. None if test not found.
   """
   for control_file in enumerate_autotest_control_files(autotest_dir):
-    info = parse_autotest_control_file(control_file)
+    try:
+      info = parse_autotest_control_file(control_file)
+    except SyntaxError:
+      logger.warning('%s is not parsable, ignore', control_file)
+      continue
+
     if info.name == test_name:
       return info
   return None
