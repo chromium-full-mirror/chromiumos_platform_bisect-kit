@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import time
 
@@ -1088,6 +1089,25 @@ def is_inside_chroot():
   return os.path.exists('/etc/cros_chroot_version')
 
 
+def convert_path_outside_chroot(chromeos_root, path):
+  """Converts path in chroot to outside.
+
+  Args:
+    chromeos_root: chromeos tree root
+    path: path inside chroot; support starting with '~/'
+
+  Returns:
+    The corresponding path outside chroot assuming the chroot is mounted
+  """
+  if path.startswith('~/'):
+    path = path.replace('~', '/home/' + os.environ['USER'])
+  assert '~' not in path, 'tilde (~) character is not fully supported'
+
+  assert os.path.isabs(path)
+  assert path[0] == os.sep
+  return os.path.join(chromeos_root, 'chroot', path[1:])
+
+
 def cros_sdk(chromeos_root, *args, **kwargs):
   """Run commands inside chromeos chroot.
 
@@ -1136,7 +1156,7 @@ def cros_sdk(chromeos_root, *args, **kwargs):
 
 
 def create_chroot(chromeos_root):
-  """Creates ChromeOS chroot.
+  """Creates ChromeOS chroot if necessary.
 
   Args:
     chromeos_root: chromeos tree root
@@ -1149,34 +1169,59 @@ def create_chroot(chromeos_root):
   util.check_output('chromite/bin/cros_sdk', '--create', cwd=chromeos_root)
 
 
-def copy_into_chroot(chromeos_root, src, dst):
+def mount_chroot(chromeos_root):
+  """Creates ChromeOS chroot if necessary.
+
+  Args:
+    chromeos_root: chromeos tree root
+  """
+  # An arbitrary file must exist in chroot.
+  path = convert_path_outside_chroot(chromeos_root, '/bin/ls')
+
+  # Not created or mounted yet.
+  if not os.path.exists(path):
+    create_chroot(chromeos_root)
+    # After this command, the chroot is mounted.
+    cros_sdk(chromeos_root, 'true')
+    assert os.path.exists(path)
+
+
+def copy_into_chroot(chromeos_root, src, dst, overwrite=True):
   """Copies file into chromeos chroot.
+
+  The side effect is chroot created and mounted.
 
   Args:
     chromeos_root: chromeos tree root
     src: path outside chroot
     dst: path inside chroot
+    overwrite: overwrite if dst alreadys exists
   """
-  # chroot may be an image, so we cannot copy to corresponding path
-  # directly.
-  cros_sdk(chromeos_root, 'sh', '-c', 'cat > %s' % dst, stdin=open(src))
+  mount_chroot(chromeos_root)
+  src = os.path.expanduser(src)
+  dst_outside = convert_path_outside_chroot(chromeos_root, dst)
+  if not overwrite and os.path.exists(dst_outside):
+    return
+
+  # Haven't support directory or special files yet.
+  assert os.path.isfile(src)
+  assert os.path.isfile(dst_outside) or not os.path.exists(dst_outside)
+
+  dirname = os.path.dirname(dst_outside)
+  if not os.path.exists(dirname):
+    os.makedirs(dirname)
+  shutil.copy(src, dst_outside)
 
 
-def exists_in_chroot(chromeos_root, path):
-  """Determine whether a path exists in the chroot.
+def prepare_chroot(chromeos_root):
+  mount_chroot(chromeos_root)
 
-  Args:
-    chromeos_root: chromeos tree root
-    path: path inside chroot, relative to src/scripts
-
-  Returns:
-    True if a path exists
-  """
-  try:
-    cros_sdk(chromeos_root, 'test', '-e', path)
-  except subprocess.CalledProcessError:
-    return False
-  return True
+  # Work around b/149077936:
+  # The creds file is copied into the chroot since 12866.0.0.
+  # But earlier versions need this file as well because of cipd ACL change.
+  creds_path = '~/.config/chrome_infra/auth/creds.json'
+  if os.path.exists(os.path.expanduser(creds_path)):
+    copy_into_chroot(chromeos_root, creds_path, creds_path, overwrite=False)
 
 
 def check_if_need_recreate_chroot(stdout, stderr):
