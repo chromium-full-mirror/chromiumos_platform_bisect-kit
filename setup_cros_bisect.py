@@ -260,6 +260,13 @@ def sync_chromeos_code(opts, path_factory):
   if generate_extra_manifest_for_deleted_repo(chromeos_mirror) != 0:
     logger.info('repo sync again')
     repo_util.sync(chromeos_mirror)
+
+  # Work around for b/149883148: 'repo' tool does not fetch all branches in
+  # mirror mode.
+  chromiumos_overlay_mirror = os.path.join(
+      chromeos_mirror, 'chromiumos/overlays/chromiumos-overlay.git')
+  git_util.fetch(chromiumos_overlay_mirror, 'cros')
+
   write_sync_time(chromeos_mirror, start_sync_time)
 
   logger.info('repo sync for chromeos tree')
