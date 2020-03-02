@@ -1854,6 +1854,16 @@ class ChromeOSSpecManager(codechange.SpecManager):
     manifest_path = os.path.join(self.manifest_dir, manifest_name)
     with open(manifest_path, 'w') as f:
       f.write(self.get_manifest(rev))
+
+    # workaround for b/150572399
+    # for chromeOS version < 12931.0.0, manifests are included from incorrect
+    # folder .repo instead of.repo/manifests
+    if is_cros_version_lesseq(rev, '12931.0.0'):
+      repo_path = os.path.join(self.config['chromeos_root'], '.repo')
+      manifest_patch_path = os.path.join(repo_path, manifest_name)
+      with open(manifest_patch_path, 'w') as f:
+        f.write(self.get_manifest(rev))
+
     return manifest_name
 
   def parse_spec(self, spec):
