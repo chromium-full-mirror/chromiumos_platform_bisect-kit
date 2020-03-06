@@ -72,7 +72,8 @@ def init(repo_dir,
          manifest_name=None,
          repo_url=None,
          reference=None,
-         mirror=False):
+         mirror=False,
+         groups=None):
   """Repo init.
 
   Args:
@@ -83,6 +84,7 @@ def init(repo_dir,
     repo_url: repo repository location
     reference: location of mirror directory
     mirror: indicates repo mirror
+    groups: repo sync groups, groups should be seperate by comma
   """
   root = find_repo_root(repo_dir)
   if root and root != repo_dir:
@@ -98,6 +100,8 @@ def init(repo_dir,
     cmd += ['--repo-url', repo_url]
   if reference:
     cmd += ['--reference', reference]
+  if groups:
+    cmd += ['--groups', groups]
   if mirror:
     cmd.append('--mirror')
   util.check_call(*cmd, cwd=repo_dir, env=_get_repo_sync_env())
