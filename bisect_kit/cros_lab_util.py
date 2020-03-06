@@ -27,9 +27,7 @@ logger = logging.getLogger(__name__)
 LAB_DUT = ':lab:'
 
 SWARMING_SERVER = 'https://chromeos-swarming.appspot.com'
-# Use 2800 minutes (roughly 2 days) because the limit is not clear
-# (crbug/1011612).
-LEASE_DURATION = 2800 * 60
+LEASE_DURATION = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
 
 
