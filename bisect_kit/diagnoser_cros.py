@@ -423,7 +423,7 @@ class CrosDiagnoser(object):
     if not self.config['buildbucket_build_chromeos']:
       switch_cmd = ['./switch_cros_localbuild.py']
     else:
-      switch_cmd = ['./switch_cros_localbuild_internal.py']
+      switch_cmd = ['./switch_cros_localbuild_buildbucket.py']
 
     if not self.config['disable_rootfs_verification']:
       switch_cmd.append('--no_disable_rootfs_verification')

@@ -86,7 +86,7 @@ def create_argument_parser():
       'Assign a chromeos manifest instead of deriving from rev')
   parser.add_argument(
       '--bucket',
-      default='cq',
+      default='bisector',
       help='Assign a buildbucket bucket to build it (default: %(default)s)')
   parser.add_argument(
       '--build_revlist',

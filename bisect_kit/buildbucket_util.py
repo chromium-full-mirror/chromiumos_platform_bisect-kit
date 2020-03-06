@@ -192,7 +192,7 @@ class BuildbucketApi(object):
     request = GetBuildRequest(id=buildbucket_id, fields=field_mask)
     return self._post('GetBuild', request, Build)
 
-  def schedule_build(self, board, manifest_xml, bucket='cq'):
+  def schedule_build(self, board, manifest_xml, bucket='bisector'):
     """Schedule a build job in buildbucket.
 
     Args:
@@ -234,11 +234,7 @@ class BuildbucketApi(object):
         'bucket': bucket,
     }
 
-    # Currently, buildbucket cannot accept build request without git commit.
-    # So we assign a template_build_id here, builder will copy the git commit
-    # from template by default.
-    request = ScheduleBuildRequest(
-        template_build_id=8896314228974782576, builder=builder)
+    request = ScheduleBuildRequest(builder=builder)
     request.properties.update(properties)
     return self._post('ScheduleBuild', request, Build)
 
