@@ -578,6 +578,12 @@ def list_snapshots_from_image_archive(board, major_version):
       # we should skip if there is duplicate snapshot
       if result and result[-1][0] == snapshot_version:
         continue
+
+      # b/151054108: snapshot version in [29288, 29439] is broken
+      _, _, snapshot_id = snapshot_version_split(snapshot_version)
+      if 29288 <= int(snapshot_id) <= 29439:
+        continue
+
       result.append((snapshot_version, gs_path))
 
   # sort by its snapshot_id
