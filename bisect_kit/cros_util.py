@@ -1636,6 +1636,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
         count -= 1
       else:
         continue
+      # b/151054108: snapshot version in [29288, 29439] is broken
+      if 29288 <= int(snapshot_id) <= 29439:
+        continue
       if int(old_snapshot_id) <= int(snapshot_id) <= int(new_snapshot_id):
         result.append((commit[0], commit[1], snapshot_id))
     # We find commits in reversed order, now reverse it again to chronological
