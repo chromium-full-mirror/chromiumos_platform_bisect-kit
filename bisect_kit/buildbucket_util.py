@@ -268,5 +268,5 @@ class BuildbucketApi:
       errors.ExternalError: If api request fail.
     """
     assert isinstance(buildbucket_id, int)
-    status = self.get(buildbucket_id)
+    status = self.get(buildbucket_id).status
     return status == Status.Value('SUCCESS')
