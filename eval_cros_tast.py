@@ -251,19 +251,18 @@ def main(args=None):
     logger.info('values=%s', values)
     # The exit code doesn't matter.
     return OLD
-  else:
-    if opts.fail_to_pass:
-      if passed:
-        logger.info('passed')
-        return NEW
-      logger.info('failed')
-      return OLD
-    else:
-      if passed:
-        logger.info('passed')
-        return OLD
-      logger.info('failed')
+
+  if opts.fail_to_pass:
+    if passed:
+      logger.info('passed')
       return NEW
+    logger.info('failed')
+    return OLD
+  if passed:
+    logger.info('passed')
+    return OLD
+  logger.info('failed')
+  return NEW
 
 
 if __name__ == '__main__':

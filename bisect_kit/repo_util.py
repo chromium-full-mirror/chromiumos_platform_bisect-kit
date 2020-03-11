@@ -621,7 +621,6 @@ class Manifest:
         if isinstance(action, codechange.GitRemoveRepo):
           assert self.count_path(action.path) == 0
           self.modified.add(action.path)
-    return
 
   def apply_manifest(self, manifest):
     """Apply another manifest to current xml.

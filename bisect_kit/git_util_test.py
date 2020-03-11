@@ -529,8 +529,8 @@ class TestGitOperation(unittest.TestCase):
       return content.split()
 
     time = 1500000000
-    c1 = self.git.add_commit(time + 10, 'msg', 'f2', '')
-    c2 = self.git.add_commit(time + 20, 'msg', 'f3', '')
+    _c1 = self.git.add_commit(time + 10, 'msg', 'f2', '')
+    _c2 = self.git.add_commit(time + 20, 'msg', 'f3', '')
     c3 = self.git.add_commit(time + 30, 'msg', 'f1', 'f2 f3')
     c4 = self.git.add_commit(time + 40, 'msg', 'f2', ' ')
 
@@ -573,9 +573,9 @@ class TestGitOperation(unittest.TestCase):
 
   def test_is_symbolic_link(self):
     time = 1500000000
-    commit1 = self.git.add_commit(time, 'msg', 'foo', 'foo')
+    _commit1 = self.git.add_commit(time, 'msg', 'foo', 'foo')
     commit2 = self.git.add_commit(time + 1, 'msg', 'bar', 'bar')
-    commit3 = self.git.add_commit(time + 2, 'msg', 'bar', None)
+    _commit3 = self.git.add_commit(time + 2, 'msg', 'bar', None)
     commit4 = self.git.add_commit(
         time + 3, 'msg', 'bar', None, link_target='foo')
     commit5 = self.git.add_commit(

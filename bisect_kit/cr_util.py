@@ -307,6 +307,7 @@ def work_around_b151054105(chrome_src):
   try:
     if not os.path.exists(goma_bin_cache_path):
       os.makedirs(goma_bin_cache_path)
+    # pylint: disable=line-too-long
     goma_download_link = 'https://clients5.google.com/cxx-compiler-service/download/2020-03-04/goma-goobuntu.tgz'
     util.check_call(
         'curl --fail %s | tar zxf - --strip=1' % goma_download_link,

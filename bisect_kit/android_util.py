@@ -59,7 +59,7 @@ def fetch_android_build_data(url):
   # Fetching android build data directly will fail without authentication.
   # Following code is just serving as demo purpose. You should modify or hook
   # it with your own implementation.
-  logger.warn('fetch_android_build_data need to be hooked')
+  logger.warning('fetch_android_build_data need to be hooked')
   from six.moves import urllib
   try:
     return urllib.request.urlopen(url).read().decode('utf8')

@@ -1906,7 +1906,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         reference=self.config['chromeos_mirror'],
         # b/150753074: moblab is in non-default group and causes mark_as_stable
         # fail
-        groups="default,moblab,platform-linux",
+        groups='default,moblab,platform-linux',
     )
 
     # Note, don't sync with current_branch=True for chromeos. One of its
