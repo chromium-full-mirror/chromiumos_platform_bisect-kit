@@ -79,9 +79,13 @@ def create_argument_parser():
       default=configure.get('CHROMEOS_MIRROR', ''),
       help='ChromeOS repo mirror path')
   parser.add_argument(
+      '--skip_sync_code',
+      action='store_true',
+      help='Skip the step syncing source code')
+  parser.add_argument(
       '--nobuild',
       action='store_true',
-      help='Sync source code only; do not build; imply --noimage')
+      help='Stop after source code sync; do not build; imply --noimage')
   parser.add_argument(
       '--noimage',
       action='store_true',
@@ -220,15 +224,17 @@ def build_and_deploy(opts, do_mark_as_stable=True):
 def switch(opts):
   cleanup(opts)
 
-  logger.info('switch source code')
-  config = dict(
-      board=opts.board,
-      chromeos_root=opts.chromeos_root,
-      chromeos_mirror=opts.chromeos_mirror)
-  spec_manager = cros_util.ChromeOSSpecManager(config)
-  cache = repo_util.RepoMirror(opts.chromeos_mirror)
-  code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager, cache)
-  code_manager.switch(opts.rev)
+  if not opts.skip_sync_code:
+    logger.info('switch source code')
+    config = dict(
+        board=opts.board,
+        chromeos_root=opts.chromeos_root,
+        chromeos_mirror=opts.chromeos_mirror)
+    spec_manager = cros_util.ChromeOSSpecManager(config)
+    cache = repo_util.RepoMirror(opts.chromeos_mirror)
+    code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager,
+                                          cache)
+    code_manager.switch(opts.rev)
 
   if opts.nobuild:
     return 0
@@ -247,6 +253,9 @@ def main(args=None):
   if opts.nobuild:
     opts.nodeploy = True
 
+  if opts.skip_sync_code and opts.nobuild:
+    raise errors.ArgumentError('--skip_sync_code and --nobuild',
+                               'nothing to do')
   if not opts.dut:
     if not opts.nodeploy:
       raise errors.ArgumentError('--dut',
