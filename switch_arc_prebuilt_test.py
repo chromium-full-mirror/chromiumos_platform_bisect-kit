@@ -7,11 +7,7 @@
 from __future__ import print_function
 import unittest
 
-try:
-  from unittest import mock
-except ImportError:
-  # TODO(kcwu): remove once migrated to python3
-  import mock
+from unittest import mock
 
 import switch_arc_prebuilt
 

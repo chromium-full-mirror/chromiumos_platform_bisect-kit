@@ -284,7 +284,7 @@ def _urljoin(base, url):
   return result
 
 
-class ManifestParser(object):
+class ManifestParser:
   """Enumerates historical manifest files and parses them."""
 
   def __init__(self, manifest_dir, load_remote=True):
@@ -498,7 +498,7 @@ class RepoMirror(codechange.CodeStorage):
     self._save_project_list(project_root, lines)
 
 
-class Manifest(object):
+class Manifest:
   """This class handles a manifest and is able to patch projects."""
 
   def __init__(self, manifest_internal_dir):

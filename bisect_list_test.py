@@ -6,17 +6,12 @@
 
 from __future__ import print_function
 import unittest
+from unittest import mock
 
 import six
 
 from bisect_kit import bisector_cli
 import bisect_list
-
-try:
-  from unittest import mock
-except ImportError:
-  # TODO(kcwu): remove once migrated to python3
-  import mock
 
 
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())

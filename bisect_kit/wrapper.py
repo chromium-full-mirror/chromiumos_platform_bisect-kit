@@ -17,7 +17,7 @@ from bisect_kit import core
 logger = logging.getLogger(__name__)
 
 
-class BisectorWrapper(object):
+class BisectorWrapper:
   """Wrapper of bisector scripts as python module."""
 
   def __init__(self, name, session):

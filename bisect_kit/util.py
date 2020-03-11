@@ -28,7 +28,7 @@ class TimeoutExpired(Exception):
   """
 
 
-class Popen(object):
+class Popen:
   """Wrapper of subprocess.Popen. Support output logging.
 
   The default is text mode with utf8 encoding. This is different to

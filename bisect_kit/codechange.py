@@ -116,7 +116,7 @@ def _normalize_repo_url(repo_url):
   return repo_url
 
 
-class PathSpec(object):
+class PathSpec:
   """Specified code version of one path.
 
   Attributes:
@@ -146,7 +146,7 @@ class PathSpec(object):
     return not self == rhs
 
 
-class Spec(object):
+class Spec:
   """Collection of PathSpec.
 
   Spec is analogy to gclient's DEPS and repo's manifest.
@@ -254,7 +254,7 @@ class Spec(object):
     logger.info('and common=%s', common_count)
 
 
-class Action(object):
+class Action:
   """Actions describe changes from one Spec to another.
 
   Attributes:
@@ -291,7 +291,7 @@ def unserialize_action(data):
   return action
 
 
-class ActionGroup(object):
+class ActionGroup:
   """Atomic group of Action objects
 
   This models atomic actions, ex:
@@ -473,7 +473,7 @@ def apply_actions(code_storage, action_groups, root_dir):
   batch_apply(commits)
 
 
-class SpecManager(object):
+class SpecManager:
   """Spec related abstract operations.
 
   This class enumerates Spec instances and switch disk state to Spec.
@@ -519,7 +519,7 @@ class SpecManager(object):
     raise NotImplementedError
 
 
-class CodeStorage(object):
+class CodeStorage:
   """Query code history and commit relationship without checkout.
 
   Because paths inside source tree may be deleted or map to different remote
@@ -624,7 +624,7 @@ class CodeStorage(object):
     return True
 
 
-class CodeManager(object):
+class CodeManager:
   """Class to reconstruct historical source tree state.
 
   This class can reconstruct all moments of source tree state and diffs between

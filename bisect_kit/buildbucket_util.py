@@ -31,7 +31,7 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 
-class BuildbucketApi(object):
+class BuildbucketApi:
   """A wrapper of buildbucket apis.
 
   This is a singleton class, it returns a same instance everytime.

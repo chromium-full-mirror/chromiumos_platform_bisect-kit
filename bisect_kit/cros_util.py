@@ -1410,7 +1410,7 @@ def build_image(chromeos_root, board):
   return image_folder
 
 
-class AutotestControlInfo(object):
+class AutotestControlInfo:
   """Parsed content of autotest control file.
 
   Attributes:

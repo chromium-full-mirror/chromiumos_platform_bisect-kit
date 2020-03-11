@@ -7,12 +7,7 @@
 from __future__ import print_function
 import os
 import contextlib
-
-try:
-  from unittest import mock
-except ImportError:
-  # TODO(kcwu): remove once migrated to python3
-  import mock
+from unittest import mock
 
 
 def get_testdata_path(filename=None):

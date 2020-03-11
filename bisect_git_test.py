@@ -8,12 +8,7 @@ from __future__ import print_function
 import shutil
 import tempfile
 import unittest
-
-try:
-  from unittest import mock
-except ImportError:
-  # TODO(kcwu): remove once migrated to python3
-  import mock
+from unittest import mock
 
 from bisect_kit import bisector_cli
 from bisect_kit import git_util_test

@@ -11,12 +11,7 @@ import shutil
 import tempfile
 import textwrap
 import unittest
-
-try:
-  from unittest import mock
-except ImportError:
-  # TODO(kcwu): remove once migrated to python3
-  import mock
+from unittest import mock
 
 from bisect_kit import common
 from bisect_kit import configure

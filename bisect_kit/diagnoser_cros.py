@@ -105,7 +105,7 @@ def need_android_bisect(old_info, new_info):
   return True
 
 
-class CrosDiagnoser(object):
+class CrosDiagnoser:
   """Integrated bisectors API for ChromeOS regression analysis."""
 
   def __init__(self, states, path_factory, config, dut):
@@ -525,7 +525,7 @@ class CrosDiagnoser(object):
       print(json.dumps(result, indent=2))
 
 
-class DiagnoseCommandLineBase(object):
+class DiagnoseCommandLineBase:
   """Diagnose command line interface."""
 
   def __init__(self):

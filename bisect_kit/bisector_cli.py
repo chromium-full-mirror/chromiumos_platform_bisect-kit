@@ -166,7 +166,7 @@ def do_switch(switch_cmd, domain, rev):
   return None
 
 
-class BisectorCommandLine(object):
+class BisectorCommandLine:
   """Bisector command line interface.
 
   The typical usage pattern:

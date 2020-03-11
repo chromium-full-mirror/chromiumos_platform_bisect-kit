@@ -49,7 +49,7 @@ CHECKOUT_TEMPLATE_NAME = 'template'
 logger = logging.getLogger(__name__)
 
 
-class DefaultProjectPathFactory(object):
+class DefaultProjectPathFactory:
   """Factory for chromeos/chrome/android source tree paths."""
 
   def __init__(self, mirror_base, work_base, session):

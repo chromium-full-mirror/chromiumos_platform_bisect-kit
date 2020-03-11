@@ -57,7 +57,7 @@ def average(values):
   return float(sum(values)) / len(values)
 
 
-class EntropyStats(object):
+class EntropyStats:
   r"""A data structure to maintain cross entropy of a set of values.
 
   This is a math helper for NoisyBinarySearch. Given a set of probability,
@@ -120,7 +120,7 @@ class EntropyStats(object):
 
 
 @functools.total_ordering
-class ExtendedFloat(object):
+class ExtendedFloat:
   """Custom floating point number with larger range of exponent.
 
   Problem:

@@ -17,7 +17,7 @@ from bisect_kit import cli
 from bisect_kit import git_util
 
 
-class GitOperation(object):
+class GitOperation:
   """Git operations for testing."""
 
   def __init__(self, git_repo):

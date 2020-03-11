@@ -17,7 +17,7 @@ from bisect_kit import math_util
 logger = logging.getLogger(__name__)
 
 
-class RevInfo(object):
+class RevInfo:
   """Aggregated evaluation result of one revision.
 
   The count of results can be easily accessed by using [] operator.
@@ -126,7 +126,7 @@ class RevInfo(object):
       self[status] += 1
 
 
-class States(object):
+class States:
   """Base class for serializing program state to disk.
 
   After instantiation, set_data() or load() should be invoked before access
@@ -270,7 +270,7 @@ class BisectStates(States):
     self.data['history'].append(entry)
 
 
-class BisectDomain(object):
+class BisectDomain:
   """Base class of bisection domain.
 
   "BisectDomain" is in the sense of "domain of math function". Mapping to

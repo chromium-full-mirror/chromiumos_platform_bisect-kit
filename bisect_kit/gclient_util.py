@@ -218,7 +218,7 @@ def _detect_host_os():
   return _PLATFORM_MAPPING[sys.platform]
 
 
-class Dep(object):
+class Dep:
   """Represent one entry of DEPS's deps.
 
   One Dep object means one subproject inside DEPS file. It recorded what to
@@ -315,7 +315,7 @@ class Dep(object):
     return eval(self.condition, vars_dict)
 
 
-class Deps(object):
+class Deps:
   """DEPS parsed result.
 
   Attributes:
@@ -331,7 +331,7 @@ class Deps(object):
     self.recursedeps = []
 
 
-class TimeSeriesTree(object):
+class TimeSeriesTree:
   """Data structure for generating snapshots of historical dependency tree.
 
   This is a tree structure with time information. Each tree node represents not
@@ -509,7 +509,7 @@ class TimeSeriesTree(object):
           del forest[entry]
 
 
-class DepsParser(object):
+class DepsParser:
   """Gclient DEPS file parser."""
 
   def __init__(self, project_root, code_storage):

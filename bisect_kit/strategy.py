@@ -71,7 +71,7 @@ def trend_score(prev_from, prev_to, now_from, now_to):
 
 # Old version of pylint may give false-positive warning.
 # pylint: disable=unpacking-non-sequence
-class NoisyBinarySearch(object):
+class NoisyBinarySearch:
   """Binary search algorithm supporting noisy signal.
 
   Examples:

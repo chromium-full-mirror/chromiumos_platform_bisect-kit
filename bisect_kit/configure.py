@@ -40,7 +40,7 @@ def _parse_config_file(args):
   return opts.rc
 
 
-class ConfigStore(object):
+class ConfigStore:
   """Content of configuration.
 
   Attributes:
