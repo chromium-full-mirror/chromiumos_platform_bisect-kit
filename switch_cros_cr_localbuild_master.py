@@ -81,9 +81,13 @@ def create_argument_parser():
       default='chrome_deploy',
       help='Deploy method (default: %(default)s)')
   parser.add_argument(
+      '--skip_sync_code',
+      action='store_true',
+      help='Skip the step syncing source code')
+  parser.add_argument(
       '--nobuild',
       action='store_true',
-      help='Sync source code only; do not build; imply --nodeploy')
+      help='Stop after source code sync; do not build; imply --nodeploy')
   parser.add_argument(
       '--nodeploy', action='store_true', help='Do not deploy after build')
 
@@ -111,6 +115,13 @@ def main(args=None):
   opts = parser.parse_args(args)
   common.config_logging(opts)
 
+  # --nobuild imply --nodeploy
+  if opts.nobuild:
+    opts.nodeploy = True
+
+  if opts.skip_sync_code and opts.nobuild:
+    raise errors.ArgumentError('--skip_sync_code and --nobuild',
+                               'nothing to do')
   if not opts.dut:
     if not opts.nodeploy:
       raise errors.ArgumentError('--dut',
@@ -132,8 +143,9 @@ def main(args=None):
   assert bisect_cr_localbuild_master.verify_gclient_dep(opts.chrome_root)
   rev = bisect_cr_localbuild_master.guess_git_rev(opts, opts.rev)
 
-  git_util.checkout_version(opts.chrome_src, rev)
-  gclient_util.sync(opts.chrome_root)
+  if not opts.skip_sync_code:
+    git_util.checkout_version(opts.chrome_src, rev)
+    gclient_util.sync(opts.chrome_root)
 
   if opts.nobuild:
     return
