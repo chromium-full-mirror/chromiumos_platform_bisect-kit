@@ -230,6 +230,7 @@ def switch(opts):
       buildbucket_id = schedule_build(opts.board, get_manifest(opts),
                                       opts.bucket)
     image_path = prepare_image(image_folder, buildbucket_id)
+  rel_path = os.path.relpath(image_path, opts.chromeos_root)
 
   if opts.nodeploy:
     return 0
@@ -239,7 +240,7 @@ def switch(opts):
       opts.chromeos_root,
       opts.dut,
       opts.board,
-      image_path,
+      rel_path,
       clobber_stateful=opts.clobber_stateful,
       disable_rootfs_verification=opts.disable_rootfs_verification,
       repair_callback=cros_lab_util.repair):
