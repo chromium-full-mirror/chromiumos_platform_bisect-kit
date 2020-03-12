@@ -551,6 +551,10 @@ def cmd_delete(opts):
       logger.info('remove cache: %s', path)
       delete_tree(path)
 
+    for path in glob.glob(os.path.join(chromeos_root, 'tmp/*')):
+      logger.info('remove cache: %s', path)
+      delete_tree(path)
+
   for path in glob.glob(
       os.path.join(path_factory.get_chrome_cache(), '_cache_*')):
     logger.info('remove cache: %s', path)
