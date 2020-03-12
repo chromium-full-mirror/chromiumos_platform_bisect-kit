@@ -999,7 +999,7 @@ def version_info(board, version):
     api = buildbucket_util.BuildbucketApi()
     milestone, short_version, _ = snapshot_version_split(version)
     buildbucket_id = query_snapshot_buildbucket_id(board, version)
-    data = api.get(int(buildbucket_id)).output.properties
+    data = api.get_build(int(buildbucket_id)).output.properties
     target_versions = json_format.MessageToDict(data['target_versions'])
     return {
         VERSION_KEY_MILESTONE: milestone,

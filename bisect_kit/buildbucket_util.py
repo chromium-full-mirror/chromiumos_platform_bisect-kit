@@ -174,7 +174,7 @@ class BuildbucketApi:
 
     raise errors.ExternalError('buildbucket api %s failed' % api)
 
-  def get(self, buildbucket_id):
+  def get_build(self, buildbucket_id):
     """Get a build object by its buildbucket id.
 
     Args:
@@ -252,7 +252,7 @@ class BuildbucketApi:
     """
     assert isinstance(buildbucket_id, int)
     waiting_status = [Status.Value('SCHEDULED'), Status.Value('STARTED')]
-    status = self.get(buildbucket_id).status
+    status = self.get_build(buildbucket_id).status
     return status in waiting_status
 
   def is_success(self, buildbucket_id):
@@ -268,5 +268,5 @@ class BuildbucketApi:
       errors.ExternalError: If api request fail.
     """
     assert isinstance(buildbucket_id, int)
-    status = self.get(buildbucket_id).status
+    status = self.get_build(buildbucket_id).status
     return status == Status.Value('SUCCESS')

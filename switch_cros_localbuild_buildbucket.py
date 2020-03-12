@@ -162,7 +162,7 @@ def get_manifest(opts):
 def prepare_image(image_folder, buildbucket_id):
   image_path = os.path.join(image_folder, cros_util.test_image_filename)
   api = buildbucket_util.BuildbucketApi()
-  properties = api.get(buildbucket_id).output.properties
+  properties = api.get_build(buildbucket_id).output.properties
 
   if 'artifacts' not in properties:
     raise errors.ExternalError(
