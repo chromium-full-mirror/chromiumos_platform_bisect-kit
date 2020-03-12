@@ -21,9 +21,14 @@ from six.moves import http_client
 from google.protobuf.field_mask_pb2 import FieldMask
 from google.protobuf.message import DecodeError
 from infra_libs.buildbucket.proto.build_pb2 import Build
+from infra_libs.buildbucket.proto.build_pb2 import BuilderID
 from infra_libs.buildbucket.proto.common_pb2 import Status
+from infra_libs.buildbucket.proto.common_pb2 import StringPair
+from infra_libs.buildbucket.proto.rpc_pb2 import BuildPredicate
 from infra_libs.buildbucket.proto.rpc_pb2 import GetBuildRequest
 from infra_libs.buildbucket.proto.rpc_pb2 import ScheduleBuildRequest
+from infra_libs.buildbucket.proto.rpc_pb2 import SearchBuildsRequest
+from infra_libs.buildbucket.proto.rpc_pb2 import SearchBuildsResponse
 
 from bisect_kit import errors
 from bisect_kit import util
@@ -132,13 +137,14 @@ class BuildbucketApi:
     util.check_call(self.auth_py, 'check', '--service', domain)
     self._token = None
 
-  def _post(self, api, request, return_class):
+  def _post(self, api, request, return_class, timeout=10):
     """Post a rpc request to buildbucket server.
 
     Args:
       api: A string indicates api name in `buildbucket.v2.Builds`.
       request: A protobuf object.
       return_class: A protobuf class that catches api's return.
+      timeout: connection timeout in seconds, default to 10.
 
     Returns:
       A `return_class` object.
@@ -150,7 +156,8 @@ class BuildbucketApi:
     logged_in = False
     while max_retries > 0:
       try:
-        conn = http_client.HTTPSConnection(self.buildbucket_domain, timeout=10)
+        conn = http_client.HTTPSConnection(
+            self.buildbucket_domain, timeout=timeout)
         conn.request('POST', self.buildbucket_api_path + api,
                      request.SerializeToString(), self._get_header())
         response = conn.getresponse()
@@ -270,3 +277,69 @@ class BuildbucketApi:
     assert isinstance(buildbucket_id, int)
     status = self.get_build(buildbucket_id).status
     return status == Status.Value('SUCCESS')
+
+  def search_builds(self,
+                    project='chromeos',
+                    bucket=None,
+                    builder=None,
+                    status=None,
+                    created_by=None,
+                    snapshot_commit=None,
+                    limit=100):
+    """Search builds.
+
+    Args:
+      project: Project name in buildbucket. Defaults to 'chromeos'.
+      bucket: Bucket name in buildbucket. Defaults to None.
+      builder: Builder name in buildbucket. Defaults to None.
+      status: Search builds by build status. Defaults to None.
+      created_by: Search builds by creater. Defaults to None.
+      snapshot_commit: Search by annealing snapshot commit hash for Chrome
+          OS. Defaults to None.
+      limit: Maximum numbers of builds to return. Defaults to 100.
+
+    Returns:
+      A list of builds.
+    """
+    search_response_fields = ['builds.*.%s' % x for x in self._build_fields]
+    field_mask = FieldMask(paths=search_response_fields)
+    tags = []
+    if status:
+      status = Status.Value(status)
+    if snapshot_commit:
+      tags.append(StringPair(key='snapshot', value=snapshot_commit))
+
+    # max page_size is 1000
+    page_size = min(1000, limit)
+    builder = BuilderID(
+        project=project,
+        bucket=bucket,
+        builder=builder,
+    )
+    predicate = BuildPredicate(
+        builder=builder,
+        created_by=created_by,
+        status=status,
+        tags=tags,
+    )
+    request = SearchBuildsRequest(
+        fields=field_mask,
+        predicate=predicate,
+        page_size=page_size,
+    )
+
+    result = []
+    while len(result) < limit:
+      response = self._post(
+          'SearchBuilds', request, SearchBuildsResponse, timeout=120)
+      result += response.builds
+      if not response.next_page_token:
+        break
+      request = SearchBuildsRequest(
+          fields=field_mask,
+          predicate=predicate,
+          page_token=response.next_page_token,
+          page_size=page_size,
+      )
+
+    return result[0:limit]
