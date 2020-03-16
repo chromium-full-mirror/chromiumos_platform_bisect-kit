@@ -151,12 +151,9 @@ def fetch(git_repo, *args):
     git_repo: path of git repo.
     args: parameters pass to 'git fetch'
   """
-  for tries in range(5):
-    if tries > 0:
-      delay = min(60, 10 * 2**tries)
-      logger.warning('git fetch failed, will retry %s seconds later', delay)
-      time.sleep(delay)
-
+  tries = 0
+  while True:
+    tries += 1
     stderr_lines = []
     try:
       util.check_call(
@@ -165,19 +162,19 @@ def fetch(git_repo, *args):
           *args,
           cwd=git_repo,
           stderr_callback=stderr_lines.append)
-      break
+      return
     except subprocess.CalledProcessError:
+      if tries >= 5:
+        logger.error('git fetch failed too much times')
+        raise
       stderr = ''.join(stderr_lines)
       # only retry 5xx internal server error
-      if 'The requested URL returned error: 5' not in stderr:
-        raise
-  else:
-    # Reached retry limit but haven't succeeded.
-    # In other words, there must be exceptions raised inside above loop.
-    logger.error('git fetch failed too much times')
-    # It's okay to raise because we are in the same scope as above loop.
-    # pylint: disable=misplaced-bare-raise
-    raise
+      if 'The requested URL returned error: 5' in stderr:
+        delay = min(60, 10 * 2**tries)
+        logger.warning('git fetch failed, will retry %s seconds later', delay)
+        time.sleep(delay)
+        continue
+      raise
 
 
 def is_containing_commit(git_repo, rev):
