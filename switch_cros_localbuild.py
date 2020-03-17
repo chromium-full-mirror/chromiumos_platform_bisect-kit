@@ -151,7 +151,7 @@ def _build_packages(opts):
   chrome_root = getattr(opts, 'chrome_root', None)
 
   if not opts.goma_chromeos_dir:
-    default_goma_chromeos_dir = os.path.expanduser('~/goma-chromeos')
+    default_goma_chromeos_dir = os.path.expanduser('~/goma')
     if os.path.exists(default_goma_chromeos_dir):
       logger.debug('found %s available, use goma automatically',
                    default_goma_chromeos_dir)
