@@ -18,6 +18,7 @@ import tempfile
 from six.moves import http_client
 
 # from third_party
+from google.protobuf import json_format
 from google.protobuf.field_mask_pb2 import FieldMask
 from google.protobuf.message import DecodeError
 from infra_libs.buildbucket.proto.build_pb2 import Build
@@ -199,13 +200,18 @@ class BuildbucketApi:
     request = GetBuildRequest(id=buildbucket_id, fields=field_mask)
     return self._post('GetBuild', request, Build)
 
-  def schedule_build(self, board, manifest_xml, bucket='bisector'):
+  def schedule_build(self,
+                     board,
+                     manifest_xml,
+                     bucket='bisector',
+                     force_rebuild=False):
     """Schedule a build job in buildbucket.
 
     Args:
       board: ChromeOS board name
       manifest_xml: A full manifest xml for building chromeOS
       bucket: A bucket name of buildbucket that will handle this build
+      force_rebuild: Set True to ignore existing builds on buildbucket
 
     Returns:
       A Build object if success.
@@ -240,6 +246,12 @@ class BuildbucketApi:
         'builder': '%s-%s' % (board, bucket),
         'bucket': bucket,
     }
+
+    # search old builds
+    if not force_rebuild:
+      build = self.search_usable_build(board, bucket, isolate_hash)
+      if build:
+        return build
 
     request = ScheduleBuildRequest(builder=builder)
     request.properties.update(properties)
@@ -343,3 +355,37 @@ class BuildbucketApi:
       )
 
     return result[0:limit]
+
+  def search_usable_build(self,
+                          board,
+                          bucket,
+                          manifest_isolate_hash,
+                          deps_isolate_hash=None):
+    """Search for recent success build if exists.
+
+    Args:
+      board: ChromeOS board name.
+      bucket: Bucket name in buildbucket.
+      manifest_isolate_hash: Isolate hash for Chrome OS manifest.
+      deps_isolate_hash: Isolate hash for Chrome DEPS file, leave None if no
+          special buildspec for Chrome.
+
+    Returns:
+      An build object if found, or None if no existing build.
+    """
+    builds = self.search_builds(
+        bucket=bucket,
+        builder='%s-%s' % (board, bucket),
+        status='SUCCESS',
+    )
+    for build in builds:
+      input_properties = json_format.MessageToDict(build.input.properties)
+      build_manifest_hash = input_properties.get(
+          '$chromeos/cros_source', {}).get('snapshot_isolate', {}).get(
+              'isolated_hash', None)
+      build_deps_hash = input_properties.get('$chromeos/chrome', {}).get(
+          'deps_isolate', {}).get('isolated_hash', None)
+      if (build_manifest_hash == manifest_isolate_hash and
+          build_deps_hash == deps_isolate_hash):
+        return build
+    return None
