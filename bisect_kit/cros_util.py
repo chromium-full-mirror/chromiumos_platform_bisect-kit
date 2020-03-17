@@ -247,6 +247,12 @@ def query_dut_is_snapshot(host):
   return '-postsubmit' in path
 
 
+def query_dut_is_by_official_builder(host):
+  """Query if given DUT is build by buildbucket builder"""
+  return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILD_TYPE',
+                                         '').startswith('Continuous Builder')
+
+
 def query_dut_boot_id(host, connect_timeout=None):
   """Query boot id.
 

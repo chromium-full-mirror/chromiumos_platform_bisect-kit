@@ -121,7 +121,10 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
               'Someone else reflashed the DUT. ' \
               'DUT locking is not respected? b/126141102'
 
-        eval_cmd = common_eval_cmd + ['--tast_build']
+        if self.config['buildbucket_build_chromeos']:
+          eval_cmd = common_eval_cmd
+        else:
+          eval_cmd = common_eval_cmd + ['--tast_build']
         diagnoser.narrow_down_chromeos_localbuild(eval_cmd)
         logger.info('%s done', __file__)
     except Exception as e:

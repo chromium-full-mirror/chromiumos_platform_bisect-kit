@@ -93,6 +93,7 @@ def prepare_to_run_test(opts):
 def get_tast_bundle_info(opts, pattern=None):
   bundles = ['cros']
   flags = ['-json']
+  # TODO(zjchang): ensure the tast version for buildbucket builds is correct
   if not opts.tast_build:
     flags.append('-build=false')
     if opts.with_private_bundles:
@@ -188,8 +189,9 @@ def main(args=None):
     logger.error('%r is not a valid DUT address', opts.dut)
     return FATAL
 
-  is_snapshot = cros_util.query_dut_is_snapshot(opts.dut)
-  if opts.with_private_bundles and not opts.tast_build and not is_snapshot:
+  by_official_builder = cros_util.query_dut_is_by_official_builder(opts.dut)
+  if (opts.with_private_bundles and not opts.tast_build and
+      not by_official_builder):
     version = cros_util.query_dut_short_version(opts.dut)
     if cros_util.is_cros_localbuild_version(version):
       logger.error(

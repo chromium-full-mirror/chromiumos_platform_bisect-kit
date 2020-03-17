@@ -40,6 +40,12 @@ GS_SNAPSHOT_AUTOTEST_CLIENT_PATH = (
 GS_SNAPSHOT_AUTOTEST_SERVER_PATH = (
     GS_SNAPSHOT_PATH + '/' + AUTOTEST_SERVER_TARBALL)
 
+GS_BUILDBUCKET_BUILD_PATH = 'gs://chromeos-image-archive/{path}'
+GS_BUILDBUCKET_BUILD_AUTOTEST_CLIENT_PATH = (
+    GS_BUILDBUCKET_BUILD_PATH + '/' + AUTOTEST_CLIENT_TARBALL)
+GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH = (
+    GS_BUILDBUCKET_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL)
+
 
 def create_argument_parser():
   parser = argparse.ArgumentParser(description=__doc__)
@@ -59,29 +65,45 @@ def create_argument_parser():
       default=configure.get('BOARD', ''),
       help='ChromeOS board name')
   parser.add_argument(
+      '--dut',
+      type=cli.argtype_notempty,
+      metavar='DUT',
+      default=configure.get('DUT'),
+      help='Address of DUT')
+  parser.add_argument(
       'version',
       nargs='?',
-      type=cros_util.argtype_cros_version,
+      type=cli.argtype_notempty,
       metavar='CROS_VERSION',
       default=configure.get('CROS_VERSION', ''),
-      help='ChromeOS version number, short (10162.0.0) or full (R64-10162.0.0)')
+      help='ChromeOS local build version string, in format short version, '
+      'full version, or "full,full+N"')
 
   return parser
 
 
-def switch(autotest_dir, board, version, test_name):
+def switch(autotest_dir, board, version, test_name, dut):
   logger.info('Unpack autotest packages for %s %s', board, version)
   if cros_util.is_cros_snapshot_version(version):
     autotest_client_path = GS_SNAPSHOT_AUTOTEST_CLIENT_PATH.format(
         board=board, snapshot_version=version)
     autotest_server_path = GS_SNAPSHOT_AUTOTEST_SERVER_PATH.format(
         board=board, snapshot_version=version)
-  else:
+  elif cros_util.is_cros_short_version(
+      version) or cros_util.is_cros_full_version(version):
     full_version = cros_util.version_to_full(board, version)
     autotest_client_path = GS_AUTOTEST_CLIENT_PATH.format(
         board=board, full_version=full_version)
     autotest_server_path = GS_AUTOTEST_SERVER_PATH.format(
         board=board, full_version=full_version)
+  else:
+    gs_path = cros_util.query_dut_lsb_release(dut).get(
+        'CHROMEOS_RELEASE_BUILDER_PATH')
+    autotest_client_path = GS_BUILDBUCKET_BUILD_AUTOTEST_CLIENT_PATH.format(
+        path=gs_path)
+    autotest_server_path = GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH.format(
+        path=gs_path)
+
   logger.info('autotest_client_path %s', autotest_client_path)
   logger.info('autotest_server_path %s', autotest_server_path)
 
@@ -125,7 +147,7 @@ def main(args=None):
 
   autotest_dir = os.path.join(opts.chromeos_root,
                               cros_util.prebuilt_autotest_dir)
-  switch(autotest_dir, opts.board, opts.version, opts.test_name)
+  switch(autotest_dir, opts.board, opts.version, opts.test_name, opts.dut)
 
   # Verify test control file exists.
   if opts.test_name:
