@@ -349,8 +349,9 @@ class ManifestParser:
           result.append(subnode)
     return result
 
-  def element_to_string(self, element):
-    return xml.etree.ElementTree.tostring(element).strip()
+  @classmethod
+  def element_to_string(cls, element):
+    return xml.etree.ElementTree.tostring(element, encoding='unicode').strip()
 
   @classmethod
   def get_project_path(cls, project):
@@ -534,7 +535,7 @@ class Manifest:
     Returns:
       A string of xml.
     """
-    return xml.etree.ElementTree.tostring(self.xml)
+    return ManifestParser.element_to_string(self.xml)
 
   def is_static_manifest(self):
     """Return true if there is any project without revision in the xml.
