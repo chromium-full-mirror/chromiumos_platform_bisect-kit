@@ -88,7 +88,7 @@ def skylab_cmd(cmd, *args, **kwargs):
   return _run_labtools_command('skylab', cmd, *args, **kwargs)
 
 
-def swarming_query(method, limit=None):
+def swarming_query(method, limit=None, verbose_log=True):
   """Wrapper of 'swarming.py query'.
 
   This is the lower level query interface. You can see available methods by
@@ -97,6 +97,7 @@ def swarming_query(method, limit=None):
   Args:
     method: the API method
     limit: limit number of result
+    verbose_log: log more if True
 
   Returns:
     result dict; the content is defined by each method call.
@@ -104,7 +105,7 @@ def swarming_query(method, limit=None):
   cmd = ['swarming.py', 'query', '--swarming', SWARMING_SERVER, method]
   if limit:
     cmd += ['--limit', str(limit)]
-  data = util.check_output(*cmd)
+  data = util.check_output(*cmd, log_stdout=verbose_log)
   return json.loads(data)
 
 
@@ -127,12 +128,13 @@ def _simplify_bot_dimensions(bot):
   bot['dimensions'] = dimensions
 
 
-def swarming_bots_list(dimensions, is_busy=None):
+def swarming_bots_list(dimensions, is_busy=None, verbose_log=True):
   """Lists swarming bots.
 
   Args:
     dimensions: dimensions constraints (list)
     is_busy: filter by "is_busy" state; None means don't care
+    verbose_log: log more if True
 
   Returns:
     list of bots dict
@@ -149,7 +151,7 @@ def swarming_bots_list(dimensions, is_busy=None):
     method += '?' + urllib.parse.urlencode(query, doseq=True)
 
   bots = []
-  for bot in swarming_query(method).get('items', []):
+  for bot in swarming_query(method, verbose_log=verbose_log).get('items', []):
     _simplify_bot_dimensions(bot)
     bots.append(bot)
   return bots
@@ -170,32 +172,34 @@ def swarming_bot_tasks(bot_id, limit=None):
   return swarming_query(method, limit=limit).get('items', [])
 
 
-def swarming_task_request(task_id):
+def swarming_task_request(task_id, verbose_log=True):
   """Gets the request of given task.
 
   Args:
     task_id: task id
+    verbose_log: log more if True
 
   Returns:
     task request dict
   """
   assert task_id
   method = 'task/%s/request' % task_id
-  return swarming_query(method)
+  return swarming_query(method, verbose_log=verbose_log)
 
 
-def swarming_task_result(task_id):
+def swarming_task_result(task_id, verbose_log=True):
   """Gets the current result of given task.
 
   Args:
     task_id: task id
+    verbose_log: log more if True
 
   Returns:
     task result dict
   """
   assert task_id
   method = 'task/%s/result' % task_id
-  return swarming_query(method)
+  return swarming_query(method, verbose_log=verbose_log)
 
 
 def is_skylab_dut(dut_name):
@@ -318,11 +322,12 @@ def parse_timestamp_from_swarming(timestamp):
   return calendar.timegm(time.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f'))
 
 
-def query_lease_status(dut_name):
+def query_lease_status(dut_name, verbose_log=True):
   """Query DUT lease status.
 
   Args:
     dut_name: DUT name
+    verbose_log: log more if True
 
   Returns:
     a dict indicates the detailed lease status:
@@ -338,7 +343,7 @@ def query_lease_status(dut_name):
   """
   status = {'dut_name': dut_name}
 
-  bots = swarming_bots_list(['dut_name:' + dut_name])
+  bots = swarming_bots_list(['dut_name:' + dut_name], verbose_log=False)
   if not bots:
     raise errors.ExternalError('dut_name:%s not found' % dut_name)
   assert len(bots) == 1
@@ -359,12 +364,12 @@ def query_lease_status(dut_name):
     user = os.environ['USER']
   assert user
 
-  request = swarming_task_request(status['task_id'])
+  request = swarming_task_request(status['task_id'], verbose_log=verbose_log)
   status['leased_by'] = request['authenticated']
   status['is_leased_by_me'] = (user in status['leased_by'])
   status['duration'] = int(request['properties']['execution_timeout_secs'])
 
-  result = swarming_task_result(status['task_id'])
+  result = swarming_task_result(status['task_id'], verbose_log=verbose_log)
   status['start_time'] = parse_timestamp_from_swarming(result['started_ts'])
   return status
 
@@ -385,7 +390,7 @@ def lease_keeper(dut_name, quit_event):
   try:
     previous_status = {}
     while True:
-      lease_status = query_lease_status(dut_name)
+      lease_status = query_lease_status(dut_name, verbose_log=False)
       if not (lease_status['is_leased'] and lease_status['is_leased_by_me']):
         if previous_status and previous_status.get('task_id'):
           task_url = ('https://chromeos-swarming.appspot.com/task?id=%s' %
