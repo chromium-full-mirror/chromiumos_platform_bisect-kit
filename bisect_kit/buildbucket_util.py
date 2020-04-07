@@ -204,7 +204,8 @@ class BuildbucketApi:
                      board,
                      manifest_xml,
                      bucket='bisector',
-                     force_rebuild=False):
+                     force_rebuild=False,
+                     build_tags={}):
     """Schedule a build job in buildbucket.
 
     Args:
@@ -212,6 +213,7 @@ class BuildbucketApi:
       manifest_xml: A full manifest xml for building chromeOS
       bucket: A bucket name of buildbucket that will handle this build
       force_rebuild: Set True to ignore existing builds on buildbucket
+      build_tags: Tags for buildbucket build object.
 
     Returns:
       A Build object if success.
@@ -219,6 +221,10 @@ class BuildbucketApi:
     Raises:
       errors.ExternalError: If api request fail.
     """
+    tags = []
+    for key, value in build_tags.items():
+      tags.append(StringPair(key=key, value=value))
+
     isolate_hash = self._isolate_upload('snapshot.xml', manifest_xml)
     properties = {
         '$chromeos/failures': {
@@ -253,7 +259,7 @@ class BuildbucketApi:
       if build:
         return build
 
-    request = ScheduleBuildRequest(builder=builder)
+    request = ScheduleBuildRequest(builder=builder, tags=tags)
     request.properties.update(properties)
     return self._post('ScheduleBuild', request, Build)
 

@@ -183,9 +183,16 @@ def prepare_image(image_folder, buildbucket_id):
   return image_path
 
 
-def schedule_build(board, manifest, bucket):
+def schedule_build(board, rev, manifest, bucket):
+  build_tags = {'bisector_chromeos_version': rev}
   api = buildbucket_util.BuildbucketApi()
-  build_id = int(api.schedule_build(board, manifest, bucket=bucket).id)
+  build_id = int(
+      api.schedule_build(
+          board,
+          manifest,
+          bucket=bucket,
+          build_tags=build_tags,
+      ).id)
   logger.info('schedule a build, id = %d', build_id)
 
   last_log_time = 0
@@ -227,7 +234,7 @@ def switch(opts):
     if opts.buildbucket_id:
       buildbucket_id = opts.buildbucket_id
     else:
-      buildbucket_id = schedule_build(opts.board, get_manifest(opts),
+      buildbucket_id = schedule_build(opts.board, opts.rev, get_manifest(opts),
                                       opts.bucket)
     image_path = prepare_image(image_folder, buildbucket_id)
   rel_path = os.path.relpath(image_path, opts.chromeos_root)
