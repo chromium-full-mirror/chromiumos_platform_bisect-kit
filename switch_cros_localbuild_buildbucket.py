@@ -113,6 +113,13 @@ def read_file(file_name):
   return result
 
 
+def get_last_float_spec(float_specs, timestamp):
+  for spec in reversed(float_specs):
+    if spec.timestamp <= timestamp:
+      return spec.name
+  return None
+
+
 def get_manifest(opts):
   if opts.manifest:
     return read_file(opts.manifest)
@@ -127,9 +134,18 @@ def get_manifest(opts):
   code_manager = codechange.CodeManager(config['chromeos_root'], spec_manager,
                                         cache)
 
+  old_rev, new_rev, _ = codechange.parse_intra_rev(opts.rev)
   intra_revision, diff = code_manager.get_intra_and_diff(opts.rev)
   if intra_revision == opts.rev:
     return spec_manager.get_manifest(intra_revision)
+
+  # get specs
+  fixed_specs = spec_manager.collect_fixed_spec(old_rev, new_rev)
+  for spec in fixed_specs:
+    spec_manager.parse_spec(spec)
+  float_specs = spec_manager.collect_float_spec(old_rev, new_rev, fixed_specs)
+  for spec in float_specs:
+    spec_manager.parse_spec(spec)
 
   # apply_manifest and apply_action_groups doesn't overwrite project's revision
   # by default, so we should apply projects by reverse chronological order here
@@ -137,7 +153,9 @@ def get_manifest(opts):
   # step1: Get a base manifest with correct projects and sources by time.
   #        Then apply diffs after intra version.
   result = repo_util.Manifest(manifest_internal_dir)
-  result.load_from_timestamp(get_last_commit_time(diff))
+  timestamp = get_last_commit_time(diff)
+  result.load_from_commit(get_last_float_spec(float_specs, timestamp))
+
   # manifest from manifest-internal repository might contain revision which
   # value is a branch or tag name.
   # As every project in snapshot should have a commit hash, we remove all the
