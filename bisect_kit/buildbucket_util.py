@@ -68,6 +68,10 @@ class BuildbucketApi:
                                  ' go/lab-tools for more information.')
 
     folder = os.path.dirname(os.path.realpath(swarming_py))
+    self.default_service_account_json = os.environ.get(
+        'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+    self.default_service_account_client_id = self._get_client_id(
+        self.default_service_account_json)
     self.auth_py = os.path.join(folder, 'auth.py')
     self.isolateserver_py = os.path.join(folder, 'isolateserver.py')
     if not os.path.exists(self.auth_py):
@@ -75,6 +79,18 @@ class BuildbucketApi:
           'auth.py not found in swarming folder: %s' % folder)
     if not os.path.exists(self.isolateserver_py):
       raise errors.InternalError('isolateserver.py not found in: %s' % folder)
+
+  def _get_client_id(self, json_file):
+    """Get client id from account json.
+
+    Returns:
+      Account id or None.
+    """
+    if not json_file:
+      return None
+    with open(json_file) as f:
+      data = json.load(f)
+    return data.get('client_id')
 
   def _isolate_upload(self, file_name, content):
     """Upload a file to isolate server.
@@ -123,7 +139,18 @@ class BuildbucketApi:
             'token cache file, please run %s manually to login.' % self.auth_py)
       with open(self.token_cache) as f:
         data = json.load(f)['data']
-      self._token = data[0]['credential']['access_token']
+      # if service account is set, use service account first
+      if self.default_service_account_client_id:
+        for x in data:
+          client_id = x.get('credential', {}).get('client_id')
+          if client_id == self.default_service_account_client_id:
+            self._token = x['credential']['access_token']
+      # use user account if service account is not found
+      if not self._token:
+        logger.warning(
+            'No token for the given service account is found in the token file,'
+            ' use the first token instead.')
+        self._token = data[0]['credential']['access_token']
     return self._token
 
   def _get_header(self):
@@ -135,7 +162,23 @@ class BuildbucketApi:
 
   def _refresh_token(self, domain):
     """Trigger swarming's auth library to renew access_token"""
-    util.check_call(self.auth_py, 'check', '--service', domain)
+    if self.default_service_account_json:
+      util.check_call(
+          self.auth_py,
+          'check',
+          '--service',
+          domain,
+          '--auth-service-account-json',
+          self.default_service_account_json,
+      )
+    else:
+      # refresh user account token
+      util.check_call(
+          self.auth_py,
+          'check',
+          '--service',
+          domain,
+      )
     self._token = None
 
   def _post(self, api, request, return_class, timeout=10):
