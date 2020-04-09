@@ -490,7 +490,9 @@ def distclean(git_repo, excludes=None):
   for untracked in list_untracked(git_repo, excludes=excludes):
     path = os.path.join(git_repo, untracked)
     logger.debug('delete untracked: %s', path)
-    if os.path.isdir(path):
+    if os.path.islink(path):
+      os.unlink(path)
+    elif os.path.isdir(path):
       shutil.rmtree(path)
     else:
       os.unlink(path)
