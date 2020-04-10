@@ -703,8 +703,6 @@ class DiagnoseCommandLineBase:
   def create_argument_parser(self):
     parser = argparse.ArgumentParser()
     common.add_common_arguments(parser)
-    parser.add_argument('--session_base', default='bisect.sessions')
-    parser.add_argument('--session', help='Session name', required=True)
     subparsers = parser.add_subparsers(
         dest='command', title='commands', metavar='<command>')
 

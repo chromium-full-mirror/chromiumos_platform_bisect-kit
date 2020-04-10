@@ -151,7 +151,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
 
-    def do_evaluate(_cmd, _domain, rev):
+    def do_evaluate(_cmd, _domain, rev, _log_file):
       if int(rev) < 42:
         return 'old', []
       return 'new', []
@@ -185,7 +185,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
 
-    def do_evaluate(_cmd, _domain, rev):
+    def do_evaluate(_cmd, _domain, rev, _log_file):
       if int(rev) < 42:
         p = 0.1
       else:
@@ -234,7 +234,7 @@ class TestBisectorCommandLine(unittest.TestCase):
 
     switched = []
 
-    def do_switch(_cmd, _domain, rev):
+    def do_switch(_cmd, _domain, rev, _log_file):
       switched.append(rev)
 
     with mock.patch('bisect_kit.bisector_cli.do_switch', do_switch):

@@ -26,8 +26,8 @@ from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SESSION_NAME = 'default'
 DEFAULT_CONFIDENCE = 0.999
+END_OF_LOG_FILE_MARKER = '== end of log file ==\n'
 
 
 def _collect_bisect_result_values(values, line):
@@ -82,7 +82,7 @@ def _execute_command(step, args, env=None, stdout_callback=None):
   return returncode
 
 
-def do_evaluate(evaluate_cmd, domain, rev):
+def do_evaluate(evaluate_cmd, domain, rev, log_file):
   """Invokes evaluator command.
 
   The `evaluate_cmd` can get the target revision from the environment variable
@@ -105,6 +105,7 @@ def do_evaluate(evaluate_cmd, domain, rev):
     evaluate_cmd: evaluator command.
     domain: a bisect_kit.core.Domain instance.
     rev: version to evaluate.
+    log_file: hint sub-process where to output detail log
 
   Returns:
     (result, values):
@@ -118,12 +119,19 @@ def do_evaluate(evaluate_cmd, domain, rev):
   env['BISECT_REV'] = rev
   domain.setenv(env, rev)
 
+  if log_file:
+    logger.info('eval log file = %s', log_file)
+    env['LOG_FILE'] = log_file
+
   values = []
   returncode = _execute_command(
       'eval',
       evaluate_cmd,
       env=env,
       stdout_callback=lambda line: _collect_bisect_result_values(values, line))
+  if log_file and os.path.exists(log_file):
+    with open(log_file, 'a') as f:
+      f.write(END_OF_LOG_FILE_MARKER)
   if returncode == 0:
     return 'old', values
   if returncode == 125:
@@ -131,7 +139,7 @@ def do_evaluate(evaluate_cmd, domain, rev):
   return 'new', values
 
 
-def do_switch(switch_cmd, domain, rev):
+def do_switch(switch_cmd, domain, rev, log_file):
   """Invokes switcher command.
 
   The `switch_cmd` can get the target revision from the environment variable
@@ -149,6 +157,7 @@ def do_switch(switch_cmd, domain, rev):
     switch_cmd: switcher command.
     domain: a bisect_kit.core.Domain instance.
     rev: version to switch.
+    log_file: hint sub-process where to output detail log
 
   Returns:
     None if switch successfully, 'skip' otherwise.
@@ -160,7 +169,14 @@ def do_switch(switch_cmd, domain, rev):
   env['BISECT_REV'] = rev
   domain.setenv(env, rev)
 
+  if log_file:
+    logger.info('switch log file = %s', log_file)
+    env['LOG_FILE'] = log_file
+
   returncode = _execute_command('switch', switch_cmd, env=env)
+  if log_file and os.path.exists(log_file):
+    with open(log_file, 'a') as f:
+      f.write(END_OF_LOG_FILE_MARKER)
   if returncode != 0:
     return 'skip'
   return None
@@ -189,6 +205,7 @@ class BisectorCommandLine:
   def __init__(self, domain_cls):
     self.domain_cls = domain_cls
     self.domain = None
+    self.session_dir = None
     self.states = None
     self.strategy = None
 
@@ -253,6 +270,15 @@ class BisectorCommandLine:
     self.states.init(config, revlist)
     self.states.save()
 
+  def _step_log_path(self, rev, step):
+    # relative to session directory
+    log_path = 'log/{bisector}.{timestamp}.{rev}.{step}.txt'.format(
+        bisector=self.domain_cls.__name__,
+        rev=rev,
+        timestamp=time.strftime('%Y%m%d-%H%M%S'),
+        step=step)
+    return log_path
+
   def _switch_and_eval(self, rev, prev_rev=None):
     """Switches and evaluates given version.
 
@@ -273,22 +299,32 @@ class BisectorCommandLine:
     """
     sample = {'rev': rev}
     if prev_rev != rev:
+      switch_log = self._step_log_path(rev, 'switch')
+      switch_log_fullpath = os.path.join(self.session_dir, switch_log)
       logger.debug('switch to rev=%s', rev)
       t0 = time.time()
-      status = do_switch(self.config['switch'], self.domain, rev)
+      status = do_switch(self.config['switch'], self.domain, rev,
+                         switch_log_fullpath)
       t1 = time.time()
       sample['switch_time'] = t1 - t0
       sample['status'] = status
+      if os.path.exists(switch_log_fullpath):
+        sample['switch_log'] = switch_log
       if status == 'skip':
         logger.debug('switch failed => skip')
         return 'switch', sample
 
+    eval_log = self._step_log_path(rev, 'eval')
+    eval_log_fullpath = os.path.join(self.session_dir, eval_log)
     logger.debug('eval rev=%s', rev)
     t0 = time.time()
-    status, values = do_evaluate(self.config['eval'], self.domain, rev)
+    status, values = do_evaluate(self.config['eval'], self.domain, rev,
+                                 eval_log_fullpath)
     t1 = time.time()
     sample['eval_time'] = t1 - t0
     sample['status'] = status
+    if os.path.exists(eval_log_fullpath):
+      sample['eval_log'] = eval_log
     if status == 'skip':
       return 'eval', sample
 
@@ -581,8 +617,9 @@ class BisectorCommandLine:
       rev = self.domain_cls.intra_revtype(opts.rev)
     assert rev
 
+    switch_log = self._step_log_path(rev, 'switch')
     logger.info('switch to %s', rev)
-    status = do_switch(self.config['switch'], self.domain, rev)
+    status = do_switch(self.config['switch'], self.domain, rev, switch_log)
     if status:
       print('switch failed')
 
@@ -617,11 +654,12 @@ class BisectorCommandLine:
 
   def _create_states(self, session=None, session_base=None):
     if not session:
-      session = DEFAULT_SESSION_NAME
+      session = common.DEFAULT_SESSION_NAME
     if not session_base:
       session_base = configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE)
 
-    session_file = os.path.join(session_base, session, self.domain_cls.__name__)
+    self.session_dir = os.path.join(session_base, session)
+    session_file = os.path.join(self.session_dir, self.domain_cls.__name__)
 
     if self.states:
       assert self.states.session_file == session_file
@@ -691,14 +729,6 @@ class BisectorCommandLine:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=description)
     common.add_common_arguments(parser)
-    parser.add_argument(
-        '--session_base',
-        default=configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE),
-        help='Directory to store sessions (default: %(default)r)')
-    parser.add_argument(
-        '--session',
-        default=DEFAULT_SESSION_NAME,
-        help='Session name (default: %(default)r)')
     subparsers = parser.add_subparsers(
         dest='command', title='commands', metavar='<command>')
 

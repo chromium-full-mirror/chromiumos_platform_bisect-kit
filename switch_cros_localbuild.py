@@ -180,7 +180,7 @@ def build(opts, do_mark_as_stable=True):
     _build_packages(opts)
     return None
 
-  cached_name = 'bisect-%s' % opts.rev.replace('/', '_')
+  cached_name = 'bisect-%s' % util.escape_rev(opts.rev)
   image_folder = os.path.join(cros_util.cached_images_dir, opts.board,
                               cached_name)
   image_path = os.path.join(image_folder, cros_util.test_image_filename)

@@ -7,6 +7,7 @@
 from __future__ import print_function
 import difflib
 import logging
+import re
 import subprocess
 import threading
 import time
@@ -272,6 +273,25 @@ def ssh_cmd(host, *args, **kwargs):
     if e.returncode == 255:
       raise errors.SshConnectionError('ssh connection to %r failed' % host)
     raise
+
+
+def escape_rev(rev):
+  """Escapes special characters in version string.
+
+  Sometimes we save files whose name is related to version, e.g. cache file and
+  log file. Version strings must be escaped properly in order to make them
+  path-friendly.
+
+  Args:
+    rev: rev string
+
+  Returns:
+    escaped string
+  """
+  # TODO(kcwu): change infra rev format, avoid special characters
+  # Assume they don't collision after escaping.
+  # Don't use "#" because gsutil using it as version identifiers.
+  return re.sub('[^a-zA-Z0-9~._-]', '_', rev)
 
 
 def version_key_func(v):

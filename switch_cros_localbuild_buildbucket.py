@@ -240,7 +240,7 @@ def build_revlist(opts):
 
 
 def switch(opts):
-  cached_name = 'bisect-%s' % opts.rev.replace('/', '_')
+  cached_name = 'bisect-%s' % util.escape_rev(opts.rev)
   image_folder = os.path.join(opts.chromeos_root, cros_util.cached_images_dir,
                               opts.board, cached_name)
   image_path = os.path.join(image_folder, cros_util.test_image_filename)

@@ -8,12 +8,14 @@ from __future__ import print_function
 import logging
 import logging.config
 import os
+import sys
 
 from bisect_kit import configure
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SESSION_BASE = 'bisect.sessions'
+DEFAULT_SESSION_NAME = 'default'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
 BISECT_KIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -45,6 +47,8 @@ def config_logging(opts):
     else:
       opts.log_file = DEFAULT_LOG_FILENAME
   os.environ['LOG_FILE'] = opts.log_file
+  os.makedirs(os.path.dirname(opts.log_file), exist_ok=True)
+  print('log file = %s' % opts.log_file, file=sys.stderr)
 
   if getattr(opts, 'debug'):
     os.environ['BISECT_KIT_CONSOLE_LOG_LEVEL'] = 'DEBUG'
@@ -54,6 +58,20 @@ def config_logging(opts):
   # only warnings and errors to console.
   console_level = os.environ.get('BISECT_KIT_CONSOLE_LOG_LEVEL', 'INFO')
   os.environ['BISECT_KIT_CONSOLE_LOG_LEVEL'] = 'WARNING'
+
+  file_handler = {
+      'class': 'logging.FileHandler',
+      'level': 'DEBUG',
+      'formatter': 'verbose',
+      'filename': opts.log_file,
+  }
+  # Rotates default log file to prevent it grows unlimitedly.
+  if opts.log_file == DEFAULT_LOG_FILENAME:
+    file_handler.update({
+        'class': 'logging.handlers.TimedRotatingFileHandler',
+        'when': 'd',
+        'backupCount': 2,
+    })
 
   logging.config.dictConfig({
       'version': 1,
@@ -74,14 +92,7 @@ def config_logging(opts):
               'class': 'logging.StreamHandler',
               'formatter': 'simple',
           },
-          'file-log': {
-              'level': 'DEBUG',
-              'class': 'logging.handlers.TimedRotatingFileHandler',
-              'formatter': 'verbose',
-              'filename': opts.log_file,
-              'when': 'd',
-              'backupCount': 2,
-          },
+          'file-log': file_handler,
       },
       'root': {
           'handlers': ['file-log', 'console'],
@@ -109,6 +120,14 @@ def add_common_arguments(parser):
       metavar=configure.CONFIG_ENV_NAME,
       help='Specify config file to use. Otherwise searches default '
       'locations. Use "none" to suppress config file searching.')
+  parser.add_argument(
+      '--session_base',
+      default=configure.get('SESSION_BASE', DEFAULT_SESSION_BASE),
+      help='Directory to store sessions (default: %(default)r)')
+  parser.add_argument(
+      '--session',
+      default=DEFAULT_SESSION_NAME,
+      help='Session name (default: %(default)r)')
 
 
 def init():
