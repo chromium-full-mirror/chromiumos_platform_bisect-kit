@@ -5,11 +5,10 @@
 """Wrapper of bisector scripts"""
 from __future__ import print_function
 import importlib
+import io
 import logging
 import subprocess
 import sys
-
-import six
 
 from bisect_kit import bisector_cli
 from bisect_kit import core
@@ -41,7 +40,7 @@ class BisectorWrapper:
     stdout_bak = sys.stdout
     try:
       if kwargs.get('capture_output'):
-        sys.stdout = fake_stdout = six.StringIO()
+        sys.stdout = fake_stdout = io.StringIO()
       bisector.main(*full_args, prog=self.name)
     finally:
       sys.stdout = stdout_bak

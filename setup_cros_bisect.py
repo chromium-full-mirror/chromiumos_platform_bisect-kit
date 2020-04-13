@@ -25,14 +25,14 @@ from __future__ import print_function
 import argparse
 import csv
 import glob
+import io
 import logging
 import os
 import subprocess
 import time
 import xml.etree.ElementTree
-
-import six
-from six.moves import urllib
+import urllib.parse
+import urllib.request
 
 from bisect_kit import common
 from bisect_kit import configure
@@ -279,7 +279,7 @@ def query_chrome_latest_branch():
   r = urllib.request.urlopen('https://omahaproxy.appspot.com/all')
   # TODO(kcwu): use io.TextIOWrapper after migrated to python3
   content = r.read().decode('utf8')
-  for row in csv.DictReader(six.StringIO(content)):
+  for row in csv.DictReader(io.StringIO(content)):
     if row['true_branch'].isdigit():
       result = max(result, int(row['true_branch']))
   return result

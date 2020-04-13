@@ -11,8 +11,6 @@ import subprocess
 import tempfile
 import unittest
 
-import six
-
 from bisect_kit import cli
 from bisect_kit import git_util
 
@@ -87,13 +85,9 @@ class GitOperation:
     p.communicate(message.encode('utf-8'))
     assert p.returncode == 0
 
-    if six.PY2:
-      git_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-                                        cwd=self.git_repo)
-    else:
-      git_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-                                        cwd=self.git_repo,
-                                        encoding='utf8')
+    git_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                      cwd=self.git_repo,
+                                      encoding='utf8')
     git_rev = git_rev.strip()
 
     assert len(git_rev) == git_util.GIT_FULL_COMMIT_ID_LENGTH
@@ -151,13 +145,9 @@ class TestGitOperation(unittest.TestCase):
                           cwd=self.git_repo,
                           env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'))
 
-    if six.PY2:
-      commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-                                         cwd=self.git_repo)
-    else:
-      commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-                                         cwd=self.git_repo,
-                                         encoding='utf8')
+    commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                       cwd=self.git_repo,
+                                       encoding='utf8')
     commit_c = commit_c.strip()
     return [commit_a, commit_b, commit_c]
 
@@ -278,21 +268,19 @@ class TestGitOperation(unittest.TestCase):
     commit_3 = self.git.add_commit(time + 300, 'msg', 'path/foo/c', '')
     commit_4 = self.git.add_commit(time + 400, 'msg', 'path/b', None)
     commit_5 = self.git.add_commit(time + 500, 'msg', 'path/foo/c', None)
-    six.assertCountEqual(
-        self, git_util.list_dir_from_revision(self.git_repo, commit_1, 'path'),
-        ['a'])
-    six.assertCountEqual(
-        self, git_util.list_dir_from_revision(self.git_repo, commit_2, 'path'),
+    self.assertCountEqual(
+        git_util.list_dir_from_revision(self.git_repo, commit_1, 'path'), ['a'])
+    self.assertCountEqual(
+        git_util.list_dir_from_revision(self.git_repo, commit_2, 'path'),
         ['a', 'b'])
-    six.assertCountEqual(
-        self, git_util.list_dir_from_revision(self.git_repo, commit_3, 'path'),
+    self.assertCountEqual(
+        git_util.list_dir_from_revision(self.git_repo, commit_3, 'path'),
         ['a', 'b', 'foo'])
-    six.assertCountEqual(
-        self, git_util.list_dir_from_revision(self.git_repo, commit_4, 'path'),
+    self.assertCountEqual(
+        git_util.list_dir_from_revision(self.git_repo, commit_4, 'path'),
         ['a', 'foo'])
-    six.assertCountEqual(
-        self, git_util.list_dir_from_revision(self.git_repo, commit_5, 'path'),
-        ['a'])
+    self.assertCountEqual(
+        git_util.list_dir_from_revision(self.git_repo, commit_5, 'path'), ['a'])
 
     with self.assertRaises(subprocess.CalledProcessError):
       git_util.list_dir_from_revision(self.git_repo, commit_1, 'path/foo')

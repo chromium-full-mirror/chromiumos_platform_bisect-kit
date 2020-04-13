@@ -11,8 +11,6 @@ import functools
 import math
 import sys
 
-import six
-
 
 def log(x):
   """Wrapper of log(x) handling zero and negative value."""
@@ -221,11 +219,6 @@ class ExtendedFloat:
 
   def __rtruediv__(self, other):
     return ExtendedFloat(other).__truediv__(self)
-
-  # TODO(kcwu): remove __div__ and __rdiv__ once we migrated to python3
-  if six.PY2:
-    __div__ = __truediv__
-    __rdiv__ = __rtruediv__
 
   def __repr__(self):
     return 'ExtendedFloat(%f, %d)' % (self.mantissa, self.exponent)

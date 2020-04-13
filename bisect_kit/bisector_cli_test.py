@@ -5,13 +5,12 @@
 """Test bisector_cli module."""
 
 from __future__ import print_function
+import io
 import random
 import shutil
 import tempfile
 import unittest
 from unittest import mock
-
-import six
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -129,7 +128,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('run')
     self.assertEqual(bisector.strategy.get_best_guess(), 7)
 
-    with mock.patch('sys.stdout', new_callable=six.StringIO):
+    with mock.patch('sys.stdout', new_callable=io.StringIO):
       # Only make sure no exceptions. No output verification.
       bisector.main('log')
 
@@ -158,11 +157,11 @@ class TestBisectorCommandLine(unittest.TestCase):
 
     with mock.patch('bisect_kit.bisector_cli.do_evaluate', do_evaluate):
       # two verify
-      with mock.patch('sys.stdout', new_callable=six.StringIO) as mock_stdout:
+      with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
         bisector.main('next')
         self.assertEqual(mock_stdout.getvalue(), '99\n')
       bisector.main('run', '-1')
-      with mock.patch('sys.stdout', new_callable=six.StringIO) as mock_stdout:
+      with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
         bisector.main('next')
         self.assertEqual(mock_stdout.getvalue(), '0\n')
       bisector.main('run', '-1')
@@ -174,7 +173,7 @@ class TestBisectorCommandLine(unittest.TestCase):
       bisector.main('run')
       self.assertEqual(bisector.strategy.get_best_guess(), 42)
 
-    with mock.patch('sys.stdout', new_callable=six.StringIO) as mock_stdout:
+    with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
       bisector.main('next')
       self.assertEqual(mock_stdout.getvalue(), 'done\n')
 
@@ -198,7 +197,7 @@ class TestBisectorCommandLine(unittest.TestCase):
       bisector.main('run')
       self.assertEqual(bisector.strategy.get_best_guess(), 42)
 
-    with mock.patch('sys.stdout', new_callable=six.StringIO) as mock_stdout:
+    with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
       bisector.main('next')
       # There might be small math error near the boundary of confidence.
       self.assertIn(mock_stdout.getvalue(), ['done\n', '41\n', '42\n'])
@@ -277,7 +276,7 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'noisy', 'old=1/10,new=8/9')
     self.assertEqual(bisector.states.config['noisy'], 'old=1/10,new=8/9')
 
-    with mock.patch('sys.stdout', new_callable=six.StringIO):
+    with mock.patch('sys.stdout', new_callable=io.StringIO):
       # Only make sure no exceptions. No output verification.
       bisector.main('view')
 

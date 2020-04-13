@@ -13,9 +13,8 @@ import logging
 import os
 import re
 import subprocess
+import urllib.parse
 import xml.etree.ElementTree
-
-from six.moves import urllib
 
 from bisect_kit import codechange
 from bisect_kit import errors

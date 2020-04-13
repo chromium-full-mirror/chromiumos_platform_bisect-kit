@@ -6,6 +6,7 @@
 """
 
 from distutils.spawn import find_executable
+import http.client
 import json
 import logging
 import os
@@ -14,8 +15,6 @@ import shutil
 import socket
 import ssl
 import tempfile
-
-from six.moves import http_client
 
 # from third_party
 from google.protobuf import json_format
@@ -200,7 +199,7 @@ class BuildbucketApi:
     logged_in = False
     while max_retries > 0:
       try:
-        conn = http_client.HTTPSConnection(
+        conn = http.client.HTTPSConnection(
             self.buildbucket_domain, timeout=timeout)
         conn.request('POST', self.buildbucket_api_path + api,
                      request.SerializeToString(), self._get_header())

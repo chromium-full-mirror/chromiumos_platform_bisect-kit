@@ -15,8 +15,7 @@ import signal
 import subprocess
 import threading
 import time
-
-from six.moves import urllib
+import urllib.parse
 
 from bisect_kit import errors
 from bisect_kit import util

@@ -7,14 +7,13 @@
 from __future__ import print_function
 import difflib
 import logging
+import queue
 import re
 import subprocess
 import threading
 import time
 
 import psutil
-import six
-from six.moves import queue
 
 from bisect_kit import errors
 
@@ -71,12 +70,7 @@ class Popen:
       self.binary_mode = False
       self.encoding = kwargs.get('encoding', 'utf8')
       self.log_stdout = log_stdout
-
-    if six.PY2:
-      if 'encoding' in kwargs:
-        del kwargs['encoding']
-    else:
-      kwargs['encoding'] = self.encoding
+    kwargs['encoding'] = self.encoding
 
     self.stdout_callback = stdout_callback
     self.stderr_callback = stderr_callback

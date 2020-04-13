@@ -13,8 +13,7 @@ import shutil
 import subprocess
 import textwrap
 import time
-
-from six.moves import urllib
+import urllib.request
 
 from bisect_kit import cli
 from bisect_kit import codechange

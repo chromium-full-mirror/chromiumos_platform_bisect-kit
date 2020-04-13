@@ -14,9 +14,9 @@ import pprint
 import shutil
 import sys
 import tempfile
+import urllib.parse
 
 import six
-from six.moves import urllib
 
 from bisect_kit import codechange
 from bisect_kit import git_util

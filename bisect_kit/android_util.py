@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import tempfile
+import urllib.request
 
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -60,7 +61,6 @@ def fetch_android_build_data(url):
   # Following code is just serving as demo purpose. You should modify or hook
   # it with your own implementation.
   logger.warning('fetch_android_build_data need to be hooked')
-  from six.moves import urllib
   try:
     return urllib.request.urlopen(url).read().decode('utf8')
   except urllib.request.URLError as e:
