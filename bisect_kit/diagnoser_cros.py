@@ -231,14 +231,14 @@ class CrosDiagnoser:
       logger.info('bypassed android bisect')
       return verified
 
-    session = '%s/%s' % (self.config['session'], self.cros_old)
     if self.config['bypass_android_prebuilt']:
       logger.info('bypassed android prebuilt bisect')
       android_old = self.old_info['android_build_id']
       android_new = self.new_info['android_build_id']
     else:
       logger.info('bisect android prebuilt')
-      bisector = wrapper.BisectorWrapper('bisect_android_build_id', session)
+      bisector = wrapper.BisectorWrapper('bisect_android_build_id',
+                                         self.config['session'])
       try:
         bisector.init_if_necessary(
             self.old_info['android_build_id'],
@@ -299,7 +299,8 @@ class CrosDiagnoser:
       return verified
 
     logger.info('bisect android local build')
-    bisector = wrapper.BisectorWrapper('bisect_android_repo', session)
+    bisector = wrapper.BisectorWrapper('bisect_android_repo',
+                                       self.config['session'])
     try:
       bisector.init_if_necessary(
           android_old,
@@ -363,7 +364,6 @@ class CrosDiagnoser:
       return False
 
     logger.info('bisect chrome local build')
-    session = '%s/%s' % (self.config['session'], self.cros_old)
     switch_cmd = ['./switch_cros_cr_localbuild_internal.py', '--dut', self.dut]
     if not with_tests:
       switch_cmd.append('--without_tests')
@@ -375,7 +375,8 @@ class CrosDiagnoser:
       ]
       if not self.config['disable_rootfs_verification']:
         switch_cmd.append('--no_disable_rootfs_verification')
-    bisector = wrapper.BisectorWrapper('bisect_cr_localbuild_internal', session)
+    bisector = wrapper.BisectorWrapper('bisect_cr_localbuild_internal',
+                                       self.config['session'])
     try:
       bisector.init_if_necessary(
           self.old_info['cr_version'],
