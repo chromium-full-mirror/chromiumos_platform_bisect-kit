@@ -120,12 +120,7 @@ def cmd_allocate_dut(opts):
   try:
     todo, host = do_allocate_dut(opts)
     leased_dut = host + '.cros' if host else None
-    # TODO(kcwu): remove "locked_dut" after bkr updated
-    result = {
-        'result': todo,
-        'locked_dut': leased_dut,
-        'leased_dut': leased_dut
-    }
+    result = {'result': todo, 'leased_dut': leased_dut}
     print(json.dumps(result))
   except Exception as e:
     logger.exception('cmd_allocate_dut failed')
@@ -203,33 +198,6 @@ def main():
   parser_release_dut.add_argument('--session', help='session name')
   parser_release_dut.add_argument('dut')
   parser_release_dut.set_defaults(func=cmd_release_dut)
-
-  # TODO(kcwu): remove `lock_dut` and `unlock_dut` after bkr updated
-  parser_lock_dut = subparsers.add_parser(
-      'lock_dut',
-      help='Lock a DUT in the lab',
-      description='Lock a DUT in the lab. '
-      'This is simply wrapper of "atest" with additional checking.')
-  # "skylab lease-dut" doesn't take reason, so this is not required=True.
-  group = parser_lock_dut.add_mutually_exclusive_group()
-  group.add_argument('--session', help='session name; for creating lock reason')
-  group.add_argument('--reason', help='specify lock reason manually')
-  parser_lock_dut.add_argument('dut')
-  parser_lock_dut.add_argument(
-      '--duration',
-      type=float,
-      help='duration in seconds; will be round to minutes')
-  parser_lock_dut.set_defaults(func=cmd_lease_dut)
-
-  parser_unlock_dut = subparsers.add_parser(
-      'unlock_dut',
-      help='Unlock a DUT in the lab',
-      description='Unlock a DUT in the lab. '
-      'This is simply wrapper of "atest" with additional checking.')
-  parser_unlock_dut.add_argument(
-      '--session', help='session name; for checking lock reason before unlock')
-  parser_unlock_dut.add_argument('dut')
-  parser_unlock_dut.set_defaults(func=cmd_release_dut)
 
   parser_allocate_dut = subparsers.add_parser(
       'allocate_dut',
