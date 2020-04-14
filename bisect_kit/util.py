@@ -177,7 +177,7 @@ class Popen:
       logger.warning('Unable to kill pid=%d; ignore', self.p.pid)
 
 
-def call(*args, **kwargs):
+def call(*args, timeout=None, **kwargs):
   """Run command.
 
   Modeled after subprocess.call.
@@ -185,16 +185,11 @@ def call(*args, **kwargs):
   Returns:
     Exit code of sub-process.
   """
-  timeout = kwargs.get('timeout')
-  # TODO(kcwu): let current function capture this optional parameter after
-  #             migrated to python3
-  if 'timeout' in kwargs:
-    del kwargs['timeout']
   p = Popen(args, **kwargs)
   return p.wait(timeout=timeout)
 
 
-def check_output(*args, **kwargs):
+def check_output(*args, timeout=None, **kwargs):
   """Runs command and return output.
 
   Modeled after subprocess.check_output.
@@ -210,11 +205,6 @@ def check_output(*args, **kwargs):
   def collect_stdout(line):
     stdout_lines.append(line)
 
-  timeout = kwargs.get('timeout')
-  # TODO(kcwu): let current function capture this optional parameter after
-  #             migrated to python3
-  if 'timeout' in kwargs:
-    del kwargs['timeout']
   p = Popen(args, stdout_callback=collect_stdout, **kwargs)
   p.wait(timeout=timeout)
   stdout = ''.join(stdout_lines)
@@ -224,7 +214,7 @@ def check_output(*args, **kwargs):
   return stdout
 
 
-def check_call(*args, **kwargs):
+def check_call(*args, timeout=None, **kwargs):
   """Runs command and ensures it succeeded.
 
   Modeled after subprocess.check_call.
@@ -232,11 +222,6 @@ def check_call(*args, **kwargs):
   Raises:
     subprocess.CalledProcessError if the exit code is non-zero.
   """
-  timeout = kwargs.get('timeout')
-  # TODO(kcwu): let current function capture this optional parameter after
-  #             migrated to python3
-  if 'timeout' in kwargs:
-    del kwargs['timeout']
   p = Popen(args, **kwargs)
   p.wait(timeout=timeout)
   if p.returncode != 0:

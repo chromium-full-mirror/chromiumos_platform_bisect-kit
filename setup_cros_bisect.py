@@ -277,9 +277,7 @@ def sync_chromeos_code(opts, path_factory):
 def query_chrome_latest_branch():
   result = 0
   r = urllib.request.urlopen('https://omahaproxy.appspot.com/all')
-  # TODO(kcwu): use io.TextIOWrapper after migrated to python3
-  content = r.read().decode('utf8')
-  for row in csv.DictReader(io.StringIO(content)):
+  for row in csv.DictReader(io.TextIOWrapper(r, encoding='utf-8')):
     if row['true_branch'].isdigit():
       result = max(result, int(row['true_branch']))
   return result
