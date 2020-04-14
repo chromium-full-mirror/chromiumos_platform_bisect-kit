@@ -7,17 +7,15 @@
 from __future__ import print_function
 import io
 import random
-import shutil
-import tempfile
 import unittest
 from unittest import mock
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import errors
+from bisect_kit import testing
 
 
 class DummyDomain(core.BisectDomain):
@@ -81,20 +79,10 @@ class TestBisectorCli(unittest.TestCase):
           values, 'BISECT_RESULT_VALUES=hello\n')
 
 
+@testing.mock_session_base()
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())
 class TestBisectorCommandLine(unittest.TestCase):
   """Test bisector_cli.BisectorCommandLine class."""
-
-  def setUp(self):
-    self.session_base = tempfile.mkdtemp()
-    self.patcher = mock.patch.object(common, 'DEFAULT_SESSION_BASE',
-                                     self.session_base)
-    self.patcher.start()
-
-  def tearDown(self):
-    shutil.rmtree(self.session_base)
-    self.patcher.stop()
-    configure.reset()
 
   def test_run_true(self):
     bisector = bisector_cli.BisectorCommandLine(DummyDomain)

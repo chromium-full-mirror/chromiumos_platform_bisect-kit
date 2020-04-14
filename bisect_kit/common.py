@@ -21,6 +21,13 @@ DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 BISECT_KIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def determine_session_dir(session):
+  if not session:
+    session = DEFAULT_SESSION_NAME
+  session_dir = os.path.join(DEFAULT_SESSION_BASE, session)
+  return session_dir
+
+
 def config_logging(opts):
   """Config logging handlers.
 
@@ -39,8 +46,7 @@ def config_logging(opts):
 
   if opts.log_file is None:
     if getattr(opts, 'session', None):
-      session_base = getattr(opts, 'session_base', DEFAULT_SESSION_BASE)
-      session_dir = os.path.join(session_base, opts.session)
+      session_dir = determine_session_dir(opts.session)
       opts.log_file = os.path.join(session_dir, DEFAULT_LOG_FILENAME)
       if not os.path.exists(session_dir):
         os.makedirs(session_dir)
@@ -120,10 +126,6 @@ def add_common_arguments(parser):
       metavar=configure.CONFIG_ENV_NAME,
       help='Specify config file to use. Otherwise searches default '
       'locations. Use "none" to suppress config file searching.')
-  parser.add_argument(
-      '--session_base',
-      default=configure.get('SESSION_BASE', DEFAULT_SESSION_BASE),
-      help='Directory to store sessions (default: %(default)r)')
   parser.add_argument(
       '--session',
       default=DEFAULT_SESSION_NAME,

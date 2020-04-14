@@ -18,7 +18,6 @@ import time
 
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import errors
 from bisect_kit import strategy
@@ -536,7 +535,7 @@ class BisectorCommandLine:
         confidence=self.config['confidence'],
         observation=self.config['noisy'])
 
-  def current_status(self, session=None, session_base=None):
+  def current_status(self, session=None):
     """Gets current bisect status.
 
     Returns:
@@ -549,7 +548,7 @@ class BisectorCommandLine:
         estimated_noise: New estimated noise.
         done: True if bisection is done, otherwise False.
     """
-    self._create_states(session=session, session_base=session_base)
+    self._create_states(session=session)
     if self.states.load():
       self.strategy = self._strategy_factory()
       left, right = self.strategy.get_range()
@@ -652,13 +651,8 @@ class BisectorCommandLine:
     logger.info('set [%s] as skip', opts.revs)
     self._add_revs_status_helper(opts.revs, 'skip')
 
-  def _create_states(self, session=None, session_base=None):
-    if not session:
-      session = common.DEFAULT_SESSION_NAME
-    if not session_base:
-      session_base = configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE)
-
-    self.session_dir = os.path.join(session_base, session)
+  def _create_states(self, session=None):
+    self.session_dir = common.determine_session_dir(session)
     session_file = os.path.join(self.session_dir, self.domain_cls.__name__)
 
     if self.states:
@@ -912,7 +906,7 @@ class BisectorCommandLine:
     if not opts.command:
       parser.error('command is missing')
 
-    self._create_states(session=opts.session, session_base=opts.session_base)
+    self._create_states(session=opts.session)
     if opts.command not in ('init', 'reset', 'config'):
       self.states.load()
       self.domain = self.domain_cls(self.states.config)

@@ -10,9 +10,11 @@ import unittest
 from unittest import mock
 
 from bisect_kit import bisector_cli
+from bisect_kit import testing
 import bisect_list
 
 
+@testing.mock_session_base()
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())
 class TestListDomain(unittest.TestCase):
   """Test ListDomain class."""

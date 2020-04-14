@@ -907,8 +907,7 @@ class DiagnoseCommandLineBase:
     if not opts.command:
       self.argument_parser.error('command is missing')
 
-    session_base = configure.get('SESSION_BASE', common.DEFAULT_SESSION_BASE)
-    session_file = os.path.join(session_base, opts.session,
-                                self.__class__.__name__)
+    session_dir = common.determine_session_dir(opts.session)
+    session_file = os.path.join(session_dir, self.__class__.__name__)
     self.states = DiagnoseStates(session_file)
     opts.func(opts)

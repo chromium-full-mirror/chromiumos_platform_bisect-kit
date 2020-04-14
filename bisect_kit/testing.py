@@ -5,9 +5,14 @@
 """Common functions for testing"""
 
 from __future__ import print_function
-import os
 import contextlib
+import os
+import shutil
+import tempfile
+
 from unittest import mock
+
+from bisect_kit import common
 
 
 def get_testdata_path(filename=None):
@@ -43,3 +48,19 @@ def mock_function_by_file(module, name, filename):
     data = f.read()
   with mock.patch.object(module, name, return_value=data):
     yield
+
+
+class mock_session_base(contextlib.ContextDecorator):
+  """Context decorator to mock session base and clean up."""
+
+  def __init__(self):
+    self.session_base_bak = None
+    self.session_base = tempfile.mkdtemp()
+
+  def __enter__(self):
+    self.session_base_bak = common.DEFAULT_SESSION_BASE
+    common.DEFAULT_SESSION_BASE = self.session_base
+
+  def __exit__(self, *exc):
+    common.DEFAULT_SESSION_BASE = self.session_base_bak
+    shutil.rmtree(self.session_base)
