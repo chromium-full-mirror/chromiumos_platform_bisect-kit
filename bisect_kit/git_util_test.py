@@ -31,6 +31,9 @@ class GitOperation:
 
     subprocess.check_call(['git', 'init', '-q'], cwd=self.git_repo)
 
+    # Remove git hooks in order to save time.
+    shutil.rmtree(os.path.join(self.git_repo, '.git', 'hooks'))
+
   def add_commit(self,
                  commit_time,
                  message,
