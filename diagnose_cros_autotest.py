@@ -221,12 +221,12 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
               'Someone else reflashed the DUT. ' \
               'DUT locking is not respected? b/126141102'
 
-        if self.config['buildbucket_build_chromeos']:
-          eval_cmd = common_eval_cmd + ['--prebuilt']
-          extra_switch_cmd = common_switch_cmd
-        else:
+        if self.config['disable_buildbucket_chromeos']:
           eval_cmd = common_eval_cmd
           extra_switch_cmd = None
+        else:
+          eval_cmd = common_eval_cmd + ['--prebuilt']
+          extra_switch_cmd = common_switch_cmd
         diagnoser.narrow_down_chromeos_localbuild(
             eval_cmd, extra_switch_cmd=extra_switch_cmd)
         logger.info('%s done', __file__)
