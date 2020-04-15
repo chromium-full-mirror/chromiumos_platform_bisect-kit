@@ -111,6 +111,160 @@ class GitOperation:
                           'commit %d' % i))
 
 
+class TestGitOperationReadOnly(unittest.TestCase):
+  """Tests git_util module with real git operations without mock."""
+
+  @classmethod
+  def setUpClass(cls):
+    cls.git_repo = tempfile.mkdtemp()
+
+    cls.git = GitOperation(cls.git_repo)
+    cls.git.init()
+    cls.git.create_commits(5)
+    cls.commits = cls.git.commits
+
+  @classmethod
+  def tearDownClass(cls):
+    shutil.rmtree(cls.git_repo)
+
+  def test_is_containing_commit(self):
+    self.assertTrue(
+        git_util.is_containing_commit(self.git_repo, self.commits[0]))
+    self.assertTrue(
+        git_util.is_containing_commit(self.git_repo, self.commits[1]))
+    self.assertTrue(
+        git_util.is_containing_commit(self.git_repo, self.commits[0][:10]))
+    self.assertFalse(
+        git_util.is_containing_commit(self.git_repo,
+                                      self.commits[0][:-10] + 'a' * 10))
+
+  def test_is_ancestor_commit(self):
+    self.assertTrue(
+        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
+                                    self.commits[1]))
+    self.assertTrue(
+        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
+                                    self.commits[2]))
+    self.assertFalse(
+        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
+                                    self.commits[0]))
+    self.assertFalse(
+        git_util.is_ancestor_commit(self.git_repo, self.commits[2],
+                                    self.commits[0]))
+
+  def test_get_commit_metadata(self):
+    self.assertNotIn(
+        'parent', git_util.get_commit_metadata(self.git_repo, self.commits[0]))
+
+    self.assertEqual(
+        git_util.get_commit_metadata(self.git_repo, self.commits[1])['parent'],
+        [self.commits[0]])
+
+  def test_get_revlist(self):
+    self.assertEqual(
+        git_util.get_revlist(self.git_repo, self.commits[1], self.commits[3]),
+        [self.commits[1], self.commits[2], self.commits[3]])
+
+  def test_get_commit_log(self):
+    self.assertIn('commit 2',
+                  git_util.get_commit_log(self.git_repo, self.commits[1]))
+
+  def test_get_rev_by_time(self):
+    # simple case
+    self.assertEqual(
+        git_util.get_rev_by_time(self.git_repo, '2017-01-03T12:00:00', None),
+        self.commits[2])
+
+    # boundary case: equal timestamp
+    self.assertEqual(
+        git_util.get_rev_by_time(self.git_repo, '2017-01-03T00:00:00', None),
+        self.commits[2])
+
+  def test_get_history(self):
+    timestamp = 1483286400  # 2017-01-02T00:00:00
+    day = 86400
+
+    # Normal case.
+    self.assertEqual(
+        git_util.get_history(
+            self.git_repo,
+            self.git.default_filename,
+            after=timestamp + 100,
+            before=timestamp + day * 2 + 100),
+        [(timestamp + day * 1, self.commits[2]),
+         (timestamp + day * 2, self.commits[3])])
+
+    # Test boundary condition (inclusive).
+    self.assertEqual(
+        git_util.get_history(
+            self.git_repo,
+            self.git.default_filename,
+            after=timestamp,
+            before=timestamp + day * 2), [
+                (timestamp, self.commits[1]),
+                (timestamp + day * 1, self.commits[2]),
+                (timestamp + day * 2, self.commits[3]),
+            ])
+
+    # Padding.
+    self.assertEqual(
+        git_util.get_history(
+            self.git_repo,
+            self.git.default_filename,
+            after=timestamp + 100,
+            before=timestamp + day * 2 + 100,
+            padding_begin=True,
+            padding_end=True), [
+                (timestamp + 100, self.commits[1]),
+                (timestamp + day * 1, self.commits[2]),
+                (timestamp + day * 2, self.commits[3]),
+                (timestamp + day * 2 + 100, self.commits[3]),
+            ])
+
+  def test_get_history_before_first_commit(self):
+    # timestamp of the first commit of git repo
+    time = 1483200000
+
+    self.assertEqual(
+        git_util.get_history(
+            self.git_repo,
+            self.git.default_filename,
+            after=time - 10,
+            before=time + 10), [
+                (time, self.commits[0]),
+            ])
+
+    self.assertEqual(
+        git_util.get_history(
+            self.git_repo,
+            self.git.default_filename,
+            after=time - 10,
+            before=time + 10,
+            padding_begin=True,
+            padding_end=True), [
+                (time, self.commits[0]),
+                (time + 10, self.commits[0]),
+            ])
+
+    self.assertEqual(
+        git_util.get_history(
+            self.git_repo,
+            self.git.default_filename,
+            after=time - 10,
+            before=time - 5,
+            padding_begin=True,
+            padding_end=True), [])
+
+    self.assertEqual(
+        git_util.get_history(
+            self.git_repo,
+            'not-exist-file',
+            after=time - 10,
+            before=time + 10,
+            padding_begin=True,
+            padding_end=True), [])
+
+
 class TestGitOperation(unittest.TestCase):
   """Tests git_util module with real git operations without mock."""
 
@@ -119,8 +273,6 @@ class TestGitOperation(unittest.TestCase):
 
     self.git = GitOperation(self.git_repo)
     self.git.init()
-    self.git.create_commits(5)
-    self.commits = self.git.commits
 
   def tearDown(self):
     shutil.rmtree(self.git_repo)
@@ -133,8 +285,9 @@ class TestGitOperation(unittest.TestCase):
     #  | *  commit B on branch foo (2017-02-02)
     #  * |  commit A (2017-02-01)
     #  |/
-    #  *  commits[4] (2017-01-05)
+    #  *  commits[0] (2017-01-01)
     #  |
+    self.git.create_commits(1)
     branch_foo = 'foo'
     subprocess.check_call(['git', 'branch', branch_foo], cwd=self.git_repo)
     commit_a = self.git.add_commit('2017-02-01T00:00:00', 'commit A', 'file2',
@@ -182,74 +335,22 @@ class TestGitOperation(unittest.TestCase):
     subprocess.check_call(['git', 'init', '-q', '--bare'], cwd=self.git_repo)
     self.assertTrue(git_util.is_git_bare_dir(self.git_repo))
 
-  def test_is_containing_commit(self):
-    self.assertTrue(
-        git_util.is_containing_commit(self.git_repo, self.commits[0]))
-    self.assertTrue(
-        git_util.is_containing_commit(self.git_repo, self.commits[1]))
-    self.assertTrue(
-        git_util.is_containing_commit(self.git_repo, self.commits[0][:10]))
-    self.assertFalse(
-        git_util.is_containing_commit(self.git_repo,
-                                      self.commits[0][:-10] + 'a' * 10))
-
-  def test_is_ancestor_commit(self):
-    self.assertTrue(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
-                                    self.commits[1]))
-    self.assertTrue(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
-                                    self.commits[2]))
-    self.assertFalse(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
-                                    self.commits[0]))
-    self.assertFalse(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[2],
-                                    self.commits[0]))
-
-  def test_get_commit_metadata(self):
-    self.assertNotIn(
-        'parent', git_util.get_commit_metadata(self.git_repo, self.commits[0]))
-
+  def test_get_commit_hash(self):
+    self.git.create_commits(3)
+    tag_name = 'foo'
+    subprocess.check_call(['git', 'tag', tag_name, self.git.commits[2]],
+                          cwd=self.git_repo)
     self.assertEqual(
-        git_util.get_commit_metadata(self.git_repo, self.commits[1])['parent'],
-        [self.commits[0]])
-
-  def test_get_revlist(self):
-    self.assertEqual(
-        git_util.get_revlist(self.git_repo, self.commits[1], self.commits[3]),
-        [self.commits[1], self.commits[2], self.commits[3]])
+        git_util.get_commit_hash(self.git_repo, tag_name), self.git.commits[2])
 
   def test_checkout_version(self):
+    self.git.create_commits(5)
     full_path = os.path.join(self.git_repo, self.git.default_filename)
     with open(full_path) as f:
       self.assertEqual(f.read(), 'commit 5')
-    git_util.checkout_version(self.git_repo, self.commits[1])
+    git_util.checkout_version(self.git_repo, self.git.commits[1])
     with open(full_path) as f:
       self.assertEqual(f.read(), 'commit 2')
-
-  def test_get_commit_log(self):
-    self.assertIn('commit 2',
-                  git_util.get_commit_log(self.git_repo, self.commits[1]))
-
-  def test_get_commit_hash(self):
-    tag_name = 'foo'
-    subprocess.check_call(['git', 'tag', tag_name, self.commits[2]],
-                          cwd=self.git_repo)
-    self.assertEqual(
-        git_util.get_commit_hash(self.git_repo, tag_name), self.commits[2])
-
-  def test_get_commit_time(self):
-    path = self.git.default_filename
-    time = 1500000000
-    commit_1 = self.git.add_commit(
-        time + 100, 'msg', path, 'a', author_time=time)
-    commit_2 = self.git.add_commit(
-        time + 300, 'msg', path, 'b', author_time=time + 200)
-    self.assertEqual(
-        git_util.get_commit_time(self.git_repo, commit_1, path), time + 100)
-    self.assertEqual(
-        git_util.get_commit_time(self.git_repo, commit_2, path), time + 300)
 
   def test_get_file_from_revision(self):
     path = 'foo'
@@ -288,16 +389,17 @@ class TestGitOperation(unittest.TestCase):
     with self.assertRaises(subprocess.CalledProcessError):
       git_util.list_dir_from_revision(self.git_repo, commit_1, 'path/foo')
 
-  def test_get_rev_by_time(self):
-    # simple case
+  def test_get_commit_time(self):
+    path = self.git.default_filename
+    time = 1500000000
+    commit_1 = self.git.add_commit(
+        time + 100, 'msg', path, 'a', author_time=time)
+    commit_2 = self.git.add_commit(
+        time + 300, 'msg', path, 'b', author_time=time + 200)
     self.assertEqual(
-        git_util.get_rev_by_time(self.git_repo, '2017-01-03T12:00:00', None),
-        self.commits[2])
-
-    # boundary case: equal timestamp
+        git_util.get_commit_time(self.git_repo, commit_1, path), time + 100)
     self.assertEqual(
-        git_util.get_rev_by_time(self.git_repo, '2017-01-03T00:00:00', None),
-        self.commits[2])
+        git_util.get_commit_time(self.git_repo, commit_2, path), time + 300)
 
   def test_get_rev_by_time_merge(self):
     commit_a, _, commit_c = self.prepare_merged_repository()
@@ -328,6 +430,7 @@ class TestGitOperation(unittest.TestCase):
         ['refs/heads/master'])
 
   def test_reset_hard(self):
+    self.git.create_commits(1)
     path = os.path.join(self.git_repo, self.git.default_filename)
     with open(path) as f:
       content = f.read()
@@ -371,47 +474,6 @@ class TestGitOperation(unittest.TestCase):
         set(git_util.list_untracked(self.git_repo, excludes=[file_to_ignore])),
         set([file_untracked_1, file_untracked_2]))
 
-  def test_get_history(self):
-    timestamp = 1483286400  # 2017-01-02T00:00:00
-    day = 86400
-
-    # Normal case.
-    self.assertEqual(
-        git_util.get_history(
-            self.git_repo,
-            self.git.default_filename,
-            after=timestamp + 100,
-            before=timestamp + day * 2 + 100),
-        [(timestamp + day * 1, self.commits[2]),
-         (timestamp + day * 2, self.commits[3])])
-
-    # Test boundary condition (inclusive).
-    self.assertEqual(
-        git_util.get_history(
-            self.git_repo,
-            self.git.default_filename,
-            after=timestamp,
-            before=timestamp + day * 2), [
-                (timestamp, self.commits[1]),
-                (timestamp + day * 1, self.commits[2]),
-                (timestamp + day * 2, self.commits[3]),
-            ])
-
-    # Padding.
-    self.assertEqual(
-        git_util.get_history(
-            self.git_repo,
-            self.git.default_filename,
-            after=timestamp + 100,
-            before=timestamp + day * 2 + 100,
-            padding_begin=True,
-            padding_end=True), [
-                (timestamp + 100, self.commits[1]),
-                (timestamp + day * 1, self.commits[2]),
-                (timestamp + day * 2, self.commits[3]),
-                (timestamp + day * 2 + 100, self.commits[3]),
-            ])
-
   def test_get_history_rebirth(self):
     time = 1500000000
     path = 'foo'
@@ -432,49 +494,6 @@ class TestGitOperation(unittest.TestCase):
             (time + 40, c4),
             (time + 50, c5),
         ])
-
-  def test_get_history_before_first_commit(self):
-    # timestamp of the first commit of git repo
-    time = 1483200000
-
-    self.assertEqual(
-        git_util.get_history(
-            self.git_repo,
-            self.git.default_filename,
-            after=time - 10,
-            before=time + 10), [
-                (time, self.commits[0]),
-            ])
-
-    self.assertEqual(
-        git_util.get_history(
-            self.git_repo,
-            self.git.default_filename,
-            after=time - 10,
-            before=time + 10,
-            padding_begin=True,
-            padding_end=True), [
-                (time, self.commits[0]),
-                (time + 10, self.commits[0]),
-            ])
-
-    self.assertEqual(
-        git_util.get_history(
-            self.git_repo,
-            self.git.default_filename,
-            after=time - 10,
-            before=time - 5,
-            padding_begin=True,
-            padding_end=True), [])
-
-    self.assertEqual(
-        git_util.get_history(
-            self.git_repo,
-            'not-exist-file',
-            after=time - 10,
-            before=time + 10,
-            padding_begin=True,
-            padding_end=True), [])
 
   def test_get_history_recursively(self):
     time = 1500000000
