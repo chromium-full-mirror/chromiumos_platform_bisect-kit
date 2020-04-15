@@ -212,6 +212,8 @@ def schedule_build(board, rev, manifest, bucket):
           build_tags=build_tags,
       ).id)
   logger.info('schedule a build, id = %d', build_id)
+  logger.info('build url: %s',
+              buildbucket_util.get_luci_link(board, build_id, bucket=bucket))
 
   last_log_time = 0
   while api.is_running(build_id):

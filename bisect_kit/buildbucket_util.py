@@ -34,6 +34,22 @@ from bisect_kit import errors
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
+luci_link = ('https://ci.chromium.org/p/chromeos/builders/'
+             '{bucket}/{board}-{bucket}/b{id}')
+
+
+def get_luci_link(board, build_id, bucket='bisector'):
+  """Get a link directs to luci build page.
+
+  Args:
+    board: ChromeOS board name.
+    build_id: Buildbucket build id.
+    bucket: A bucket name of buildbucket.
+
+  Returns:
+    A link to luci build details.
+  """
+  return luci_link.format(board=board, bucket=bucket, id=build_id)
 
 
 class BuildbucketApi:
