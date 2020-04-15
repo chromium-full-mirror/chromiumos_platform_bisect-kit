@@ -273,7 +273,7 @@ class BisectorCommandLine:
     # relative to session directory
     log_path = 'log/{bisector}.{timestamp}.{rev}.{step}.txt'.format(
         bisector=self.domain_cls.__name__,
-        rev=rev,
+        rev=util.escape_rev(rev),
         timestamp=time.strftime('%Y%m%d-%H%M%S'),
         step=step)
     return log_path
