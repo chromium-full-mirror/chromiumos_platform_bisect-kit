@@ -248,6 +248,13 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
   if kwargs.get('internal'):
     prefix.append('--internal')
 
+  # This work around http://crbug.com/1072400
+  # New goma exists in depot_tools but chromite still uses old way to fetch
+  # goma.
+  goma_dir = os.path.expanduser('~/depot_tools/.cipd_bin')
+  if os.path.exists(os.path.join(goma_dir, 'gomacc')):
+    prefix += ['--gomadir', goma_dir]
+
   env = kwargs.get('env')
   cmd = prefix + ['--'] + list(args)
 
