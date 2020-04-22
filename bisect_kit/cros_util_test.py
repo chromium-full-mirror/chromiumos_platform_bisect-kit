@@ -192,7 +192,7 @@ class TestCrosUtil(unittest.TestCase):
   def _gsutil_ls(*args, **_kwargs):
     archive_base = 'gs://chromeos-image-archive/foo-release/'
     release_base = 'gs://chromeos-releases/stable-channel/foo/'
-    snapshot_base = 'gs://chromeos-image-archive/foo-postsubmit/'
+    snapshot_base = 'gs://chromeos-image-archive/foo-snapshot/'
 
     gs_files = [
         release_base + '9994.0.0/',

@@ -154,14 +154,14 @@ def snapshot_version_split(snapshot_version):
 def query_snapshot_buildbucket_id(board, snapshot_version):
   """Query buildbucket id of a snapshot"""
   assert is_cros_snapshot_version(snapshot_version)
-  path = ('gs://chromeos-image-archive/{board}-postsubmit'
+  path = ('gs://chromeos-image-archive/{board}-snapshot'
           '/{snapshot_version}-*/image.zip')
   output = gsutil_ls(
       '-d',
       path.format(board=board, snapshot_version=snapshot_version),
       ignore_errors=True)
   for line in output:
-    m = re.match(r'.*-postsubmit/R\d+-\d+\.\d+\.\d+-\d+-(.+)/image\.zip', line)
+    m = re.match(r'.*-snapshot/R\d+-\d+\.\d+\.\d+-\d+-(.+)/image\.zip', line)
     if m:
       return m.group(1)
   return None
@@ -239,12 +239,6 @@ def query_dut_short_version(host):
   is_cros_short_version() is false.
   """
   return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_VERSION')
-
-
-def query_dut_is_snapshot(host):
-  """Query if given DUT is a snapshot version."""
-  path = query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILDER_PATH', '')
-  return '-postsubmit' in path
 
 
 def query_dut_is_by_official_builder(host):
@@ -569,7 +563,7 @@ def list_snapshots_from_image_archive(board, major_version):
   if not milestone:
     milestone = '*'
 
-  path = ('gs://chromeos-image-archive/{board}-postsubmit/R{milestone}-'
+  path = ('gs://chromeos-image-archive/{board}-snapshot/R{milestone}-'
           '{short_version}-*/image.zip')
   result = []
   output = gsutil_ls(
@@ -801,7 +795,7 @@ def prepare_snapshot_image(chromeos_root, board, snapshot_version):
   if not os.path.exists(tmp_dir):
     os.makedirs(tmp_dir)
 
-  gs_path = ('gs://chromeos-image-archive/{board}-postsubmit/' +
+  gs_path = ('gs://chromeos-image-archive/{board}-snapshot/' +
              '{snapshot_version}-*/image.zip')
   gs_path = gs_path.format(board=board, snapshot_version=snapshot_version)
 
@@ -933,7 +927,7 @@ def cros_flash(chromeos_root,
     if is_cros_snapshot_version(version):
       builder_path = query_dut_lsb_release(host).get(
           'CHROMEOS_RELEASE_BUILDER_PATH', '')
-      expect_prefix = '%s-postsubmit/%s-' % (board, version)
+      expect_prefix = '%s-snapshot/%s-' % (board, version)
       if not builder_path.startswith(expect_prefix):
         raise errors.ExternalError(
             'although cros flash succeeded, the OS builder path is '
@@ -1592,7 +1586,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
     assert is_cros_snapshot_version(new)
 
     gs_path = (
-        'gs://chromeos-image-archive/{board}-postsubmit/{version}-*/image.zip')
+        'gs://chromeos-image-archive/{board}-snapshot/{version}-*/image.zip')
     # Try to guess the commit time of a snapshot manifest, it is usually a few
     # minutes different between snapshot manifest commit and image.zip
     # generate.
@@ -1785,7 +1779,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         return old
       if new.endswith('-' + snapshot_id):
         return new
-      gs_path = ('gs://chromeos-image-archive/{board}-postsubmit/'
+      gs_path = ('gs://chromeos-image-archive/{board}-snapshot/'
                  'R*-{snapshot_id}-*'.format(
                      board=board, snapshot_id=snapshot_id))
       for line in gsutil_ls(gs_path, ignore_errors=True):
