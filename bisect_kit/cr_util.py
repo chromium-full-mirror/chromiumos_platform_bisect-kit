@@ -286,48 +286,6 @@ def get_chrome_test_binaries(chrome_src, board):
   return result
 
 
-def work_around_b151054105(chrome_src):
-  """Works around b/151054105 goma install issue
-
-  For Chrome versions between roughly 2020-02-21 to 2020-03-11, goma failed to
-  install due to a bug in chromite python3 migration.
-  """
-  # This function will only be used for few months, so it is implemented
-  # naively.
-  # TODO(kcwu): remove this function once we don't care those versions.
-  chromite_path = os.path.join(chrome_src, 'third_party', 'chromite')
-  fix_commit = '64b2b065a8d3b5e1e6305bbbd59637b866387c11'
-  if (git_util.is_containing_commit(chromite_path, fix_commit) and
-      git_util.is_ancestor_commit(chromite_path, fix_commit, 'HEAD')):
-    # The fix is already landed.
-    return
-
-  goma_bin_cache_path = os.path.join(chrome_src,
-                                     'build/cros_cache/common/goma+2')
-  goma_file = os.path.join(goma_bin_cache_path, 'MANIFEST')
-  if os.path.exists(goma_file):
-    # goma is already properly installed.
-    return
-
-  logger.info('apply workaround for b/151054105 goma install issue')
-  try:
-    if not os.path.exists(goma_bin_cache_path):
-      os.makedirs(goma_bin_cache_path)
-    # pylint: disable=line-too-long
-    goma_download_link = 'https://clients5.google.com/cxx-compiler-service/download/2020-03-04/goma-goobuntu.tgz'
-    util.check_call(
-        'curl --fail %s | tar zxf - --strip=1' % goma_download_link,
-        cwd=goma_bin_cache_path,
-        shell=True)
-    env = os.environ.copy()
-    env['PLATFORM'] = 'goobuntu'
-    util.check_call('./goma_ctl.py', 'update', env=env, cwd=goma_bin_cache_path)
-    assert os.path.exists(goma_file)
-  except Exception:
-    shutil.rmtree(goma_bin_cache_path)
-    raise
-
-
 def build_and_deploy(chrome_src,
                      board,
                      dut,
@@ -344,7 +302,6 @@ def build_and_deploy(chrome_src,
     with_tests: build test binaries as well if targets is not specified
     nodeploy: if True, only build, do not deploy
   """
-  work_around_b151054105(chrome_src)
   if not targets:
     targets = CHROME_BINARIES
     if with_tests:
