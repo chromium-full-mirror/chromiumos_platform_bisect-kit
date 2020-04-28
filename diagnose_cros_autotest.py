@@ -86,7 +86,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     #  - what chrome binaries to run
     #  - dependency labels for DUT allocation
     common_switch_cmd, _common_eval_cmd = self._build_cmds()
-    util.check_call(*(common_switch_cmd + [self.config['old']]))
+    util.check_call(
+        *(common_switch_cmd + [self.config['old'], '--dut', opts.dut]))
 
   def _build_cmds(self):
     # prebuilt version will be specified later.
@@ -173,7 +174,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             extra_switch_cmd=extra_switch_cmd)
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
-        util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
+        util.check_call(
+            *(common_switch_cmd + [diagnoser.cros_old, '--dut', dut]))
         dut_os_version = cros_util.query_dut_short_version(dut)
 
         try:
