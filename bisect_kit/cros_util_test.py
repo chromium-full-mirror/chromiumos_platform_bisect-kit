@@ -91,6 +91,54 @@ class TestCrosUtil(unittest.TestCase):
       self.assertEqual(
           cros_util.query_dut_short_version(dummy_dut), '12345.0.0')
 
+  def test_query_dut_prebuilt_version(self):
+    dummy_dut = 'dummy'
+    sample1 = {
+        'CHROMEOS_RELEASE_VERSION': '13064.0.0',
+        'CHROMEOS_RELEASE_BUILDER_PATH': 'nocturne-release/R84-13064.0.0',
+    }
+    sample2 = {
+        'CHROMEOS_RELEASE_VERSION': '13064.0.0',
+        'CHROMEOS_RELEASE_BUILDER_PATH': 'nocturne-release/R84-13064.0.0-12345',
+    }
+    sample3 = {
+        'CHROMEOS_RELEASE_VERSION':
+            '13059.0.0',
+        'CHROMEOS_RELEASE_BUILDER_PATH':
+            'octopus-snapshot/R84-13059.0.0-31619-8882013661175561136',
+    }
+    sample4 = {
+        'CHROMEOS_RELEASE_VERSION':
+            '13059.0.0',
+        'CHROMEOS_RELEASE_BUILDER_PATH':
+            'octopus-postsubmit/R84-13059.0.0-31619-8882013661175561136',
+    }
+
+    with mock.patch(
+        'bisect_kit.cros_util.query_dut_lsb_release', return_value=sample1):
+      self.assertEqual(
+          cros_util.query_dut_prebuilt_version(dummy_dut),
+          '13064.0.0',
+      )
+    with mock.patch(
+        'bisect_kit.cros_util.query_dut_lsb_release', return_value=sample2):
+      self.assertEqual(
+          cros_util.query_dut_prebuilt_version(dummy_dut),
+          '13064.0.0',
+      )
+    with mock.patch(
+        'bisect_kit.cros_util.query_dut_lsb_release', return_value=sample3):
+      self.assertEqual(
+          cros_util.query_dut_prebuilt_version(dummy_dut),
+          'R84-13059.0.0-31619',
+      )
+    with mock.patch(
+        'bisect_kit.cros_util.query_dut_lsb_release', return_value=sample4):
+      self.assertEqual(
+          cros_util.query_dut_prebuilt_version(dummy_dut),
+          'R84-13059.0.0-31619',
+      )
+
   def test_gsutil(self):
     with mock.patch('bisect_kit.util.check_output', return_value='abc'):
       self.assertEqual(cros_util.gsutil('cat', 'foo'), 'abc')

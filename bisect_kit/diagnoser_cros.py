@@ -198,8 +198,11 @@ class CrosDiagnoser:
                     self.config['board'], '--nobuild', self.cros_old)
 
     if not force:
-      short_version = cros_util.version_to_short(self.cros_old)
-      if cros_util.query_dut_short_version(self.dut) == short_version:
+      if cros_util.is_cros_full_version(self.cros_old):
+        version = cros_util.version_to_short(self.cros_old)
+      else:
+        version = self.cros_old
+      if cros_util.query_dut_prebuilt_version(self.dut) == version:
         return
     cmd = [
         './switch_cros_prebuilt.py', '--board', self.config['board'], '--dut',

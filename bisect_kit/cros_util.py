@@ -241,6 +241,25 @@ def query_dut_short_version(host):
   return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_VERSION')
 
 
+def query_dut_prebuilt_version(host):
+  """Return a snapshot version or short version of a given DUT.
+
+  Args:
+    host: dut host
+
+  Returns:
+    Snapshot version or short version.
+  """
+  lsb_release = query_dut_lsb_release(host)
+  release_version = lsb_release.get('CHROMEOS_RELEASE_VERSION')
+  builder_path = lsb_release.get('CHROMEOS_RELEASE_BUILDER_PATH')
+  match = re.match(r'\S+-(?:snapshot|postsubmit)/(R\d+-\d+\.\d+\.\d+-\d+)-\d+',
+                   builder_path)
+  if match:
+    return match.group(1)
+  return release_version
+
+
 def query_dut_is_by_official_builder(host):
   """Query if given DUT is build by buildbucket builder"""
   return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILD_TYPE',
