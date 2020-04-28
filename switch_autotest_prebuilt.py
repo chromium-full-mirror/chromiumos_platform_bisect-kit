@@ -144,7 +144,11 @@ def main(args=None):
       names = []
       for control_file in cros_util.enumerate_autotest_control_files(
           autotest_dir):
-        info = cros_util.parse_autotest_control_file(control_file)
+        try:
+          info = cros_util.parse_autotest_control_file(control_file)
+        except SyntaxError:
+          logger.warning('%s is not parsable, ignore', control_file)
+          continue
         names.append(info.name)
       util.show_similar_candidates('test_name', opts.test_name, names)
       sys.exit(cli.EXIT_CODE_FATAL)
