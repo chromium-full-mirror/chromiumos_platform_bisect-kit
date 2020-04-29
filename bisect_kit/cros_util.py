@@ -55,6 +55,31 @@ gsutil_bin = 'gsutil'
 # info.
 snapshot_cutover_version = '12618.0.0'
 
+# current earliest buildbucket buildable versions
+# picked from https://crrev.com/c/2072618
+buildbucket_cutover_versions = [
+    '12931.0.0',
+    '12871.26.0',  # R81
+    '12871.24.2',  # stabilize-12871.24.B
+    '12812.10.0',  # factory-excelsior-12812.B
+    '12768.14.0',  # firmware-servo-12768.B
+    '12739.85.0',  # R80
+    '12739.67.1',  # stabilize-excelsior-12739.67.B
+    '12692.36.0',  # factory-hatch-12692.B
+    '12672.104.0',  # firmware-hatch-12672.B
+    '12607.110.0',  # R79
+    '12607.83.2',  # stabilize-quickfix-12607.83.B
+    '12587.59.0',  # factory-kukui-12587.B
+    '12573.78.0',  # firmware-kukui-12573.B
+    '12499.96.0',  # R78
+    '12422.33.0',  # firmware-mistral-12422.B
+    '12371.190.0',  # R77
+    '12361.38.0',  # factory-mistral-12361.B
+    '12200.65.0',  # firmware-sarien-12200.B
+    '12105.128.0',  # R75
+    '12033.82.0',  # factory-sarien-12033.B
+]
+
 chromeos_root_inside_chroot = '/mnt/host/source'
 # relative to chromeos_root
 prebuilt_autotest_dir = 'tmp/autotest-prebuilt'
@@ -114,7 +139,7 @@ def is_cros_version_lesseq(ver1, ver2):
     ver2: a Chrome OS version in short, full, or snapshot format.
 
   Returns:
-    True if ver1 is smaller than ver2.
+    True if ver1 is less or equal to ver2.
   """
   assert is_cros_version(ver1) or is_cros_snapshot_version(ver1)
   assert is_cros_version(ver2) or is_cros_snapshot_version(ver2)
@@ -122,6 +147,16 @@ def is_cros_version_lesseq(ver1, ver2):
   ver1 = [int(x) for x in re.split(r'[.-]', ver1) if not x.startswith('R')]
   ver2 = [int(x) for x in re.split(r'[.-]', ver2) if not x.startswith('R')]
   return ver1 <= ver2
+
+
+def is_buildbucket_buildable(version):
+  """Determines if a version is buildable on buildbucket."""
+  short_version = version_to_short(version)
+  # If given version is child of any cutover, then it's buildable
+  return any([
+      util.is_direct_relative_version(x, short_version) and
+      is_cros_version_lesseq(x, version) for x in buildbucket_cutover_versions
+  ])
 
 
 def make_cros_full_version(milestone, short_version):

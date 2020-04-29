@@ -416,6 +416,18 @@ class TestCrosUtil(unittest.TestCase):
     self.assertFalse(
         cros_util.is_cros_version_lesseq('R99-1.0.0-124', 'R99-1.0.0-123'))
 
+  def test_is_buildbucket_buildable(self):
+    sample_cutover = ['10000.0.0', '9999.20.0', '9998.20.0']
+    with mock.patch.object(cros_util, 'buildbucket_cutover_versions',
+                           sample_cutover):
+      self.assertTrue(cros_util.is_buildbucket_buildable('R77-10000.0.0-12345'))
+      self.assertTrue(cros_util.is_buildbucket_buildable('10000.0.0'))
+      self.assertFalse(cros_util.is_buildbucket_buildable('R77-9999.0.0-12345'))
+      self.assertFalse(cros_util.is_buildbucket_buildable('9999.19.0'))
+      self.assertTrue(cros_util.is_buildbucket_buildable('9999.20.0'))
+      self.assertTrue(cros_util.is_buildbucket_buildable('9998.100.100'))
+      self.assertFalse(cros_util.is_buildbucket_buildable('9997.100.100'))
+
   def test_detect_branch_level(self):
     ref_prefix = [
         '',

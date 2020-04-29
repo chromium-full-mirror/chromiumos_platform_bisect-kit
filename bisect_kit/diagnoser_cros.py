@@ -411,11 +411,15 @@ class CrosDiagnoser:
       return False
     return True
 
-  def narrow_down_chromeos_localbuild(self, eval_cmd, extra_switch_cmd=None):
+  def narrow_down_chromeos_localbuild(self,
+                                      eval_cmd,
+                                      buildbucket_build=False,
+                                      extra_switch_cmd=None):
     """Bisect with ChromeOS localbuild.
 
     Args:
       eval_cmd: command to reproduce the regression
+      buildbucket_build: to build ChromeOS image on buildbucket
       extra_switch_cmd: additional command to run when switch ChromeOS version
     """
     if self.config['bypass_chromeos_build']:
@@ -424,7 +428,7 @@ class CrosDiagnoser:
 
     bisector = wrapper.BisectorWrapper('bisect_cros_repo',
                                        self.config['session'])
-    if self.config['disable_buildbucket_chromeos']:
+    if not buildbucket_build:
       switch_cmd = ['./switch_cros_localbuild.py']
     else:
       switch_cmd = ['./switch_cros_localbuild_buildbucket.py']
