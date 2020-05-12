@@ -19,11 +19,13 @@ import tempfile
 # from third_party
 from google.protobuf import json_format
 from google.protobuf.field_mask_pb2 import FieldMask
+from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.message import DecodeError
 from infra_libs.buildbucket.proto.build_pb2 import Build
 from infra_libs.buildbucket.proto.build_pb2 import BuilderID
 from infra_libs.buildbucket.proto.common_pb2 import Status
 from infra_libs.buildbucket.proto.common_pb2 import StringPair
+from infra_libs.buildbucket.proto.common_pb2 import TimeRange
 from infra_libs.buildbucket.proto.rpc_pb2 import BuildPredicate
 from infra_libs.buildbucket.proto.rpc_pb2 import GetBuildRequest
 from infra_libs.buildbucket.proto.rpc_pb2 import ScheduleBuildRequest
@@ -67,6 +69,8 @@ class BuildbucketApi:
   buildbucket_api_path = '/prpc/buildbucket.v2.Builds/'
   isolate_domain_url = 'https://chromeos-isolated.appspot.com/'
   token_cache = os.path.expanduser('~/.isolated_oauth')
+  # 2020-05-12T00:00:00Z: remove cros_debug flag
+  old_artifact_cutoff = 1589241600
 
   def __new__(cls):
     if cls._instance is None:
@@ -361,7 +365,9 @@ class BuildbucketApi:
                     status=None,
                     created_by=None,
                     snapshot_commit=None,
-                    limit=100):
+                    limit=100,
+                    start_time=None,
+                    end_time=None):
     """Search builds.
 
     Args:
@@ -373,17 +379,27 @@ class BuildbucketApi:
       snapshot_commit: Search by annealing snapshot commit hash for Chrome
           OS. Defaults to None.
       limit: Maximum numbers of builds to return. Defaults to 100.
+      start_time: An integer timestamp indicates lower bound of start time.
+      end_time: An integer timestamp indicates upper bound of start time.
 
     Returns:
       A list of builds.
     """
     search_response_fields = ['builds.*.%s' % x for x in self._build_fields]
     field_mask = FieldMask(paths=search_response_fields)
+    create_time = None
     tags = []
     if status:
       status = Status.Value(status)
     if snapshot_commit:
       tags.append(StringPair(key='snapshot', value=snapshot_commit))
+
+    if start_time or end_time:
+      create_time = TimeRange()
+      if start_time:
+        create_time.start_time.CopyFrom(Timestamp(seconds=start_time, nanos=0))
+      if end_time:
+        create_time.end_time.CopyFrom(Timestamp(seconds=end_time, nanos=0))
 
     # max page_size is 1000
     page_size = min(1000, limit)
@@ -397,6 +413,7 @@ class BuildbucketApi:
         created_by=created_by,
         status=status,
         tags=tags,
+        create_time=create_time,
     )
     request = SearchBuildsRequest(
         fields=field_mask,
@@ -441,6 +458,7 @@ class BuildbucketApi:
         bucket=bucket,
         builder='%s-%s' % (board, bucket),
         status='SUCCESS',
+        start_time=self.old_artifact_cutoff,
     )
     for build in builds:
       input_properties = json_format.MessageToDict(build.input.properties)
