@@ -198,6 +198,7 @@ class BuildbucketApi:
           '--service',
           domain,
       )
+    logger.debug('buildbucket token refreshed')
     self._token = None
 
   def _post(self, api, request, return_class, timeout=10):
@@ -230,7 +231,7 @@ class BuildbucketApi:
         return result
       except DecodeError:
         response_content = response_content.decode('utf-8')
-        if response_content == 'Invalid OAuth token' and not logged_in:
+        if not logged_in:
           self._refresh_token(self.buildbucket_domain_url)
           logged_in = True
         else:
