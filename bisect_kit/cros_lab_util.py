@@ -10,6 +10,7 @@ import errno
 import json
 import logging
 import os
+import queue
 import re
 import signal
 import subprocess
@@ -290,8 +291,8 @@ def skylab_release_dut(dut_name):
     dut_name: DUT name
   """
   if not is_dut_leased_by_me(query_lease_status(dut_name)):
-    raise errors.DutLeaseException(
-        '%s is not leased, or not leased by me' % dut_name)
+    raise errors.DutLeaseException('%s is not leased, or not leased by me' %
+                                   dut_name)
 
   skylab_cmd('release-duts', dut_name)
 
@@ -373,7 +374,13 @@ def query_lease_status(dut_name, verbose_log=True):
   return status
 
 
-def lease_keeper(dut_name, quit_event):
+def _notify_error_from_lease_keeper(exception, error_queue):
+  error_queue.put(exception)
+  # SIGINT will be translated to KeyboardInterrupt.
+  os.kill(os.getpid(), signal.SIGINT)
+
+
+def lease_keeper(dut_name, quit_event, error_queue):
   """Monitors and maintains skylab lease status.
 
   This function checks DUT lease status periodically in order to ensure the DUT
@@ -384,6 +391,7 @@ def lease_keeper(dut_name, quit_event):
   Args:
     dut_name: DUT name which is leased by me.
     quit_event: a threading.Event object, which indicates program stop event.
+    error_queue: a queue.Queue object, for passing exception to main thread.
   """
 
   try:
@@ -397,10 +405,9 @@ def lease_keeper(dut_name, quit_event):
           raise errors.DutLeaseException(
               'the DUT was leased by me %s , but now is not unexpectedly: %s' %
               (task_url, lease_status))
-        else:
-          raise errors.DutLeaseException(
-              'the DUT is expected to be leased by me, but not: %s' %
-              lease_status)
+        raise errors.DutLeaseException(
+            'the DUT is expected to be leased by me, but not: %s' %
+            lease_status)
       previous_status = lease_status
 
       expire_time = lease_status['start_time'] + lease_status['duration']
@@ -423,7 +430,8 @@ def lease_keeper(dut_name, quit_event):
       logger.info("Previous lease is near expiration, let's lease again")
       this_lease = skylab_lease_dut(dut_name)
       if not this_lease:
-        raise errors.DutLeaseException('unable to extend the lease')
+        raise errors.DutLeaseException(
+            'Lease is expired and unable to extend the lease')
 
       # leased, but need to verify in case of race condition
       tasks = swarming_bot_tasks(lease_status['bot_id'], limit=5)
@@ -445,13 +453,12 @@ def lease_keeper(dut_name, quit_event):
         raise errors.DutLeaseException(
             'not found previous lease task in task list')
   except (errors.DutLeaseException, errors.ExternalError,
-          subprocess.CalledProcessError):
+          subprocess.CalledProcessError) as e:
     logger.exception('swarming api failed or bad lease state, abort')
-    # SIGINT will be translated to KeyboardInterrupt.
-    os.kill(os.getpid(), signal.SIGINT)
-  except Exception:
+    _notify_error_from_lease_keeper(e, error_queue)
+  except Exception as e:
     logger.exception('unhandled exception in lease keeper, abort')
-    os.kill(os.getpid(), signal.SIGINT)
+    _notify_error_from_lease_keeper(e, error_queue)
 
 
 @contextlib.contextmanager
@@ -474,10 +481,21 @@ def dut_lease_manager(dut):
     return
 
   quit_event = threading.Event()
+  error_queue = queue.Queue()
   try:
-    thread = threading.Thread(target=lease_keeper, args=(host, quit_event))
+    thread = threading.Thread(
+        target=lease_keeper, args=(host, quit_event, error_queue))
     thread.start()
     yield
+  except KeyboardInterrupt:
+    try:
+      e = error_queue.get_nowait()
+      # Re-raise the actual exception got from lease_keeper thread.
+      raise e
+    except queue.Empty:
+      # No exception from lease_keeper, do nothing
+      pass
+    raise
   finally:
     quit_event.set()
     logger.debug('wait keeper thread terminated')
