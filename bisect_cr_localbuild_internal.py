@@ -107,8 +107,8 @@ class ChromeSrcDomain(core.BisectDomain):
     if not cr_util.is_version_lesseq(old, new):
       raise errors.ArgumentError(
           '--old and --new',
-          'start chrome version (%s) is newer than end version (%s)' % (old,
-                                                                        new))
+          'start chrome version (%s) is newer than end version (%s)' %
+          (old, new))
 
     config = dict(
         chrome_root=opts.chrome_root,

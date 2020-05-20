@@ -87,8 +87,8 @@ def create_argument_parser():
       'behavior is FAIL')
   group.add_argument(
       '--metric',
-      help=
-      'Metric name of performance test; example: "cheets_SystemRawImageSize"')
+      help='Metric name of performance test; example: '
+      '"cheets_SystemRawImageSize"')
   group.add_argument(
       '--args',
       help='Extra args passed to "test_that --args"; Overrides the default')

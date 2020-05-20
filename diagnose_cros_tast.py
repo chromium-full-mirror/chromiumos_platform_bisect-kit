@@ -65,8 +65,8 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       common_eval_cmd = self._build_cmds()
 
       with cros_lab_util.dut_manager(
-          self.config['dut'],
-          lambda: diagnoser_cros.grab_dut(self.config)) as dut:
+          self.config['dut'], lambda: diagnoser_cros.grab_dut(self.config)
+      ) as dut:
         if not dut:
           raise errors.NoDutAvailable('unable to allocate DUT')
         if not cros_util.is_good_dut(dut):
@@ -81,8 +81,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         diagnoser = diagnoser_cros.CrosDiagnoser(self.states, path_factory,
                                                  self.config, dut)
 
-        diagnoser.narrow_down_chromeos_prebuilt(
-            self.config['old'], self.config['new'], common_eval_cmd)
+        diagnoser.narrow_down_chromeos_prebuilt(self.config['old'],
+                                                self.config['new'],
+                                                common_eval_cmd)
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
         dut_os_version = cros_util.query_dut_short_version(dut)

@@ -562,8 +562,8 @@ class ChromeSpecManager(codechange.SpecManager):
     """
     gclient_util.config(
         self.config['chrome_root'],
-        url=
-        'https://chrome-internal.googlesource.com/a/chrome/tools/buildspec.git',
+        url='https://chrome-internal.googlesource.com'
+        '/a/chrome/tools/buildspec.git',
         deps_file=deps_file,
         custom_var='checkout_src_internal=True',
         cache_dir=self.config['chrome_mirror'])

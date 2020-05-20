@@ -578,8 +578,8 @@ class TestGitOperation(unittest.TestCase):
 
     # The commit ordering should be preserved.
     self.assertEqual(
-        git_util.get_history_recursively(self.git_repo, 'foo', time, time,
-                                         lambda *_: []), commits)
+        git_util.get_history_recursively(self.git_repo, 'foo', time,
+                                         time, lambda *_: []), commits)
 
   def test_is_symbolic_link(self):
     time = 1500000000

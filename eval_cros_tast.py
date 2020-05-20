@@ -79,8 +79,8 @@ def create_argument_parser():
       'behavior is FAIL')
   group.add_argument(
       '--metric',
-      help=
-      'Metric name of performance test; example: "cheets_SystemRawImageSize"')
+      help='Metric name of performance test; example: '
+      '"cheets_SystemRawImageSize"')
 
   return parser
 

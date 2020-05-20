@@ -76,8 +76,8 @@ def _execute_command(step, args, env=None, stdout_callback=None):
     for line in stderr_lines[-50:]:
       print(line, end='', file=sys.stderr)
     print('=' * 40, file=sys.stderr)
-    raise errors.ExecutionFatalError(
-        '%s failed: %s' % (step, cli.format_returncode(returncode)))
+    raise errors.ExecutionFatalError('%s failed: %s' %
+                                     (step, cli.format_returncode(returncode)))
   return returncode
 
 
@@ -448,10 +448,8 @@ class BisectorCommandLine:
               self.states.idx2rev(highlight_old_idx),
               self.states.idx2rev(highlight_new_idx)
           ],
-          'prob':
-              self.strategy.get_prob(),
-          'remaining_steps':
-              self.strategy.remaining_steps(),
+          'prob': self.strategy.get_prob(),
+          'remaining_steps': self.strategy.remaining_steps(),
       })
 
     if opts.verbose or opts.json:

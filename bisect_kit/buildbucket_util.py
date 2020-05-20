@@ -94,8 +94,8 @@ class BuildbucketApi:
     self.auth_py = os.path.join(folder, 'auth.py')
     self.isolateserver_py = os.path.join(folder, 'isolateserver.py')
     if not os.path.exists(self.auth_py):
-      raise errors.InternalError(
-          'auth.py not found in swarming folder: %s' % folder)
+      raise errors.InternalError('auth.py not found in swarming folder: %s' %
+                                 folder)
     if not os.path.exists(self.isolateserver_py):
       raise errors.InternalError('isolateserver.py not found in: %s' % folder)
 
@@ -464,8 +464,8 @@ class BuildbucketApi:
     for build in builds:
       input_properties = json_format.MessageToDict(build.input.properties)
       build_manifest_hash = input_properties.get(
-          '$chromeos/cros_source', {}).get('snapshot_isolate', {}).get(
-              'isolated_hash', None)
+          '$chromeos/cros_source', {}).get('snapshot_isolate',
+                                           {}).get('isolated_hash', None)
       build_deps_hash = input_properties.get('$chromeos/chrome', {}).get(
           'deps_isolate', {}).get('isolated_hash', None)
       if (build_manifest_hash == manifest_isolate_hash and

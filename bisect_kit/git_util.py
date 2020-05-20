@@ -357,8 +357,8 @@ def is_symbolic_link(git_repo, rev, path):
   if len(splitted) >= 4 and splitted[3] == path:
     return stat.S_ISLNK(int(splitted[0], 8))
 
-  raise ValueError(
-      'file %s is not found in repo:%s rev:%s' % (path, git_repo, rev))
+  raise ValueError('file %s is not found in repo:%s rev:%s' %
+                   (path, git_repo, rev))
 
 
 def get_file_from_revision(git_repo, rev, path):

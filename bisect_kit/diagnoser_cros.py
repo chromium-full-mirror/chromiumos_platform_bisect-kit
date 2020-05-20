@@ -567,8 +567,9 @@ class DiagnoseCommandLineBase:
       # Board name cannot be deduced from auto allocated devices because they
       # may be provisioned with image of unexpected board.
       if not opts.board:
-        self.argument_parser.error('--board need to be specified if DUT is "%s"'
-                                   % cros_lab_util.LAB_DUT)
+        self.argument_parser.error(
+            '--board need to be specified if DUT is "%s"' %
+            cros_lab_util.LAB_DUT)
     else:
       if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)
@@ -584,11 +585,11 @@ class DiagnoseCommandLineBase:
       opts.new = cros_util.version_to_full(opts.board, opts.new)
 
     if not cros_util.has_test_image(opts.board, opts.old):
-      self.argument_parser.error(
-          '--old: %s has no image for %s' % (opts.board, opts.old))
+      self.argument_parser.error('--old: %s has no image for %s' %
+                                 (opts.board, opts.old))
     if not cros_util.has_test_image(opts.board, opts.new):
-      self.argument_parser.error(
-          '--new: %s has no image for %s' % (opts.board, opts.new))
+      self.argument_parser.error('--new: %s has no image for %s' %
+                                 (opts.board, opts.new))
 
     if opts.metric:
       if opts.old_value is None:

@@ -183,8 +183,8 @@ def prepare_image(image_folder, buildbucket_id):
   properties = api.get_build(buildbucket_id).output.properties
 
   if 'artifacts' not in properties:
-    raise errors.ExternalError(
-        'artifacts not found in buildbucket_id: %s' % buildbucket_id)
+    raise errors.ExternalError('artifacts not found in buildbucket_id: %s' %
+                               buildbucket_id)
 
   gs_path = 'gs://%s/%s/image.zip' % (properties['artifacts']['gs_bucket'],
                                       properties['artifacts']['gs_path'])

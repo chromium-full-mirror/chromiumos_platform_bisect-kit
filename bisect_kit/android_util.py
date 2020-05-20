@@ -268,8 +268,8 @@ class AndroidSpecManager(codechange.SpecManager):
     spec.entries = parser.process_parsed_result(root)
     if spec.spec_type == codechange.SPEC_FIXED:
       if not spec.is_static():
-        raise ValueError(
-            'fixed spec %r has unexpected floating entries' % spec.name)
+        raise ValueError('fixed spec %r has unexpected floating entries' %
+                         spec.name)
 
   def sync_disk_state(self, rev):
     manifest_name = fetch_manifest(self.config['android_root'],

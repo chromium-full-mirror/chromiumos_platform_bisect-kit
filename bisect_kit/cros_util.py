@@ -1723,8 +1723,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
       timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
                                            'refs/heads/master', path)
     except ValueError:
-      raise errors.InternalError(
-          '%s does not have %s' % (self.historical_manifest_git_dir, path))
+      raise errors.InternalError('%s does not have %s' %
+                                 (self.historical_manifest_git_dir, path))
     return timestamp
 
   def detect_float_spec_branch_level(self, spec):
@@ -1943,8 +1943,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
     spec.entries = parser.process_parsed_result(root)
     if spec.spec_type == codechange.SPEC_FIXED:
       if not spec.is_static():
-        raise ValueError(
-            'fixed spec %r has unexpected floating entries' % spec.name)
+        raise ValueError('fixed spec %r has unexpected floating entries' %
+                         spec.name)
     spec.revision = root.get('revision')
 
   def sync_disk_state(self, rev):
