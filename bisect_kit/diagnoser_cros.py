@@ -120,9 +120,10 @@ class CrosDiagnoser:
       extra_switch_cmd: additional command to run when switch chromeos version
     """
     if self.config['bypass_chromeos_prebuilt']:
-      self.make_decision('bypassed chromeos prebuilt image bisect; '
-                         'assume that old chromeos has old behavior and '
-                         'new chromeos has new behavior')
+      self.make_decision(
+          'The bisection with Chrome OS prebuilt image is bypassed; '
+          'assume that old Chrome OS has old behavior and '
+          'new Chrome OS has new behavior')
       self.cros_old = old
       self.cros_new = new
     else:
@@ -205,16 +206,17 @@ class CrosDiagnoser:
     if (old_info.get('android_build_id') is None or
         new_info.get('android_build_id') is None):
       self.make_decision(
-          'At least one version has no android. skip android bisect')
+          'At least one version has no Android. skip Android bisect')
       return False
 
     if old_info['android_build_id'] == new_info['android_build_id']:
-      self.make_decision('android version identical, no need to bisect android')
+      self.make_decision(
+          'The Android version is identical, no need to bisect Android')
       return False
 
     if old_info.get('android_branch') != new_info.get('android_branch'):
       self.make_decision(
-          'android branch mismatch: %s vs %s; unable to bisect android',
+          'Android branch mismatch: %s vs %s; unable to bisect Android',
           old_info.get('android_branch'), new_info.get('android_branch'))
       return False
 
@@ -239,11 +241,11 @@ class CrosDiagnoser:
 
     if (self.config['bypass_android_prebuilt'] and
         self.config['bypass_android_build']):
-      self.make_decision('bypassed android bisect')
+      self.make_decision('The bisection with Android is bypasswd')
       return verified
 
     if self.config['bypass_android_prebuilt']:
-      self.make_decision('bypassed android prebuilt bisect')
+      self.make_decision('The bisection with Android prebuilt is bypassed')
       android_old = self.old_info['android_build_id']
       android_new = self.new_info['android_build_id']
     else:
@@ -275,17 +277,21 @@ class CrosDiagnoser:
             self.states, 'bisect android prebuilt')
         verified = True
       except errors.VerifyOldBehaviorFailed:
-        self.make_decision('expect old android has old behavior but failed')
+        self.make_decision(
+            'Expect old Android has old behavior (%s) but failed' %
+            self.config['term_old'])
         raise errors.DiagnoseContradiction(
-            '%s that old chromeos has old behavior; '
-            'but it became new behavior after deployed old android prebuilt' %
-            self._verified_chromeos_prebuilt())
+            '%s that old chromeos has old behavior (%s); '
+            'but it became new behavior (%s) '
+            'after deployed old android prebuilt' %
+            (self._verified_chromeos_prebuilt(), self.config['term_old'],
+             self.config['term_new']))
       except errors.VerifyNewBehaviorFailed:
-        self.make_decision('unable to reproduce, culprit is not in android')
+        self.make_decision('Unable to reproduce, the culprit is not in Android')
         return verified
 
     if self.config['bypass_android_build']:
-      self.make_decision('bypassed android local build bisect')
+      self.make_decision('The bisection with Android local build is bypasswd')
       return verified
 
     # TODO(kcwu): what if the branch name does not have 'git_' prefix
@@ -337,17 +343,19 @@ class CrosDiagnoser:
     except errors.VerificationFailed as e:
       if verified:
         self.make_decision(
-            'verified with android prebuilt but failed with local build')
+            'Verified with Android prebuilt but failed with local build')
         raise errors.DiagnoseContradiction(
             'verified that the issue could be reproduced with '
             'android prebuilt; but unable to reproduce with local build')
       elif isinstance(e, errors.VerifyOldBehaviorFailed):
         raise errors.DiagnoseContradiction(
-            '%s that old chromeos has old behavior; '
-            'but it became new behavior after deployed old android prebuilt' %
-            self._verified_chromeos_prebuilt())
+            '%s that old chromeos has old behavior (%s); '
+            'but it became new behavior (%s) '
+            'after deployed old android prebuilt' %
+            (self._verified_chromeos_prebuilt(), self.config['term_old'],
+             self.config['term_new']))
       else:
-        self.make_decision('unable to reproduce, culprit is not in android')
+        self.make_decision('Unable to reproduce, the culprit is not in Android')
         return verified
     return verified
 
@@ -367,11 +375,12 @@ class CrosDiagnoser:
       False: culprit is not inside Chrome or unable to bisect
     """
     if self.old_info['cr_version'] == self.new_info['cr_version']:
-      self.make_decision('chrome version identical, no need to bisect chrome')
+      self.make_decision(
+          'Chrome version is identical, no need to bisect Chrome')
       return False
 
     if self.config['bypass_chrome_build']:
-      self.make_decision('bypassed chrome local build bisect')
+      self.make_decision('The bisection with Chrome local build is bypassed')
       return False
 
     logger.info('bisect chrome local build')
@@ -409,13 +418,15 @@ class CrosDiagnoser:
 
       bisector.narrow_down(self.states, 'bisect chrome local build')
     except errors.VerifyOldBehaviorFailed:
-      self.make_decision('expect old chrome has old behavior but failed')
+      self.make_decision('Expect old Chrome has old behavior (%s) but failed' %
+                         self.config['term_old'])
       raise errors.DiagnoseContradiction(
-          '%s that old chrome os has old behavior; '
-          'but it became new behavior after deployed chrome' %
-          self._verified_chromeos_prebuilt())
+          '%s that old chrome os has old behavior (%s); '
+          'but it became new behavior (%s) after deployed chrome' %
+          (self._verified_chromeos_prebuilt(), self.config['term_old'],
+           self.config['term_new']))
     except errors.VerifyNewBehaviorFailed:
-      logger.info('unable to reproduce, culprit is not in chrome')
+      self.make_decision('Unable to reproduce, the culprit is not in Chrome')
       return False
     return True
 
@@ -431,7 +442,7 @@ class CrosDiagnoser:
       extra_switch_cmd: additional command to run when switch ChromeOS version
     """
     if self.config['bypass_chromeos_build']:
-      self.make_decision('bypassed chromeos local build bisect')
+      self.make_decision('The bisection with Chrome OS local build is bypassed')
       return
 
     bisector = wrapper.BisectorWrapper('bisect_cros_repo',

@@ -185,8 +185,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           raise
         except Exception:
           diagnoser.make_decision(
-              'exception in android bisector before verification; '
-              'assume culprit is not inside android and continue')
+              'Exception in Android bisector before verification; '
+              'assume the culprit is not inside Android and continue')
         # Assume it's ok to leave random version of android prebuilt on DUT.
 
         # Sanity check. The OS version should not change after android bisect.
@@ -216,8 +216,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           raise
         except Exception:
           diagnoser.make_decision(
-              'exception in chrome bisector before verification; '
-              'assume culprit is not inside chrome and continue')
+              'Exception in Chrome bisector before verification; '
+              'assume the culprit is not inside Chrome and continue')
 
         if not self.config['chrome_deploy_image']:
           # Sanity check. The OS version should not change after chrome bisect.
