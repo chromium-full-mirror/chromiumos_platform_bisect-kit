@@ -725,7 +725,10 @@ def list_commits_between_commits(git_repo, old, new):
     list of (timestamp, rev)
   """
   assert old and new
-  assert old == new or is_ancestor_commit(git_repo, old, new)
+  if old == new:
+    return []
+
+  assert is_ancestor_commit(git_repo, old, new)
   commits = []
   # --first-parent is necessary for Android, see following link for more
   # discussion.
