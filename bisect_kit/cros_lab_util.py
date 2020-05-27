@@ -345,7 +345,7 @@ def query_lease_status(dut_name, verbose_log=True):
 
   bots = swarming_bots_list(['dut_name:' + dut_name], verbose_log=False)
   if not bots:
-    raise errors.ExternalError('dut_name:%s not found' % dut_name)
+    raise errors.DutLeaseException('dut_name:%s not found' % dut_name)
   assert len(bots) == 1
   bot = bots[0]
   status['bot_id'] = bot['bot_id']
