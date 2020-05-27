@@ -352,6 +352,7 @@ def is_symbolic_link(git_repo, rev, path):
     ValueError if not found
   """
   # format: 120000 blob 8735a8c1dd96ede39a21d983d5c96792fd15c1a5 default.xml
+  # TODO(kcwu): handle escaped path with special characters
   splitted = util.check_output(
       'git', 'ls-tree', rev, '--full-name', path, cwd=git_repo).split()
   if len(splitted) >= 4 and splitted[3] == path:
@@ -374,8 +375,14 @@ def get_file_from_revision(git_repo, rev, path):
   """
   result = util.check_output(
       'git', 'show', '%s:%s' % (rev, path), cwd=git_repo, log_stdout=False)
-  if is_symbolic_link(git_repo, rev, path):
+
+  # It might be a symbolic link.
+  # In extreme case, it's possible that filenames contain special characters,
+  # like newlines. In practice, it should be safe to assume no such cases and
+  # reduce disk i/o.
+  if '\n' not in result and is_symbolic_link(git_repo, rev, path):
     return get_file_from_revision(git_repo, rev, result)
+
   return result
 
 
