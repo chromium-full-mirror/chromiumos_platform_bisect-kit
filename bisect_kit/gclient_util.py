@@ -314,6 +314,39 @@ class Dep:
     # pylint: disable=eval-used
     return eval(self.condition, vars_dict)
 
+  def to_lines(self):
+    s = []
+    condition_part = (['    "condition": %r,' %
+                       self.condition] if self.condition else [])
+    if self.dep_type == 'cipd':
+      s.extend([
+          '  "%s": {' % (self.path.split(':')[0],),
+          '    "packages": [',
+      ])
+      for p in sorted(self.packages, key=lambda x: x['package']):
+        s.extend([
+            '      {',
+            '        "package": "%s",' % p['package'],
+            '        "version": "%s",' % p['version'],
+            '      },',
+        ])
+      s.extend([
+          '    ],',
+          '    "dep_type": "cipd",',
+      ] + condition_part + [
+          '  },',
+          '',
+      ])
+    else:
+      s.extend([
+          '  "%s": {' % (self.path,),
+          '    "url": "%s",' % (self.url,),
+      ] + condition_part + [
+          '  },',
+          '',
+      ])
+    return s
+
 
 class Deps:
   """DEPS parsed result.
@@ -328,7 +361,88 @@ class Deps:
   def __init__(self):
     self.variables = {}
     self.entries = {}
+    self.ignored_entries = {}
     self.recursedeps = []
+    self.allowed_hosts = set()
+    self.gn_args_file = None
+    self.gn_args = []
+    self.hooks = []
+    self.pre_deps_hooks = []
+
+  def _gn_settings_to_lines(self):
+    s = []
+    if self.gn_args_file:
+      s.extend([
+          'gclient_gn_args_file = "%s"' % self.gn_args_file,
+          'gclient_gn_args = %r' % self.gn_args,
+      ])
+    return s
+
+  def _allowed_hosts_to_lines(self):
+    """Converts |allowed_hosts| set to list of lines for output."""
+    if not self.allowed_hosts:
+      return []
+    s = ['allowed_hosts = [']
+    for h in sorted(self.allowed_hosts):
+      s.append('  "%s",' % h)
+    s.extend([']', ''])
+    return s
+
+  def _entries_to_lines(self):
+    """Converts |entries| dict to list of lines for output."""
+    entries = self.ignored_entries
+    entries.update(self.entries)
+    if not entries:
+      return []
+    s = ['deps = {']
+    for _, dep in sorted(entries.items()):
+      s.extend(dep.to_lines())
+    s.extend(['}', ''])
+    return s
+
+  def _vars_to_lines(self):
+    """Converts |variables| dict to list of lines for output."""
+    if not self.variables:
+      return []
+    s = ['vars = {']
+    for key, value in sorted(self.variables.items()):
+      s.extend([
+          '  "%s": %r,' % (key, value),
+          '',
+      ])
+    s.extend(['}', ''])
+    return s
+
+  def _hooks_to_lines(self, name, hooks):
+    """Converts |hooks| list to list of lines for output."""
+    if not hooks:
+      return []
+    s = ['%s = [' % name]
+    for hook in hooks:
+      s.extend([
+          '  {',
+      ])
+      if hook.get('name') is not None:
+        s.append('    "name": "%s",' % hook.get('name'))
+      if hook.get('pattern') is not None:
+        s.append('    "pattern": "%s",' % hook.get('pattern'))
+      if hook.get('condition') is not None:
+        s.append('    "condition": %r,' % hook.get('condition'))
+      # Flattened hooks need to be written relative to the root gclient dir
+      cwd = os.path.relpath(os.path.normpath(hook.get('cwd')))
+      s.extend(['    "cwd": "%s",' % cwd] + ['    "action": ['] +
+               ['        "%s",' % arg for arg in hook.get('action', [])] +
+               ['    ]', '  },', ''])
+    s.extend([']', ''])
+    return s
+
+  def to_string(self):
+    """Return flatten DEPS string."""
+    return '\n'.join(
+        self._gn_settings_to_lines() + self._allowed_hosts_to_lines() +
+        self._entries_to_lines() + self._hooks_to_lines('hooks', self.hooks) +
+        self._hooks_to_lines('pre_deps_hooks', self.pre_deps_hooks) +
+        self._vars_to_lines() + [''])  # Ensure newline at end of file.
 
 
 class TimeSeriesTree:
@@ -557,6 +671,15 @@ class DepsParser:
                        name)
     if 'deps_os' in local_scope:
       logger.warning('deps_os is no longer supported')
+    if local_scope.get('gclient_gn_args_from'):
+      logger.warning('gclient_gn_args_from is not supported')
+
+    if 'allowed_hosts' in local_scope:
+      deps.allowed_hosts = set(local_scope.get('allowed_hosts'))
+    deps.hooks = local_scope.get('hooks', [])
+    deps.pre_deps_hooks = local_scope.get('pre_deps_hooks', [])
+    deps.gn_args_file = local_scope.get('gclient_gn_args_file')
+    deps.gn_args = local_scope.get('gclient_gn_args', [])
 
     for path, dep_entry in local_scope['deps'].items():
       path = path.format(**deps.variables)
@@ -565,6 +688,7 @@ class DepsParser:
       path = os.path.normpath(path)
       dep = Dep(path, deps.variables, dep_entry)
       if not dep.eval_condition():
+        deps.ignored_entries[path] = dep
         continue
 
       # TODO(kcwu): support dep_type=cipd http://crbug.com/846564
@@ -574,6 +698,7 @@ class DepsParser:
           emitted_warnings.add(warning_key)
           logger.warning('dep_type=%s is not supported yet: %s', dep.dep_type,
                          path)
+        deps.ignored_entries[path] = dep
         continue
 
       deps.entries[path] = dep

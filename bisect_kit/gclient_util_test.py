@@ -14,6 +14,7 @@ import unittest
 from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import git_util_test
+from bisect_kit import testing
 
 
 class TestDepsParser(unittest.TestCase):
@@ -104,6 +105,14 @@ class TestDepsParser(unittest.TestCase):
     deps = parser.parse_single_deps(deps_content)
     self.assertIn(('src/foo', 'DEPS'), deps.recursedeps)
     self.assertIn(('src/bar', 'DEPS.bar'), deps.recursedeps)
+
+  def test_deps_to_string(self):
+    with open(testing.get_testdata_path('DEPS')) as f:
+      deps = f.read()
+    parser = gclient_util.DepsParser('/dummy', None)
+    deps_generated = parser.parse_single_deps(deps).to_string()
+    self.assertDictEqual(
+        parser.load_single_deps(deps), parser.load_single_deps(deps_generated))
 
 
 # TODO(kcwu): refactor into normal unittest.
