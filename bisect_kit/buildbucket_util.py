@@ -266,6 +266,10 @@ class BuildbucketApi:
   def schedule_build(self,
                      board,
                      manifest_xml,
+                     recipe='build_target',
+                     deps=None,
+                     deps_src_ver=None,
+                     git_auth=True,
                      bucket='bisector',
                      force_rebuild=False,
                      build_tags={}):
@@ -274,6 +278,10 @@ class BuildbucketApi:
     Args:
       board: ChromeOS board name
       manifest_xml: A full manifest xml for building chromeOS
+      recipe: Recipe name to execute
+      deps: A full DEPS file for building Chrome
+      deps_src_ver: Commit hash for Chrome src project
+      git_auth: A workaround for crbug.com/1068743
       bucket: A bucket name of buildbucket that will handle this build
       force_rebuild: Set True to ignore existing builds on buildbucket
       build_tags: Tags for buildbucket build object.
@@ -288,27 +296,39 @@ class BuildbucketApi:
     for key, value in build_tags.items():
       tags.append(StringPair(key=key, value=value))
 
-    isolate_hash = self._isolate_upload('snapshot.xml', manifest_xml)
+    chromeos_isolate = self._isolate_upload('snapshot.xml', manifest_xml)
+    # TODO(zjchang): remove git_auth after crbug.com/1068743 fixed.
     properties = {
         '$chromeos/failures': {
             'disable_silences': True,
         },
         '$chromeos/cros_source': {
             'snapshot_isolate': {
-                'isolated_hash': isolate_hash,
+                'isolated_hash': chromeos_isolate,
                 'isolate_server': self.isolate_domain_url,
             },
         },
         '$kitchen': {
             'devshell': True,
-            'git_auth': True,
+            'git_auth': git_auth,
         },
         'build_target': {
             'name': board,
         },
         'builder_name': '%s-%s' % (board, bucket),
-        'recipe': 'build_target',
+        'recipe': recipe,
     }
+
+    chrome_isolate = None
+    if deps:
+      chrome_isolate = self._isolate_upload('DEPS', deps)
+      properties['$chromeos/chrome'] = {
+          'deps_isolate': {
+              'isolated_hash': chrome_isolate,
+              'isolate_server': self.isolate_domain_url,
+          },
+          'version': deps_src_ver,
+      }
 
     builder = {
         'project': 'chromeos',
@@ -318,7 +338,8 @@ class BuildbucketApi:
 
     # search old builds
     if not force_rebuild:
-      build = self.search_usable_build(board, bucket, isolate_hash)
+      build = self.search_usable_build(board, bucket, chromeos_isolate,
+                                       chrome_isolate)
       if build:
         return build
 
