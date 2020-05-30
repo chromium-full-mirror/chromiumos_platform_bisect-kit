@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from bisect_kit import cli
 from bisect_kit import git_util
@@ -620,6 +621,76 @@ class TestGitUtil(unittest.TestCase):
     self.assertEqual(git_util.argtype_git_rev(rev), rev)
     with self.assertRaises(cli.ArgTypeError):
       git_util.argtype_git_rev('hello')
+
+
+class TestFastLookup(unittest.TestCase):
+  """Tests FastLookup and FastLookupEntry class."""
+
+  git_repo = '/dummy/git/repo/path'
+  branch = 'dummy-branch'
+  commits = [
+      (100, 'aaaaa'),
+      (200, 'bbbbb'),
+      (300, 'ccccc'),
+      (400, 'ddddd'),
+      (500, 'eeeee'),
+  ]
+
+  def test_disabled(self):
+    lookup = git_util.FastLookup()
+    with self.assertRaises(git_util.FastLookupFailed):
+      lookup.get_rev_by_time(self.git_repo, self.branch, 123456789)
+    with self.assertRaises(git_util.FastLookupFailed):
+      lookup.is_containing_commit(self.git_repo, '012345abcdef')
+    with self.assertRaises(git_util.FastLookupFailed):
+      lookup.is_ancestor_commit(self.git_repo, '123456', 'abcdef')
+
+  def test_get_rev_by_time(self):
+    with mock.patch(
+        'bisect_kit.git_util.get_revlist_by_period', return_value=self.commits):
+      lookup = git_util.FastLookup()
+      lookup.optimize((100, 500))
+      self.assertEqual(
+          lookup.get_rev_by_time(self.git_repo, 100, self.branch), 'aaaaa')
+      self.assertEqual(
+          lookup.get_rev_by_time(self.git_repo, 199, self.branch), 'aaaaa')
+      self.assertEqual(
+          lookup.get_rev_by_time(self.git_repo, 200, self.branch), 'bbbbb')
+      self.assertEqual(
+          lookup.get_rev_by_time(self.git_repo, 201, self.branch), 'bbbbb')
+
+      # Outside the optimized range.
+      with self.assertRaises(git_util.FastLookupFailed):
+        lookup.get_rev_by_time(self.git_repo, 50, self.branch)
+
+  def test_is_containing_commit(self):
+    with mock.patch(
+        'bisect_kit.git_util.get_revlist_by_period', return_value=self.commits):
+      lookup = git_util.FastLookup()
+      lookup.optimize((100, 500))
+      lookup.get_rev_by_time(self.git_repo, 100, self.branch)
+      self.assertTrue(lookup.is_containing_commit(self.git_repo, 'bbbbb'))
+      self.assertTrue(lookup.is_containing_commit(self.git_repo, 'ccccc'))
+
+      with self.assertRaises(git_util.FastLookupFailed):
+        lookup.is_containing_commit(self.git_repo, 'abcdef')
+
+  def test_is_ancestor_commit(self):
+    with mock.patch(
+        'bisect_kit.git_util.get_revlist_by_period', return_value=self.commits):
+      lookup = git_util.FastLookup()
+      lookup.optimize((100, 500))
+      lookup.get_rev_by_time(self.git_repo, 100, self.branch)
+      self.assertTrue(
+          lookup.is_ancestor_commit(self.git_repo, 'bbbbb', 'ccccc'))
+      self.assertFalse(
+          lookup.is_ancestor_commit(self.git_repo, 'ccccc', 'ccccc'))
+      self.assertFalse(
+          lookup.is_ancestor_commit(self.git_repo, 'ccccc', 'bbbbb'))
+
+      # Outside the optimized range.
+      with self.assertRaises(git_util.FastLookupFailed):
+        lookup.is_ancestor_commit(self.git_repo, 'ccccc', 'abcdef')
 
 
 if __name__ == '__main__':

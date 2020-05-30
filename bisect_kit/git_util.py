@@ -5,6 +5,7 @@
 """Git utility."""
 
 from __future__ import print_function
+import bisect
 import logging
 import os
 import re
@@ -177,6 +178,150 @@ def fetch(git_repo, *args):
       raise
 
 
+def _adjust_timestamp_increasingly(commits):
+  """Adjust commit timestamps.
+
+  After adjust, the timestamps are increasing.
+
+  Args:
+    commits: list of (timestamp, commit hash)
+
+  Returns:
+    (adjusted count, list of (timestamp, commit hash))
+  """
+  result = []
+  adjusted = 0
+  last_timestamp = -1
+  for timestamp, git_rev in commits:
+    if timestamp < last_timestamp:
+      adjusted += 1
+      timestamp = last_timestamp
+    else:
+      last_timestamp = timestamp
+    result.append((timestamp, git_rev))
+  return adjusted, result
+
+
+class FastLookupFailed(Exception):
+  """No data is cached for this query.
+
+  The caller should fallback to the original operation.
+  """
+
+
+class FastLookupEntry:
+  """Cached commits from one branch of given time period.
+
+  With this class, we can look up commit via commit hash and timestamp fast.
+  """
+
+  def __init__(self, git_repo, branch):
+    self.git_repo = git_repo
+    self.branch = branch
+    self.optimized_period = None
+    self.cached = []
+    self.commit_to_index = {}
+
+  def optimize(self, period):
+    assert period[0] <= period[1]
+    if (self.optimized_period and self.optimized_period[0] <= period[0] and
+        period[1] <= self.optimized_period[1]):
+      # already done
+      return
+
+    self.cached = get_revlist_by_period(self.git_repo, self.branch, period)
+    self.optimized_period = period
+
+    # Adjust timestamps, so we can do binary search by timestamp
+    _adjusted, self.cached = _adjust_timestamp_increasingly(self.cached)
+
+    self.commit_to_index = {}
+    for i, (_timestamp, rev) in enumerate(self.cached):
+      self.commit_to_index[rev] = i
+
+  def get_rev_by_time(self, timestamp):
+    if not self.optimized_period[0] <= timestamp <= self.optimized_period[1]:
+      raise FastLookupFailed
+
+    # Note that, the return value might be different as "git rev-list" if the
+    # actual commit timestamps are not fully increasing.
+    x = (timestamp, '')
+    idx = bisect.bisect_right(self.cached, x)
+    if idx == 0 and timestamp < self.cached[0][0]:
+      return None
+    if idx == len(self.cached) or self.cached[idx][0] != timestamp:
+      idx -= 1
+    return self.cached[idx][1]
+
+  def is_containing_commit(self, rev):
+    if rev in self.commit_to_index:
+      return True
+    raise FastLookupFailed
+
+  def is_ancestor_commit(self, old, new):
+    old_idx = self.commit_to_index.get(old)
+    new_idx = self.commit_to_index.get(new)
+    if old_idx is not None and new_idx is not None:
+      return old_idx < new_idx
+    raise FastLookupFailed
+
+
+class FastLookup:
+  """Collection of FastLookupEntry"""
+
+  def __init__(self):
+    self.entries = {}
+    self.target_period = None
+
+  def optimize(self, period):
+    self.target_period = period
+
+  def disable(self):
+    self.target_period = None
+    self.entries = {}
+
+  def get_rev_by_time(self, git_repo, timestamp, branch):
+    if not self.target_period:
+      raise FastLookupFailed
+    if not self.target_period[0] <= timestamp <= self.target_period[1]:
+      raise FastLookupFailed
+
+    if git_repo not in self.entries:
+      self.entries[git_repo] = {}
+    if branch not in self.entries[git_repo]:
+      self.entries[git_repo][branch] = FastLookupEntry(git_repo, branch)
+    entry = self.entries[git_repo][branch]
+    entry.optimize(self.target_period)
+    return entry.get_rev_by_time(timestamp)
+
+  def is_containing_commit(self, git_repo, rev):
+    # This function is optimized only after get_rev_by_time() is invoked.
+    if git_repo not in self.entries:
+      raise FastLookupFailed
+
+    for entry in self.entries[git_repo].values():
+      try:
+        return entry.is_containing_commit(rev)
+      except FastLookupFailed:
+        pass
+    raise FastLookupFailed
+
+  def is_ancestor_commit(self, git_repo, old, new):
+    # This function is optimized only after get_rev_by_time() is invoked.
+    if git_repo not in self.entries:
+      raise FastLookupFailed
+
+    for entry in self.entries[git_repo].values():
+      try:
+        return entry.is_ancestor_commit(old, new)
+      except FastLookupFailed:
+        pass
+    raise FastLookupFailed
+
+
+fast_lookup = FastLookup()
+
+
 def is_containing_commit(git_repo, rev):
   """Determines given commit exists.
 
@@ -188,6 +333,11 @@ def is_containing_commit(git_repo, rev):
     True if rev is inside given git repo. If git_repo is not a git folder,
     returns False as well.
   """
+  try:
+    return fast_lookup.is_containing_commit(git_repo, rev)
+  except FastLookupFailed:
+    pass
+
   try:
     return util.check_output(
         'git', 'cat-file', '-t', rev, cwd=git_repo) == 'commit\n'
@@ -209,6 +359,11 @@ def is_ancestor_commit(git_repo, old, new):
     True only if `old` is the ancestor of `new`. One commit is not considered
     as ancestor of itself.
   """
+  try:
+    return fast_lookup.is_ancestor_commit(git_repo, old, new)
+  except FastLookupFailed:
+    pass
+
   return util.check_output(
       'git',
       'rev-list',
@@ -425,6 +580,12 @@ def get_rev_by_time(git_repo, timestamp, branch, path=None):
   if not branch:
     branch = 'HEAD'
 
+  if not path:
+    try:
+      return fast_lookup.get_rev_by_time(git_repo, timestamp, branch)
+    except FastLookupFailed:
+      pass
+
   cmd = [
       'git',
       'rev-list',
@@ -439,6 +600,38 @@ def get_rev_by_time(git_repo, timestamp, branch, path=None):
 
   result = util.check_output(*cmd, cwd=git_repo).strip()
   return result or None
+
+
+def get_revlist_by_period(git_repo, branch, period):
+  # Find the last commit before period[0].
+  text = util.check_output(
+      'git',
+      'rev-list',
+      '--timestamp',
+      '-1',
+      '--before',
+      str(period[0] - 1),
+      branch,
+      cwd=git_repo)
+
+  # Find commits in the period.
+  text += util.check_output(
+      'git',
+      'rev-list',
+      '--timestamp',
+      '--reverse',
+      '--after',
+      str(period[0]),
+      '--before',
+      str(period[1]),
+      branch,
+      cwd=git_repo)
+
+  result = []
+  for line in text.splitlines():
+    timestamp, commit = line.split()
+    result.append((int(timestamp), commit))
+  return result
 
 
 def reset_hard(git_repo):
@@ -742,23 +935,16 @@ def list_commits_between_commits(git_repo, old, new):
       '%s..%s' % (old, new),
       cwd=git_repo).splitlines():
     timestamp, git_rev = line.split()
-    commits.append([int(timestamp), git_rev])
+    commits.append((int(timestamp), git_rev))
 
   # bisect-kit has a fundamental assumption that commit timestamps are
   # increasing because we sort and bisect the commits by timestamp across git
   # repos. If not increasing, we have to adjust the timestamp as workaround.
   # This might lead to bad bisect result, however the bad probability is low in
   # practice since most machines' clocks are good enough.
-  if commits != sorted(commits, key=lambda x: x[0]):
+  adjusted, commits = _adjust_timestamp_increasingly(commits)
+  if adjusted != 0:
     logger.warning('Commit timestamps are not increasing')
-    last_timestamp = -1
-    adjusted = 0
-    for commit in commits:
-      if commit[0] < last_timestamp:
-        commit[0] = last_timestamp
-        adjusted += 1
-
-      last_timestamp = commit[0]
     logger.warning('%d timestamps adjusted', adjusted)
 
   return commits

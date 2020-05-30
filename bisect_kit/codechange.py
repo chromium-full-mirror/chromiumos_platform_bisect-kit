@@ -930,6 +930,8 @@ class CodeManager:
     for spec in float_specs:
       self.spec_manager.parse_spec(spec)
 
+    git_util.fast_lookup.optimize(
+        (float_specs[0].timestamp, float_specs[-1].timestamp))
     # step 2, synthesize all fixed specs in the range from float specs.
     specs = float_specs + [fixed_specs[-1]]
     action_groups = []
@@ -990,6 +992,11 @@ class CodeManager:
           fixed_specs[fixed_index].name, fixed_specs[next_fixed_index].name,
           this_action_groups)
     revlist.append(fixed_specs[associated_pairs[-1][0]].name)
+
+    # Disable cache because there might be write or even destructive git
+    # operations when switch git versions. Be conservative now. We can cache
+    # more if we observed more slow git operations later.
+    git_util.fast_lookup.disable()
 
     return fixed_specs, float_specs, revlist
 
