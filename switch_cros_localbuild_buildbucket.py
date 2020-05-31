@@ -7,6 +7,7 @@
 
 from __future__ import print_function
 import argparse
+import copy
 import logging
 import os
 import sys
@@ -17,9 +18,11 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import gclient_util
 from bisect_kit import repo_util
 from bisect_kit import util
 
@@ -40,9 +43,8 @@ def add_build_and_deploy_arguments(parser_group):
       help="Don't disable rootfs verification after update is completed")
 
 
-def create_argument_parser():
-  parser = argparse.ArgumentParser()
-  cli.patching_argparser_exit(parser)
+def add_common_arguments(parser):
+  """add common arguments for both Chrome and Chrome OS builds"""
   common.add_common_arguments(parser)
   parser.add_argument(
       '--dut',
@@ -50,14 +52,6 @@ def create_argument_parser():
       metavar='DUT',
       default=configure.get('DUT'),
       help='DUT address')
-  parser.add_argument(
-      'rev',
-      nargs='?',
-      type=cli.argtype_notempty,
-      metavar='CROS_VERSION',
-      default=configure.get('CROS_VERSION', ''),
-      help='ChromeOS local build version string, in format short version, '
-      'full version, or "full,full+N"')
   parser.add_argument(
       '--board',
       metavar='BOARD',
@@ -97,6 +91,61 @@ def create_argument_parser():
   group = parser.add_argument_group(title='Build and deploy options')
   add_build_and_deploy_arguments(group)
 
+
+def create_argument_parser():
+  parser = argparse.ArgumentParser()
+  subparsers = parser.add_subparsers(dest='subcommand', required=True)
+  cli.patching_argparser_exit(parser)
+
+  # chromeos parser
+  parser_cros = subparsers.add_parser(
+      'bisect_chromeos', help='Bisect on Chrome OS versions')
+  add_common_arguments(parser_cros)
+  parser_cros.add_argument(
+      'chromeos_rev',
+      nargs='?',
+      type=cli.argtype_notempty,
+      metavar='CROS_VERSION',
+      default=configure.get('CROS_VERSION', ''),
+      help='ChromeOS local build version string, in format short version, '
+      'full version, or "full,full+N"')
+
+  # chrome parser
+  parser_chrome = subparsers.add_parser(
+      'bisect_chrome', help='Bisect on Chrome versions')
+  add_common_arguments(parser_chrome)
+  parser_chrome.add_argument(
+      '--chrome_root',
+      metavar='CHROME_ROOT',
+      type=cli.argtype_dir_path,
+      default=configure.get('CHROME_ROOT', ''),
+      help='Root of Chrome source tree, like ~/chromium')
+  parser_chrome.add_argument(
+      '--chrome_mirror',
+      metavar='CHROME_MIRROR',
+      type=cli.argtype_dir_path,
+      default=configure.get('CHROME_MIRROR', ''),
+      help='gclient cache dir')
+  parser_chrome.add_argument(
+      '--chromeos_rev',
+      type=cli.argtype_notempty,
+      metavar='CROS_VERSION',
+      default=configure.get('CROS_VERSION', ''),
+      help='ChromeOS local build version string, in format short version, '
+      'full version, or "full,full+N"')
+  parser_chrome.add_argument(
+      '--deps',
+      help='(for testing) '
+      'Assign a Chrome DEPS instead of deriving from rev')
+  parser_chrome.add_argument(
+      'chrome_rev',
+      nargs='?',
+      type=cli.argtype_notempty,
+      metavar='REV',
+      default=configure.get('REV', ''),
+      help='Chrome version, local build intra version (in format "%s").' %
+      codechange.make_intra_rev('X', 'Y', 3))
+
   return parser
 
 
@@ -116,27 +165,95 @@ def read_file(file_name):
 def get_last_float_spec(float_specs, timestamp):
   for spec in reversed(float_specs):
     if spec.timestamp <= timestamp:
-      return spec.name
-  return None
+      return spec
+  raise errors.ExternalError(
+      'Cannot predict a correct float spec before timestamp %d' % timestamp)
+
+
+def get_chrome_managers(opts):
+  cache_manager = gclient_util.GclientCache(opts.chrome_mirror)
+  config = dict(chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror)
+  spec_manager = cr_util.ChromeSpecManager(config)
+  code_manager = codechange.CodeManager(opts.chrome_root, spec_manager,
+                                        cache_manager)
+  return spec_manager, code_manager, cache_manager
+
+
+def get_chrome_buildspec_by_time(opts, timestamp, old_rev, new_rev):
+  """Get a Chrome Deps buildspec (float spec) at given timestamp"""
+  spec_manager, code_manager, cache_manager = get_chrome_managers(opts)
+  deps_path = spec_manager.generate_meta_deps(new_rev)
+  old_timestamp = spec_manager.lookup_build_timestamp(old_rev)
+  new_timestamp = spec_manager.lookup_build_timestamp(new_rev)
+  if not old_timestamp <= timestamp <= new_timestamp:
+    logger.warning('Adjust timestamp: [%d, %d], %d', old_timestamp,
+                   new_timestamp, timestamp)
+    old_timestamp = min(old_timestamp, timestamp)
+    new_timestamp = max(new_timestamp, timestamp)
+
+  result = None
+  parser = gclient_util.DepsParser(opts.chrome_root, cache_manager)
+  timeseries_forests = parser.enumerate_gclient_solutions(
+      old_timestamp, new_timestamp, deps_path)
+  for time, forest in timeseries_forests:
+    if time <= timestamp:
+      result = copy.deepcopy(forest)
+
+  return parser.flatten(result, deps_path)
+
+
+def get_chromeos_spec_manager(opts):
+  config = dict(
+      board=opts.board,
+      chromeos_root=opts.chromeos_root,
+      chromeos_mirror=opts.chromeos_mirror)
+  return cros_util.ChromeOSSpecManager(config)
+
+
+def get_deps(opts):
+  if opts.deps:
+    return read_file(opts.deps)
+
+  spec_manager, code_manager, cache_manager = get_chrome_managers(opts)
+  old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chrome_rev)
+  intra_revision, diff = code_manager.get_intra_and_diff(opts.chrome_rev)
+  if intra_revision == opts.chrome_rev:
+    return spec_manager.get_release_deps(intra_revision)
+
+  # step1: Get a base deps with correct projects and sources by time.
+  #        Then apply diffs after intra version.
+  timestamp = get_last_commit_time(diff)
+  deps = get_chrome_buildspec_by_time(opts, timestamp, old_rev, new_rev)
+  deps.apply_action_groups(diff)
+
+  # step2: Apply remaining projects from intra_version.
+  parser = gclient_util.DepsParser(opts.chrome_root, cache_manager)
+  intra_deps = parser.parse_single_deps(
+      spec_manager.get_release_deps(intra_revision))
+  deps.apply_deps(intra_deps)
+  return deps.to_string()
+
+
+def get_release_manifest(opts):
+  """Get manifest of a release Chrome OS version or snapshot version"""
+  if opts.manifest:
+    return read_file(opts.manifest)
+  spec_manager = get_chromeos_spec_manager(opts)
+  return spec_manager.get_manifest(opts.chromeos_rev)
 
 
 def get_manifest(opts):
   if opts.manifest:
     return read_file(opts.manifest)
-  config = dict(
-      board=opts.board,
-      chromeos_root=opts.chromeos_root,
-      chromeos_mirror=opts.chromeos_mirror)
   manifest_internal_dir = os.path.join(opts.chromeos_mirror,
                                        'manifest-internal.git')
-  spec_manager = cros_util.ChromeOSSpecManager(config)
+  spec_manager = get_chromeos_spec_manager(opts)
   cache = repo_util.RepoMirror(opts.chromeos_mirror)
-  code_manager = codechange.CodeManager(config['chromeos_root'], spec_manager,
-                                        cache)
+  code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager, cache)
 
-  old_rev, new_rev, _ = codechange.parse_intra_rev(opts.rev)
-  intra_revision, diff = code_manager.get_intra_and_diff(opts.rev)
-  if intra_revision == opts.rev:
+  old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
+  intra_revision, diff = code_manager.get_intra_and_diff(opts.chromeos_rev)
+  if intra_revision == opts.chromeos_rev:
     return spec_manager.get_manifest(intra_revision)
 
   # get specs
@@ -154,7 +271,7 @@ def get_manifest(opts):
   #        Then apply diffs after intra version.
   result = repo_util.Manifest(manifest_internal_dir)
   timestamp = get_last_commit_time(diff)
-  result.load_from_commit(get_last_float_spec(float_specs, timestamp))
+  result.load_from_commit(get_last_float_spec(float_specs, timestamp).name)
 
   # manifest from manifest-internal repository might contain revision which
   # value is a branch or tag name.
@@ -201,19 +318,38 @@ def prepare_image(image_folder, buildbucket_id):
   return image_path
 
 
-def schedule_build(board, rev, manifest, bucket):
-  build_tags = {'bisector_chromeos_version': rev}
+def schedule_build(opts):
+  build_tags = {'bisector_chromeos_version': opts.chromeos_rev}
   api = buildbucket_util.BuildbucketApi()
+
+  if opts.subcommand == 'bisect_chrome':
+    manifest = get_release_manifest(opts)
+    deps = get_deps(opts)
+    build_tags['bisector_chrome_version'] = opts.chrome_rev
+    git_auth = False
+  else:
+    manifest = get_manifest(opts)
+    deps = None
+    git_auth = True
+
   build_id = int(
       api.schedule_build(
-          board,
+          opts.board,
           manifest,
-          bucket=bucket,
+          bucket=opts.bucket,
           build_tags=build_tags,
+          deps=deps,
+          git_auth=git_auth,
       ).id)
   logger.info('schedule a build, id = %d', build_id)
-  logger.info('build url: %s',
-              buildbucket_util.get_luci_link(board, build_id, bucket=bucket))
+  logger.info(
+      'build url: %s',
+      buildbucket_util.get_luci_link(opts.board, build_id, bucket=opts.bucket))
+
+  # If --nodeploy is given, the script will exit as soon as job scheduled and
+  # ignore potential build errors.
+  if opts.nodeploy:
+    return build_id
 
   last_log_time = 0
   while api.is_running(build_id):
@@ -229,7 +365,7 @@ def schedule_build(board, rev, manifest, bucket):
 
 
 def build_revlist(opts):
-  old_rev, new_rev, _ = codechange.parse_intra_rev(opts.rev)
+  old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
   config = dict(
       board=opts.board,
       chromeos_root=opts.chromeos_root,
@@ -242,7 +378,9 @@ def build_revlist(opts):
 
 
 def switch(opts):
-  cached_name = 'bisect-%s' % util.escape_rev(opts.rev)
+  cached_name = 'bisect-%s' % util.escape_rev(opts.chromeos_rev)
+  if opts.subcommand == 'bisect_chrome':
+    cached_name += '-%s' % util.escape_rev(opts.chrome_rev)
   image_folder = os.path.join(opts.chromeos_root, cros_util.cached_images_dir,
                               opts.board, cached_name)
   image_path = os.path.join(image_folder, cros_util.test_image_filename)
@@ -250,17 +388,19 @@ def switch(opts):
     os.makedirs(image_folder)
 
   # schedule build request and prepare image
+  buildbucket_id = None
   if not os.path.exists(image_path):
     if opts.buildbucket_id:
       buildbucket_id = opts.buildbucket_id
     else:
-      buildbucket_id = schedule_build(opts.board, opts.rev, get_manifest(opts),
-                                      opts.bucket)
-    image_path = prepare_image(image_folder, buildbucket_id)
-  rel_path = os.path.relpath(image_path, opts.chromeos_root)
+      buildbucket_id = schedule_build(opts)
 
   if opts.nodeploy:
     return 0
+
+  if buildbucket_id:
+    image_path = prepare_image(image_folder, buildbucket_id)
+  rel_path = os.path.relpath(image_path, opts.chromeos_root)
 
   # deploy and flash
   if cros_util.cros_flash_with_retry(
@@ -297,8 +437,8 @@ def main(args=None):
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 
-  if cros_util.is_cros_short_version(opts.rev):
-    opts.rev = cros_util.version_to_full(opts.board, opts.rev)
+  if cros_util.is_cros_short_version(opts.chromeos_rev):
+    opts.chromeos_rev = cros_util.version_to_full(opts.board, opts.chromeos_rev)
 
   if opts.build_revlist:
     build_revlist(opts)

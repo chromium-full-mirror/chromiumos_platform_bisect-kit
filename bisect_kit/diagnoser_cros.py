@@ -373,7 +373,10 @@ class CrosDiagnoser:
       return verified
     return verified
 
-  def narrow_down_chrome(self, eval_cmd, extra_switch_cmd=None,
+  def narrow_down_chrome(self,
+                         eval_cmd,
+                         buildbucket_build=False,
+                         extra_switch_cmd=None,
                          with_tests=True):
     """Bisect with Chrome localbuild.
 
@@ -381,6 +384,7 @@ class CrosDiagnoser:
 
     Args:
       eval_cmd: command to reproduce the regression
+      buildbucket_build: to build ChromeOS image on buildbucket
       extra_switch_cmd: additional command to run when switch chrome version
       with_tests: build test binaries as well
 
@@ -403,17 +407,36 @@ class CrosDiagnoser:
         text='bisect chrome local build',
         bisector='bisect_cr_localbuild_internal',
         session=self.config['session'])
-    switch_cmd = ['./switch_cros_cr_localbuild_internal.py', '--dut', self.dut]
-    if not with_tests:
-      switch_cmd.append('--without_tests')
-    if self.config['chrome_deploy_image']:
-      switch_cmd += [
-          '--deploy_method=image',
+    if buildbucket_build:
+      switch_cmd = [
+          './switch_cros_localbuild_buildbucket.py',
+          'bisect_chrome',
+          '--dut',
+          self.dut,
           '--chromeos_root',
           self.config['chromeos_root'],
+          '--chromeos_mirror',
+          self.config['chromeos_mirror'],
+          '--chromeos_rev',
+          self.cros_old,
       ]
       if not self.config['disable_rootfs_verification']:
         switch_cmd.append('--no_disable_rootfs_verification')
+    else:
+      switch_cmd = [
+          './switch_cros_cr_localbuild_internal.py', '--dut', self.dut
+      ]
+      if not with_tests:
+        switch_cmd.append('--without_tests')
+      if self.config['chrome_deploy_image']:
+        switch_cmd += [
+            '--deploy_method=image',
+            '--chromeos_root',
+            self.config['chromeos_root'],
+        ]
+        if not self.config['disable_rootfs_verification']:
+          switch_cmd.append('--no_disable_rootfs_verification')
+
     bisector = wrapper.BisectorWrapper('bisect_cr_localbuild_internal',
                                        self.config['session'])
     try:
@@ -474,7 +497,9 @@ class CrosDiagnoser:
     if not buildbucket_build:
       switch_cmd = ['./switch_cros_localbuild.py']
     else:
-      switch_cmd = ['./switch_cros_localbuild_buildbucket.py']
+      switch_cmd = [
+          './switch_cros_localbuild_buildbucket.py', 'bisect_chromeos'
+      ]
 
     if not self.config['disable_rootfs_verification']:
       switch_cmd.append('--no_disable_rootfs_verification')
@@ -731,6 +756,7 @@ class DiagnoseCommandLineBase:
         chrome_deploy_image=opts.chrome_deploy_image,
         disable_snapshot=opts.disable_snapshot,
         disable_buildbucket_chromeos=opts.disable_buildbucket_chromeos,
+        enable_buildbucket_chrome=opts.enable_buildbucket_chrome,
     )
 
     self.states.init(config)
@@ -938,6 +964,10 @@ class DiagnoseCommandLineBase:
         '--disable_buildbucket_chromeos',
         action='store_true',
         help='Build ChromeOS on local instead of buildbucket')
+    group.add_argument(
+        '--enable_buildbucket_chrome',
+        action='store_true',
+        help='Build Chrome on buildbucket')
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser('run', help='Start auto bisection')

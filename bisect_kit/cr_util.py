@@ -363,7 +363,7 @@ class ChromeSpecManager(codechange.SpecManager):
       raise errors.InternalError('%s does not have %s' % (self.spec_dir, path))
     return timestamp
 
-  def _generate_meta_deps(self, rev):
+  def generate_meta_deps(self, rev):
     """Synthesize branch DEPS with continuous history.
 
     Although chrome uses DEPS in its tree as source of truth, we need to use
@@ -451,7 +451,7 @@ class ChromeSpecManager(codechange.SpecManager):
     # See crbug.com/900514 for a real case. 16 hours threshold is not enough.
     old_timestamp -= 86400  # 1 day
 
-    meta_dir = self._generate_meta_deps(new)
+    meta_dir = self.generate_meta_deps(new)
 
     result = []
     code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])

@@ -105,11 +105,15 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             'DUT locking is not respected? b/126141102'
 
         try:
+          buildbucket_build = (
+              cros_util.is_buildbucket_buildable(self.config['old']) and
+              self.config['enable_buildbucket_chrome'])
           if self.config['chrome_deploy_image']:
             eval_cmd = common_eval_cmd + ['--tast_build']
           else:
             eval_cmd = common_eval_cmd
-          if diagnoser.narrow_down_chrome(eval_cmd):
+          if diagnoser.narrow_down_chrome(
+              eval_cmd, buildbucket_build=buildbucket_build):
             return
         except errors.DiagnoseContradiction:
           raise
@@ -118,7 +122,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
               'Exception in Chrome bisector before verification; '
               'assume the culprit is not inside Chrome and continue')
 
-        if not self.config['chrome_deploy_image']:
+        if not self.config['chrome_deploy_image'] and not buildbucket_build:
           # Sanity check. The OS version should not change after chrome bisect.
           assert dut_os_version == cros_util.query_dut_short_version(dut), \
               'Someone else reflashed the DUT. ' \

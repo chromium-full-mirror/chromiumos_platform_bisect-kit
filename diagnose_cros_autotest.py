@@ -209,8 +209,13 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           util.call(*eval_cmd)
 
         try:
+          buildbucket_build = (
+              cros_util.is_buildbucket_buildable(self.config['old']) and
+              self.config['enable_buildbucket_chrome'])
           if diagnoser.narrow_down_chrome(
-              eval_cmd, with_tests=chrome_with_tests):
+              eval_cmd,
+              buildbucket_build=buildbucket_build,
+              with_tests=chrome_with_tests):
             return
         except errors.DiagnoseContradiction:
           raise
@@ -219,7 +224,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
               'Exception in Chrome bisector before verification; '
               'assume the culprit is not inside Chrome and continue')
 
-        if not self.config['chrome_deploy_image']:
+        if not self.config['chrome_deploy_image'] and not buildbucket_build:
           # Sanity check. The OS version should not change after chrome bisect.
           assert dut_os_version == cros_util.query_dut_short_version(dut), \
               'Someone else reflashed the DUT. ' \
