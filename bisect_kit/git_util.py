@@ -14,6 +14,7 @@ import stat
 import subprocess
 import time
 
+from bisect_kit import cache_util
 from bisect_kit import cli
 from bisect_kit import util
 
@@ -373,6 +374,7 @@ def is_ancestor_commit(git_repo, old, new):
       cwd=git_repo) != ''
 
 
+@cache_util.Cache.default_disabled
 def get_commit_metadata(git_repo, rev):
   """Get metadata of given commit.
 
@@ -517,6 +519,7 @@ def is_symbolic_link(git_repo, rev, path):
                    (path, git_repo, rev))
 
 
+@cache_util.Cache.default_disabled
 def get_file_from_revision(git_repo, rev, path):
   """Get file content of given revision.
 

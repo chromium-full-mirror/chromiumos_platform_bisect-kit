@@ -916,6 +916,11 @@ class CodeManager:
     logger.info('get_specs_and_revlist: old = %s, new = %s', old, new)
     revlist = []
 
+    # Enable cache for repetitive git operations. The space complixity is
+    # O(number of candidates).
+    git_util.get_commit_metadata.enable_cache()
+    git_util.get_file_from_revision.enable_cache()
+
     # step 1, find all float and fixed specs in the given range.
     fixed_specs = self.spec_manager.collect_fixed_spec(old, new)
     assert fixed_specs
@@ -997,6 +1002,8 @@ class CodeManager:
     # operations when switch git versions. Be conservative now. We can cache
     # more if we observed more slow git operations later.
     git_util.fast_lookup.disable()
+    git_util.get_commit_metadata.disable_cache()
+    git_util.get_file_from_revision.disable_cache()
 
     return fixed_specs, float_specs, revlist
 
