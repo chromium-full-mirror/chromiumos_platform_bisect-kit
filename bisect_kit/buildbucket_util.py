@@ -33,6 +33,7 @@ from infra_libs.buildbucket.proto.rpc_pb2 import SearchBuildsRequest
 from infra_libs.buildbucket.proto.rpc_pb2 import SearchBuildsResponse
 
 from bisect_kit import errors
+from bisect_kit import gclient_util
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -268,7 +269,6 @@ class BuildbucketApi:
                      manifest_xml,
                      recipe='build_target',
                      deps=None,
-                     deps_src_ver=None,
                      git_auth=True,
                      bucket='bisector',
                      force_rebuild=False,
@@ -280,7 +280,6 @@ class BuildbucketApi:
       manifest_xml: A full manifest xml for building chromeOS
       recipe: Recipe name to execute
       deps: A full DEPS file for building Chrome
-      deps_src_ver: Commit hash for Chrome src project
       git_auth: A workaround for crbug.com/1068743
       bucket: A bucket name of buildbucket that will handle this build
       force_rebuild: Set True to ignore existing builds on buildbucket
@@ -321,6 +320,11 @@ class BuildbucketApi:
 
     chrome_isolate = None
     if deps:
+      depsParser = gclient_util.DepsParser(None, None)
+      parsed = depsParser.parse_single_deps(deps)
+      deps_src_ver = parsed.remove_src()
+      deps = parsed.to_string()
+
       chrome_isolate = self._isolate_upload('DEPS', deps)
       properties['$chromeos/chrome'] = {
           'deps_isolate': {

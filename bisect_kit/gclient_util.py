@@ -444,6 +444,13 @@ class Deps:
         self._hooks_to_lines('pre_deps_hooks', self.pre_deps_hooks) +
         self._vars_to_lines() + [''])  # Ensure newline at end of file.
 
+  def remove_src(self):
+    """Return src_revision for buildbucket use."""
+    assert 'src' in self.entries
+    _, src_rev = self.entries['src'].parse_url()
+    del self.entries['src']
+    return src_rev
+
 
 class TimeSeriesTree:
   """Data structure for generating snapshots of historical dependency tree.
