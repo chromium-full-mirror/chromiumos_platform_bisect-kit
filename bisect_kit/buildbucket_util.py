@@ -479,10 +479,17 @@ class BuildbucketApi:
     builds = self.search_builds(
         bucket=bucket,
         builder='%s-%s' % (board, bucket),
-        status='SUCCESS',
         start_time=self.old_artifact_cutoff,
     )
+    valid_status = [
+        Status.Value('SCHEDULED'),
+        Status.Value('STARTED'),
+        Status.Value('SUCCESS')
+    ]
+
     for build in builds:
+      if build.status not in valid_status:
+        continue
       input_properties = json_format.MessageToDict(build.input.properties)
       build_manifest_hash = input_properties.get(
           '$chromeos/cros_source', {}).get('snapshot_isolate',
