@@ -388,6 +388,8 @@ class ChromeSpecManager(codechange.SpecManager):
     # 1. Create initial commit with DEPS file referring to master.
     init_timestamp = '2018-01-01T00:00:00'
     meta_deps = textwrap.dedent("""
+    gclient_gn_args_from = "src"
+
     vars = {
       "checkout_src_internal": True,
     }
@@ -585,7 +587,7 @@ class ChromeSpecManager(codechange.SpecManager):
     Args:
       rev: chrome release version
     """
-    release_deps_file = self.get_release_deps(rev)
+    release_deps_file = self.get_release_deps_file(rev)
     path = os.path.join(self.spec_dir, release_deps_file)
     # The buildspec repo is already sync'ed using setup_cros_bisect.py, so DEPS
     # files should exist.
@@ -600,7 +602,7 @@ class ChromeSpecManager(codechange.SpecManager):
     self.sync_to_release(rev)
 
   @staticmethod
-  def get_release_deps(rev):
+  def get_release_deps_file(rev):
     """Get DEPS file path of given release.
 
     Args:
@@ -610,3 +612,18 @@ class ChromeSpecManager(codechange.SpecManager):
       DEPS file path, relative to buildspec/ folder
     """
     return 'releases/%s/DEPS' % rev
+
+  def get_release_deps(self, rev):
+    """Get DEPS content of given release.
+
+    Args:
+      rev: chrome release version number
+
+    Returns:
+      DEPS string
+    """
+    release_deps_file = self.get_release_deps_file(rev)
+    path = os.path.join(self.spec_dir, release_deps_file)
+    with open(path) as f:
+      deps = f.read()
+    return deps

@@ -180,7 +180,7 @@ def main(args=None):
   code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
 
   if cr_util.is_chrome_version(opts.rev):
-    release_deps_file = spec_manager.get_release_deps(opts.rev)
+    release_deps_file = spec_manager.get_release_deps_file(opts.rev)
     path = os.path.join(spec_manager.spec_dir, release_deps_file)
     if not os.path.exists(path):
       raise errors.ArgumentError(

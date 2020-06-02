@@ -122,13 +122,13 @@ class ChromeSrcDomain(core.BisectDomain):
     cache = gclient_util.GclientCache(opts.chrome_mirror)
 
     # Initial sync to get all buildspecs.
-    release_deps_file = cr_util.ChromeSpecManager.get_release_deps(new)
+    release_deps_file = cr_util.ChromeSpecManager.get_release_deps_file(new)
     path = os.path.join(opts.chrome_root, 'buildspec', release_deps_file)
     if not os.path.exists(path):
       spec_manager.sync_to_release(new)
 
     for rev in (old, new):
-      release_deps_file = cr_util.ChromeSpecManager.get_release_deps(rev)
+      release_deps_file = cr_util.ChromeSpecManager.get_release_deps_file(rev)
       path = os.path.join(opts.chrome_root, 'buildspec', release_deps_file)
       if not os.path.exists(path):
         raise errors.InternalError("%s doesn't exist" % path)
