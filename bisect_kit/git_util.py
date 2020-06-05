@@ -886,13 +886,14 @@ def get_history_recursively(git_repo,
   return result2
 
 
-def get_branches(git_repo, all_branches=True, commit=None):
+def get_branches(git_repo, all_branches=True, commit=None, remote=False):
   """Get branches of a repository.
 
   Args:
     git_repo: path of git repo
     all_branches: return remote branches if is set to True
     commit: return branches containing this commit if is not None
+    remote: only remote tracking branches
 
   Returns:
     list of branch names
@@ -902,6 +903,8 @@ def get_branches(git_repo, all_branches=True, commit=None):
     cmd += ['-a']
   if commit:
     cmd += ['--contains', commit]
+  if remote:
+    cmd.append('--remote')
 
   result = []
   for line in util.check_output(*cmd, cwd=git_repo).splitlines():
