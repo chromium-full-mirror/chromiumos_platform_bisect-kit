@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 
 from google.protobuf import json_format
@@ -1749,36 +1750,93 @@ class ChromeOSSpecManager(codechange.SpecManager):
       return False
     return level_old != level_new
 
-  def collect_float_spec(self, old, new, fixed_specs=None):
-    assert fixed_specs
-    branch = None
-    old_branches = []
-    new_branches = []
-
-    # There is no revision tag in snapshot's xml
+  def _determine_float_branch(self, old, new, fixed_specs):
+    # There is no revision tag in snapshot's xml. We know snapshot
+    # builds are on master branch.
+    master_refname = 'refs/remotes/origin/master'
     if fixed_specs[0].revision:
       old_branches = git_util.get_branches(
-          self.manifest_dir, commit=fixed_specs[0].revision)
+          self.manifest_dir, commit=fixed_specs[0].revision, remote=True)
+    else:
+      old_branches = [master_refname]
+
     if fixed_specs[-1].revision:
       new_branches = git_util.get_branches(
-          self.manifest_dir, commit=fixed_specs[-1].revision)
-
-    # 1. if both are not snapshot, do AND operation
-    # 2. if new is snapshot, branch = master
-    # 3. if old is snapshot but new is not, respect new's branch
-    if fixed_specs[0].revision and fixed_specs[-1].revision:
-      branches = list(set(old_branches) & set(new_branches))
-    elif not fixed_specs[-1].revision:
-      branches = ['refs/remotes/origin/master']
+          self.manifest_dir, commit=fixed_specs[-1].revision, remote=True)
     else:
-      branches = new_branches
+      new_branches = [master_refname]
 
-    if branches:
-      branch = branches[0]
-    else:
-      logger.warning(
-          'unable to determine float spec branch, '
-          'old = %s, new = %s', old_branches, new_branches)
+    common_branches = list(set(old_branches) & set(new_branches))
+    assert common_branches, '%s and %s are not on common branches?' % (old, new)
+
+    if len(common_branches) == 1:
+      return common_branches[0]
+
+    # There are more than one common branches, use heuristic to tie breaking.
+    # The heuristic is simple: choice the branch with "smallest" number.
+    # "Smaller" means the more major branch (not branched) or branched later.
+    #
+    # Following is the commit graph of manifest-internal repo. It shows many
+    # interesting cases.
+    #
+    #          84/13021.0.0   84/13022.0.0   84/13024.0.0
+    # --A--+---X--------------X------B-------X-----------> master
+    #       \
+    #        \    83/13020.1.0    83/13020.56.0    83/13020.68.0
+    #         C---X----D--+-------X-------+--------X-----> release-R83-13020.B
+    #                      \               \
+    #                       \               E------------> stabilize-13020.67.B
+    #                        \      83/13020.55.1
+    #                         F-----X--------------------> stabilize-13020.55.B
+    #
+    # How to read this graph:
+    #  - Time goes from left to right. Branch names are on the right side of
+    #    arrows.
+    #  - Letters A-F are manifest commits.
+    #  - Marker X means release image build at that time, the version numbers
+    #    are labeled above the X marker.
+    # For example,
+    #  1) 13021.0.0 release is based on manifest A, which is on all branches
+    #     shown on the graph.
+    #     We know 13021.0.0 is on master (and R84 branch later, not shown in
+    #     this graph), not on 13020* branches.
+    #  2) 13020.56.0 release is based on manifest D, which is on 3 branches
+    #     (R83-13020.B, 13020.67.B, and 13020.55.B).
+    #     We know 13020.56.0 is on R83-13020.B and 13020.67.B, but not
+    #     13020.55.B.
+    #
+    # There is an important property here. Every time a new branch is created,
+    # there will always be a commit (like C, E, and F) to fix "revision" field
+    # in the manifest file. In other words, xxxxx.1.0 is impossible based on
+    # manifest on master branch. xxxxx.yy.1 is impossible based on manifest on
+    # xxxxx.B branch.
+    #
+    # With such property, among the branches containing the given manifest
+    # file, the branch with "smallest" number guarantees where the release is.
+
+    def branch_key(s):
+      if s == master_refname:
+        return 0, 0, 0
+      m = re.search(r'-(\d+)\.B$', s)
+      if m:
+        return int(m.group(1)), 0, 0
+      m = re.search(r'-(\d+)\.(\d+)\.B$', s)
+      if m:
+        return int(m.group(1)), int(m.group(2)), 0
+      m = re.search(r'-(\d+)\.(\d+)\.(\d+)\.B$', s)
+      if m:
+        return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+      logger.warning('unexpected branch name: %s', s)
+      return (sys.maxsize, sys.maxsize, sys.maxsize, s)
+
+    common_branches.sort(key=branch_key)
+    return common_branches[0]
+
+  def collect_float_spec(self, old, new, fixed_specs=None):
+    assert fixed_specs
+    branch = self._determine_float_branch(old, new, fixed_specs)
+    logger.debug('float branch=%s', branch)
 
     old_timestamp = self.lookup_build_timestamp(old)
     new_timestamp = self.lookup_build_timestamp(new)
