@@ -12,6 +12,7 @@ import re
 import shutil
 import stat
 import subprocess
+import tempfile
 import time
 
 from bisect_kit import cache_util
@@ -374,6 +375,28 @@ def is_ancestor_commit(git_repo, old, new):
       cwd=git_repo) != ''
 
 
+def _parse_commit_object(s):
+  meta = {}
+  header, meta['message'] = s.split('\n\n', 1)
+  for line in header.splitlines():
+    m = re.match(r'^tree (\w+)', line)
+    if m:
+      meta['tree'] = m.group(1)
+      continue
+
+    m = re.match(r'^parent (\w+)', line)
+    if m:
+      meta['parent'] = line.split()[1:]
+      continue
+
+    m = re.match(r'^(author|committer) (.*) (\d+) (\S+)$', line)
+    if m:
+      meta[m.group(1)] = m.group(2)
+      meta['%s_time' % m.group(1)] = int(m.group(3))
+      continue
+  return meta
+
+
 @cache_util.Cache.default_disabled
 def get_commit_metadata(git_repo, rev):
   """Get metadata of given commit.
@@ -393,27 +416,42 @@ def get_commit_metadata(git_repo, rev):
       committer_time: commit timestamp (without timezone information)
       message: commit message text
   """
-  meta = {}
   data = util.check_output(
       'git', 'cat-file', '-p', rev, cwd=git_repo, log_stdout=False)
-  header, meta['message'] = data.split('\n\n', 1)
-  for line in header.splitlines():
-    m = re.match(r'^tree (\w+)', line)
-    if m:
-      meta['tree'] = m.group(1)
-      continue
+  return _parse_commit_object(data)
 
-    m = re.match(r'^parent (\w+)', line)
-    if m:
-      meta['parent'] = line.split()[1:]
-      continue
 
-    m = re.match(r'^(author|committer) (.*) (\d+) (\S+)$', line)
-    if m:
-      meta[m.group(1)] = m.group(2)
-      meta['%s_time' % m.group(1)] = int(m.group(3))
+def get_batch_commit_metadata(git_repo, revs):
+  query = '\n'.join(revs)
+  logger.debug('get_batch_commit_metadata %r', query)
+  with tempfile.NamedTemporaryFile('w+t') as f:
+    f.write(query)
+    f.flush()
+    # util.check_output doesn't support stdin, so use shell
+    # redirect instead.
+    # binary=True because we need to count size in bytes later.
+    data = util.check_output(
+        'sh',
+        '-c',
+        'git cat-file --batch < ' + f.name,
+        cwd=git_repo,
+        binary=True)
+
+  metas = {}
+  while data:
+    first_line, data = data.split(b'\n', 1)
+    m = re.match(r'^(\w+) (\w+)(?: (\d+))?', first_line.decode('utf8'))
+    assert m, repr(first_line)
+    object_name, object_type = m.group(1, 2)
+    if not m.group(3):
+      metas[object_name] = None
       continue
-  return meta
+    assert object_type == 'commit', 'unsupported object type: %s' % object_type
+    object_size = int(m.group(3))
+    assert data[object_size] == ord(b'\n'), repr(data[object_size])
+    obj, data = data[:object_size], data[object_size + 1:]
+    metas[object_name] = _parse_commit_object(obj.decode('utf8'))
+  return metas
 
 
 def get_revlist(git_repo, old, new):

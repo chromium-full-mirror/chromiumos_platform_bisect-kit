@@ -14,7 +14,6 @@ Example:
 
 from __future__ import print_function
 import logging
-import subprocess
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -51,7 +50,19 @@ class GitDomain(core.BisectDomain):
 
     config = dict(git_repo=opts.git_repo)
     revlist = git_util.get_revlist(opts.git_repo, opts.old, opts.new)
-    return config, revlist
+
+    details = {}
+    metas = git_util.get_batch_commit_metadata(opts.git_repo, revlist)
+    for rev in revlist:
+      meta = metas[rev]
+      if meta is None:
+        commit_summary = '(unknown)'
+      else:
+        commit_summary = meta['message'].splitlines()[0]
+      action = {'rev': rev, 'commit_summary': commit_summary}
+      details[rev] = {'actions': [action]}
+
+    return config, {'revlist': revlist}
 
   def __init__(self, config):
     self.config = config
@@ -60,23 +71,9 @@ class GitDomain(core.BisectDomain):
     env['GIT_REPO'] = self.config['git_repo']
     env['GIT_REV'] = rev
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
-    for i in interesting_indexes:
-      rev_info = summary['rev_info'][i]
-      rev = rev_info['rev']
-      try:
-        commit_summary = git_util.get_commit_log(self.config['git_repo'],
-                                                 rev).splitlines()[0]
-      except subprocess.CalledProcessError:
-        logger.warning('failed to get commit log of %s at %s', rev[:10],
-                       self.config['git_repo'])
-        commit_summary = '(unknown)'
-      text = 'commit %s %r' % (rev[:10], commit_summary)
-      rev_info.update({
-          'actions': [{
-              'text': text,
-          }],
-      })
+  def fill_candidate_summary(self, summary):
+    # Do nothing.
+    pass
 
 
 if __name__ == '__main__':

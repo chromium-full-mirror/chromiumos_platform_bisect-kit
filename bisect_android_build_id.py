@@ -32,6 +32,10 @@ from bisect_kit import cros_util
 
 logger = logging.getLogger(__name__)
 
+diff_url_template = (
+    'https://android-build.googleplex.com/'
+    'builds/{new}/branches/{branch}/targets/{flavor}/cls?end={old}')
+
 
 class AndroidBuildIDDomain(core.BisectDomain):
   """BisectDomain for Android build IDs."""
@@ -93,7 +97,16 @@ class AndroidBuildIDDomain(core.BisectDomain):
           if android_util.is_good_build(opts.branch, opts.flavor, bid)
       ]
 
-    return config, revlist
+    details = {}
+    for i in range(1, len(revlist)):
+      url = diff_url_template.format(
+          branch=opts.branch,
+          flavor=opts.flavor,
+          old=revlist[i - 1],
+          new=revlist[i])
+      details[revlist[i]] = {'actions': [{'link': url}]}
+
+    return config, {'revlist': revlist, 'details': details}
 
   def __init__(self, config):
     self.config = config
@@ -105,31 +118,15 @@ class AndroidBuildIDDomain(core.BisectDomain):
     if self.config.get('dut'):
       env['DUT'] = self.config['dut']
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
-    url_template = ('https://android-build.googleplex.com/'
-                    'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
-                        self.config['branch'], self.config['flavor'])
+  def fill_candidate_summary(self, summary):
     if 'current_range' in summary:
       old, new = summary['current_range']
-      summary['links'] = [
-          {
-              'name': 'change_list',
-              'url': url_template.format(old=old, new=new),
-          },
-      ]
-
-    for i in interesting_indexes:
-      if i == 0:
-        continue
-      rev_info = summary['rev_info'][i]
-      rev_info.update({
-          'actions': [{
-              'link':
-                  url_template.format(
-                      old=summary['rev_info'][i - 1]['rev'],
-                      new=rev_info['rev']),
-          }],
-      })
+      url = diff_url_template.format(
+          branch=self.config['branch'],
+          flavor=self.config['flavor'],
+          old=old,
+          new=new)
+      summary['links'] = [dict(name='change_list', url=url)]
 
 
 if __name__ == '__main__':

@@ -151,9 +151,12 @@ class ChromeSrcDomain(core.BisectDomain):
 
     # TODO(kcwu): verify full git history is available.
     code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
-    revlist = code_manager.build_revlist(old, new)
+    revlist, details = code_manager.build_revlist(old, new)
+    for detail in details.values():
+      for action in detail.get('actions', []):
+        generate_action_link(action)
 
-    return config, revlist
+    return config, {'revlist': revlist, 'details': details}
 
   def __init__(self, config):
     self.config = config
@@ -168,7 +171,7 @@ class ChromeSrcDomain(core.BisectDomain):
     if self.config['dut']:
       env['DUT'] = self.config['dut']
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
+  def fill_candidate_summary(self, summary):
     if 'current_range' in summary:
       old, new = summary['current_range']
       old_base, _, _ = codechange.parse_intra_rev(old)
@@ -191,16 +194,6 @@ class ChromeSrcDomain(core.BisectDomain):
               'url': log_url + '&pretty=fuller',
           },
       ]
-
-    cache = gclient_util.GclientCache(self.config['chrome_mirror'])
-    spec_manager = cr_util.ChromeSpecManager(self.config)
-    code_manager = codechange.CodeManager(self.config['chrome_root'],
-                                          spec_manager, cache)
-    for i in interesting_indexes:
-      rev_info = summary['rev_info'][i]
-      rev_info.update(code_manager.get_rev_detail(rev_info['rev']))
-      for action in rev_info.get('actions', []):
-        generate_action_link(action)
 
 
 if __name__ == '__main__':

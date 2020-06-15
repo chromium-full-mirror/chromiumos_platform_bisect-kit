@@ -48,7 +48,7 @@ class ListDomain(core.BisectDomain):
   def init(opts):
     config = {}
     revlist = [line.strip() for line in sys.stdin.readlines()]
-    return config, revlist
+    return config, {'revlist': revlist}
 
   def __init__(self, config):
     self.config = config
@@ -56,7 +56,7 @@ class ListDomain(core.BisectDomain):
   def setenv(self, env, rev):
     pass
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
+  def fill_candidate_summary(self, summary):
     # Do nothing.
     return
 

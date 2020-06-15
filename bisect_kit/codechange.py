@@ -11,13 +11,13 @@ repo manifest.
 """
 
 from __future__ import print_function
+import collections
 import copy
 import json
 import logging
 import os
 import re
 import shutil
-import subprocess
 
 from bisect_kit import cli
 from bisect_kit import errors
@@ -269,7 +269,7 @@ class Action:
   def apply(self, _code_storage, _root_dir):
     raise NotImplementedError
 
-  def summary(self, _code_storage):
+  def summary(self):
     raise NotImplementedError
 
   def __eq__(self, rhs):
@@ -318,13 +318,11 @@ class ActionGroup:
         comment=self.comment,
         actions=[a.serialize() for a in self.actions])
 
-  def summary(self, code_storage):
+  def summary(self):
     result = {}
     if self.comment:
       result['comment'] = self.comment
-    result['actions'] = [
-        action.summary(code_storage) for action in self.actions
-    ]
+    result['actions'] = [action.summary() for action in self.actions]
     return result
 
   @staticmethod
@@ -360,21 +358,12 @@ class GitCheckoutCommit(Action):
     assert git_util.is_git_root(git_repo)
     git_util.checkout_version(git_repo, self.rev)
 
-  def summary(self, code_storage):
-    git_root = code_storage.cached_git_root(self.repo_url)
-    try:
-      commit_summary = git_util.get_commit_log(git_root,
-                                               self.rev).splitlines()[0]
-    except subprocess.CalledProcessError:
-      logger.warning('failed to get commit log of %s at %s', self.rev[:10],
-                     git_root)
-      commit_summary = '(unknown)'
-    text = 'commit %s %s %r' % (self.rev[:10], self.path, commit_summary)
+  def summary(self):
+    text = 'commit %s %s' % (self.rev[:10], self.path)
     return dict(
         timestamp=self.timestamp,
         action_type='commit',
         path=self.path,
-        commit_summary=commit_summary,
         repo_url=self.repo_url,
         rev=self.rev,
         text=text,
@@ -411,7 +400,7 @@ class GitAddRepo(Action):
 
     code_storage.add_to_project_list(root_dir, self.path, self.repo_url)
 
-  def summary(self, _code_storage):
+  def summary(self):
     text = 'add repo %s from %s@%s' % (self.path, self.repo_url, self.rev[:10])
     return dict(
         timestamp=self.timestamp,
@@ -436,7 +425,7 @@ class GitRemoveRepo(Action):
 
     code_storage.remove_from_project_list(root_dir, self.path)
 
-  def summary(self, _code_storage):
+  def summary(self):
     return dict(
         timestamp=self.timestamp,
         action_type='remove_repo',
@@ -898,23 +887,36 @@ class CodeManager:
       return None
     return make_up
 
+  def _batch_fill_action_commit_log(self, details):
+    group_by_repo = collections.defaultdict(list)
+    for detail in details.values():
+      for action in detail.get('actions', []):
+        if action['action_type'] == 'commit':
+          group_by_repo[action['repo_url']].append(action)
+
+    for repo_url, actions in group_by_repo.items():
+      git_root = self.code_storage.cached_git_root(repo_url)
+      revs = set(a['rev'] for a in actions)
+      metas = git_util.get_batch_commit_metadata(git_root, revs)
+      for action in actions:
+        meta = metas[action['rev']]
+        if meta is None:
+          commit_summary = '(unknown)'
+        else:
+          commit_summary = meta['message'].splitlines()[0]
+        action['commit_summary'] = commit_summary
+
   def build_revlist(self, old, new):
     """Build revlist.
 
     Returns:
-      list of rev string
+      (revlist, details):
+        revlist: list of rev string
+        details: dict of rev to rev detail
     """
-    _, _, revlist = self.get_specs_and_revlist(old, new)
-    return revlist
-
-  def get_specs_and_revlist(self, old, new):
-    """Build revlist.
-
-    Returns:
-      (parsed fixed_specs, parsed float_specs, list of rev string)
-    """
-    logger.info('get_specs_and_revlist: old = %s, new = %s', old, new)
+    logger.info('build_revlist: old=%s, new=%s', old, new)
     revlist = []
+    details = {}
 
     # Enable cache for repetitive git operations. The space complixity is
     # O(number of candidates).
@@ -992,11 +994,14 @@ class CodeManager:
                              fixed_specs[next_fixed_index].name, idx)
         ag.name = rev
         revlist.append(rev)
+        details[rev] = ag.summary()
 
       self.save_action_groups_between_releases(
           fixed_specs[fixed_index].name, fixed_specs[next_fixed_index].name,
           this_action_groups)
     revlist.append(fixed_specs[associated_pairs[-1][0]].name)
+
+    self._batch_fill_action_commit_log(details)
 
     # Disable cache because there might be write or even destructive git
     # operations when switch git versions. Be conservative now. We can cache
@@ -1005,7 +1010,13 @@ class CodeManager:
     git_util.get_commit_metadata.disable_cache()
     git_util.get_file_from_revision.disable_cache()
 
-    return fixed_specs, float_specs, revlist
+    # Make sure all repos in between are cached
+    for spec in reversed(float_specs):
+      if self.code_storage.are_spec_commits_available(spec):
+        continue
+      self.spec_manager.sync_disk_state(spec.name)
+
+    return revlist, details
 
   def save_action_groups_between_releases(self, old, new, action_groups):
     data = [ag.serialize() for ag in action_groups]
@@ -1030,16 +1041,6 @@ class CodeManager:
         result.append(ActionGroup.unserialize(data))
 
     return result
-
-  def get_rev_detail(self, rev):
-    rev_old, rev_new, index = parse_intra_rev(rev)
-    if rev_old == rev_new:
-      return {}
-
-    action_groups = self.load_action_groups_between_releases(rev_old, rev_new)
-    # Indexes inside intra_rev are 1 based.
-    action_group = action_groups[index - 1]
-    return action_group.summary(self.code_storage)
 
   def switch(self, rev):
     rev_old, action_groups = self.get_intra_and_diff(rev)

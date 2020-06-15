@@ -109,15 +109,12 @@ class ChromeOSRepoDomain(core.BisectDomain):
     code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager,
                                           cache)
 
-    # Make sure all repos in between are cached
-    _, float_specs, revlist = code_manager.get_specs_and_revlist(
-        opts.old, opts.new)
-    for spec in reversed(float_specs):
-      if cache.are_spec_commits_available(spec):
-        continue
-      spec_manager.sync_disk_state(spec.name)
+    revlist, details = code_manager.build_revlist(opts.old, opts.new)
+    for detail in details.values():
+      for action in detail.get('actions', []):
+        generate_action_link(action)
 
-    return config, revlist
+    return config, {'revlist': revlist, 'details': details}
 
   def __init__(self, config):
     self.config = config
@@ -131,7 +128,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
     env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
     env['CROS_VERSION'] = rev
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
+  def fill_candidate_summary(self, summary):
     if 'current_range' in summary:
       old, new = summary['current_range']
       old_base, _, _ = codechange.parse_intra_rev(old)
@@ -142,16 +139,6 @@ class ChromeOSRepoDomain(core.BisectDomain):
               'url': cros_util.get_crosland_link(old_base, new_next),
           },
       ]
-
-    cache = repo_util.RepoMirror(self.config['chromeos_mirror'])
-    spec_manager = cros_util.ChromeOSSpecManager(self.config)
-    code_manager = codechange.CodeManager(self.config['chromeos_root'],
-                                          spec_manager, cache)
-    for i in interesting_indexes:
-      rev_info = summary['rev_info'][i]
-      rev_info.update(code_manager.get_rev_detail(rev_info['rev']))
-      for action in rev_info.get('actions', []):
-        generate_action_link(action)
 
 
 if __name__ == '__main__':

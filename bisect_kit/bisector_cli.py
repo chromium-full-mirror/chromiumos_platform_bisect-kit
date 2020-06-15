@@ -243,8 +243,9 @@ class BisectorCommandLine:
           '--old_value and --new_value must be specified '
           'when --recompute_init_values is present')
 
-    config, revlist = self.domain_cls.init(opts)
-    logger.info('found %d revs to bisect', len(revlist))
+    config, candidates = self.domain_cls.init(opts)
+    revlist = candidates['revlist']
+    logger.info('found %d candidates to bisect', len(revlist))
     logger.debug('revlist %r', revlist)
     if 'new' not in config:
       config['new'] = opts.new
@@ -266,7 +267,8 @@ class BisectorCommandLine:
         new_value=opts.new_value,
         recompute_init_values=opts.recompute_init_values)
 
-    self.states.init(config, revlist)
+    details = candidates.get('details', {})
+    self.states.init(config, revlist, details)
     self.states.save()
 
   def _step_log_path(self, rev, step):
@@ -430,8 +432,14 @@ class BisectorCommandLine:
   def cmd_view(self, opts):
     """Shows remaining candidates."""
     summary = {
-        'rev_info': [info.to_dict() for info in self.strategy.rev_info],
+        'rev_info': [],
     }
+
+    for info in self.strategy.rev_info:
+      info_dict = info.to_dict()
+      detail = self.states.details.get(info.rev, {})
+      info_dict.update(detail)
+      summary['rev_info'].append(info_dict)
 
     try:
       old_idx, new_idx = self.strategy.get_range()
@@ -463,7 +471,7 @@ class BisectorCommandLine:
           if p > 0.05:
             interesting_indexes.add(i)
 
-    self.domain.fill_candidate_summary(summary, interesting_indexes)
+    self.domain.fill_candidate_summary(summary)
 
     if opts.json:
       print(json.dumps(summary, indent=2, sort_keys=True))
@@ -510,8 +518,8 @@ class BisectorCommandLine:
         if 'comment' in rev_info:
           print('\t%s' % rev_info['comment'])
         for action in rev_info.get('actions', []):
-          if 'text' in action:
-            print('\t%s' % action['text'])
+          if 'rev' in action and 'commit_summary' in action:
+            print('%s %r' % (action['rev'][:10], action['commit_summary']))
           if 'link' in action:
             print('\t%s' % action['link'])
 

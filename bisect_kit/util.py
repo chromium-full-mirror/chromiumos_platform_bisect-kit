@@ -108,7 +108,7 @@ class Popen:
       where: 'stdout' or 'stderr'.
       child_file: file object which producing output.
     """
-    for line in iter(child_file.readline, ''):
+    for line in child_file:
       self.queue.put((where, line))
     self.queue.put((where, ''))
     child_file.close()
@@ -207,7 +207,10 @@ def check_output(*args, timeout=None, **kwargs):
 
   p = Popen(args, stdout_callback=collect_stdout, **kwargs)
   p.wait(timeout=timeout)
-  stdout = ''.join(stdout_lines)
+  if kwargs.get('binary'):
+    stdout = b''.join(stdout_lines)
+  else:
+    stdout = ''.join(stdout_lines)
   if p.returncode != 0:
     raise subprocess.CalledProcessError(p.returncode, args, stdout)
 

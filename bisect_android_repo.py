@@ -82,7 +82,7 @@ class AndroidRepoDomain(core.BisectDomain):
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT', ''),
+        default=configure.get('DUT'),
         help='DUT address')
     parser.add_argument(
         '--android_root',
@@ -119,13 +119,17 @@ class AndroidRepoDomain(core.BisectDomain):
       assert cros_util.is_dut(opts.dut)
 
     if not opts.flavor:
-      assert opts.dut
+      if not opts.dut:
+        raise errors.ArgumentError('--dut and --flavor', 'Neither is specified')
       opts.flavor = arc_util.query_flavor(opts.dut)
 
     if not opts.board:
-      assert opts.dut
+      if not opts.dut:
+        raise errors.ArgumentError('--dut and --board', 'Neither is specified')
       opts.board = cros_util.query_dut_board(opts.dut)
     if not opts.branch:
+      if not opts.dut:
+        raise errors.ArgumentError('--dut and --branch', 'Neither is specified')
       version = cros_util.query_dut_short_version(opts.dut)
       if not cros_util.is_cros_short_version(version):
         base = '.'.join(version.split('.')[:-1] + ['0'])
@@ -156,19 +160,14 @@ class AndroidRepoDomain(core.BisectDomain):
 
     spec_manager = android_util.AndroidSpecManager(config)
     cache = repo_util.RepoMirror(opts.android_mirror)
-
-    # Make sure all repos in between are cached
-    float_specs = spec_manager.collect_float_spec(old, new)
-    for spec in reversed(float_specs):
-      spec_manager.parse_spec(spec)
-      if cache.are_spec_commits_available(spec):
-        continue
-      spec_manager.sync_disk_state(spec.name)
-
     code_manager = codechange.CodeManager(opts.android_root, spec_manager,
                                           cache)
-    revlist = code_manager.build_revlist(old, new)
-    return config, revlist
+    revlist, details = code_manager.build_revlist(old, new)
+    for detail in details.values():
+      for action in detail.get('actions', []):
+        generate_action_link(action)
+
+    return config, {'revlist': revlist, 'details': details}
 
   def __init__(self, config):
     self.config = config
@@ -181,7 +180,7 @@ class AndroidRepoDomain(core.BisectDomain):
     env['ANDROID_MIRROR'] = self.config['android_mirror']
     env['INTRA_REV'] = rev
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
+  def fill_candidate_summary(self, summary):
     if 'current_range' in summary:
       old, new = summary['current_range']
       old_base, _, _ = codechange.parse_intra_rev(old)
@@ -196,18 +195,6 @@ class AndroidRepoDomain(core.BisectDomain):
               'url': url_template.format(old=old_base, new=new_next),
           },
       ]
-
-    spec_manager = android_util.AndroidSpecManager(self.config)
-    cache = repo_util.RepoMirror(self.config['android_mirror'])
-    code_manager = codechange.CodeManager(self.config['android_root'],
-                                          spec_manager, cache)
-    for i in interesting_indexes:
-      if i == 0:
-        continue
-      rev_info = summary['rev_info'][i]
-      rev_info.update(code_manager.get_rev_detail(rev_info.rev))
-      for action in rev_info.get('actions', []):
-        generate_action_link(action)
 
 
 if __name__ == '__main__':

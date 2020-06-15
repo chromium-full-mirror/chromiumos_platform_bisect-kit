@@ -50,6 +50,8 @@ revtype = cli.argtype_multiplexer(cr_util.argtype_chrome_version,
                                   git_util.argtype_git_rev,
                                   cli.argtype_re(r'^#(\d+)$', '#12345'))
 
+chrome_repo_url = 'https://chromium.googlesource.com/chromium/src'
+
 
 def guess_git_rev(opts, rev):
   """Recognizes version number and determines the corresponding git hash.
@@ -161,7 +163,14 @@ class ChromeSrcMasterDomain(core.BisectDomain):
         new=new,
         board=opts.board,
         dut=opts.dut)
-    return config, revlist
+
+    details = {}
+    for rev in revlist:
+      link = '%s/+/%s' % (chrome_repo_url, rev)
+      action = {'link': link}
+      details[rev] = {'actions': [action]}
+
+    return config, {'revlist': revlist, 'details': details}
 
   def __init__(self, config):
     self.config = config
@@ -177,8 +186,7 @@ class ChromeSrcMasterDomain(core.BisectDomain):
     if self.config['dut']:
       env['DUT'] = self.config['dut']
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
-    chrome_repo_url = 'https://chromium.googlesource.com/chromium/src'
+  def fill_candidate_summary(self, summary):
     if 'current_range' in summary:
       old, new = summary['current_range']
       log_url = '%s/+log/%s..%s?n=10000' % (chrome_repo_url, old, new)
@@ -196,14 +204,6 @@ class ChromeSrcMasterDomain(core.BisectDomain):
               'url': log_url + '&pretty=fuller',
           },
       ]
-
-    for i in interesting_indexes:
-      rev_info = summary['rev_info'][i]
-      rev_info.update({
-          'actions': {
-              'link': '%s/+/%s' % (chrome_repo_url, rev_info['rev']),
-          },
-      })
 
 
 if __name__ == '__main__':

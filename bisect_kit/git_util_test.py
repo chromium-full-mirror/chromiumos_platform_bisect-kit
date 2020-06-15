@@ -161,6 +161,14 @@ class TestGitOperationReadOnly(unittest.TestCase):
         git_util.get_commit_metadata(self.git_repo, self.commits[1])['parent'],
         [self.commits[0]])
 
+  def test_get_batch_commit_metadata(self):
+    bad_obj = 'foobar'
+    result = git_util.get_batch_commit_metadata(self.git_repo,
+                                                self.commits + [bad_obj])
+    self.assertEqual(result[self.commits[1]]['parent'], [self.commits[0]])
+    self.assertEqual(result[self.commits[3]]['parent'], [self.commits[2]])
+    self.assertEqual(result[bad_obj], None)
+
   def test_get_revlist(self):
     self.assertEqual(
         git_util.get_revlist(self.git_repo, self.commits[1], self.commits[3]),

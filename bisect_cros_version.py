@@ -95,6 +95,12 @@ class ChromeOSVersionDomain(core.BisectDomain):
     old, new, revlist = get_revlist(
         opts.board, opts.old, opts.new, use_snapshot=not opts.disable_snapshot)
     config = dict(dut=opts.dut, board=opts.board, old=old, new=new)
+
+    details = {}
+    for i in range(1, len(revlist)):
+      link = cros_util.get_crosland_link(revlist[i - 1], revlist[i])
+      details[revlist[i]] = {'actions': [{'link': link}]}
+
     return config, revlist
 
   def __init__(self, config):
@@ -117,8 +123,7 @@ class ChromeOSVersionDomain(core.BisectDomain):
     env['CROS_FULL_VERSION'] = rev
     env['CROS_VERSION'] = rev
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
-
+  def fill_candidate_summary(self, summary):
     if 'current_range' in summary:
       old, new = summary['current_range']
       summary['links'] = [
@@ -127,16 +132,6 @@ class ChromeOSVersionDomain(core.BisectDomain):
               'url': cros_util.get_crosland_link(old, new),
           },
       ]
-
-    for i in interesting_indexes:
-      if i == 0:
-        continue
-      rev_info = summary['rev_info'][i]
-      link = cros_util.get_crosland_link(summary['rev_info'][i - 1]['rev'],
-                                         rev_info['rev'])
-      rev_info.update({
-          'actions': [dict(link=link)],
-      })
 
 
 if __name__ == '__main__':

@@ -43,6 +43,7 @@ class RevInfo:
 
   def to_dict(self):
     result = vars(self).copy()
+    del result['term_map']
     result['averages'] = self.averages()
     # backward compatible with old behavior
     # TODO(kcwu): remove this after callers migrated
@@ -214,12 +215,17 @@ class BisectStates(States):
   def stats(self):
     return self.data['stats']
 
-  def init(self, config, revlist):
+  @property
+  def details(self):
+    return self.data['details']
+
+  def init(self, config, revlist, details=None):
     """Initializes attributes data, rev_info and rev_index.
 
     Args:
       config: bisection configuration.
       revlist: version list.
+      details: dict of rev details.
     """
     # Statistics of bisector's action count (switch, eval) and their
     # accumulated duration.
@@ -235,6 +241,7 @@ class BisectStates(States):
             config=config,
             # List of bisect candidates (version numbers).
             revlist=revlist,
+            details=details or {},
             # What have been done so far. Each entry contains at least
             # timestamp, rev, and result.
             history=[],
@@ -343,12 +350,14 @@ class BisectDomain:
       opts: An argparse.Namespace to hold command line arguments.
 
     Returns:
-      (config, revlist):
+      (config, revdata):
         config (dict): values saved to the per session storage. The bisection
-          range could be adjusted by setting config['old'] and config['new'].
-        revlist (list of string): list of version strings need to bisect. The
-          bisect range `old` and `new` must be inside the list (but unnecessary
-          to be the first and the last one).
+            range could be adjusted by setting config['old'] and config['new'].
+        revdata (dict):
+          revlist: list of version strings need to bisect. The
+              bisect range `old` and `new` must be inside the list (but
+              unnecessary to be the first and the last one).
+          details (dict): detail information for each rev
     """
 
   def setenv(self, env, rev):
@@ -359,7 +368,7 @@ class BisectDomain:
       rev: Current bisecting version.
     """
 
-  def fill_candidate_summary(self, summary, interesting_indexes):
+  def fill_candidate_summary(self, summary):
     """Fill detail of candidates.
 
     This is for 'view' subcommand to display information of remaining
@@ -375,6 +384,4 @@ class BisectDomain:
         This method can modify or fill more fields into the dict.
           links:
           rev_info:
-      interesting_indexes:
-        indexes of rev_info; hints what candidates need more detail information
     """
