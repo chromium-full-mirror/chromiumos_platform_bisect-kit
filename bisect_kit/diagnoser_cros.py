@@ -22,6 +22,7 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
 from bisect_kit import wrapper
+import cros_helper
 import setup_cros_bisect
 
 logger = logging.getLogger(__name__)
@@ -37,12 +38,14 @@ def grab_dut(config):
     return host_name
 
   # TODO(kcwu): support test-specific dependency labels
-  dimensions = ['dut_state:ready', 'label-pool:DUT_POOL_QUOTA']
+  dimensions = ['dut_state:ready']
   if config['model']:
     dimensions.append('label-model:' + config['model'])
   if config['sku']:
     dimensions.append('label-hwid_sku:' +
                       cros_lab_util.normalize_sku_name(config['sku']))
+  if config['pool']:
+    dimensions.append('label-pool:' + config['pool'])
 
   bots = cros_lab_util.swarming_bots_list(dimensions, is_busy=False)
   if not bots:
@@ -695,7 +698,7 @@ class DiagnoseCommandLineBase:
         android_root=opts.android_root,
         android_mirror=opts.android_mirror,
         dut=opts.dut,
-        pools=opts.pools,
+        pool=opts.pool,
         model=opts.model,
         sku=opts.sku,
         board=opts.board,
@@ -819,11 +822,10 @@ class DiagnoseCommandLineBase:
         help='Address of DUT (Device Under Test). If "%s", DUT will be '
         'automatically allocated from the lab' % cros_lab_util.LAB_DUT)
     group.add_argument(
-        '--pools',
+        '--pool',
         type=cli.argtype_notempty,
-        default='suites',
-        help='Desired pools, comma separated and ordered by preference '
-        '(default: %(default)s)')
+        default=cros_helper.DEFAULT_DUT_POOL,
+        help='Desired pools (default: %(default)s)')
     group.add_argument(
         '--model',
         metavar='MODEL',

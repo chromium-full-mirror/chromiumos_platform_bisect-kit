@@ -18,6 +18,7 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
 
+DEFAULT_DUT_POOL = 'DUT_POOL_QUOTA'
 logger = logging.getLogger(__name__)
 
 
@@ -71,11 +72,20 @@ def do_allocate_dut(opts):
       todo: 'ready' or 'wait'
       host: leased host name
   """
-  if not opts.model and not opts.sku:
-    raise errors.ArgumentError('--model or --sku', 'need to be specified')
+  if not opts.model and not opts.sku and not opts.dut_name:
+    raise errors.ArgumentError('--model or --sku or --dut_name',
+                               'need to be specified')
+  if opts.dut_name and (opts.model or opts.sku):
+    raise errors.ArgumentError(
+        '--model or --sku should be empty if dut_name is specified')
 
   t0 = time.time()
-  dimensions = ['dut_state:ready', 'label-pool:DUT_POOL_QUOTA']
+  dimensions = ['dut_state:ready']
+  if opts.dut_name:
+    dimensions.append('dut_name:' + opts.dut_name)
+  else:
+    dimensions.append('label-pool:' + opts.pool)
+
   if opts.model:
     dimensions.append('label-model:' + opts.model)
   if opts.sku:
@@ -208,9 +218,10 @@ def main():
   parser_allocate_dut.add_argument(
       '--session', required=True, help='session name')
   parser_allocate_dut.add_argument(
-      '--pools', required=True, help='Pools to search dut, comma separated')
+      '--pool', help='Pool to search dut', default=DEFAULT_DUT_POOL)
   parser_allocate_dut.add_argument('--model', help='allocation criteria')
   parser_allocate_dut.add_argument('--sku', help='allocation criteria')
+  parser_allocate_dut.add_argument('--dut_name', help='allocation criteria')
   parser_allocate_dut.add_argument(
       '--label', '-b', help='Additional required labels, comma separated')
   # Pubsub ack deadline is 10 minutes (b/143663659). Default 9 minutes with 1
