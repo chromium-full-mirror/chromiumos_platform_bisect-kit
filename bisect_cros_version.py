@@ -101,7 +101,7 @@ class ChromeOSVersionDomain(core.BisectDomain):
       link = cros_util.get_crosland_link(revlist[i - 1], revlist[i])
       details[revlist[i]] = {'actions': [{'link': link}]}
 
-    return config, revlist
+    return config, {'revlist': revlist, 'details': details}
 
   def __init__(self, config):
     self.config = config
