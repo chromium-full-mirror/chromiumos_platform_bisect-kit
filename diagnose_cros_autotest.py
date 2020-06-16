@@ -242,7 +242,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       logger.exception('got exception; stop')
       exception_name = e.__class__.__name__
       self.states.add_history(
-          'failed', '%s: %s' % (exception_name, e), exception=exception_name)
+          'failed',
+          text='%s: %s' % (exception_name, e),
+          exception=exception_name)
 
   def create_argument_parser_hook(self, parser_init):
     group = parser_init.add_argument_group(title='Options for CTS/GTS tests')

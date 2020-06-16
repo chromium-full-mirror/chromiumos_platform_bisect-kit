@@ -138,7 +138,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       logger.exception('got exception; stop')
       exception_name = e.__class__.__name__
       self.states.add_history(
-          'failed', '%s: %s' % (exception_name, e), exception=exception_name)
+          'failed',
+          text='%s: %s' % (exception_name, e),
+          exception=exception_name)
 
 
 if __name__ == '__main__':

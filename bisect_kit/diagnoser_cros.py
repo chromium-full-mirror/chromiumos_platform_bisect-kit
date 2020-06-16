@@ -71,8 +71,8 @@ class DiagnoseStates(core.States):
   def config(self):
     return self.data['config']
 
-  def add_history(self, event, text, **kwargs):
-    entry = dict(timestamp=time.time(), event=event, text=text, **kwargs)
+  def add_history(self, event, **kwargs):
+    entry = dict(timestamp=time.time(), event=event, **kwargs)
     self.data['history'].append(entry)
     self.save()
 
@@ -104,7 +104,7 @@ class CrosDiagnoser:
       logger.exception('decision: %s', text)
     else:
       logger.info('decision: %s', text)
-    self.states.add_history('decision', text)
+    self.states.add_history('decision', text=text)
 
   def narrow_down_chromeos_prebuilt(self,
                                     old,

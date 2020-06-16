@@ -208,6 +208,8 @@ class BisectorCommandLine:
     self.states = None
     self.strategy = None
 
+    self.previous_strategy_state = None
+
   @property
   def config(self):
     return self.states.config
@@ -298,7 +300,9 @@ class BisectorCommandLine:
           switch_time: how much time in switch step
           eval_time: how much time in eval step
     """
-    sample = {'rev': rev}
+    # We treat 'rev' as source of truth. 'index' is redundant and just
+    # informative.
+    sample = {'rev': rev, 'index': self.states.rev2idx(rev)}
     if prev_rev != rev:
       switch_log = self._step_log_path(rev, 'switch')
       switch_log_fullpath = os.path.join(self.session_dir, switch_log)
@@ -357,6 +361,27 @@ class BisectorCommandLine:
         if opts.once:
           break
 
+  def _make_decision(self, text):
+    if sys.exc_info() != (None, None, None):
+      logger.exception('decision: %s', text)
+    else:
+      logger.info('decision: %s', text)
+    self.states.add_history('decision', text=text)
+
+  def _show_step_summary(self):
+    """Show current status after each bisect step."""
+    current_state = self.strategy.state
+    if self.config['recompute_init_values']:
+      if (self.previous_strategy_state == self.strategy.INITED and
+          current_state == self.strategy.STARTED):
+        self._make_decision('After verifying with the initial revisions, '
+                            'use %f as the bisect threshold.' %
+                            self.strategy.threshold)
+
+    self.previous_strategy_state = current_state
+
+    self.strategy.show_summary()
+
   def cmd_run(self, opts):
     """Performs bisection.
 
@@ -374,6 +399,8 @@ class BisectorCommandLine:
       assert self.config.get('switch')
       assert self.config.get('eval')
 
+      self.states.add_history(
+          'start_range', old=self.config['old'], new=self.config['new'])
       term_map = self._get_term_map()
       prev_rev = None
       force = opts.force
@@ -399,7 +426,7 @@ class BisectorCommandLine:
         self.strategy.check_verification_range()
 
         self.strategy.add_sample(idx, **sample)
-        self.strategy.show_summary()
+        self._show_step_summary()
 
         if step == 'switch' and sample['status'] == 'skip':
           # Previous switch failed and thus the current version is unknown. Set
@@ -476,9 +503,10 @@ class BisectorCommandLine:
     if opts.json:
       print(json.dumps(summary, indent=2, sort_keys=True))
     else:
-      self.show_summary(summary, interesting_indexes, verbose=opts.verbose)
+      self.show_bisect_summary(
+          summary, interesting_indexes, verbose=opts.verbose)
 
-  def show_summary(self, summary, interesting_indexes, verbose=False):
+  def show_bisect_summary(self, summary, interesting_indexes, verbose=False):
     for link in summary.get('links', []):
       if 'name' in link and 'url' in link:
         print('%s: %s' % (link['name'], link['url']))
