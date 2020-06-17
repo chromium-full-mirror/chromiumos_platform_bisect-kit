@@ -442,7 +442,7 @@ def apply_actions(code_storage, action_groups, root_dir):
 
   def batch_apply(commits):
     for i, _, commit_action in sorted(commits.values(), key=lambda x: x[:2]):
-      logger.debug('[%d] applying "%r"', i, commit_action.summary(code_storage))
+      logger.debug('[%d] applying "%r"', i, commit_action.summary())
       commit_action.apply(code_storage, root_dir)
 
   for i, action_group in enumerate(action_groups, 1):
