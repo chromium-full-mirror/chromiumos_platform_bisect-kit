@@ -95,7 +95,8 @@ class BisectorWrapper:
     self._set_switch_commands()
 
   def narrow_down(self, states, desc):
-    states.add_history('bisect', desc, bisector=self.name, session=self.session)
+    states.add_history(
+        'bisect', text=desc, bisector=self.name, session=self.session)
     status = self.current_status()
     logger.info('%s old=%s, new=%s, done=%s', self.name, status['old'],
                 status['new'], status['done'])
