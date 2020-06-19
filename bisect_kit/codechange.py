@@ -922,6 +922,7 @@ class CodeManager:
     # O(number of candidates).
     git_util.get_commit_metadata.enable_cache()
     git_util.get_file_from_revision.enable_cache()
+    git_util.is_containing_commit.enable_cache()
 
     # step 1, find all float and fixed specs in the given range.
     fixed_specs = self.spec_manager.collect_fixed_spec(old, new)
@@ -1003,18 +1004,20 @@ class CodeManager:
 
     self._batch_fill_action_commit_log(details)
 
+    # Verify all repos in between are cached.
+    for spec in reversed(float_specs):
+      if self.code_storage.are_spec_commits_available(spec):
+        continue
+      raise errors.InternalError('Some commits in %s (%s) are unavailable' %
+                                 (spec.name, spec.path))
+
     # Disable cache because there might be write or even destructive git
     # operations when switch git versions. Be conservative now. We can cache
     # more if we observed more slow git operations later.
     git_util.fast_lookup.disable()
     git_util.get_commit_metadata.disable_cache()
     git_util.get_file_from_revision.disable_cache()
-
-    # Make sure all repos in between are cached
-    for spec in reversed(float_specs):
-      if self.code_storage.are_spec_commits_available(spec):
-        continue
-      self.spec_manager.sync_disk_state(spec.name)
+    git_util.is_containing_commit.disable_cache()
 
     return revlist, details
 

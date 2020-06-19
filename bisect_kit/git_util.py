@@ -324,6 +324,7 @@ class FastLookup:
 fast_lookup = FastLookup()
 
 
+@cache_util.Cache.default_disabled
 def is_containing_commit(git_repo, rev):
   """Determines given commit exists.
 

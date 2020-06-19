@@ -149,7 +149,6 @@ class ChromeSrcDomain(core.BisectDomain):
           'still have expected old behavior as %s', lowest_common_ancestor, old)
       config['old'] = old = lowest_common_ancestor
 
-    # TODO(kcwu): verify full git history is available.
     code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
     revlist, details = code_manager.build_revlist(old, new)
     for detail in details.values():
