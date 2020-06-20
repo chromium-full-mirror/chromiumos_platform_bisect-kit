@@ -923,6 +923,7 @@ class CodeManager:
     git_util.get_commit_metadata.enable_cache()
     git_util.get_file_from_revision.enable_cache()
     git_util.is_containing_commit.enable_cache()
+    git_util.is_ancestor_commit.enable_cache()
 
     # step 1, find all float and fixed specs in the given range.
     fixed_specs = self.spec_manager.collect_fixed_spec(old, new)
@@ -1018,6 +1019,7 @@ class CodeManager:
     git_util.get_commit_metadata.disable_cache()
     git_util.get_file_from_revision.disable_cache()
     git_util.is_containing_commit.disable_cache()
+    git_util.is_ancestor_commit.disable_cache()
 
     return revlist, details
 

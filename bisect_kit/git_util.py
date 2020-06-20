@@ -260,13 +260,6 @@ class FastLookupEntry:
       return True
     raise FastLookupFailed
 
-  def is_ancestor_commit(self, old, new):
-    old_idx = self.commit_to_index.get(old)
-    new_idx = self.commit_to_index.get(new)
-    if old_idx is not None and new_idx is not None:
-      return old_idx < new_idx
-    raise FastLookupFailed
-
 
 class FastLookup:
   """Collection of FastLookupEntry"""
@@ -308,18 +301,6 @@ class FastLookup:
         pass
     raise FastLookupFailed
 
-  def is_ancestor_commit(self, git_repo, old, new):
-    # This function is optimized only after get_rev_by_time() is invoked.
-    if git_repo not in self.entries:
-      raise FastLookupFailed
-
-    for entry in self.entries[git_repo].values():
-      try:
-        return entry.is_ancestor_commit(old, new)
-      except FastLookupFailed:
-        pass
-    raise FastLookupFailed
-
 
 fast_lookup = FastLookup()
 
@@ -350,6 +331,7 @@ def is_containing_commit(git_repo, rev):
     return False
 
 
+@cache_util.Cache.default_disabled
 def is_ancestor_commit(git_repo, old, new):
   """Determines `old` commit is ancestor of `new` commit.
 
@@ -362,11 +344,6 @@ def is_ancestor_commit(git_repo, old, new):
     True only if `old` is the ancestor of `new`. One commit is not considered
     as ancestor of itself.
   """
-  try:
-    return fast_lookup.is_ancestor_commit(git_repo, old, new)
-  except FastLookupFailed:
-    pass
-
   return util.check_output(
       'git',
       'rev-list',
