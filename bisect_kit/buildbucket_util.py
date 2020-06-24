@@ -63,7 +63,7 @@ class BuildbucketApi:
   _instance = None
   _build_fields = [
       'status', 'update_time', 'created_by', 'builder', 'create_time',
-      'critical', 'start_time', 'input', 'output', 'end_time', 'id'
+      'critical', 'start_time', 'input', 'output', 'end_time', 'id', 'tags'
   ]
   buildbucket_domain = 'cr-buildbucket.appspot.com'
   buildbucket_domain_url = 'https://cr-buildbucket.appspot.com/'
@@ -321,6 +321,7 @@ class BuildbucketApi:
     }
 
     chrome_isolate = None
+    deps_src_ver = None
     if deps:
       depsParser = gclient_util.DepsParser(None, None)
       parsed = depsParser.parse_single_deps(deps)
@@ -345,7 +346,7 @@ class BuildbucketApi:
     # search old builds
     if not force_rebuild:
       build = self.search_usable_build(board, bucket, chromeos_isolate,
-                                       chrome_isolate)
+                                       chrome_isolate, deps_src_ver)
       if build:
         return build
 
@@ -413,7 +414,8 @@ class BuildbucketApi:
     Returns:
       A list of builds.
     """
-    search_response_fields = ['builds.*.%s' % x for x in self._build_fields]
+    search_response_fields = ['builds.*.%s' % x for x in self._build_fields
+                             ] + ['next_page_token']
     field_mask = FieldMask(paths=search_response_fields)
     create_time = None
     tags = []
@@ -429,8 +431,10 @@ class BuildbucketApi:
       if end_time:
         create_time.end_time.CopyFrom(Timestamp(seconds=end_time, nanos=0))
 
-    # max page_size is 1000
-    page_size = min(1000, limit)
+    # Limitation of page_size is 1000 in theory.
+    # But in practice, setting to 1000 can cause api instance exceed memory
+    # limit, so here size is set to 100 to avoid api crash.
+    page_size = min(100, limit)
     builder = BuilderID(
         project=project,
         bucket=bucket,
@@ -469,7 +473,8 @@ class BuildbucketApi:
                           board,
                           bucket,
                           manifest_isolate_hash,
-                          deps_isolate_hash=None):
+                          deps_isolate_hash=None,
+                          deps_src_ver=None):
     """Search for recent success build if exists.
 
     Args:
@@ -478,6 +483,7 @@ class BuildbucketApi:
       manifest_isolate_hash: Isolate hash for Chrome OS manifest.
       deps_isolate_hash: Isolate hash for Chrome DEPS file, leave None if no
           special buildspec for Chrome.
+      deps_src_ver: The src revision inside deps.
 
     Returns:
       An build object if found, or None if no existing build.
@@ -502,7 +508,10 @@ class BuildbucketApi:
                                            {}).get('isolated_hash', None)
       build_deps_hash = input_properties.get('$chromeos/chrome', {}).get(
           'deps_isolate', {}).get('isolated_hash', None)
+      build_src_ver = input_properties.get('$chromeos/chrome',
+                                           {}).get('version', None)
       if (build_manifest_hash == manifest_isolate_hash and
-          build_deps_hash == deps_isolate_hash):
+          build_deps_hash == deps_isolate_hash and
+          build_src_ver == deps_src_ver):
         return build
     return None
