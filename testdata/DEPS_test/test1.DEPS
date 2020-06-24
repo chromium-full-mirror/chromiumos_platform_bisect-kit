@@ -71,16 +71,6 @@ deps = {
 hooks = [
   # buildspec_release -> src
   {
-    "name": "landmines",
-    "pattern": ".",
-    "cwd": ".",
-    "action": [
-        "python",
-        "src/build/landmines.py",
-    ]
-  },
-  # buildspec_release -> src
-  {
     "name": "disable_depot_tools_selfupdate",
     "pattern": ".",
     "cwd": ".",
@@ -88,6 +78,16 @@ hooks = [
         "python",
         "src/third_party/depot_tools/update_depot_tools_toggle.py",
         "--disable",
+    ]
+  },
+  # buildspec_release -> src
+  {
+    "name": "landmines",
+    "pattern": ".",
+    "cwd": ".",
+    "action": [
+        "python",
+        "src/build/landmines.py",
     ]
   },
   # buildspec_release -> src

@@ -1,0 +1,19 @@
+gclient_gn_args_file = "foo"
+gclient_gn_args = ['bar']
+
+allowed_hosts = [
+  "b",
+  "d",
+]
+deps = {
+  'b':
+    'b',
+  'd':
+    'd',
+}
+hooks = [
+  {
+    "name": "bar",
+    "action": []
+  }
+]

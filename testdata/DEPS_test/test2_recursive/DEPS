@@ -1,0 +1,26 @@
+gclient_gn_args_file = "should_be_ignored"
+gclient_gn_args = ['should_be_ignored']
+gclient_gn_args_from = "B"
+use_relative_paths = False
+
+allowed_hosts = [
+  "a",
+  "c",
+]
+
+deps = {
+  'A': 'GIT_PATH/A',
+  'B': 'GIT_PATH/B',
+}
+
+recursedeps = [
+  'A',
+  'B',
+]
+
+hooks = [
+  {
+    "name": "C",
+    "action": []
+  }
+]
