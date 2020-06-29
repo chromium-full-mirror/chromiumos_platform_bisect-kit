@@ -12,6 +12,16 @@ from bisect_kit import cros_lab_util
 class TestCrosLab(unittest.TestCase):
   """Test functions in cros_lab_util module."""
 
+  def test_normalize_board_name(self):
+    self.assertEqual(cros_lab_util.normalize_board_name('eve'), 'eve')
+    self.assertEqual(
+        cros_lab_util.normalize_board_name('eve-kernelnext'), 'eve')
+    self.assertEqual(
+        cros_lab_util.normalize_board_name('veyron_minnie'), 'veyron_minnie')
+    self.assertEqual(
+        cros_lab_util.normalize_board_name('veyron_minnie-kernelnext'),
+        'veyron_minnie')
+
   def test_normalize_sku_name(self):
     self.assertEqual(cros_lab_util.normalize_sku_name('foo_16GB'), 'foo_16GB')
     self.assertEqual(cros_lab_util.normalize_sku_name('foo_16Gb'), 'foo_16GB')

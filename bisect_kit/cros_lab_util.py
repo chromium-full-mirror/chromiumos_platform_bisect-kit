@@ -31,6 +31,23 @@ LEASE_DURATION = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
 
 
+def normalize_board_name(board):
+  """Normalize BOARD name.
+
+  Here, we want to find the actual device board. Suffixes like -kernelnext will
+  be removed. So we can use that name to query DUTs inside the lab.
+
+  Args:
+    board: BOARD name
+
+  Returns:
+    normalized BOARD name
+  """
+  # This is just a heuristic. There are some exceptions in the lab, which are
+  # not easy to handle.
+  return board.split('-')[0]
+
+
 def normalize_sku_name(sku):
   """Normalize SKU name.
 
@@ -119,21 +136,29 @@ def swarming_cancel(task_id):
                   task_id)
 
 
-def _simplify_bot_dimensions(bot):
+def _simplify_bot_dimensions(dimensions_pairs):
   # Convert list to dict, so it's easier to access.
   dimensions = {}
-  for dimension in bot['dimensions']:
+  for dimension in dimensions_pairs:
     assert dimension['key'] not in dimensions
     dimensions[dimension['key']] = dimension['value']
-  bot['dimensions'] = dimensions
+  return dimensions
 
 
-def swarming_bots_list(dimensions, is_busy=None, verbose_log=True):
+def swarming_bots_dimensions():
+  method = 'bots/dimensions'
+  bots_dimensions = swarming_query(
+      method, verbose_log=False).get('bots_dimensions', [])
+  return _simplify_bot_dimensions(bots_dimensions)
+
+
+def swarming_bots_list(dimensions, is_busy=None, limit=None, verbose_log=True):
   """Lists swarming bots.
 
   Args:
     dimensions: dimensions constraints (list)
     is_busy: filter by "is_busy" state; None means don't care
+    limit: limit number of bots
     verbose_log: log more if True
 
   Returns:
@@ -151,8 +176,9 @@ def swarming_bots_list(dimensions, is_busy=None, verbose_log=True):
     method += '?' + urllib.parse.urlencode(query, doseq=True)
 
   bots = []
-  for bot in swarming_query(method, verbose_log=verbose_log).get('items', []):
-    _simplify_bot_dimensions(bot)
+  for bot in swarming_query(
+      method, limit=limit, verbose_log=verbose_log).get('items', []):
+    bot['dimensions'] = _simplify_bot_dimensions(bot['dimensions'])
     bots.append(bot)
   return bots
 
@@ -253,6 +279,16 @@ def skylab_lease_dut(dut_name, duration=None, timeout=None):
         stdout_callback=stdout_lines.append,
         stderr_callback=stderr_lines.append,
         timeout=timeout)
+
+    # wait the state propagated
+    for _ in range(10):
+      time.sleep(5)
+      status = query_lease_status(dut_name)
+      if is_dut_leased_by_me(status):
+        break
+    else:
+      raise errors.DutLeaseException('lease verification failed: %s' % status)
+
     orphan_task = False
   except subprocess.CalledProcessError:
     stderr = ''.join(stderr_lines)
@@ -270,15 +306,6 @@ def skylab_lease_dut(dut_name, duration=None, timeout=None):
         task_id = m.group(1)
         logger.info('cancel the lease task %s', task_id)
         swarming_cancel(task_id)
-
-  # wait the state propagated
-  for _ in range(10):
-    time.sleep(5)
-    status = query_lease_status(dut_name)
-    if is_dut_leased_by_me(status):
-      break
-  else:
-    raise errors.DutLeaseException('lease verification failed: %s' % status)
 
   logger.info('leased dut %s for %.1f hours', dut_name, duration // 60 / 60.0)
   return status

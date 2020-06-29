@@ -64,6 +64,31 @@ def cmd_release_dut(opts):
   logger.info('%s released', host)
 
 
+def verify_dimensions_by_lab(dimensions):
+  result = []
+  bots_dimensions = cros_lab_util.swarming_bots_dimensions()
+  for dimension in dimensions:
+    key, value = dimension.split(':', 1)
+    if value in bots_dimensions.get(key, []):
+      result.append(dimension)
+    else:
+      logger.warning('dimension=%s is unknown in the lab, typo? ignored',
+                     dimension)
+  return result
+
+
+def select_available_bot_randomly(dimensions, variants, is_busy=None):
+  bots = []
+  for variant in variants:
+    # There might be thousand bots available, set 'limit' to reduce swarming
+    # API cost. This is not uniform random, but should be good enough.
+    bots += cros_lab_util.swarming_bots_list(
+        dimensions + [variant], is_busy=is_busy, limit=10)
+  if not bots:
+    return None
+  return random.choice(bots)
+
+
 def do_allocate_dut(opts):
   """Helper of cmd_allocate_dut.
 
@@ -72,36 +97,57 @@ def do_allocate_dut(opts):
       todo: 'ready' or 'wait'
       host: leased host name
   """
-  if not opts.model and not opts.sku and not opts.dut_name:
-    raise errors.ArgumentError('--model or --sku or --dut_name',
-                               'need to be specified')
-  if opts.dut_name and (opts.model or opts.sku):
+  if not opts.dut_name and not opts.pool:
+    raise errors.ArgumentError('--pool',
+                               'need to be specified if not --dut_name')
+  for v in opts.version_hint.split(','):
+    if cros_util.is_cros_version(v) or cros_util.is_cros_snapshot_version(v):
+      continue
     raise errors.ArgumentError(
-        '--model or --sku should be empty if dut_name is specified')
+        '--version_hint',
+        'should be Chrome OS version numbers, separated by comma')
 
   t0 = time.time()
   dimensions = ['dut_state:ready']
-  if opts.dut_name:
-    dimensions.append('dut_name:' + opts.dut_name)
-  else:
+  if not opts.dut_name:
     dimensions.append('label-pool:' + opts.pool)
 
+  variants = []
+  if opts.board:
+    for board in opts.board.split(','):
+      if opts.version_hint:
+        versions = opts.version_hint.split(',')
+        if not all(cros_util.has_test_image(board, v) for v in versions):
+          logger.warning(
+              'board=%s does not have prebuilt test image for %s, ignore',
+              board, opts.version_hint)
+          continue
+      variants.append('label-board:' +
+                      cros_lab_util.normalize_board_name(board))
   if opts.model:
-    dimensions.append('label-model:' + opts.model)
+    for model in opts.model.split(','):
+      variants.append('label-model:' + model)
   if opts.sku:
-    dimensions.append('label-hwid_sku:' +
-                      cros_lab_util.normalize_sku_name(opts.sku))
+    for sku in opts.sku.split(','):
+      variants.append('label-hwid_sku:' + cros_lab_util.normalize_sku_name(sku))
+  if opts.dut_name:
+    for dut_name in opts.dut_name.split(','):
+      variants.append('dut_name:' + dut_name)
+
+  verified_variants = verify_dimensions_by_lab(variants)
+  if not verified_variants:
+    raise errors.NoDutAvailable('No valid constraints (%s)' % variants)
+  variants = verified_variants
 
   while True:
     # Query every time because each iteration takes 10+ minutes
-    bots = cros_lab_util.swarming_bots_list(dimensions, is_busy=False)
-    if not bots:
-      bots = cros_lab_util.swarming_bots_list(dimensions)
-    if not bots:
+    bot = select_available_bot_randomly(dimensions, variants, is_busy=False)
+    if not bot:
+      bot = select_available_bot_randomly(dimensions, variants, is_busy=True)
+    if not bot:
       raise errors.NoDutAvailable(
-          'no bots satisfy constraints; incorrect model/sku? %s' % dimensions)
+          'no bots satisfy constraints; all are in maintenance state?')
 
-    bot = random.choice(bots)
     host = bot['dimensions']['dut_name'][0]
     logger.info('trying to lease %s', host)
     remaining_time = opts.time_limit - (time.time() - t0)
@@ -218,12 +264,14 @@ def main():
   parser_allocate_dut.add_argument(
       '--session', required=True, help='session name')
   parser_allocate_dut.add_argument(
-      '--pool', help='Pool to search dut', default=DEFAULT_DUT_POOL)
-  parser_allocate_dut.add_argument('--model', help='allocation criteria')
-  parser_allocate_dut.add_argument('--sku', help='allocation criteria')
-  parser_allocate_dut.add_argument('--dut_name', help='allocation criteria')
+      '--pool', help='Pool to search DUT', default=DEFAULT_DUT_POOL)
+  group = parser_allocate_dut.add_mutually_exclusive_group(required=True)
+  group.add_argument('--board', help='allocation criteria; comma separated')
+  group.add_argument('--model', help='allocation criteria; comma separated')
+  group.add_argument('--sku', help='allocation criteria; comma separated')
+  group.add_argument('--dut_name', help='allocation criteria; comma separated')
   parser_allocate_dut.add_argument(
-      '--label', '-b', help='Additional required labels, comma separated')
+      '--version_hint', help='chromeos version; comma separated')
   # Pubsub ack deadline is 10 minutes (b/143663659). Default 9 minutes with 1
   # minute buffer.
   parser_allocate_dut.add_argument(
