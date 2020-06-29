@@ -272,7 +272,7 @@ class BuildbucketApi:
                      git_auth=True,
                      bucket='bisector',
                      force_rebuild=False,
-                     build_tags={}):
+                     build_tags=None):
     """Schedule a build job in buildbucket.
 
     Args:
@@ -291,6 +291,8 @@ class BuildbucketApi:
     Raises:
       errors.ExternalError: If api request fail.
     """
+    if build_tags is None:
+      build_tags = {}
     tags = []
     for key, value in build_tags.items():
       tags.append(StringPair(key=key, value=value))

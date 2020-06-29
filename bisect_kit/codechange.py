@@ -864,8 +864,7 @@ class CodeManager:
           logger.error('essential spec mismatch, unable to continue')
           raise ValueError('Commit history analyze failed. '
                            'Bisector cannot deal with this version range.')
-        else:
-          logger.warning('%s do not match, skip', fixed_spec.name)
+        logger.warning('%s do not match, skip', fixed_spec.name)
         continue
       result.append((i, matched_index))
       last_index = matched_index

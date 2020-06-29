@@ -223,8 +223,8 @@ class CrosDiagnoser:
 
     if old_info.get('android_branch') != new_info.get('android_branch'):
       self.make_decision(
-          'Android branch mismatch: %s vs %s; unable to bisect Android',
-          old_info.get('android_branch'), new_info.get('android_branch'))
+          'Android branch mismatch: %s vs %s; unable to bisect Android' %
+          (old_info.get('android_branch'), new_info.get('android_branch')))
       return False
 
     return True
@@ -362,16 +362,15 @@ class CrosDiagnoser:
         raise errors.DiagnoseContradiction(
             'verified that the issue could be reproduced with '
             'android prebuilt; but unable to reproduce with local build')
-      elif isinstance(e, errors.VerifyOldBehaviorFailed):
+      if isinstance(e, errors.VerifyOldBehaviorFailed):
         raise errors.DiagnoseContradiction(
             '%s that old chromeos has old behavior (%s); '
             'but it became new behavior (%s) '
             'after deployed old android prebuilt' %
             (self._verified_chromeos_prebuilt(), self.config['term_old'],
              self.config['term_new']))
-      else:
-        self.make_decision('Unable to reproduce, the culprit is not in Android')
-        return verified
+      self.make_decision('Unable to reproduce, the culprit is not in Android')
+      return verified
     return verified
 
   def narrow_down_chrome(self, eval_cmd, extra_switch_cmd=None,

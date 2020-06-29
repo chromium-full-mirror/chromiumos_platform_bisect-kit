@@ -644,11 +644,7 @@ class DepsParser:
 
     global_scope = dict(Var=var_function)
     local_scope = {}
-    try:
-      six.exec_(content, global_scope, local_scope)
-    except SyntaxError:
-      raise
-
+    six.exec_(content, global_scope, local_scope)
     return local_scope
 
   def parse_single_deps(self, content, parent_vars=None, parent_path=''):
