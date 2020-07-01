@@ -524,8 +524,11 @@ class BisectorCommandLine:
       old_idx, new_idx = None, None
 
     for i, rev_info in enumerate(summary['rev_info']):
-      if (not verbose and not old_idx <= i <= new_idx and
-          not rev_info['result_counter']):
+      if not any([
+          verbose,
+          old_idx is not None and old_idx <= i <= new_idx,
+          rev_info['result_counter'],
+      ]):
         continue
 
       detail = []
@@ -699,7 +702,8 @@ class BisectorCommandLine:
 
     See config command's help message for more detail.
     """
-    self.states.load()
+    if not self.states.load():
+      raise errors.Uninitialized
     self.domain = self.domain_cls(self.states.config)
     if not opts.value:
       print(self.states.config[opts.key])
@@ -942,7 +946,8 @@ class BisectorCommandLine:
 
     self._create_states(session=opts.session)
     if opts.command not in ('init', 'reset', 'config'):
-      self.states.load()
+      if not self.states.load():
+        raise errors.Uninitialized
       self.domain = self.domain_cls(self.states.config)
       self.strategy = self._strategy_factory()
 

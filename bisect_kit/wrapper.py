@@ -79,6 +79,9 @@ class BisectorWrapper:
         common_init_args += ['--new_value', str(new_value)]
       if recompute_init_values:
         common_init_args.append('--recompute_init_values')
+      # Note that, if 'init' failed, no session file for this bisector is
+      # created. In other words, the error event is only recorded in
+      # diagnoser's log.
       self.call('init', *(common_init_args + init_args))
 
     self.switch_cmds = [switch_cmd]

@@ -19,6 +19,10 @@ class ArgumentError(Exception):
     return self.message
 
 
+class Uninitialized(Exception):
+  """'init' must succeed before other subcommands."""
+
+
 class ExecutionFatalError(Exception):
   """Fatal error and bisect should not continue.
 

@@ -525,16 +525,20 @@ class CrosDiagnoser:
       # Special case, combine bisector log nestedly.
       if entry.get('event') == 'bisect':
         bisector = wrapper.BisectorWrapper(entry['bisector'], entry['session'])
-        cmd = ['log', '--after', str(entry['timestamp'])]
-        if len(history) > i + 1:
-          cmd += ['--before', str(history[i + 1]['timestamp'])]
+        try:
+          cmd = ['log', '--after', str(entry['timestamp'])]
+          if len(history) > i + 1:
+            cmd += ['--before', str(history[i + 1]['timestamp'])]
 
-        if json_output:
-          cmd.append('--json')
-          output = bisector.call(*cmd, capture_output=True)
-          entry['log'] = json.loads(output)
-        else:
-          bisector.call(*cmd)
+          if json_output:
+            cmd.append('--json')
+            output = bisector.call(*cmd, capture_output=True)
+            entry['log'] = json.loads(output)
+          else:
+            bisector.call(*cmd)
+        except errors.Uninitialized:
+          # if 'init' failed, skip
+          continue
 
     if json_output:
       print(json.dumps(result, indent=2))
@@ -557,20 +561,24 @@ class CrosDiagnoser:
 
     for entry in bisects:
       bisector = wrapper.BisectorWrapper(entry['bisector'], entry['session'])
-      cmd = ['view']
-      if verbose:
-        cmd.append('--verbose')
-      if json_output:
-        cmd.append('--json')
-        output = bisector.call(*cmd, capture_output=True)
-        result.append({
-            'bisector': entry['bisector'],
-            'view': json.loads(output),
-        })
-      else:
-        print('bisector: %s' % entry['bisector'])
-        bisector.call(*cmd)
-        print('=' * 60)
+      try:
+        cmd = ['view']
+        if verbose:
+          cmd.append('--verbose')
+        if json_output:
+          cmd.append('--json')
+          output = bisector.call(*cmd, capture_output=True)
+          result.append({
+              'bisector': entry['bisector'],
+              'view': json.loads(output),
+          })
+        else:
+          print('bisector: %s' % entry['bisector'])
+          bisector.call(*cmd)
+          print('=' * 60)
+      except errors.Uninitialized:
+        # if 'init' failed, skip
+        continue
 
     if json_output:
       print(json.dumps(result, indent=2))
