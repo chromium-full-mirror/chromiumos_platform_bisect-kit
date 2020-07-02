@@ -100,12 +100,13 @@ def do_allocate_dut(opts):
   if not opts.dut_name and not opts.pool:
     raise errors.ArgumentError('--pool',
                                'need to be specified if not --dut_name')
-  for v in opts.version_hint.split(','):
-    if cros_util.is_cros_version(v) or cros_util.is_cros_snapshot_version(v):
-      continue
-    raise errors.ArgumentError(
-        '--version_hint',
-        'should be Chrome OS version numbers, separated by comma')
+  if opts.version_hint:
+    for v in opts.version_hint.split(','):
+      if cros_util.is_cros_version(v) or cros_util.is_cros_snapshot_version(v):
+        continue
+      raise errors.ArgumentError(
+          '--version_hint',
+          'should be Chrome OS version numbers, separated by comma')
 
   t0 = time.time()
   dimensions = ['dut_state:ready']
