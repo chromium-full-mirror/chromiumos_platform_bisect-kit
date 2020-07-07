@@ -11,12 +11,16 @@ import logging
 import operator
 import os
 import pprint
+import queue
 import shutil
 import sys
 import tempfile
 import urllib.parse
 
 import six
+
+# from third_party
+from depot_tools import gclient_eval
 
 from bisect_kit import codechange
 from bisect_kit import git_util
@@ -264,7 +268,16 @@ class Dep:
   def __ne__(self, rhs):
     return not self.__eq__(rhs)
 
-  def as_path_spec(self):
+  def set_url(self, repo_url, at):
+    assert self.dep_type == 'git'
+    self.url = '%s@%s' % (repo_url, at)
+
+  def set_revision(self, at):
+    assert self.dep_type == 'git'
+    repo_url, _ = self.parse_url()
+    self.set_url(repo_url, at)
+
+  def parse_url(self):
     assert self.dep_type == 'git'
 
     if '@' in self.url:
@@ -272,6 +285,10 @@ class Dep:
     else:
       # If the dependency is not pinned, the default is master branch.
       repo_url, at = self.url, 'master'
+    return repo_url, at
+
+  def as_path_spec(self):
+    repo_url, at = self.parse_url()
     return codechange.PathSpec(self.path, repo_url, at)
 
   def eval_condition(self):
@@ -364,10 +381,12 @@ class Deps:
     self.ignored_entries = {}
     self.recursedeps = []
     self.allowed_hosts = set()
+    self.gn_args_from = None
     self.gn_args_file = None
     self.gn_args = []
     self.hooks = []
     self.pre_deps_hooks = []
+    self.modified = set()
 
   def _gn_settings_to_lines(self):
     s = []
@@ -417,6 +436,7 @@ class Deps:
     """Converts |hooks| list to list of lines for output."""
     if not hooks:
       return []
+    hooks.sort(key=lambda x: x.get('name', ''))
     s = ['%s = [' % name]
     for hook in hooks:
       s.extend([
@@ -429,7 +449,7 @@ class Deps:
       if hook.get('condition') is not None:
         s.append('    "condition": %r,' % hook.get('condition'))
       # Flattened hooks need to be written relative to the root gclient dir
-      cwd = os.path.relpath(os.path.normpath(hook.get('cwd')))
+      cwd = os.path.relpath(os.path.normpath(hook.get('cwd', '.')))
       s.extend(['    "cwd": "%s",' % cwd] + ['    "action": ['] +
                ['        "%s",' % arg for arg in hook.get('action', [])] +
                ['    ]', '  },', ''])
@@ -450,6 +470,52 @@ class Deps:
     _, src_rev = self.entries['src'].parse_url()
     del self.entries['src']
     return src_rev
+
+  def apply_commit(self, path, revision, overwrite=True):
+    """Set revision to a project by path.
+
+    Args:
+      path: A project's path.
+      revision: A git commit id.
+      overwrite: Overwrite flag, the project won't change if overwrite=False
+                 and it was modified before.
+    """
+    if path in self.modified and not overwrite:
+      return
+    self.modified.add(path)
+
+    if path not in self.entries:
+      logger.warning('path: %s not found in DEPS', path)
+      return
+    self.entries[path].set_revision(revision)
+
+  def apply_action_groups(self, action_groups):
+    """Apply multiple action groups to DEPS.
+
+    If there are multiple actions in one repo, only last one is applied.
+
+    Args:
+      action_groups: A list of action groups.
+    """
+    # Apply in reversed order with overwrite=False,
+    # so each repo is on the state of last action.
+    for action_group in reversed(action_groups):
+      for action in reversed(action_group.actions):
+        if isinstance(action, codechange.GitCheckoutCommit):
+          self.apply_commit(action.path, action.rev, overwrite=False)
+        if isinstance(action, codechange.GitAddRepo):
+          self.apply_commit(action.path, action.rev, overwrite=False)
+        if isinstance(action, codechange.GitRemoveRepo):
+          assert action.path not in self.entries
+          self.modified.add(action.path)
+
+  def apply_deps(self, deps):
+    for path, dep in deps.entries.items():
+      if path in self.entries:
+        _, rev = dep.parse_url()
+        self.apply_commit(path, rev, overwrite=False)
+
+    # hooks, vars, ignored_entries are ignored and should be set by float_spec
 
 
 class TimeSeriesTree:
@@ -592,13 +658,13 @@ class TimeSeriesTree:
 
     return result
 
-  def iter_path_specs(self):
+  def iter_forest(self):
     """Iterates snapshots of project dependency state.
 
     Yields:
       (timestamp, path_specs):
         timestamp: time of snapshot
-        path_specs: dict of path_spec entries
+        forest: A dict indicates path => deps mapping
     """
     forest = {}
     # Group by timestamp
@@ -615,19 +681,29 @@ class TimeSeriesTree:
         else:
           end_counter[entry] -= 1
 
-      # Merge Deps at time `timestamp` into single path_specs.
-      path_specs = {}
-      for deps in forest.values():
-        for path, dep in deps.entries.items():
-          path_specs[path] = dep.as_path_spec()
-
-      yield timestamp, path_specs
+      yield timestamp, forest
 
       # Remove deps which are removed at this timestamp.
       for entry, count in end_counter.items():
         assert -1 <= count <= 1, (timestamp, entry)
         if count == 1:
           del forest[entry]
+
+  def iter_path_specs(self):
+    """Iterates snapshots of project dependency state.
+
+    Yields:
+      (timestamp, path_specs):
+        timestamp: time of snapshot
+        path_specs: dict of path_spec entries
+    """
+    for timestamp, forest in self.iter_forest():
+      path_specs = {}
+      # Merge Deps at time `timestamp` into single path_specs.
+      for deps in forest.values():
+        for path, dep in deps.entries.items():
+          path_specs[path] = dep.as_path_spec()
+      yield timestamp, path_specs
 
 
 class DepsParser:
@@ -647,13 +723,18 @@ class DepsParser:
     six.exec_(content, global_scope, local_scope)
     return local_scope
 
-  def parse_single_deps(self, content, parent_vars=None, parent_path=''):
+  def parse_single_deps(self,
+                        content,
+                        parent_vars=None,
+                        parent_path='',
+                        parent_dep=None):
     """Parses DEPS file without recursion.
 
     Args:
       content: file content of DEPS file
       parent_vars: variables inherent from parent DEPS
       parent_path: project path of parent DEPS file
+      parent_dep: A corresponding Dep object in parent DEPS
 
     Returns:
       Deps object
@@ -674,23 +755,42 @@ class DepsParser:
                        name)
     if 'deps_os' in local_scope:
       logger.warning('deps_os is no longer supported')
-    if local_scope.get('gclient_gn_args_from'):
-      logger.warning('gclient_gn_args_from is not supported')
 
     if 'allowed_hosts' in local_scope:
       deps.allowed_hosts = set(local_scope.get('allowed_hosts'))
     deps.hooks = local_scope.get('hooks', [])
     deps.pre_deps_hooks = local_scope.get('pre_deps_hooks', [])
+    deps.gn_args_from = local_scope.get('gclient_gn_args_from')
     deps.gn_args_file = local_scope.get('gclient_gn_args_file')
     deps.gn_args = local_scope.get('gclient_gn_args', [])
 
+    # recalculate hook path
+    use_relative_hooks = local_scope.get('use_relative_hooks', False)
+    if use_relative_hooks:
+      assert local_scope.get('use_relative_paths', False)
+      for hook in deps.hooks:
+        hook['cwd'] = os.path.join(parent_path, hook.get('cwd', ''))
+      for pre_deps_hook in deps.pre_deps_hooks:
+        pre_deps_hook['cwd'] = os.path.join(parent_path,
+                                            pre_deps_hook.get('cwd', ''))
+
     for path, dep_entry in local_scope['deps'].items():
+      # recalculate path
       path = path.format(**deps.variables)
       if local_scope.get('use_relative_paths', False):
         path = os.path.join(parent_path, path)
       path = os.path.normpath(path)
+
       dep = Dep(path, deps.variables, dep_entry)
-      if not dep.eval_condition():
+      eval_condition = dep.eval_condition()
+
+      # update condition
+      if parent_dep and parent_dep.condition:
+        tmp_dict = {'condition': dep.condition}
+        gclient_eval.UpdateCondition(tmp_dict, 'and', parent_dep.condition)
+        dep.condition = tmp_dict['condition']
+
+      if not eval_condition:
         deps.ignored_entries[path] = dep
         continue
 
@@ -732,6 +832,7 @@ class DepsParser:
                           before,
                           parent_vars=None,
                           parent_path='',
+                          parent_dep=None,
                           deps_file='DEPS'):
     """Processes DEPS recursively of given time period.
 
@@ -750,6 +851,7 @@ class DepsParser:
       parent_vars: DEPS variables inherit from parent DEPS (including
           custom_vars)
       parent_path: the path of parent project of current DEPS file
+      parent_dep: A corresponding Dep object in parent DEPS
       deps_file: filename of DEPS file, relative to the git repo, repo_rul
     """
     if '://' in repo_url:
@@ -787,7 +889,10 @@ class DepsParser:
       content = git_util.get_file_from_revision(git_repo, git_rev, deps_file)
 
       deps = self.parse_single_deps(
-          content, parent_vars=parent_vars, parent_path=parent_path)
+          content,
+          parent_vars=parent_vars,
+          parent_path=parent_path,
+          parent_dep=parent_dep)
       tstree.add_snapshot(timestamp, deps, deps.recursedeps)
 
     tstree.no_more_snapshot()
@@ -803,12 +908,73 @@ class DepsParser:
           subtree.end_time,
           parent_vars=subtree.parent_deps.variables,
           parent_path=path,
+          parent_dep=subtree.parent_deps.entries[path],
           deps_file=deps_file)
 
   def enumerate_path_specs(self, start_time, end_time, path):
     tstree = TimeSeriesTree(None, path, start_time, end_time)
     self.construct_deps_tree(tstree, path, 'master', start_time, end_time)
     return tstree.iter_path_specs()
+
+  def enumerate_gclient_solutions(self, start_time, end_time, path):
+    tstree = TimeSeriesTree(None, path, start_time, end_time)
+    self.construct_deps_tree(tstree, path, 'master', start_time, end_time)
+    return tstree.iter_forest()
+
+  def flatten(self, solutions, entry_point):
+    """Flatten all given Deps
+
+    Args:
+      solutions: A name => Deps dict, name can be either a str or a tuple.
+      entry_point (str): An entry_point name of solutions.
+
+    Returns:
+      Deps: A flatten Deps.
+    """
+
+    def _add_unvisited_recursedeps(deps_queue, visited, deps):
+      for name in deps.recursedeps:
+        if name not in visited:
+          visited.add(name)
+          deps_queue.put(name)
+
+    result = solutions[entry_point]
+    deps_queue = queue.SimpleQueue()
+    visited = set()
+    visited.add(entry_point)
+    _add_unvisited_recursedeps(deps_queue, visited, solutions[entry_point])
+
+    # BFS to merge `deps` into `result`
+    while not deps_queue.empty():
+      deps_name = deps_queue.get()
+      deps = solutions[deps_name]
+
+      result.allowed_hosts.update(deps.allowed_hosts)
+      for key, value in deps.variables.items():
+        assert key not in result.variables or deps.variables[key] == value
+        result.variables[key] = value
+      result.pre_deps_hooks += deps.pre_deps_hooks
+      result.hooks += deps.hooks
+
+      for dep in deps.entries.values():
+        assert dep.path not in result.entries or result.entries.get(
+            dep.path) == dep
+        result.entries[dep.path] = dep
+
+      for dep in deps.ignored_entries.values():
+        assert (dep.path not in result.ignored_entries or
+                result.ignored_entries.get(dep.path) == dep)
+        result.ignored_entries[dep.path] = dep
+
+      _add_unvisited_recursedeps(deps_queue, visited, deps)
+
+    # If gn_args_from is set in root DEPS, overwrite gn arguments
+    if solutions[entry_point].gn_args_from:
+      gn_args_dep = solutions[(solutions[entry_point].gn_args_from, 'DEPS')]
+      result.gn_args = gn_args_dep.gn_args
+      result.gn_args_file = gn_args_dep.gn_args_file
+
+    return result
 
 
 class GclientCache(codechange.CodeStorage):

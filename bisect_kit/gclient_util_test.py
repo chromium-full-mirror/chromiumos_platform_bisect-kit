@@ -5,6 +5,7 @@
 """Test gclient_util module."""
 
 from __future__ import print_function
+import copy
 import os
 import shutil
 import tempfile
@@ -107,12 +108,45 @@ class TestDepsParser(unittest.TestCase):
     self.assertIn(('src/bar', 'DEPS.bar'), deps.recursedeps)
 
   def test_deps_to_string(self):
-    with open(testing.get_testdata_path('DEPS')) as f:
+    with open(testing.get_testdata_path('DEPS_test/test1.DEPS')) as f:
       deps = f.read()
     parser = gclient_util.DepsParser('/dummy', None)
     deps_generated = parser.parse_single_deps(deps).to_string()
     self.assertDictEqual(
         parser.load_single_deps(deps), parser.load_single_deps(deps_generated))
+
+  def test_flatten_multiple_deps(self):
+    # create three repos: GIT_PATH, GIT_PATH/A and GIT_PATH/B
+    # and saves each deps to corresponding repo
+    test_dir = testing.get_testdata_path('DEPS_test/test2_recursive')
+
+    try:
+      repos = tempfile.mkdtemp()
+      for cur_dir, _, files in sorted(os.walk(test_dir)):
+        repo = os.path.join(repos, os.path.relpath(cur_dir, test_dir))
+        os.makedirs(repo, exist_ok=True)
+        git = git_util_test.GitOperation(repo)
+        git.init()
+
+        for filename in files:
+          with open(os.path.join(cur_dir, filename)) as f:
+            relpath = os.path.relpath(os.path.join(cur_dir, filename), test_dir)
+            content = f.read().replace('GIT_PATH', repos)
+            git.add_commit('2018-01-01T00:00:00', 'add', filename, content)
+
+      parser = gclient_util.DepsParser(None, None)
+      for t, f in parser.enumerate_gclient_solutions(1515024000, 1577923200,
+                                                     repos):
+        forest = copy.deepcopy(f)
+      deps = parser.flatten(forest, repos)
+    finally:
+      shutil.rmtree(repos)
+
+    with open(testing.get_testdata_path('DEPS_test/test2_expected.DEPS')) as f:
+      expected = f.read().replace('GIT_PATH', repos)
+    self.assertDictEqual(
+        parser.load_single_deps(deps.to_string()),
+        parser.load_single_deps(expected))
 
 
 # TODO(kcwu): refactor into normal unittest.

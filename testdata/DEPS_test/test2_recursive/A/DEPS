@@ -1,0 +1,16 @@
+allowed_hosts = [
+  "b",
+  "c",
+]
+deps = {
+  'a':
+    'a',
+  'c':
+    'c',
+}
+hooks = [
+  {
+    "name": "foo",
+    "action": []
+  }
+]
