@@ -224,6 +224,9 @@ def run_test(opts):
     output = cros_util.cros_sdk(
         opts.chromeos_root, *cmd, chrome_root=opts.chrome_root)
   except subprocess.CalledProcessError as e:
+    if e.output is None:
+      logger.error('cros_sdk failed before test started')
+      return None
     output = e.output
 
   m = re.search(r'Finished running tests. Results can be found in (\S+)',

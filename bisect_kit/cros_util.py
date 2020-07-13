@@ -1205,7 +1205,11 @@ def cros_sdk(chromeos_root, *args, **kwargs):
   # This is the hack to run dummy command once, so we can get clean output for
   # the command we are interested.
   cmd = prefix + ['true']
-  util.check_call(*cmd, cwd=chromeos_root)
+  try:
+    util.check_call(*cmd, cwd=chromeos_root)
+  except subprocess.CalledProcessError:
+    logger.exception('cros_sdk init/update failed')
+    raise
 
   cmd = prefix + list(args)
   return util.check_output(
