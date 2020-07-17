@@ -2,8 +2,18 @@
 # Copyright 2018 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Module to manipulate machines in chromeos test lab."""
+"""Module to manipulate machines in chromeos test lab.
+
+Terminology to refer a DUT in bisect-kit:
+  dut: (in bisect-kit everywhere)
+      It means the network address of a DUT, which is ssh-able.
+  dut_name: (for swarming and skylab api) also known as "host" name
+      Name of DUT in the lab, in format like chromeosX-rowX-rackX-hostX.
+      "dut_name" is almost used only in this module. It needs conversion to
+      "dut" for rest of bisect-kit code (dut_name_to_address).
+"""
 from __future__ import print_function
+import asyncio
 import calendar
 import contextlib
 import errno
@@ -18,6 +28,7 @@ import threading
 import time
 import urllib.parse
 
+from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
 
@@ -66,13 +77,23 @@ def is_lab_dut(dut):
 
 
 def dut_host_name(dut):
-  """Converts DUT address to host name.
+  """Converts DUT address to host name (aka dut_name).
 
   Args:
     dut: DUT address; assume the address is returned from this module
   """
   assert dut.endswith('.cros')
   return dut[:-5]
+
+
+def dut_name_to_address(dut_name):
+  """Converts DUT name to DUT address.
+
+  Args:
+    dut_name: DUT name, which is the host name in the lab
+  """
+  assert '.' not in dut_name
+  return dut_name + '.cros'
 
 
 def _run_labtools_command(name, *args, **kwargs):
@@ -251,6 +272,101 @@ def is_dut_leased_by_me(status):
     return False
 
   return True
+
+
+async def create_async_skylab_proc(cmd, *args, **kwargs):
+  cmd_args = [cmd]
+  service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+  if service_account_json:
+    cmd_args += ['-service-account-json', service_account_json]
+  cmd_args += list(args)
+  return await asyncio.create_subprocess_exec(
+      'skylab',
+      *cmd_args,
+      stdout=kwargs.get('stdout', subprocess.PIPE),
+      stderr=kwargs.get('stderr', subprocess.PIPE))
+
+
+async def async_lease(dut_name, duration=None):
+  if not duration:
+    duration = LEASE_DURATION
+  cmd = [
+      'lease-dut',
+      '-minutes',
+      '%d' % (duration // 60),
+      dut_name,
+  ]
+  logger.debug('run %r', cmd)
+  proc = await create_async_skylab_proc(
+      *cmd,
+      # combine two streams, so the code becomes simpler
+      stderr=subprocess.STDOUT)
+
+  pending_task = None
+  try:
+    while True:
+      line = await proc.stdout.readline()
+      if not line:
+        break
+      line = line.decode('utf8')
+      logger.debug('lease(%s): %s', dut_name, line)
+      m = re.search(r'Created lease task.*task\?id=(\w+)', line)
+      if m:
+        pending_task = m.group(1)
+        continue
+      if 'EXPIRED' in line:
+        pending_task = None
+        return None
+
+    await proc.wait()
+    if proc.returncode != 0:
+      logger.warning('lease(%s): skylab command failed: %s', dut_name,
+                     proc.returncode)
+      raise errors.InternalError('skylab command failed unexpectedly: %s' % proc.returncode)
+
+    if not cros_util.is_good_dut(dut_name_to_address(dut_name)):
+      logger.warning(
+          'lease(%s): the leased DUT is broken; '
+          'return it and lease another one later', dut_name)
+      return None
+
+    # wait the state propagated
+    for _ in range(10):
+      await asyncio.sleep(5)
+      status = query_lease_status(dut_name, verbose_log=False)
+      if is_dut_leased_by_me(status):
+        break
+    else:
+      raise errors.DutLeaseException('lease verification failed: %s' % status)
+
+    pending_task = None
+    return dut_name
+  except asyncio.CancelledError:
+    logger.debug('lease(%s): got CancelledError', dut_name)
+    raise
+  except errors.DutLeaseException:
+    logger.exception('lease(%s): lease task state is unexpected. discard',
+                     dut_name)
+    return None
+  finally:
+    if proc.returncode is None:
+      # We call asyncio.run() frequently. In other words, the event loop is
+      # short lived. Although asyncio.subprocess will cancel and terminate the
+      # process during event loop shutdown, the exit handler may be invoked
+      # after event loop is closed (too late and bounce exception).
+      # https://bugs.python.org/issue41320
+      try:
+        proc.kill()
+        await proc.wait()
+      except ProcessLookupError:
+        # The process may be already dead; ignore this error silently.
+        # Especially, our code and the process got ctrl-c at the same time and
+        # race.
+        pass
+    if pending_task:
+      logger.debug('lease(%s): cancel the lease task %s', dut_name,
+                   pending_task)
+      swarming_cancel(pending_task)
 
 
 def skylab_lease_dut(dut_name, duration=None, timeout=None):
@@ -555,8 +671,8 @@ def dut_manager(dut, allocator):
 
     try:
       # Append (partial) domain name of the lab
-      with dut_lease_manager(host + '.cros'):
-        yield host + '.cros'
+      with dut_lease_manager(dut_name_to_address(host)):
+        yield dut_name_to_address(host)
     finally:
       logger.info('auto release DUT %s', host)
       skylab_release_dut(host)

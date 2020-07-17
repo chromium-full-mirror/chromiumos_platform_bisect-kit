@@ -5,6 +5,7 @@
 # found in the LICENSE file.
 """Helper script to manipulate chromeos DUT or query info."""
 from __future__ import print_function
+import asyncio
 import argparse
 import json
 import logging
@@ -16,7 +17,6 @@ from bisect_kit import common
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
-from bisect_kit import util
 
 DEFAULT_DUT_POOL = 'DUT_POOL_QUOTA'
 logger = logging.getLogger(__name__)
@@ -50,6 +50,8 @@ def _get_label_by_prefix(info, prefix):
 
 
 def cmd_lease_dut(opts):
+  if opts.duration is not None and opts.duration < 60:
+    raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
   host = cros_lab_util.dut_host_name(opts.dut)
   logger.info('trying to lease %s', host)
   if cros_lab_util.skylab_lease_dut(host, opts.duration):
@@ -77,7 +79,7 @@ def verify_dimensions_by_lab(dimensions):
   return result
 
 
-def select_available_bot_randomly(dimensions, variants, is_busy=None):
+def select_available_bots_randomly(dimensions, variants, num=1, is_busy=None):
   bots = []
   for variant in variants:
     # There might be thousand bots available, set 'limit' to reduce swarming
@@ -86,7 +88,29 @@ def select_available_bot_randomly(dimensions, variants, is_busy=None):
         dimensions + [variant], is_busy=is_busy, limit=10)
   if not bots:
     return None
-  return random.choice(bots)
+  return random.sample(bots, min(num, len(bots)))
+
+
+async def lease_dut_parallelly(duration, bots, timeout=None):
+  tasks = []
+  hosts = []
+  for bot in bots:
+    host = bot['dimensions']['dut_name'][0]
+    hosts.append(host)
+    tasks.append(
+        asyncio.create_task(cros_lab_util.async_lease(host, duration=duration)))
+
+  try:
+    logger.info('trying to lease %d DUTs: %s', len(hosts), hosts)
+    for coro in asyncio.as_completed(tasks, timeout=timeout):
+      host = await coro
+      if host:
+        logger.info('leased %s', host)
+        # Unfinished lease tasks will be cancelled when asyncio.run is finishing.
+        return host
+    return None
+  except asyncio.TimeoutError:
+    return None
 
 
 def do_allocate_dut(opts):
@@ -107,6 +131,8 @@ def do_allocate_dut(opts):
       raise errors.ArgumentError(
           '--version_hint',
           'should be Chrome OS version numbers, separated by comma')
+  if opts.duration is not None and opts.duration < 60:
+    raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
 
   t0 = time.time()
   dimensions = ['dut_state:ready']
@@ -141,31 +167,23 @@ def do_allocate_dut(opts):
   variants = verified_variants
 
   while True:
-    # Query every time because each iteration takes 10+ minutes
-    bot = select_available_bot_randomly(dimensions, variants, is_busy=False)
-    if not bot:
-      bot = select_available_bot_randomly(dimensions, variants, is_busy=True)
-    if not bot:
+    # Query every time because each iteration takes a few minutes
+    bots = select_available_bots_randomly(
+        dimensions, variants, num=opts.parallel, is_busy=False)
+    if not bots:
+      bots = select_available_bots_randomly(
+          dimensions, variants, num=opts.parallel, is_busy=True)
+    if not bots:
       raise errors.NoDutAvailable(
           'no bots satisfy constraints; all are in maintenance state?')
 
-    host = bot['dimensions']['dut_name'][0]
-    logger.info('trying to lease %s', host)
     remaining_time = opts.time_limit - (time.time() - t0)
     if remaining_time <= 0:
       break
-    try:
-      if cros_lab_util.skylab_lease_dut(
-          host, opts.duration, timeout=remaining_time):
-        logger.info('leased %s (bot_id=%s)', host, bot['bot_id'])
-        dut = host + '.cros'
-        if cros_util.is_good_dut(dut):
-          return 'ready', host
-        logger.warning('the leased DUT is broken; '
-                       'return it and lease another one later')
-        cros_lab_util.skylab_release_dut(host)
-    except util.TimeoutExpired:
-      break
+    timeout = min(120, remaining_time)
+    host = asyncio.run(lease_dut_parallelly(opts.duration, bots, timeout))
+    if host:
+      return 'ready', host
     time.sleep(1)
 
   logger.warning('unable to lease DUT in time limit')
@@ -176,7 +194,7 @@ def cmd_allocate_dut(opts):
   leased_dut = None
   try:
     todo, host = do_allocate_dut(opts)
-    leased_dut = host + '.cros' if host else None
+    leased_dut = cros_lab_util.dut_name_to_address(host) if host else None
     result = {'result': todo, 'leased_dut': leased_dut}
     print(json.dumps(result))
   except Exception as e:
@@ -284,6 +302,11 @@ def main():
       '--duration',
       type=float,
       help='lease duration in seconds; will be round to minutes')
+  parser_allocate_dut.add_argument(
+      '--parallel',
+      type=int,
+      default=1,
+      help='Submit multiple lease tasks to speed up (default: %(default)d)')
   parser_allocate_dut.set_defaults(func=cmd_allocate_dut)
 
   parser_repair_dut = subparsers.add_parser(
