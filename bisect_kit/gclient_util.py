@@ -718,7 +718,10 @@ class DepsParser:
     def var_function(name):
       return '{%s}' % name
 
-    global_scope = dict(Var=var_function)
+    def str_function(name):
+      return str(name)
+
+    global_scope = dict(Var=var_function, Str=str_function)
     local_scope = {}
     six.exec_(content, global_scope, local_scope)
     return local_scope

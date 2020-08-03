@@ -72,7 +72,7 @@ hooks = [
   # buildspec_release -> src
   {
     "name": "disable_depot_tools_selfupdate",
-    "pattern": ".",
+    "pattern": Str('.'),
     "cwd": ".",
     "action": [
         "python",
