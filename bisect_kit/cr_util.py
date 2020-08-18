@@ -46,6 +46,8 @@ CHROME_TEST_BINARIES = [
     'vaapi_unittest',
     'video_decode_accelerator_perf_tests',
     'video_decode_accelerator_tests',
+    'video_encode_accelerator_perf_tests',
+    'video_encode_accelerator_tests',
     'video_encode_accelerator_unittest',
     'wayland_client_perftests',
 
