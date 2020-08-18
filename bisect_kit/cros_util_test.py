@@ -86,10 +86,16 @@ class TestCrosUtil(unittest.TestCase):
       sample = f.read()
     with mock.patch('bisect_kit.util.check_output', return_value=sample):
       dummy_dut = 'dummy'
-      self.assertTrue(cros_util.is_dut(dummy_dut))
       self.assertEqual(cros_util.query_dut_board(dummy_dut), 'samus')
       self.assertEqual(
           cros_util.query_dut_short_version(dummy_dut), '12345.0.0')
+
+  def test_os_release(self):
+    with open(testing.get_testdata_path('os-release')) as f:
+      sample = f.read()
+    with mock.patch('bisect_kit.util.check_output', return_value=sample):
+      dummy_dut = 'dummy'
+      self.assertTrue(cros_util.is_dut(dummy_dut))
 
   def test_query_dut_prebuilt_version(self):
     dummy_dut = 'dummy'

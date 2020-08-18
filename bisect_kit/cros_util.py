@@ -230,6 +230,26 @@ def query_dut_lsb_release(host):
   return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
 
 
+def query_dut_os_release(host):
+  """Query /etc/os-release of given DUT
+
+  Args:
+    host: the DUT address
+
+  Returns:
+    dict for keys and values of /etc/os-release.
+
+  Raises:
+    errors.SshConnectionError: cannot connect to host
+    errors.ExternalError: lsb-release file doesn't exist
+  """
+  try:
+    output = util.ssh_cmd(host, 'cat', '/etc/os-release')
+  except subprocess.CalledProcessError:
+    raise errors.ExternalError('unable to read /etc/os-release; not a DUT')
+  return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
+
+
 def is_dut(host):
   """Determines whether a host is a chromeos device.
 
@@ -240,12 +260,9 @@ def is_dut(host):
     True if the host is a chromeos device.
   """
   try:
-    return query_dut_lsb_release(host).get('DEVICETYPE') in [
-        'CHROMEBASE',
-        'CHROMEBIT',
-        'CHROMEBOOK',
-        'CHROMEBOX',
-        'REFERENCE',
+    return query_dut_os_release(host).get('ID') in [
+        'chromiumos',
+        'chromeos',
     ]
   except (errors.ExternalError, errors.SshConnectionError):
     return False
