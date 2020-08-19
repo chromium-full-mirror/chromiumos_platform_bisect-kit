@@ -154,7 +154,7 @@ def swarming_cancel(task_id):
     task_id: task id
   """
   util.check_call('swarming.py', 'cancel', '--swarming', SWARMING_SERVER,
-                  task_id)
+                  '--kill-running', task_id)
 
 
 def _simplify_bot_dimensions(dimensions_pairs):
