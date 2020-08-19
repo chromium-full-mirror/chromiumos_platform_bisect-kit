@@ -975,6 +975,16 @@ def cros_flash(chromeos_root,
   # entered a bad state.
   reboot(host)
 
+  # Stop service ap-update-manager to prevent rebooting during autoupdate.
+  # The service is used in jetstream boards, but not other CrOS devices.
+  if query_dut_os_release(host).get('GOOGLE_CRASH_ID') == 'Jetstream':
+    try:
+      # Sleep to wait ap-update-manager start; 10 is not enough.
+      time.sleep(20)
+      util.ssh_cmd(host, 'stop', 'ap-update-manager')
+    except subprocess.CalledProcessError:
+      pass  # not started; do nothing
+
   # Handle relative path.
   if '://' not in image_path and not os.path.isabs(image_path):
     assert os.path.exists(os.path.join(chromeos_root, image_path))
