@@ -979,8 +979,12 @@ def cros_flash(chromeos_root,
   # The service is used in jetstream boards, but not other CrOS devices.
   if query_dut_os_release(host).get('GOOGLE_CRASH_ID') == 'Jetstream':
     try:
-      # Sleep to wait ap-update-manager start; 10 is not enough.
-      time.sleep(20)
+      # Sleep to wait ap-update-manager start, which may take up to 27 seconds.
+      # For simplicity, we wait 60 seconds here, which is the timeout value of
+      # jetstream_host.
+      # https://chromium.googlesource.com/chromiumos/third_party/autotest
+      #     /+/master/server/hosts/jetstream_host.py#27
+      time.sleep(60)
       util.ssh_cmd(host, 'stop', 'ap-update-manager')
     except subprocess.CalledProcessError:
       pass  # not started; do nothing
