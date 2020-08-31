@@ -25,7 +25,7 @@ for TARGET in $TARGETS; do
         chrome)
             # --force to skip prompt and remove rootfs verification
             # automatically
-            deploy_chrome --force --build-dir=$out_dir --to=$DUT
+            deploy_chrome --force --build-dir=$out_dir --device=$DUT
             ;;
         *test|*tests)
             chmod o+x $out_dir/$TARGET
