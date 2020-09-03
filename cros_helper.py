@@ -39,7 +39,8 @@ def cmd_query_dut_board(opts):
 
 def cmd_reboot(opts):
   assert cros_util.is_dut(opts.dut)
-  cros_util.reboot(opts.dut)
+  cros_util.reboot(
+      opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo)
 
 
 def _get_label_by_prefix(info, prefix):

@@ -681,6 +681,37 @@ def dut_manager(dut, allocator):
       yield dut
 
 
+def reboot_via_servo(dut):
+  """Reboot a DUT in the lab via servo.
+
+  When this function returns, the reboot process may not finish yet. The caller
+  is responsible to wait boot complete.
+
+  Args:
+    dut: dut address
+
+  Returns:
+    True if reboot is triggered
+  """
+  if not is_lab_dut(dut):
+    return False
+
+  info = skylab_cmd('dut-info', dut_host_name(dut))
+  m = re.search(r'servo_host\s+(\S+)', info)
+  if not m:
+    logger.debug('this DUT has no servo?')
+    return False
+  servo_host = dut_name_to_address(m.group(1))
+
+  try:
+    util.ssh_cmd(servo_host, 'start', 'servod')
+  except subprocess.CalledProcessError:
+    pass  # servod is already running
+
+  util.ssh_cmd(servo_host, 'dut-control', 'power_state:reset')
+  return True
+
+
 def repair(dut):
   """Requests lab automatic DUT repairing.
 

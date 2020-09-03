@@ -18,6 +18,7 @@ from bisect_kit import catapult_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import util
 
@@ -87,7 +88,8 @@ def create_argument_parser():
 
 def prepare_to_run_test(opts):
   if opts.reboot_before_test:
-    cros_util.reboot(opts.dut)
+    cros_util.reboot(
+        opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo)
 
 
 def get_tast_bundle_info(opts, pattern=None):

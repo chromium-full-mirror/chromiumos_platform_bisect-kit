@@ -79,7 +79,8 @@ def switch(opts):
       version=opts.version,
       clobber_stateful=opts.clobber_stateful,
       disable_rootfs_verification=opts.disable_rootfs_verification,
-      repair_callback=cros_lab_util.repair):
+      repair_callback=cros_lab_util.repair,
+      force_reboot_callback=cros_lab_util.reboot_via_servo):
     return 0
   return 1
 

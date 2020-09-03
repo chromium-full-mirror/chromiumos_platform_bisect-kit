@@ -336,8 +336,14 @@ def query_dut_boot_id(host, connect_timeout=None):
       connect_timeout=connect_timeout).strip()
 
 
-def reboot(host):
-  """Reboot a DUT and verify"""
+def reboot(host, force_reboot_callback=None):
+  """Reboot a DUT and verify.
+
+  Args:
+    host: DUT address
+    force_reboot_callback: powerful reboot hook (via servo). This will be
+        invoked if normal reboot failed.
+  """
   logger.debug('reboot %s', host)
   boot_id = query_dut_boot_id(host)
 
@@ -347,7 +353,14 @@ def reboot(host):
     # Depends on timing, ssh may return failure due to broken pipe, which is
     # working as intended. Ignore such kind of errors.
     pass
-  wait_reboot_done(host, boot_id)
+
+  try:
+    wait_reboot_done(host, boot_id)
+  except (errors.SshConnectionError, errors.ExternalError):
+    if force_reboot_callback and force_reboot_callback(host):
+      wait_reboot_done(host, boot_id)
+      return
+    raise
 
 
 def wait_reboot_done(host, boot_id):
@@ -950,7 +963,8 @@ def cros_flash(chromeos_root,
                image_path,
                version=None,
                clobber_stateful=False,
-               disable_rootfs_verification=True):
+               disable_rootfs_verification=True,
+               force_reboot_callback=None):
   """Flash a DUT with given ChromeOS image.
 
   This is implemented by 'cros flash' command line.
@@ -965,6 +979,7 @@ def cros_flash(chromeos_root,
     clobber_stateful: Clobber stateful partition when performing update
     disable_rootfs_verification: Disable rootfs verification after update
         is completed
+    force_reboot_callback: powerful reboot hook (via servo)
 
   Raises:
     errors.ExternalError: cros flash failed
@@ -973,7 +988,7 @@ def cros_flash(chromeos_root,
 
   # Reboot is necessary because sometimes previous 'cros flash' failed and
   # entered a bad state.
-  reboot(host)
+  reboot(host, force_reboot_callback=force_reboot_callback)
 
   # Stop service ap-update-manager to prevent rebooting during autoupdate.
   # The service is used in jetstream boards, but not other CrOS devices.
@@ -1040,7 +1055,8 @@ def cros_flash_with_retry(chromeos_root,
                           version=None,
                           clobber_stateful=False,
                           disable_rootfs_verification=True,
-                          repair_callback=None):
+                          repair_callback=None,
+                          force_reboot_callback=None):
   # 'cros flash' is not 100% reliable, retry if necessary.
   for attempt in range(2):
     if attempt > 0:
@@ -1055,7 +1071,8 @@ def cros_flash_with_retry(chromeos_root,
           image_path,
           version=version,
           clobber_stateful=clobber_stateful,
-          disable_rootfs_verification=disable_rootfs_verification)
+          disable_rootfs_verification=disable_rootfs_verification,
+          force_reboot_callback=force_reboot_callback)
       return True
     except errors.ExternalError:
       logger.exception('cros flash failed')
