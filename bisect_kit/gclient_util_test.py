@@ -130,12 +130,11 @@ class TestDepsParser(unittest.TestCase):
 
         for filename in files:
           with open(os.path.join(cur_dir, filename)) as f:
-            relpath = os.path.relpath(os.path.join(cur_dir, filename), test_dir)
             content = f.read().replace('GIT_PATH', repos)
             git.add_commit('2018-01-01T00:00:00', 'add', filename, content)
 
       parser = gclient_util.DepsParser(None, None)
-      for t, f in parser.enumerate_gclient_solutions(1515024000, 1577923200,
+      for _, f in parser.enumerate_gclient_solutions(1515024000, 1577923200,
                                                      repos):
         forest = copy.deepcopy(f)
       deps = parser.flatten(forest, repos)

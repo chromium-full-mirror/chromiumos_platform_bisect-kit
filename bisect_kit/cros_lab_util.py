@@ -322,7 +322,8 @@ async def async_lease(dut_name, duration=None):
     if proc.returncode != 0:
       logger.warning('lease(%s): skylab command failed: %s', dut_name,
                      proc.returncode)
-      raise errors.InternalError('skylab command failed unexpectedly: %s' % proc.returncode)
+      raise errors.InternalError('skylab command failed unexpectedly: %s' %
+                                 proc.returncode)
 
     if not cros_util.is_good_dut(dut_name_to_address(dut_name)):
       logger.warning(

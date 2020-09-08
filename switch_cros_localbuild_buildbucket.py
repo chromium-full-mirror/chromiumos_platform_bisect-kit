@@ -181,7 +181,7 @@ def get_chrome_managers(opts):
 
 def get_chrome_buildspec_by_time(opts, timestamp, old_rev, new_rev):
   """Get a Chrome Deps buildspec (float spec) at given timestamp"""
-  spec_manager, code_manager, cache_manager = get_chrome_managers(opts)
+  spec_manager, _code_manager, cache_manager = get_chrome_managers(opts)
   deps_path = spec_manager.generate_meta_deps(new_rev)
   old_timestamp = spec_manager.lookup_build_timestamp(old_rev)
   new_timestamp = spec_manager.lookup_build_timestamp(new_rev)
@@ -195,8 +195,8 @@ def get_chrome_buildspec_by_time(opts, timestamp, old_rev, new_rev):
   parser = gclient_util.DepsParser(opts.chrome_root, cache_manager)
   timeseries_forests = parser.enumerate_gclient_solutions(
       old_timestamp, new_timestamp, deps_path)
-  for time, forest in timeseries_forests:
-    if time <= timestamp:
+  for t, forest in timeseries_forests:
+    if t <= timestamp:
       result = copy.deepcopy(forest)
 
   return parser.flatten(result, deps_path)
