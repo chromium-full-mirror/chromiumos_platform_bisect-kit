@@ -917,7 +917,7 @@ class CodeManager:
     revlist = []
     details = {}
 
-    # Enable cache for repetitive git operations. The space complixity is
+    # Enable cache for repetitive git operations. The space complexity is
     # O(number of candidates).
     git_util.get_commit_metadata.enable_cache()
     git_util.get_file_from_revision.enable_cache()

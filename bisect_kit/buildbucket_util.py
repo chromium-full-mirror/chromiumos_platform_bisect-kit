@@ -58,7 +58,7 @@ def get_luci_link(board, build_id, bucket='bisector'):
 class BuildbucketApi:
   """A wrapper of buildbucket apis.
 
-  This is a singleton class, it returns a same instance everytime.
+  This is a singleton class, it returns a same instance every time.
   """
   _instance = None
   _build_fields = [
@@ -404,7 +404,7 @@ class BuildbucketApi:
       bucket: Bucket name in buildbucket. Defaults to None.
       builder: Builder name in buildbucket. Defaults to None.
       status: Search builds by build status. Defaults to None.
-      created_by: Search builds by creater. Defaults to None.
+      created_by: Search builds by creator. Defaults to None.
       snapshot_commit: Search by annealing snapshot commit hash for Chrome
           OS. Defaults to None.
       limit: Maximum numbers of builds to return. Defaults to 100.

@@ -241,5 +241,5 @@ class ExtendedFloat:
       return self.exponent < other.exponent
     return self.exponent > other.exponent
 
-  def __round__(self, ndigits):
-    return round(float(self), ndigits)
+  def __round__(self, digits):
+    return round(float(self), digits)

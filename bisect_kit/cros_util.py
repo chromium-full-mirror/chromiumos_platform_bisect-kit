@@ -990,7 +990,7 @@ def cros_flash(chromeos_root,
   # entered a bad state.
   reboot(host, force_reboot_callback=force_reboot_callback)
 
-  # Stop service ap-update-manager to prevent rebooting during autoupdate.
+  # Stop service ap-update-manager to prevent rebooting during auto update.
   # The service is used in jetstream boards, but not other CrOS devices.
   if query_dut_os_release(host).get('GOOGLE_CRASH_ID') == 'Jetstream':
     try:
@@ -1308,7 +1308,7 @@ def copy_into_chroot(chromeos_root, src, dst, overwrite=True):
     chromeos_root: chromeos tree root
     src: path outside chroot
     dst: path inside chroot
-    overwrite: overwrite if dst alreadys exists
+    overwrite: overwrite if dst already exists
   """
   mount_chroot(chromeos_root)
   src = os.path.expanduser(src)

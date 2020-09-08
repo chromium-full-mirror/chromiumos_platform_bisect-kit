@@ -248,7 +248,7 @@ class CrosDiagnoser:
 
     if (self.config['bypass_android_prebuilt'] and
         self.config['bypass_android_build']):
-      self.make_decision('The bisection with Android is bypasswd')
+      self.make_decision('The bisection with Android is bypassed')
       return verified
 
     if self.config['bypass_android_prebuilt']:
@@ -302,7 +302,7 @@ class CrosDiagnoser:
         return verified
 
     if self.config['bypass_android_build']:
-      self.make_decision('The bisection with Android local build is bypasswd')
+      self.make_decision('The bisection with Android local build is bypassed')
       return verified
 
     # TODO(kcwu): what if the branch name does not have 'git_' prefix

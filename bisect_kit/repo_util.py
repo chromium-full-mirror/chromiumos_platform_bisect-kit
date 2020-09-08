@@ -83,7 +83,7 @@ def init(repo_dir,
     repo_url: repo repository location
     reference: location of mirror directory
     mirror: indicates repo mirror
-    groups: repo sync groups, groups should be seperate by comma
+    groups: repo sync groups, groups should be separate by comma
   """
   root = find_repo_root(repo_dir)
   if root and root != repo_dir:

@@ -526,10 +526,10 @@ def is_symbolic_link(git_repo, rev, path):
   """
   # format: 120000 blob 8735a8c1dd96ede39a21d983d5c96792fd15c1a5 default.xml
   # TODO(kcwu): handle escaped path with special characters
-  splitted = util.check_output(
+  parts = util.check_output(
       'git', 'ls-tree', rev, '--full-name', path, cwd=git_repo).split()
-  if len(splitted) >= 4 and splitted[3] == path:
-    return stat.S_ISLNK(int(splitted[0], 8))
+  if len(parts) >= 4 and parts[3] == path:
+    return stat.S_ISLNK(int(parts[0], 8))
 
   raise ValueError('file %s is not found in repo:%s rev:%s' %
                    (path, git_repo, rev))
