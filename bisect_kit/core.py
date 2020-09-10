@@ -100,7 +100,7 @@ class RevInfo:
                  **kwargs):
     if 'rev' in kwargs:
       assert kwargs['rev'] == self.rev
-    assert status in (None, 'init', 'old', 'new', 'skip')
+    assert status in (None, 'init', 'old', 'new', 'skip', 'fatal')
 
     if times is None:
       times = 1

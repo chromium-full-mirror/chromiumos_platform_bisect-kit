@@ -45,20 +45,20 @@ def _collect_bisect_result_values(values, line):
           'BISECT_RESULT_VALUES should be list of floats: %r' % m.group(1))
 
 
-def _execute_command(step, args, env=None, stdout_callback=None):
+def _is_fatal_returncode(returncode):
+  return returncode < 0 or returncode >= 128
+
+
+def _execute_command(args, env=None, stdout_callback=None):
   """Helper of do_evaluate() and do_switch().
 
   Args:
-    step: step name
     args: command line arguments
     env: environment variables
     stdout_callback: Callback function for stdout. Called once per line.
 
   Returns:
-    returncode; range 0 <= returncode < 128
-
-  Raises:
-    errors.ExecutionFatalError if child process returned fatal error code.
+    returncode
   """
   stderr_lines = []
   p = util.Popen(
@@ -67,8 +67,9 @@ def _execute_command(step, args, env=None, stdout_callback=None):
       stdout_callback=stdout_callback,
       stderr_callback=stderr_lines.append)
   returncode = p.wait()
-  if returncode < 0 or returncode >= 128:
+  if _is_fatal_returncode(returncode):
     # Only output error messages of child process if it is fatal error.
+    print(cli.format_returncode(returncode))
     print(
         'Last stderr lines of "%s"' % subprocess.list2cmdline(args),
         file=sys.stderr)
@@ -76,8 +77,6 @@ def _execute_command(step, args, env=None, stdout_callback=None):
     for line in stderr_lines[-50:]:
       print(line, end='', file=sys.stderr)
     print('=' * 40, file=sys.stderr)
-    raise errors.ExecutionFatalError('%s failed: %s' %
-                                     (step, cli.format_returncode(returncode)))
   return returncode
 
 
@@ -108,11 +107,8 @@ def do_evaluate(evaluate_cmd, domain, rev, log_file):
 
   Returns:
     (result, values):
-      result is one of 'old', 'new', 'skip'.
+      result is one of 'old', 'new', 'skip', 'fatal'.
       values are additional collected values, like performance score.
-
-  Raises:
-    errors.ExecutionFatalError if evaluator returned fatal error code.
   """
   env = os.environ.copy()
   env['BISECT_REV'] = rev
@@ -124,13 +120,14 @@ def do_evaluate(evaluate_cmd, domain, rev, log_file):
 
   values = []
   returncode = _execute_command(
-      'eval',
       evaluate_cmd,
       env=env,
       stdout_callback=lambda line: _collect_bisect_result_values(values, line))
   if log_file and os.path.exists(log_file):
     with open(log_file, 'a') as f:
       f.write(END_OF_LOG_FILE_MARKER)
+  if _is_fatal_returncode(returncode):
+    return 'fatal', []
   if returncode == 0:
     return 'old', values
   if returncode == 125:
@@ -159,10 +156,7 @@ def do_switch(switch_cmd, domain, rev, log_file):
     log_file: hint sub-process where to output detail log
 
   Returns:
-    None if switch successfully, 'skip' otherwise.
-
-  Raises:
-    errors.ExecutionFatalError if switcher returned fatal error code.
+    None if switch successfully, otherwise 'skip' or 'fatal'.
   """
   env = os.environ.copy()
   env['BISECT_REV'] = rev
@@ -172,10 +166,12 @@ def do_switch(switch_cmd, domain, rev, log_file):
     logger.info('switch log file = %s', log_file)
     env['LOG_FILE'] = log_file
 
-  returncode = _execute_command('switch', switch_cmd, env=env)
+  returncode = _execute_command(switch_cmd, env=env)
   if log_file and os.path.exists(log_file):
     with open(log_file, 'a') as f:
       f.write(END_OF_LOG_FILE_MARKER)
+  if _is_fatal_returncode(returncode):
+    return 'fatal'
   if returncode != 0:
     return 'skip'
   return None
@@ -295,7 +291,7 @@ class BisectorCommandLine:
       (step, sample):
         step: Last step executed ('switch' or 'eval').
         sample (dict): sampling result of `rev`. The dict contains:
-          status: Execution result ('old', 'new', or 'skip').
+          status: Execution result ('old', 'new', 'fatal', or 'skip').
           values: For eval bisection, collected values from eval step.
           switch_time: how much time in switch step
           eval_time: how much time in eval step
@@ -315,8 +311,8 @@ class BisectorCommandLine:
       sample['status'] = status
       if os.path.exists(switch_log_fullpath):
         sample['switch_log'] = switch_log
-      if status == 'skip':
-        logger.debug('switch failed => skip')
+      if status in ('skip', 'fatal'):
+        logger.debug('switch failed => %s', status)
         return 'switch', sample
 
     eval_log = self._step_log_path(rev, 'eval')
@@ -330,7 +326,7 @@ class BisectorCommandLine:
     sample['status'] = status
     if os.path.exists(eval_log_fullpath):
       sample['eval_log'] = eval_log
-    if status == 'skip':
+    if status in ('skip', 'fatal'):
       return 'eval', sample
 
     if self.strategy.is_value_bisection():
@@ -415,6 +411,8 @@ class BisectorCommandLine:
         step, sample = self._switch_and_eval(rev, prev_rev=prev_rev)
         self.states.add_history('sample', **sample)
         self.states.save()
+        if sample['status'] == 'fatal':
+          raise errors.ExecutionFatalError('%s failed' % step)
         status = term_map.get(sample['status'], sample['status'])
         if 'values' in sample:
           logger.info('rev=%s status => %s: %s', rev, status, sample['values'])
