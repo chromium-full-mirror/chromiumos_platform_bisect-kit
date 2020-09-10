@@ -92,6 +92,22 @@ def select_available_bots_randomly(dimensions, variants, num=1, is_busy=None):
   return random.sample(bots, min(num, len(bots)))
 
 
+def filter_dimensions_by_board(boards_with_prebuilt, dimensions):
+  result = []
+  for dimension in dimensions:
+    bots = cros_lab_util.swarming_bots_list([dimension], is_busy=None, limit=1)
+    if not bots:
+      continue
+    board = bots[0]['dimensions']['label-board'][0]
+    if board not in boards_with_prebuilt:
+      logger.warning(
+          'dimension=%s (board=%s) does not have corresponding '
+          'prebuilt image, ignore', dimension, board)
+      continue
+    result.append(dimension)
+  return result
+
+
 async def lease_dut_parallelly(duration, bots, timeout=None):
   tasks = []
   hosts = []
@@ -107,7 +123,8 @@ async def lease_dut_parallelly(duration, bots, timeout=None):
       host = await coro
       if host:
         logger.info('leased %s', host)
-        # Unfinished lease tasks will be cancelled when asyncio.run is finishing.
+        # Unfinished lease tasks will be cancelled when asyncio.run is
+        # finishing.
         return host
     return None
   except asyncio.TimeoutError:
@@ -118,9 +135,10 @@ def do_allocate_dut(opts):
   """Helper of cmd_allocate_dut.
 
   Returns:
-    (todo, host)
+    (todo, host, board_to_build)
       todo: 'ready' or 'wait'
       host: leased host name
+      board_to_build: board name for building image
   """
   if not opts.dut_name and not opts.pool:
     raise errors.ArgumentError('--pool',
@@ -143,13 +161,6 @@ def do_allocate_dut(opts):
   variants = []
   if opts.board:
     for board in opts.board.split(','):
-      if opts.version_hint:
-        versions = opts.version_hint.split(',')
-        if not all(cros_util.has_test_image(board, v) for v in versions):
-          logger.warning(
-              'board=%s does not have prebuilt test image for %s, ignore',
-              board, opts.version_hint)
-          continue
       variants.append('label-board:' +
                       cros_lab_util.normalize_board_name(board))
   if opts.model:
@@ -162,10 +173,39 @@ def do_allocate_dut(opts):
     for dut_name in opts.dut_name.split(','):
       variants.append('dut_name:' + dut_name)
 
-  verified_variants = verify_dimensions_by_lab(variants)
-  if not verified_variants:
-    raise errors.NoDutAvailable('No valid constraints (%s)' % variants)
-  variants = verified_variants
+  variants = verify_dimensions_by_lab(variants)
+  variants = sorted(set(variants))  # dedup
+  if not variants:
+    raise errors.NoDutAvailable(
+        'Invalid constraints: %s;%s;%s;%s' %
+        (opts.board, opts.model, opts.sku, opts.dut_name))
+
+  # Filter variants by prebuilt images.
+  if opts.version_hint:
+    if not opts.builder_hint:
+      opts.builder_hint = opts.board
+    if not opts.builder_hint:
+      raise errors.ArgumentError('--builder_hint',
+                                 'must be specified along with --version_hint')
+    boards_with_prebuilt = []
+    versions = opts.version_hint.split(',')
+    for builder in opts.builder_hint.split(','):
+      if not all(cros_util.has_test_image(builder, v) for v in versions):
+        logger.warning(
+            'builder=%s does not have prebuilt test image for %s, ignore',
+            builder, opts.version_hint)
+        continue
+      boards_with_prebuilt.append(cros_lab_util.normalize_board_name(builder))
+    logger.info('boards with prebuilt: %s', boards_with_prebuilt)
+    if not boards_with_prebuilt:
+      raise errors.ArgumentError(
+          '--version_hint',
+          'given builders have no prebuilt for %s' % opts.version_hint)
+    variants = filter_dimensions_by_board(boards_with_prebuilt, variants)
+    if not variants:
+      raise errors.NoDutAvailable(
+          'Devices with specified constraints have no prebuilt. '
+          'Wrong version number?')
 
   while True:
     # Query every time because each iteration takes a few minutes
@@ -184,19 +224,31 @@ def do_allocate_dut(opts):
     timeout = min(120, remaining_time)
     host = asyncio.run(lease_dut_parallelly(opts.duration, bots, timeout))
     if host:
-      return 'ready', host
+      # Resolve what board we should build during bisection.
+      board_to_build = None
+      bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])
+      host_board = bots[0]['dimensions']['label-board'][0]
+      if opts.builder_hint:
+        for builder in opts.builder_hint.split(','):
+          if cros_lab_util.normalize_board_name(builder) == host_board:
+            board_to_build = builder
+            break
+      else:
+        board_to_build = host_board
+
+      return 'ready', host, board_to_build
     time.sleep(1)
 
   logger.warning('unable to lease DUT in time limit')
-  return 'wait', None
+  return 'wait', None, None
 
 
 def cmd_allocate_dut(opts):
   leased_dut = None
   try:
-    todo, host = do_allocate_dut(opts)
+    todo, host, board = do_allocate_dut(opts)
     leased_dut = cros_lab_util.dut_name_to_address(host) if host else None
-    result = {'result': todo, 'leased_dut': leased_dut}
+    result = {'result': todo, 'leased_dut': leased_dut, 'board': board}
     print(json.dumps(result))
   except Exception as e:
     logger.exception('cmd_allocate_dut failed')
@@ -284,7 +336,9 @@ def main():
   parser_allocate_dut.add_argument(
       '--session', required=True, help='session name')
   parser_allocate_dut.add_argument(
-      '--pool', help='Pool to search DUT', default=DEFAULT_DUT_POOL)
+      '--pool',
+      help='Pool to search DUT (default: %(default)s)',
+      default=DEFAULT_DUT_POOL)
   group = parser_allocate_dut.add_mutually_exclusive_group(required=True)
   group.add_argument('--board', help='allocation criteria; comma separated')
   group.add_argument('--model', help='allocation criteria; comma separated')
@@ -292,6 +346,8 @@ def main():
   group.add_argument('--dut_name', help='allocation criteria; comma separated')
   parser_allocate_dut.add_argument(
       '--version_hint', help='chromeos version; comma separated')
+  parser_allocate_dut.add_argument(
+      '--builder_hint', help='chromeos builder; comma separated')
   # Pubsub ack deadline is 10 minutes (b/143663659). Default 9 minutes with 1
   # minute buffer.
   parser_allocate_dut.add_argument(

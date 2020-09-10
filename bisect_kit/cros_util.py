@@ -621,7 +621,9 @@ def version_to_full(board, version):
   if is_cros_full_version(version):
     return version
   milestone = query_milestone_by_version(board, version)
-  assert milestone, 'incorrect board=%s or version=%s ?' % (board, version)
+  if not milestone:
+    raise errors.ExternalError('incorrect board=%s or version=%s ?' %
+                               (board, version))
   return make_cros_full_version(milestone, version)
 
 
@@ -738,7 +740,12 @@ def has_test_image(board, version):
   if is_cros_snapshot_version(version):
     return bool(query_snapshot_buildbucket_id(board, version))
 
-  full_version = version_to_full(board, version)
+  try:
+    full_version = version_to_full(board, version)
+  except errors.ExternalError:
+    # version_to_full() is implemented by checking image, thus its failure
+    # means no image.
+    return False
   short_version = version_to_short(version)
   paths = [
       gs_archive_path.format(board=board) +
