@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import sys
+import textwrap
 
 from bisect_kit import catapult_util
 from bisect_kit import cli
@@ -167,6 +168,28 @@ def prepare_to_run_test(opts):
       if b'file descriptor passing not supported' in f.read():
         cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge',
                            'net-misc/openssh')
+
+  # Special handling for audio tests (b/136136270).
+  if opts.prebuilt:
+    autotest_dir = os.path.join(opts.chromeos_root,
+                                cros_util.prebuilt_autotest_dir)
+  else:
+    autotest_dir = os.path.join(opts.chromeos_root,
+                                'src/third_party/autotest/files')
+  sox_path = os.path.join(opts.chromeos_root, 'chroot/usr/bin/sox')
+  if not os.path.exists(sox_path):
+    cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'sox')
+  shadow_config_path = os.path.join(autotest_dir, 'shadow_config.ini')
+  if not os.path.exists(shadow_config_path):
+    with open(shadow_config_path, 'w') as f:
+      f.write(
+          textwrap.dedent("""
+            [CROS]
+            enable_ssh_tunnel_for_servo: True
+            enable_ssh_tunnel_for_chameleon: True
+            enable_ssh_connection_for_devserver: True
+            enable_ssh_tunnel_for_moblab: True
+          """))
 
   # test_that may use this ssh key and ssh complains its permission is too open.
   # chmod every time just before run test_that because the permission may change
