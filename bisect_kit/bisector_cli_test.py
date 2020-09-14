@@ -39,7 +39,7 @@ class DummyDomain(core.BisectDomain):
         new=opts.new)
 
     revlist = [str(i) for i in range(opts.num)]
-    return config, revlist
+    return config, {'revlist': revlist}
 
   def __init__(self, config):
     self.config = config
@@ -79,10 +79,16 @@ class TestBisectorCli(unittest.TestCase):
           values, 'BISECT_RESULT_VALUES=hello\n')
 
 
-@testing.mock_session_base()
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())
 class TestBisectorCommandLine(unittest.TestCase):
   """Test bisector_cli.BisectorCommandLine class."""
+
+  def setUp(self):
+    self.session_base_patcher = testing.SessionBasePatcher()
+    self.session_base_patcher.patch()
+
+  def tearDown(self):
+    self.session_base_patcher.reset()
 
   def test_run_true(self):
     bisector = bisector_cli.BisectorCommandLine(DummyDomain)

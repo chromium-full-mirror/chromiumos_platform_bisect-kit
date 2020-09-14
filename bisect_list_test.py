@@ -14,10 +14,16 @@ from bisect_kit import testing
 import bisect_list
 
 
-@testing.mock_session_base()
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())
 class TestListDomain(unittest.TestCase):
   """Test ListDomain class."""
+
+  def setUp(self):
+    self.session_base_patcher = testing.SessionBasePatcher()
+    self.session_base_patcher.patch()
+
+  def tearDown(self):
+    self.session_base_patcher.reset()
 
   def test_basic(self):
     """Tests basic functionality."""

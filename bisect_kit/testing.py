@@ -50,17 +50,20 @@ def mock_function_by_file(module, name, filename):
     yield
 
 
-class mock_session_base(contextlib.ContextDecorator):
-  """Context decorator to mock session base and clean up."""
+class SessionBasePatcher:
+  """Helper class to patch session base and clean up."""
 
   def __init__(self):
-    self.session_base_bak = None
-    self.session_base = tempfile.mkdtemp()
-
-  def __enter__(self):
     self.session_base_bak = common.DEFAULT_SESSION_BASE
-    common.DEFAULT_SESSION_BASE = self.session_base
+    self.session_base = None
 
-  def __exit__(self, *exc):
-    common.DEFAULT_SESSION_BASE = self.session_base_bak
-    shutil.rmtree(self.session_base)
+  def patch(self):
+    if not self.session_base:
+      self.session_base = tempfile.mkdtemp()
+      common.DEFAULT_SESSION_BASE = self.session_base
+
+  def reset(self):
+    if self.session_base:
+      common.DEFAULT_SESSION_BASE = self.session_base_bak
+      shutil.rmtree(self.session_base)
+      self.session_base = None

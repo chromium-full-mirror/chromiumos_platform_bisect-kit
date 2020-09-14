@@ -16,18 +16,20 @@ from bisect_kit import testing
 import bisect_git
 
 
-@testing.mock_session_base()
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())
 class TestGitDomain(unittest.TestCase):
   """Test GitDomain class."""
 
   def setUp(self):
+    self.session_base_patcher = testing.SessionBasePatcher()
+    self.session_base_patcher.patch()
     self.git_repo = tempfile.mkdtemp()
     self.git = git_util_test.GitOperation(self.git_repo)
     self.git.init()
 
   def tearDown(self):
     shutil.rmtree(self.git_repo)
+    self.session_base_patcher.reset()
 
   def test_basic(self):
     """Tests basic functionality."""
