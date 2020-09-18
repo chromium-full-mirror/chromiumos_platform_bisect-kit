@@ -19,6 +19,9 @@ import os
 import tempfile
 import urllib.request
 
+import apiclient
+import google.oauth2.service_account
+
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import errors
@@ -136,30 +139,34 @@ def lunch(android_root, flavor, *args, **kwargs):
                   **kwargs)
 
 
-def fetch_artifact(flavor, build_id, filename, dest):
+def fetch_artifact_from_g3(flavor, build_id, filename, dest_folder):
   """Fetches Android build artifact.
 
   Args:
     flavor: Android build flavor
     build_id: Android build id
     filename: artifact name
-    dest: local path to store the fetched artifact
+    dest_folder: local path to store the fetched artifact
   """
-  service_account_args = []
-  # These arguments are for bisector service and not required for users of
-  # bisect-kit using personal account.
-  if os.environ.get('ANDROID_CLOUD_SERVICE_ACCOUNT_EMAIL'):
-    assert os.environ.get('ANDROID_CLOUD_SERVICE_ACCOUNT_KEY')
-    service_account_args += [
-        '--email',
-        os.environ.get('ANDROID_CLOUD_SERVICE_ACCOUNT_EMAIL'),
-        '--apiary_service_account_private_key_path',
-        os.environ.get('ANDROID_CLOUD_SERVICE_ACCOUNT_KEY'),
-    ]
-
   util.check_call('/google/data/ro/projects/android/fetch_artifact', '--target',
-                  flavor, '--bid', build_id, filename, dest,
-                  *service_account_args)
+                  flavor, '--bid', build_id, filename, dest_folder)
+
+
+def fetch_artifact(flavor, build_id, filename, dest_folder):
+  """Fetches Android build artifact.
+
+  Args:
+    flavor: Android build flavor
+    build_id: Android build id
+    filename: artifact name
+    dest_folder: local path to store the fetched artifact
+  """
+  if os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'):
+    api = AndroidInternalApi()
+    api.download_artifact(build_id, flvor, filename,
+                          os.path.join(dest_folder, filename))
+  else:
+    fetch_artifact_from_g3(flavor, build_id, filename, dest_folder)
 
 
 def fetch_manifest(android_root, flavor, build_id):
@@ -278,3 +285,93 @@ class AndroidSpecManager(codechange.SpecManager):
         self.config['android_root'],
         manifest_name=manifest_name,
         current_branch=True)
+
+
+class AndroidInternalApi:
+  """Wrapper of android internal api. Singleton class"""
+
+  _instance = None
+  _default_chunk_size = 20 * 1024 * 1024  # 20M
+  _retries = 5
+
+  def __new__(cls):
+    if cls._instance is None:
+      cls._instance = object.__new__(cls)
+    return cls._instance
+
+  def __init__(self):
+    if not os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'):
+      raise errors.InternalError(
+          'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON must defined when using Android Api'
+      )
+    self.credentials = self.get_credentials()
+    self.service = apiclient.discovery.build(
+        'androidbuildinternal', 'v3', credentials=self.credentials)
+
+  def get_credentials(self):
+    # TODO(zjchang): support compute engine type credential
+    credentials = google.oauth2.service_account.Credentials.from_service_account_file(
+        os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'),
+        scopes=['https://www.googleapis.com/auth/androidbuild.internal'],
+    )
+    return credentials
+
+  def get_artifact_info(self, build_id, target, name, attempt_id=0):
+    """Get Android build artifact info.
+
+    Args:
+      build_id: Android build ID.
+      target: Android build target.
+      name: Artifact name.
+      attempt_id: A build attempt. Defaults to 0.
+
+    Returns:
+      Artifact info.
+
+    Raises:
+      errors.ExternalError
+    """
+    try:
+      artifact = self.service.buildartifact().get(
+          buildId=build_id,
+          target=target,
+          attemptId=attempt_id,
+          resourceId=name).execute(num_retries=self._retries)
+    except (googleapiclient.errors.HttpError, httplib2.HttpLib2Error) as e:
+      raise errors.ExternalError('Android API error: ' + str(e))
+
+    if artifact is None:
+      raise errors.ExternalError('Invalid artifact %s/%s/%s/%s' %
+                                 (build_id, target, attempt_id, name))
+    return artifact
+
+  def download_artifact(self, build_id, target, name, output_file,
+                        attempt_id=0):
+    """Download one artifact.
+
+    Args:
+      build_id: Android build ID.
+      target: Android build target.
+      name: Artifact name.
+      output_file: Target file path.
+      attempt_id: A build attempt. Defaults to 0.
+
+    Raises:
+      errors.ExternalError
+    """
+    artifact = self.get_artifact_info(
+        build_id, target, name, attempt_id=attempt_id)
+    chunksize = min(int(artifact['size']), self._default_chunk_size)
+
+    download_request = self.service.buildartifact().get_media(
+        buildId=build_id, target=target, attemptId=attempt_id, resourceId=name)
+
+    try:
+      with open(output_file, mode='wb') as f:
+        downloader = apiclient.http.MediaIoBaseDownload(
+            f, download_request, chunksize=chunksize)
+        done = False
+        while not done:
+          status, done = downloader.next_chunk(num_retries=self._retries)
+    except (googleapiclient.errors.HttpError, httplib2.HttpLib2Error) as e:
+      raise errors.ExternalError('Android API error: ' + str(e))
