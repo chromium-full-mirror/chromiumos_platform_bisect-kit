@@ -1581,15 +1581,15 @@ def enumerate_autotest_control_files(autotest_dir):
       'client/tests',
   ]
 
-  blacklist = ['site-packages', 'venv', 'results', 'logs', 'containers']
+  denylist = ['site-packages', 'venv', 'results', 'logs', 'containers']
   result = []
   for subpath in subpaths:
     path = os.path.join(autotest_dir, subpath)
     for root, dirs, files in os.walk(path):
 
-      for black in blacklist:
-        if black in dirs:
-          dirs.remove(black)
+      for deny in denylist:
+        if deny in dirs:
+          dirs.remove(deny)
 
       for filename in files:
         if filename == 'control' or filename.startswith('control.'):
