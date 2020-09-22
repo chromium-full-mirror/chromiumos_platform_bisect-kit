@@ -178,7 +178,13 @@ def prepare_to_run_test(opts):
                                 'src/third_party/autotest/files')
   sox_path = os.path.join(opts.chromeos_root, 'chroot/usr/bin/sox')
   if not os.path.exists(sox_path):
-    cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'sox')
+    try:
+      cros_util.cros_sdk(opts.chromeos_root, 'sudo', 'emerge', 'sox')
+    except subprocess.CalledProcessError:
+      # It's known that installing sox would fail for earlier version of
+      # chromeos (b/136136270), so ignore the failure.
+      logger.debug('Sox is only required by some audio tests. '
+                   'Assume the failure of installing sox is harmless')
   shadow_config_path = os.path.join(autotest_dir, 'shadow_config.ini')
   if not os.path.exists(shadow_config_path):
     with open(shadow_config_path, 'w') as f:
