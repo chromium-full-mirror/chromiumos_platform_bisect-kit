@@ -21,6 +21,13 @@ from bisect_kit import errors
 DEFAULT_DUT_POOL = 'DUT_POOL_QUOTA'
 logger = logging.getLogger(__name__)
 
+models_to_avoid = {
+    # model: reason
+    'kasumi': 'b/160458394 stateful partition is too small',
+    'mimrock': 'b/160458394 stateful partition is too small',
+    'vorticon': 'b/160458394 stateful partition is too small',
+}
+
 
 def cmd_version_info(opts):
   info = cros_util.version_info(opts.board, opts.version)
@@ -89,7 +96,20 @@ def select_available_bots_randomly(dimensions, variants, num=1, is_busy=None):
         dimensions + [variant], is_busy=is_busy, limit=10)
   if not bots:
     return None
-  return random.sample(bots, min(num, len(bots)))
+
+  known_bad = set()
+  good_bots = []
+  for bot in bots:
+    model = bot['dimensions']['label-model'][0]
+    if model in models_to_avoid:
+      if model not in known_bad:
+        logger.warning('model=%s is bad (reason:%s), ignore', model,
+                       models_to_avoid[model])
+        known_bad.add(model)
+      continue
+    good_bots.append(bot)
+
+  return random.sample(good_bots, min(num, len(good_bots)))
 
 
 def filter_dimensions_by_board(boards_with_prebuilt, dimensions):
@@ -165,7 +185,14 @@ def do_allocate_dut(opts):
                       cros_lab_util.normalize_board_name(board))
   if opts.model:
     for model in opts.model.split(','):
+      if model in models_to_avoid:
+        logger.warning('model=%s is bad (reason:%s), ignore', model,
+                       models_to_avoid[model])
+        continue
       variants.append('label-model:' + model)
+    if not variants:
+      raise errors.ArgumentError('--model',
+                                 'all specified models are not supported')
   if opts.sku:
     for sku in opts.sku.split(','):
       variants.append('label-hwid_sku:' + cros_lab_util.normalize_sku_name(sku))
