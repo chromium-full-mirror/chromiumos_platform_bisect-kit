@@ -306,7 +306,10 @@ class AndroidInternalApi:
       )
     self.credentials = self.get_credentials()
     self.service = apiclient.discovery.build(
-        'androidbuildinternal', 'v3', credentials=self.credentials)
+        'androidbuildinternal',
+        'v3',
+        credentials=self.credentials,
+        cache_discovery=False)
 
   def get_credentials(self):
     # TODO(zjchang): support compute engine type credential
