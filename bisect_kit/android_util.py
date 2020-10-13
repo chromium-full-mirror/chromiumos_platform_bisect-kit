@@ -163,7 +163,7 @@ def fetch_artifact(flavor, build_id, filename, dest_folder):
   """
   if os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'):
     api = AndroidInternalApi()
-    api.download_artifact(build_id, flvor, filename,
+    api.download_artifact(build_id, flavor, filename,
                           os.path.join(dest_folder, filename))
   else:
     fetch_artifact_from_g3(flavor, build_id, filename, dest_folder)
