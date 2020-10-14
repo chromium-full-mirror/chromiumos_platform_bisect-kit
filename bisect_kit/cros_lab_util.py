@@ -698,18 +698,21 @@ def reboot_via_servo(dut):
     return False
 
   info = skylab_cmd('dut-info', dut_host_name(dut))
-  m = re.search(r'servo_host\s+(\S+)', info)
-  if not m:
+  m1 = re.search(r'servo_host\s+(\S+)', info)
+  m2 = re.search(r'servo_port\s+(\d+)', info)
+  if not m1 or not m2:
     logger.debug('this DUT has no servo?')
     return False
-  servo_host = dut_name_to_address(m.group(1))
+  servo_host = dut_name_to_address(m1.group(1))
+  servo_port = m2.group(1)
 
   try:
-    util.ssh_cmd(servo_host, 'start', 'servod')
+    util.ssh_cmd(servo_host, 'start', 'servod', 'PORT=' + servo_port)
   except subprocess.CalledProcessError:
     pass  # servod is already running
 
-  util.ssh_cmd(servo_host, 'dut-control', 'power_state:reset')
+  util.ssh_cmd(servo_host, 'servodutil', 'wait-for-active', '-p', servo_port)
+  util.ssh_cmd(servo_host, 'dut-control', '--port', servo_port, 'power_state:reset')
   return True
 
 
