@@ -30,6 +30,11 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 emitted_warnings = set()
 
+# If the dependency is not pinned in DEPS file, the default branch.
+# ref: gclient_scm.py GitWrapper.update default_rev
+# TODO(kcwu): follow gclient to change the default branch name
+DEFAULT_BRANCH_NAME = 'master'
+
 
 def config(gclient_dir,
            url=None,
@@ -283,8 +288,8 @@ class Dep:
     if '@' in self.url:
       repo_url, at = self.url.split('@')
     else:
-      # If the dependency is not pinned, the default is master branch.
-      repo_url, at = self.url, 'master'
+      # If the dependency is not pinned, the default branch.
+      repo_url, at = self.url, DEFAULT_BRANCH_NAME
     return repo_url, at
 
   def as_path_spec(self):
@@ -916,12 +921,14 @@ class DepsParser:
 
   def enumerate_path_specs(self, start_time, end_time, path):
     tstree = TimeSeriesTree(None, path, start_time, end_time)
-    self.construct_deps_tree(tstree, path, 'master', start_time, end_time)
+    self.construct_deps_tree(tstree, path, DEFAULT_BRANCH_NAME, start_time,
+                             end_time)
     return tstree.iter_path_specs()
 
   def enumerate_gclient_solutions(self, start_time, end_time, path):
     tstree = TimeSeriesTree(None, path, start_time, end_time)
-    self.construct_deps_tree(tstree, path, 'master', start_time, end_time)
+    self.construct_deps_tree(tstree, path, DEFAULT_BRANCH_NAME, start_time,
+                             end_time)
     return tstree.iter_forest()
 
   def flatten(self, solutions, entry_point):

@@ -126,7 +126,7 @@ class TestDepsParser(unittest.TestCase):
         repo = os.path.join(repos, os.path.relpath(cur_dir, test_dir))
         os.makedirs(repo, exist_ok=True)
         git = git_util_test.GitOperation(repo)
-        git.init()
+        git.init(initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
 
         for filename in files:
           with open(os.path.join(cur_dir, filename)) as f:
@@ -175,16 +175,16 @@ class TestBug123161903(unittest.TestCase):
 
     src_mirror = self.code_storage.cached_git_root(repo_url['src'])
     src_git = git_util_test.GitOperation(src_mirror)
-    src_git.init()
+    src_git.init(initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
 
     src_internal_mirror = self.code_storage.cached_git_root(
         repo_url['src-internal'])
     src_internal_git = git_util_test.GitOperation(src_internal_mirror)
-    src_internal_git.init()
+    src_internal_git.init(initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
 
     assistant_mirror = self.code_storage.cached_git_root(repo_url['assistant'])
     assistant_git = git_util_test.GitOperation(assistant_mirror)
-    assistant_git.init()
+    assistant_git.init(initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
 
     a_3dcc = assistant_git.add_commit(1545172424, '-1', 'foo', '1')
     a_df77 = assistant_git.add_commit(1547073422, 'target', 'foo', '2')

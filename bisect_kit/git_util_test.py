@@ -24,13 +24,15 @@ class GitOperation:
     self.commits = []
     self.default_filename = 'file'
 
-  def init(self):
+  def init(self, initial_branch='main'):
     """Git init."""
 
     if not os.path.exists(self.git_repo):
       os.makedirs(self.git_repo)
 
-    subprocess.check_call(['git', 'init', '-q'], cwd=self.git_repo)
+    subprocess.check_call(
+        ['git', 'init', '-q', '--initial-branch', initial_branch],
+        cwd=self.git_repo)
 
     # Remove git hooks in order to save time.
     shutil.rmtree(os.path.join(self.git_repo, '.git', 'hooks'))
@@ -304,7 +306,7 @@ class TestGitOperation(unittest.TestCase):
     subprocess.check_call(['git', 'checkout', branch_foo], cwd=self.git_repo)
     commit_b = self.git.add_commit('2017-02-02T00:00:00', 'commit B',
                                    self.git.default_filename, 'commit B')
-    subprocess.check_call(['git', 'checkout', 'master'], cwd=self.git_repo)
+    subprocess.check_call(['git', 'checkout', 'main'], cwd=self.git_repo)
     # --no-edit: git may complain EDITOR is unset
     subprocess.check_call(['git', 'merge', '--no-edit', branch_foo],
                           cwd=self.git_repo,
@@ -427,16 +429,16 @@ class TestGitOperation(unittest.TestCase):
     commit_a, commit_b, commit_c = self.prepare_merged_repository()
     self.assertCountEqual(
         git_util.get_branches(self.git_repo),
-        ['refs/heads/foo', 'refs/heads/master'])
+        ['refs/heads/foo', 'refs/heads/main'])
     self.assertCountEqual(
         git_util.get_branches(self.git_repo, commit=commit_a),
-        ['refs/heads/master'])
+        ['refs/heads/main'])
     self.assertCountEqual(
         git_util.get_branches(self.git_repo, commit=commit_b),
-        ['refs/heads/foo', 'refs/heads/master'])
+        ['refs/heads/foo', 'refs/heads/main'])
     self.assertCountEqual(
         git_util.get_branches(self.git_repo, commit=commit_c),
-        ['refs/heads/master'])
+        ['refs/heads/main'])
 
   def test_reset_hard(self):
     self.git.create_commits(1)

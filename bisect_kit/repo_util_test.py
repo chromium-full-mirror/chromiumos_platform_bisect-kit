@@ -20,6 +20,7 @@ class TestRepoOperation(unittest.TestCase):
   """Tests repo_util module with real repo operations without mock."""
 
   def _create_dummy_repo(self):
+    self.manifest_branch = 'main'
     git1_dir = os.path.join(self.gitbase, 'g1.git')
     self.git1 = git_util_test.GitOperation(git1_dir)
     self.git1.init()
@@ -32,11 +33,11 @@ class TestRepoOperation(unittest.TestCase):
 
     manifest_git_dir = os.path.join(self.gitbase, 'm')
     self.manifest_git = git_util_test.GitOperation(manifest_git_dir)
-    self.manifest_git.init()
+    self.manifest_git.init(initial_branch=self.manifest_branch)
     manifest = """<!--?xml version="1.0" encoding="UTF-8"?-->
     <manifest>
         <remote name="mydisk" fetch="file://%s"></remote>
-        <default revision="refs/heads/master" remote="mydisk"></default>
+        <default revision="refs/heads/main" remote="mydisk"></default>
         <project name="g1.git" remote="mydisk" path="dir1/g1"></project>
         <project name="g2.git" path="dir2/g2" revision="%s"></project>
         <project name="g3.git" path="dir3/g3" groups="notdefault"></project>
@@ -57,13 +58,16 @@ class TestRepoOperation(unittest.TestCase):
     shutil.rmtree(self.tmp_dir)
 
   def test_repo_init_and_sync(self):
-    repo_util.init(self.repo_dir, 'file://%s' % self.manifest_git.git_repo)
+    repo_util.init(
+        self.repo_dir,
+        'file://%s' % self.manifest_git.git_repo,
+        manifest_branch=self.manifest_branch)
     repo_util.sync(self.repo_dir)
     assert os.path.exists(os.path.join(self.repo_dir, 'dir1', 'g1', 'file'))
     assert os.path.exists(os.path.join(self.repo_dir, 'dir2', 'g2', 'file'))
 
     self.assertEqual(
-        repo_util.get_current_branch(self.repo_dir), 'refs/heads/master')
+        repo_util.get_current_branch(self.repo_dir), 'refs/heads/main')
 
 
 class TestManifestParser(unittest.TestCase):

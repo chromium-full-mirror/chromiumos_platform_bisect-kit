@@ -385,7 +385,7 @@ class ChromeSpecManager(codechange.SpecManager):
     meta_dir = os.path.join(self.config['chrome_root'], 'meta-deps')
     if os.path.exists(meta_dir):
       shutil.rmtree(meta_dir)
-    git_util.init(meta_dir)
+    git_util.init(meta_dir, initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
 
     # 1. Create initial commit with DEPS file referring to master.
     init_timestamp = '2018-01-01T00:00:00'

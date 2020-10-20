@@ -86,7 +86,7 @@ def checkout_version(git_repo, rev):
   util.check_call('git', 'checkout', '-q', '-f', rev, cwd=git_repo)
 
 
-def init(git_repo):
+def init(git_repo, initial_branch='main'):
   """git init.
 
   git_repo and its parent directories will be created if they don't exist.
@@ -97,7 +97,8 @@ def init(git_repo):
   if not os.path.exists(git_repo):
     os.makedirs(git_repo)
 
-  util.check_call('git', 'init', '-q', cwd=git_repo)
+  util.check_call(
+      'git', 'init', '-q', '--initial-branch', initial_branch, cwd=git_repo)
 
 
 def commit_file(git_repo,
