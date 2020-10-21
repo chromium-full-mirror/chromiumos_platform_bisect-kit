@@ -244,6 +244,8 @@ def ssh_cmd(host, *args, **kwargs):
     subprocess.CalledProcessError if the exit code is non-zero.
   """
   cmd = ['ssh']
+  # Avoid keyboard-interactive to prevent hang forever.
+  cmd += ['-oPreferredAuthentications=publickey']
   if kwargs.get('connect_timeout'):
     cmd += ['-oConnectTimeout=%d' % kwargs['connect_timeout']]
   cmd.append(host)
