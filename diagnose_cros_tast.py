@@ -36,6 +36,14 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     pass
 
   def _build_cmds(self):
+    # prebuilt version will be specified later.
+    common_switch_cmd = [
+        './switch_tast_prebuilt.py',
+        '--chromeos_root',
+        self.config['chromeos_root'],
+        '--board',
+        self.config['board'],
+    ]
     common_eval_cmd = [
         './eval_cros_tast.py',
         '--with_private_bundles',
@@ -51,7 +59,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     if self.config['reboot_before_test']:
       common_eval_cmd.append('--reboot_before_test')
 
-    return common_eval_cmd
+    return common_switch_cmd, common_eval_cmd
 
   def cmd_run(self, opts):
     del opts  # unused
@@ -62,7 +70,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       path_factory = setup_cros_bisect.DefaultProjectPathFactory(
           self.config['mirror_base'], self.config['work_base'],
           self.config['session'])
-      common_eval_cmd = self._build_cmds()
+      common_switch_cmd, common_eval_cmd = self._build_cmds()
 
       with cros_lab_util.dut_manager(
           self.config['dut'], lambda: diagnoser_cros.grab_dut(self.config)
@@ -81,11 +89,16 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         diagnoser = diagnoser_cros.CrosDiagnoser(self.states, path_factory,
                                                  self.config, dut)
 
-        diagnoser.narrow_down_chromeos_prebuilt(self.config['old'],
-                                                self.config['new'],
-                                                common_eval_cmd)
+        eval_cmd = common_eval_cmd + ['--prebuilt']
+        extra_switch_cmd = common_switch_cmd
+        diagnoser.narrow_down_chromeos_prebuilt(
+            self.config['old'],
+            self.config['new'],
+            eval_cmd,
+            extra_switch_cmd=extra_switch_cmd)
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
+        util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
         dut_os_version = cros_util.query_dut_short_version(dut)
 
         try:
@@ -111,7 +124,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
           if self.config['chrome_deploy_image']:
             eval_cmd = common_eval_cmd + ['--tast_build']
           else:
-            eval_cmd = common_eval_cmd
+            eval_cmd = common_eval_cmd + ['--prebuilt']
           if diagnoser.narrow_down_chrome(
               eval_cmd, buildbucket_build=buildbucket_build):
             return
@@ -134,8 +147,10 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         if not buildbucket_build:
           eval_cmd = common_eval_cmd + ['--tast_build']
+          extra_switch_cmd = None
         else:
-          eval_cmd = common_eval_cmd
+          eval_cmd = common_eval_cmd + ['--prebuilt']
+          extra_switch_cmd = common_switch_cmd
         diagnoser.narrow_down_chromeos_localbuild(eval_cmd, buildbucket_build)
         logger.info('%s done', __file__)
     except Exception as e:

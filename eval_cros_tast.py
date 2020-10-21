@@ -54,6 +54,11 @@ def create_argument_parser():
       default=configure.get('CHROMEOS_ROOT', ''),
       help='ChromeOS tree root')
   parser.add_argument(
+      '--prebuilt',
+      action='store_true',
+      help='Run tast using existing server prebuilt package if specified; '
+      'otherwise use the default one')
+  parser.add_argument(
       '--tast_build',
       action='store_true',
       help='Build tast test bundle (-build=true) if specified; '
@@ -92,17 +97,33 @@ def prepare_to_run_test(opts):
         opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo)
 
 
-def get_tast_bundle_info(opts, pattern=None):
-  bundles = ['cros']
-  flags = ['-json']
+def tast_cmd(opts, cmd, *args):
+  flags = []
+  if opts.prebuilt:
+    tast_dir = os.path.join(cros_util.chromeos_root_inside_chroot,
+                            cros_util.prebuilt_tast_dir)
+    tast_bin = os.path.join(tast_dir, 'tast')
+    flags += ['-remotebundledir', os.path.join(tast_dir, 'bundles', 'remote')]
+    flags += ['-remotedatadir', os.path.join(tast_dir, 'data')]
+    flags += ['-remoterunner', os.path.join(tast_dir, 'remote_test_runner')]
+    if cmd == 'run':
+      flags += ['-defaultvarsdir', os.path.join(tast_dir, 'vars', 'private')]
+  else:
+    tast_bin = 'tast'
+
   # TODO(zjchang): ensure the tast version for buildbucket builds is correct
   if not opts.tast_build:
     flags.append('-build=false')
     if opts.with_private_bundles:
       flags.append('-downloadprivatebundles=true')
-  else:
-    if opts.with_private_bundles:
-      bundles.append('crosint')
+
+  return [tast_bin, '-verbose', cmd] + flags + list(args)
+
+
+def get_tast_bundle_info(opts, pattern=None):
+  bundles = ['cros']
+  if opts.with_private_bundles:
+    bundles.append('crosint')
 
   args = [opts.dut]
   if pattern:
@@ -110,7 +131,7 @@ def get_tast_bundle_info(opts, pattern=None):
 
   result = {}
   for bundle in bundles:
-    cmd = ['tast', 'list'] + flags + ['-buildbundle=' + bundle] + args
+    cmd = tast_cmd(opts, 'list', '-json', '-buildbundle=' + bundle, *args)
     json_text = cros_util.cros_sdk(opts.chromeos_root, *cmd, log_stdout=False)
     for entry in json.loads(json_text):
       result[entry['name']] = bundle
@@ -139,15 +160,10 @@ def run_test(opts, bundle):
     shutil.rmtree(results_dir_output_chroot)
 
   # TODO(kcwu): add -timeout
-  cmd = ['tast', '-verbose', 'run']
-  if not opts.tast_build:
-    cmd.append('-build=false')
-    if opts.with_private_bundles:
-      cmd.append('-downloadprivatebundles=true')
-  else:
-    cmd.append('-buildbundle=' + bundle)
-  cmd += ['-resultsdir', results_dir, opts.dut, opts.test_name]
-
+  flags = ['-resultsdir', results_dir]
+  if opts.tast_build:
+    flags.append('-buildbundle=' + bundle)
+  cmd = tast_cmd(opts, 'run', *flags, opts.dut, opts.test_name)
   cros_util.cros_sdk(opts.chromeos_root, *cmd)
 
   return results_dir_output_chroot
