@@ -103,13 +103,22 @@ def switch(autotest_dir, board, version, test_name, dut):
 
   cros_util.gsutil('cp', autotest_client_path, tmp_dir)
   tarball = os.path.join(tmp_dir, AUTOTEST_CLIENT_TARBALL)
-  # strip 'autotest/'
   util.check_call(
-      'tar', 'xvf', tarball, '--strip-components=1', cwd=autotest_dir)
+      'tar',
+      'xvf',
+      tarball,
+      '--strip-components=1',  # strip 'autotest/'
+      'autotest',  # only extract autotest/
+      cwd=autotest_dir)
   cros_util.gsutil('cp', autotest_server_path, tmp_dir)
   tarball = os.path.join(tmp_dir, AUTOTEST_SERVER_TARBALL)
   util.check_call(
-      'tar', 'xf', tarball, '--strip-components=1', cwd=autotest_dir)
+      'tar',
+      'xf',
+      tarball,
+      '--strip-components=1',  # strip 'autotest/'
+      'autotest',  # only extract autotest/
+      cwd=autotest_dir)
 
   # Need to extract the control file if the target is a client site test.
   if test_name:
