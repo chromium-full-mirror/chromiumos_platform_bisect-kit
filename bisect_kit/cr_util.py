@@ -257,7 +257,19 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
   if os.path.exists(os.path.join(goma_dir, 'gomacc')):
     prefix += ['--gomadir', goma_dir]
 
-  env = kwargs.get('env')
+  env = kwargs.get('env', os.environ).copy()
+
+  # This work around http://crbug.com/658104, which depot_tool can't find GN
+  # path correctly.
+  env['CHROMIUM_BUILDTOOLS_PATH'] = os.path.abspath(
+      os.path.join(chrome_src, 'buildtools'))
+
+  if os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'):
+    env['GOMA_SERVICE_ACCOUNT_JSON_FILE'] = os.environ.get(
+        'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+    env['GOMA_SERVER_HOST'] = 'goma.chromium.org'
+    env['GOMA_RPC_EXTRA_PARAMS'] = '?prod'
+
   cmd = prefix + ['--'] + list(args)
 
   return util.check_output(*cmd, cwd=chrome_src, env=env)
@@ -265,11 +277,6 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
 
 def get_chrome_test_binaries(chrome_src, board):
   result = []
-  env = os.environ.copy()
-  # This work around http://crbug.com/658104, which depot_tool can't find GN
-  # path correctly.
-  env['CHROMIUM_BUILDTOOLS_PATH'] = os.path.abspath(
-      os.path.join(chrome_src, 'buildtools'))
   out_dir = os.path.join('out_%s' % board, 'Release')
   available_targets = simple_chrome_shell(
       chrome_src,
@@ -279,8 +286,7 @@ def get_chrome_test_binaries(chrome_src, board):
       '--type=executable',
       '--as=output',
       out_dir,
-      internal=True,
-      env=env).splitlines()
+      internal=True).splitlines()
   for binary in CHROME_TEST_BINARIES:
     if binary not in available_targets:
       continue
@@ -310,25 +316,18 @@ def build_and_deploy(chrome_src,
       targets += get_chrome_test_binaries(chrome_src, board)
 
   logger.info('build %s', targets)
-  env = os.environ.copy()
-  # This work around http://crbug.com/658104, which depot_tool can't find GN
-  # path correctly.
-  env['CHROMIUM_BUILDTOOLS_PATH'] = os.path.abspath(
-      os.path.join(chrome_src, 'buildtools'))
-
   out_dir = os.path.join('out_%s' % board, 'Release')
-
   with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
     cmd = ['./third_party/depot_tools/autoninja', '-C', out_dir] + targets
     try:
-      simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
+      simple_chrome_shell(chrome_src, board, *cmd, internal=True)
     except subprocess.CalledProcessError:
       logger.warning('build failed, delete out directory and retry again')
       # Some compiler processes are still terminating. Short delay is
       # necessary.
       time.sleep(10)
       shutil.rmtree(os.path.join(chrome_src, out_dir))
-      simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
+      simple_chrome_shell(chrome_src, board, *cmd, internal=True)
 
   if nodeploy:
     return
