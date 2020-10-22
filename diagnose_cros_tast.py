@@ -19,6 +19,7 @@ from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import errors
+from bisect_kit import util
 import setup_cros_bisect
 
 logger = logging.getLogger(__name__)
