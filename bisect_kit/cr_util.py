@@ -269,6 +269,7 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
         'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
     env['GOMA_SERVER_HOST'] = 'goma.chromium.org'
     env['GOMA_RPC_EXTRA_PARAMS'] = '?prod'
+    env['GOMA_ARBITRARY_TOOLCHAIN_SUPPORT'] = 'true'
 
   cmd = prefix + ['--'] + list(args)
 
