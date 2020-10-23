@@ -87,29 +87,21 @@ def verify_dimensions_by_lab(dimensions):
   return result
 
 
-def select_available_bots_randomly(dimensions, variants, num=1, is_busy=None):
+def select_available_bots_randomly(dimensions,
+                                   variants,
+                                   num=1,
+                                   is_busy=None,
+                                   filter_func=None):
   bots = []
   for variant in variants:
     # There might be thousand bots available, set 'limit' to reduce swarming
     # API cost. This is not uniform random, but should be good enough.
     bots += cros_lab_util.swarming_bots_list(
         dimensions + [variant], is_busy=is_busy, limit=10)
-  if not bots:
-    return None
 
-  known_bad = set()
-  good_bots = []
-  for bot in bots:
-    model = bot['dimensions']['label-model'][0]
-    if model in models_to_avoid:
-      if model not in known_bad:
-        logger.warning('model=%s is bad (reason:%s), ignore', model,
-                       models_to_avoid[model])
-        known_bad.add(model)
-      continue
-    good_bots.append(bot)
-
-  return random.sample(good_bots, min(num, len(good_bots)))
+  if filter_func:
+    bots = list(filter(filter_func, bots))
+  return random.sample(bots, min(num, len(bots)))
 
 
 def filter_dimensions_by_board(boards_with_prebuilt, dimensions):
@@ -128,21 +120,24 @@ def filter_dimensions_by_board(boards_with_prebuilt, dimensions):
   return result
 
 
-def filter_bots_by_board(boards_with_prebuilt, bots):
+def is_acceptable_bot(boards_with_prebuilt, bot):
+  model = bot['dimensions']['label-model'][0]
+  if model in models_to_avoid:
+    logger.warning('model=%s is bad (reason:%s), ignore', model,
+                   models_to_avoid[model])
+    return False
+
   # Sometimes swarming database has inconsistent records. For example,
   # label-model=kefka + label-board=strago are incorrect (should be
   # label-board=kefka). It is probably human errors (strago is kefka's
   # reference board).
-  # This function discards such bots.
-  result = []
-  for bot in bots:
-    board = bot['dimensions']['label-board'][0]
-    if board not in boards_with_prebuilt:
-      logger.warning('%s has unexpected board=%s ignore',
-                     bot['dimensions']['dut_name'][0], board)
-      continue
-    result.append(bot)
-  return result
+  board = bot['dimensions']['label-board'][0]
+  if board not in boards_with_prebuilt:
+    logger.warning('%s has unexpected board=%s, ignore',
+                   bot['dimensions']['dut_name'][0], board)
+    return False
+
+  return True
 
 
 async def lease_dut_parallelly(duration, bots, timeout=None):
@@ -252,13 +247,21 @@ def do_allocate_dut(opts):
           'Wrong version number?')
 
   while True:
+    filter_func = lambda bot: is_acceptable_bot(boards_with_prebuilt, bot)
     # Query every time because each iteration takes a few minutes
     bots = select_available_bots_randomly(
-        dimensions, variants, num=opts.parallel, is_busy=False)
+        dimensions,
+        variants,
+        num=opts.parallel,
+        is_busy=False,
+        filter_func=filter_func)
     if not bots:
       bots = select_available_bots_randomly(
-          dimensions, variants, num=opts.parallel, is_busy=True)
-    bots = filter_bots_by_board(boards_with_prebuilt, bots)
+          dimensions,
+          variants,
+          num=opts.parallel,
+          is_busy=True,
+          filter_func=filter_func)
     if not bots:
       raise errors.NoDutAvailable(
           'no bots satisfy constraints; all are in maintenance state?')
