@@ -45,7 +45,13 @@ def cmd_query_dut_board(opts):
 
 
 def cmd_reboot(opts):
-  assert cros_util.is_dut(opts.dut)
+  if not cros_util.is_dut(opts.dut):
+    if opts.force:
+      logger.warning('%s is not a Chrome OS device?', opts.dut)
+    else:
+      raise errors.ArgumentError(
+          'dut', 'not a Chrome OS device (--force to continue)')
+
   cros_util.reboot(
       opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo)
 
@@ -349,6 +355,7 @@ def main():
       'reboot',
       help='Reboot a DUT',
       description='Reboot a DUT and verify the reboot is successful.')
+  parser_reboot.add_argument('--force', action='store_true')
   parser_reboot.add_argument('dut')
   parser_reboot.set_defaults(func=cmd_reboot)
 
