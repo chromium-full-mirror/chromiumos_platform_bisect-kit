@@ -99,7 +99,8 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             extra_switch_cmd=extra_switch_cmd)
 
         diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
-        util.check_call(*(common_switch_cmd + [diagnoser.cros_old]))
+        util.check_call(*(common_switch_cmd +
+                          [diagnoser.cros_old, '--dut', dut]))
         dut_os_version = cros_util.query_dut_short_version(dut)
 
         try:
