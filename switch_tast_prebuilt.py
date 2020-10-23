@@ -52,7 +52,7 @@ def create_argument_parser():
       '--dut',
       type=cli.argtype_notempty,
       metavar='DUT',
-      default=configure.get('DUT'),
+      default=configure.get('DUT', ''),
       help='Address of DUT')
   parser.add_argument(
       'version',
