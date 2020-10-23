@@ -346,16 +346,17 @@ def reboot(host, force_reboot_callback=None):
         invoked if normal reboot failed.
   """
   logger.debug('reboot %s', host)
-  boot_id = query_dut_boot_id(host)
-
+  boot_id = None
   try:
-    util.ssh_cmd(host, 'reboot')
-  except errors.SshConnectionError:
-    # Depends on timing, ssh may return failure due to broken pipe, which is
-    # working as intended. Ignore such kind of errors.
-    pass
+    boot_id = query_dut_boot_id(host)
 
-  try:
+    try:
+      util.ssh_cmd(host, 'reboot')
+    except errors.SshConnectionError:
+      # Depends on timing, ssh may return failure due to broken pipe, which is
+      # working as intended. Ignore such kind of errors.
+      pass
+
     wait_reboot_done(host, boot_id)
   except (errors.SshConnectionError, errors.ExternalError):
     if force_reboot_callback and force_reboot_callback(host):
