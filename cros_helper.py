@@ -128,6 +128,23 @@ def filter_dimensions_by_board(boards_with_prebuilt, dimensions):
   return result
 
 
+def filter_bots_by_board(boards_with_prebuilt, bots):
+  # Sometimes swarming database has inconsistent records. For example,
+  # label-model=kefka + label-board=strago are incorrect (should be
+  # label-board=kefka). It is probably human errors (strago is kefka's
+  # reference board).
+  # This function discards such bots.
+  result = []
+  for bot in bots:
+    board = bot['dimensions']['label-board'][0]
+    if board not in boards_with_prebuilt:
+      logger.warning('%s has unexpected board=%s ignore',
+                     bot['dimensions']['dut_name'][0], board)
+      continue
+    result.append(bot)
+  return result
+
+
 async def lease_dut_parallelly(duration, bots, timeout=None):
   tasks = []
   hosts = []
@@ -241,6 +258,7 @@ def do_allocate_dut(opts):
     if not bots:
       bots = select_available_bots_randomly(
           dimensions, variants, num=opts.parallel, is_busy=True)
+    bots = filter_bots_by_board(boards_with_prebuilt, bots)
     if not bots:
       raise errors.NoDutAvailable(
           'no bots satisfy constraints; all are in maintenance state?')
@@ -260,6 +278,9 @@ def do_allocate_dut(opts):
           if cros_lab_util.normalize_board_name(builder) == host_board:
             board_to_build = builder
             break
+        else:
+          raise errors.DutLeaseException('DUT with unexpected board:%s' %
+                                         host_board)
       else:
         board_to_build = host_board
 
