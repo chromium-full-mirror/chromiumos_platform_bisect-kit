@@ -358,7 +358,8 @@ class ManifestParser:
     # default path is its name
     if not path:
       path = project.get('name')
-    return path
+    # Follow repo's behavior to strip trailing slash (crbug/1086043).
+    return path.rstrip('/')
 
   @classmethod
   def get_project_revision(cls, project, default):
@@ -418,7 +419,9 @@ class ManifestParser:
       if remote_name not in remote_fetch_map:
         raise errors.InternalError('unknown remote name=%s' % remote_name)
       fetch_url = remote_fetch_map.get(remote_name)
-      repo_url = _urljoin(fetch_url, project.get('name'))
+      # Follow repo's behavior to strip trailing slash (crbug/1086043).
+      name = project.get('name').rstrip('/')
+      repo_url = _urljoin(fetch_url, name)
 
       result[path] = codechange.PathSpec(path, repo_url, revision)
     return result

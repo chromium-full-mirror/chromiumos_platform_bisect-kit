@@ -84,6 +84,7 @@ class TestManifestParser(unittest.TestCase):
       <project path="frameworks/base" name="platform/frameworks/base" />
       <project path="frameworks/foo" name="platform/frameworks/foo"
                groups="notdefault" />
+      <project name="path/with/trailing/slash/" />
     </manifest>
     """
 
@@ -103,6 +104,11 @@ class TestManifestParser(unittest.TestCase):
     self.assertEqual(result['frameworks/base'].at, 'master')
 
     self.assertNotIn('frameworks/foo', result)
+
+    self.assertEqual(result['path/with/trailing/slash'].path,
+                     'path/with/trailing/slash')
+    self.assertEqual(result['path/with/trailing/slash'].repo_url,
+                     'https://example.com/path/with/trailing/slash')
 
   def test_parse_manifest_bad(self):
     manifest_url = 'https://example.com/manifest'
