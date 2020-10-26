@@ -712,7 +712,8 @@ def reboot_via_servo(dut):
     pass  # servod is already running
 
   util.ssh_cmd(servo_host, 'servodutil', 'wait-for-active', '-p', servo_port)
-  util.ssh_cmd(servo_host, 'dut-control', '--port', servo_port, 'power_state:reset')
+  util.ssh_cmd(servo_host, 'dut-control', '--port', servo_port,
+               'power_state:reset')
   return True
 
 

@@ -301,9 +301,8 @@ class AndroidInternalApi:
 
   def __init__(self):
     if not os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'):
-      raise errors.InternalError(
-          'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON must defined when using Android Api'
-      )
+      raise errors.InternalError('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON '
+                                 'must defined when using Android Api')
     self.credentials = self.get_credentials()
     self.service = apiclient.discovery.build(
         'androidbuildinternal',
@@ -313,6 +312,7 @@ class AndroidInternalApi:
 
   def get_credentials(self):
     # TODO(zjchang): support compute engine type credential
+    # pylint: disable=line-too-long
     credentials = google.oauth2.service_account.Credentials.from_service_account_file(
         os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'),
         scopes=['https://www.googleapis.com/auth/androidbuild.internal'],
@@ -375,6 +375,6 @@ class AndroidInternalApi:
             f, download_request, chunksize=chunksize)
         done = False
         while not done:
-          status, done = downloader.next_chunk(num_retries=self._retries)
+          _status, done = downloader.next_chunk(num_retries=self._retries)
     except (googleapiclient.errors.HttpError, httplib2.HttpLib2Error) as e:
       raise errors.ExternalError('Android API error: ' + str(e))

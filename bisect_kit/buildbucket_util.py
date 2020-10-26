@@ -10,7 +10,6 @@ import http.client
 import json
 import logging
 import os
-import re
 import shutil
 import socket
 import ssl
@@ -132,7 +131,7 @@ class BuildbucketApi:
           '-isolate-server',
           self.isolate_domain_url,
           '-dirs',
-          "%s:." % work_space,
+          '%s:.' % work_space,
           '-dump-hash',
           hash_file,
       ]

@@ -93,6 +93,7 @@ def init(git_repo, initial_branch='main'):
 
   Args:
     git_repo: path of git repo.
+    initial_branch: the default branch after git init
   """
   if not os.path.exists(git_repo):
     os.makedirs(git_repo)
