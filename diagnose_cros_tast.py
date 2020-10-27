@@ -153,7 +153,8 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         else:
           eval_cmd = common_eval_cmd + ['--prebuilt']
           extra_switch_cmd = common_switch_cmd
-        diagnoser.narrow_down_chromeos_localbuild(eval_cmd, buildbucket_build)
+        diagnoser.narrow_down_chromeos_localbuild(eval_cmd, buildbucket_build,
+            extra_switch_cmd=extra_switch_cmd)
         logger.info('%s done', __file__)
     except Exception as e:
       logger.exception('got exception; stop')
