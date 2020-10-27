@@ -19,8 +19,9 @@ import os
 import tempfile
 import urllib.request
 
-import apiclient
 import google.oauth2.service_account
+import googleapiclient
+import googleapiclient.discovery
 
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -304,7 +305,7 @@ class AndroidInternalApi:
       raise errors.InternalError('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON '
                                  'must defined when using Android Api')
     self.credentials = self.get_credentials()
-    self.service = apiclient.discovery.build(
+    self.service = googleapiclient.discovery.build(
         'androidbuildinternal',
         'v3',
         credentials=self.credentials,
@@ -371,7 +372,7 @@ class AndroidInternalApi:
 
     try:
       with open(output_file, mode='wb') as f:
-        downloader = apiclient.http.MediaIoBaseDownload(
+        downloader = googleapiclient.http.MediaIoBaseDownload(
             f, download_request, chunksize=chunksize)
         done = False
         while not done:
