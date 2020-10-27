@@ -22,6 +22,7 @@ import urllib.request
 import google.oauth2.service_account
 import googleapiclient
 import googleapiclient.discovery
+import httplib2
 
 from bisect_kit import cli
 from bisect_kit import codechange
