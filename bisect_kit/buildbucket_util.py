@@ -125,6 +125,9 @@ class BuildbucketApi:
     try:
       with open(file_path, 'w') as f:
         f.write(content)
+      # Normalize file mode, so the isolate hash depends only on file content.
+      # The actual mode value doesn't matter.
+      os.chmod(file_path, 0o640)
       cmd = [
           'isolated',
           'archive',
