@@ -140,7 +140,10 @@ def swarming_query(method, limit=None, verbose_log=True):
   Returns:
     result dict; the content is defined by each method call.
   """
+  service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
   cmd = ['swarming.py', 'query', '--swarming', SWARMING_SERVER, method]
+  if service_account_json:
+    cmd += ['--auth-service-account-json', service_account_json]
   if limit:
     cmd += ['--limit', str(limit)]
   data = util.check_output(*cmd, log_stdout=verbose_log)
@@ -153,8 +156,14 @@ def swarming_cancel(task_id):
   Args:
     task_id: task id
   """
-  util.check_call('swarming.py', 'cancel', '--swarming', SWARMING_SERVER,
-                  '--kill-running', task_id)
+  service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+  cmd = [
+      'swarming.py', 'cancel', '--swarming', SWARMING_SERVER, '--kill-running',
+      task_id
+  ]
+  if service_account_json:
+    cmd += ['--auth-service-account-json', service_account_json]
+  util.check_call(*cmd)
 
 
 def _simplify_bot_dimensions(dimensions_pairs):
