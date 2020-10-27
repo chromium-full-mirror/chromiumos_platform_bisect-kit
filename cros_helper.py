@@ -133,15 +133,16 @@ def is_acceptable_bot(boards_with_prebuilt, bot):
                    models_to_avoid[model])
     return False
 
-  # Sometimes swarming database has inconsistent records. For example,
-  # label-model=kefka + label-board=strago are incorrect (should be
-  # label-board=kefka). It is probably human errors (strago is kefka's
-  # reference board).
-  board = bot['dimensions']['label-board'][0]
-  if board not in boards_with_prebuilt:
-    logger.warning('%s has unexpected board=%s, ignore',
-                   bot['dimensions']['dut_name'][0], board)
-    return False
+  if boards_with_prebuilt is not None:
+    # Sometimes swarming database has inconsistent records. For example,
+    # label-model=kefka + label-board=strago are incorrect (should be
+    # label-board=kefka). It is probably human errors (strago is kefka's
+    # reference board).
+    board = bot['dimensions']['label-board'][0]
+    if board not in boards_with_prebuilt:
+      logger.warning('%s has unexpected board=%s, ignore',
+                     bot['dimensions']['dut_name'][0], board)
+      return False
 
   return True
 
@@ -226,6 +227,7 @@ def do_allocate_dut(opts):
         (opts.board, opts.model, opts.sku, opts.dut_name))
 
   # Filter variants by prebuilt images.
+  boards_with_prebuilt = None
   if opts.version_hint:
     if not opts.builder_hint:
       opts.builder_hint = opts.board
