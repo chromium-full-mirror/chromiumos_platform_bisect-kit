@@ -455,19 +455,19 @@ def gsutil_ls(*args, **kwargs):
   return gsutil('ls', *args, **kwargs).splitlines()
 
 
-def gsutil_stat_update_time(*args, **kwargs):
-  """Returns the last modified time of a file or multiple files.
+def gsutil_stat_creation_time(*args, **kwargs):
+  """Returns the creation time of a file or multiple files.
 
   Args:
     args: arguments passed to 'gsutil stat'.
     kwargs: extra parameters for gsutil.
 
   Returns:
-    A integer indicates the last modified timestamp.
+    A integer indicates the creation timestamp.
 
   Raises:
     subprocess.CalledProcessError: gsutil failed, usually means path not found
-    errors.ExternalError: update time is not found
+    errors.ExternalError: creation time is not found
   """
   result = -1
   # Currently we believe stat always returns a UTC time, and strptime also
@@ -479,14 +479,14 @@ def gsutil_stat_update_time(*args, **kwargs):
       continue
     key, value = line.split(':', 1)
     key, value = key.strip(), value.strip()
-    if key != 'Update time':
+    if key != 'Creation time':
       continue
     dt = datetime.datetime.strptime(value, time_format)
     unixtime = int(calendar.timegm(dt.utctimetuple()))
     result = max(result, unixtime)
 
   if result == -1:
-    raise errors.ExternalError("didn't find update time")
+    raise errors.ExternalError("didn't find creation time")
   return result
 
 
@@ -1707,12 +1707,12 @@ class ChromeOSSpecManager(codechange.SpecManager):
     # minutes different between snapshot manifest commit and image.zip
     # generate.
     try:
-      old_timestamp = gsutil_stat_update_time(
+      old_timestamp = gsutil_stat_creation_time(
           gs_path.format(board=self.config['board'], version=old)) - 86400
     except subprocess.CalledProcessError:
       old_timestamp = None
     try:
-      new_timestamp = gsutil_stat_update_time(
+      new_timestamp = gsutil_stat_creation_time(
           gs_path.format(board=self.config['board'], version=new)) + 86400
       # 1558657989 is snapshot_id 5982's commit time, this ensures every time
       # we can find snapshot 5982
