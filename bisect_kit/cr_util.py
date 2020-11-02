@@ -578,10 +578,7 @@ class ChromeSpecManager(codechange.SpecManager):
       f.write('target_os = ["chromeos"]\n')
 
     gclient_util.sync(
-        self.config['chrome_root'],
-        with_branch_heads=True,
-        with_tags=True,
-        ignore_locks=True)
+        self.config['chrome_root'], with_branch_heads=True, with_tags=True)
 
   def sync_to_release(self, rev):
     """Switch source tree to given release version.

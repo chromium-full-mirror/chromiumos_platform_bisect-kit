@@ -67,18 +67,13 @@ def config(gclient_dir,
   util.check_call(*cmd, cwd=gclient_dir)
 
 
-def sync(gclient_dir,
-         with_branch_heads=False,
-         with_tags=False,
-         ignore_locks=False,
-         jobs=8):
+def sync(gclient_dir, with_branch_heads=False, with_tags=False, jobs=8):
   """Simply wrapper of `gclient sync`.
 
   Args:
     gclient_dir: root directory of gclient project
     with_branch_heads: whether to clone git `branch_heads` refspecs
     with_tags: whether to clone git tags
-    ignore_locks: bypass gclient's lock
     jobs: how many workers running in parallel
   """
   # Work around gclient issue crbug/943430
@@ -102,13 +97,6 @@ def sync(gclient_dir,
     cmd.append('--with_branch_heads')
   if with_tags:
     cmd.append('--with_tags')
-
-  # If 'gclient sync' is interrupted by ctrl-c or terminated with whatever
-  # reasons, it will leave annoying lock files on disk and thus unfriendly to
-  # bot tasks. In bisect-kit, we will use our own lock mechanism (in caller of
-  # this function) and bypass gclient's.
-  if ignore_locks:
-    cmd.append('--ignore_locks')
 
   try:
     old_projects = load_gclient_entries(gclient_dir)

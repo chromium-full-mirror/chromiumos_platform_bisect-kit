@@ -316,8 +316,7 @@ cache_dir = %r
       logger.info('gclient sync for chrome (this takes hours; be patient)')
     else:
       logger.info('gclient sync for chrome')
-    gclient_util.sync(
-        chrome_tree, with_branch_heads=True, with_tags=True, ignore_locks=True)
+    gclient_util.sync(chrome_tree, with_branch_heads=True, with_tags=True)
 
     # It's possible that some repos are removed from latest branch and thus
     # their commit history is not fetched in recent gclient sync. So we call
