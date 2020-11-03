@@ -42,23 +42,6 @@ LEASE_DURATION = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
 
 
-def normalize_board_name(board):
-  """Normalize BOARD name.
-
-  Here, we want to find the actual device board. Suffixes like -kernelnext will
-  be removed. So we can use that name to query DUTs inside the lab.
-
-  Args:
-    board: BOARD name
-
-  Returns:
-    normalized BOARD name
-  """
-  # This is just a heuristic. There are some exceptions in the lab, which are
-  # not easy to handle.
-  return board.split('-')[0]
-
-
 def normalize_sku_name(sku):
   """Normalize SKU name.
 

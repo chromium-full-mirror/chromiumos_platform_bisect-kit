@@ -17,6 +17,7 @@ import ast
 import calendar
 import datetime
 import errno
+import glob
 import json
 import logging
 import os
@@ -1620,6 +1621,77 @@ def get_autotest_test_info(autotest_dir, test_name):
     if info.name == test_name:
       return info
   return None
+
+
+def _get_overlay_name(overlay):
+  path = os.path.join(overlay, 'metadata', 'layout.conf')
+  if os.path.exists(path):
+    with open(path) as f:
+      for line in f:
+        m = re.search(r'repo-name\s*=\s*(\S+)', line)
+        if m:
+          return m.group(1)
+
+  path = os.path.join(overlay, 'profiles', 'repo_name')
+  if os.path.exists(path):
+    with open(path) as f:
+      return f.readline().rstrip()
+
+  return None
+
+
+def parse_chromeos_overlays(chromeos_root):
+  # ref: chromite's lib/portage_util.py ListOverlays().
+  overlays = {}
+  paths = ['src/overlays', 'src/private-overlays']
+
+  for path in paths:
+    path = os.path.join(chromeos_root, path, 'overlay-*')
+    for overlay in sorted(glob.glob(path)):
+      name = _get_overlay_name(overlay)
+      if not name:
+        continue
+      # Special cases which have variant boards.
+      if name in ['auron', 'guado', 'nyan', 'veyron']:
+        continue
+
+      path = os.path.join(overlay, 'metadata', 'layout.conf')
+      masters = []
+      if os.path.exists(path):
+        with open(path) as f:
+          for line in f:
+            m = re.search(r'masters\s*=(.*)', line)
+            if m:
+              masters = m.group(1).split()
+      overlays[name] = masters
+  return overlays
+
+
+def resolve_basic_boards(overlays):
+
+  def normalize(name):
+    return name.replace('-private', '')
+
+  def resolve(name):
+    result = set()
+    for parent in overlays[name]:
+      assert parent != name, 'recursive overlays definition?'
+      if parent not in overlays:
+        continue
+      for basic in resolve(parent):
+        result.add(basic)
+    if not result:
+      result.add(name)
+    return set(map(normalize, result))
+
+  result = {}
+  for name in overlays:
+    board = normalize(name)
+    basic = resolve(name)
+    assert len(basic) == 1
+    basic_board = basic.pop()
+    result[board] = basic_board
+  return result
 
 
 def detect_branch_level(branch):

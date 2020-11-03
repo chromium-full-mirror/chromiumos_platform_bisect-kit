@@ -434,6 +434,26 @@ class TestCrosUtil(unittest.TestCase):
       self.assertTrue(cros_util.is_buildbucket_buildable('9998.100.100'))
       self.assertFalse(cros_util.is_buildbucket_buildable('9997.100.100'))
 
+  def test_resolve_basic_boards(self):
+    overlays = {
+        'foo': ['chromiumos'],
+        'foo-private': ['chromiumos'],
+        'foo-kernelnext-private': ['chromiumos', 'foo-private'],
+        'foo64-private': ['chromiumos', 'foo-private'],
+        'bar-private': ['foo-private', 'chromiumos'],
+        'bar-kernelnext': ['chromiumos', 'bar-private'],
+        'bar64': ['chromiumos', 'bar-private'],
+    }
+    self.assertDictEqual(
+        cros_util.resolve_basic_boards(overlays), {
+            'foo': 'foo',
+            'foo-kernelnext': 'foo',
+            'foo64': 'foo',
+            'bar': 'foo',
+            'bar-kernelnext': 'foo',
+            'bar64': 'foo',
+        })
+
   def test_detect_branch_level(self):
     ref_prefix = [
         '',

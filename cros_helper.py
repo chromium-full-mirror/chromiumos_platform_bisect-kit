@@ -5,15 +5,17 @@
 # found in the LICENSE file.
 """Helper script to manipulate chromeos DUT or query info."""
 from __future__ import print_function
-import asyncio
 import argparse
+import asyncio
 import json
 import logging
+import os
 import random
 import time
 
 from bisect_kit import cli
 from bisect_kit import common
+from bisect_kit import configure
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -170,6 +172,24 @@ async def lease_dut_parallelly(duration, bots, timeout=None):
     return None
 
 
+def normalize_board_name(chromeos_root, board):
+  """Normalize BOARD name.
+
+  Here, we want to find the actual device board. Suffixes like -kernelnext will
+  be removed. So we can use that name to query DUTs inside the lab.
+
+  Args:
+    chromeos_root: chromeos source root
+    board: BOARD name
+
+  Returns:
+    normalized BOARD name
+  """
+  overlays = cros_util.parse_chromeos_overlays(chromeos_root)
+  boards_info = cros_util.resolve_basic_boards(overlays)
+  return boards_info[board]
+
+
 def do_allocate_dut(opts):
   """Helper of cmd_allocate_dut.
 
@@ -201,7 +221,7 @@ def do_allocate_dut(opts):
   if opts.board:
     for board in opts.board.split(','):
       variants.append('label-board:' +
-                      cros_lab_util.normalize_board_name(board))
+                      normalize_board_name(opts.chromeos_root, board))
   if opts.model:
     for model in opts.model.split(','):
       if model in models_to_avoid:
@@ -242,7 +262,8 @@ def do_allocate_dut(opts):
             'builder=%s does not have prebuilt test image for %s, ignore',
             builder, opts.version_hint)
         continue
-      boards_with_prebuilt.append(cros_lab_util.normalize_board_name(builder))
+      boards_with_prebuilt.append(
+          normalize_board_name(opts.chromeos_root, builder))
     logger.info('boards with prebuilt: %s', boards_with_prebuilt)
     if not boards_with_prebuilt:
       raise errors.ArgumentError(
@@ -286,7 +307,7 @@ def do_allocate_dut(opts):
       host_board = bots[0]['dimensions']['label-board'][0]
       if opts.builder_hint:
         for builder in opts.builder_hint.split(','):
-          if cros_lab_util.normalize_board_name(builder) == host_board:
+          if normalize_board_name(opts.chromeos_root, builder) == host_board:
             board_to_build = builder
             break
         else:
@@ -424,6 +445,12 @@ def main():
       type=int,
       default=1,
       help='Submit multiple lease tasks to speed up (default: %(default)d)')
+  parser_allocate_dut.add_argument(
+      '--chromeos_root',
+      type=cli.argtype_dir_path,
+      default=configure.get('DEFAULT_CHROMEOS_ROOT',
+                            os.path.expanduser('~/chromiumos')),
+      help='Chrome OS source tree, for overlay data (default: %(default)s)')
   parser_allocate_dut.set_defaults(func=cmd_allocate_dut)
 
   parser_repair_dut = subparsers.add_parser(
