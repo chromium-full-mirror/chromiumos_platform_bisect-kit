@@ -64,7 +64,7 @@ class RevInfo:
   @classmethod
   def format_result_counter(cls, result_counter, term_map):
     result = []
-    for status, count in result_counter.items():
+    for status, count in sorted(result_counter.items()):
       status = term_map.get(status, status)
       result.append('%s:%s' % (status, count))
     return ', '.join(result)
