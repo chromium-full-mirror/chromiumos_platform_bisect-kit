@@ -8,7 +8,7 @@
 if [ -n "$1" ]; then
     TARGETS="$*"
 else
-    TARGETS="chrome chrome_sandbox nacl_helper"
+    TARGETS="chrome nacl_helper"
 fi
 
 out_dir=out_${SDK_BOARD}/Release
@@ -19,7 +19,7 @@ TAST_TEST_BINARY_PATH=/usr/local/libexec/chrome-binary-tests/
 
 for TARGET in $TARGETS; do
     case "$TARGET" in
-        chrome_sandbox|nacl_helper)
+        nacl_helper)
             # do nothing; they will be deployed along with 'chrome'
             ;;
         chrome)

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 RE_CHROME_VERSION = r'^\d+\.\d+\.\d+\.\d+$'
 
-CHROME_BINARIES = ['chrome', 'chrome_sandbox', 'nacl_helper']
+CHROME_BINARIES = ['chrome', 'nacl_helper']
 # This list is created manually by inspecting
 # src/third_party/chromiumos-overlay/chromeos-base/chrome-binary-tests/
 # chrome-binary-tests-0.0.1.ebuild
