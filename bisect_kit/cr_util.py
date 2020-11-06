@@ -28,7 +28,9 @@ logger = logging.getLogger(__name__)
 
 RE_CHROME_VERSION = r'^\d+\.\d+\.\d+\.\d+$'
 
-CHROME_BINARIES = ['chrome', 'nacl_helper']
+CHROME_BINARIES = ['chrome']
+# nacl_helper is not available on arm64
+CHROME_BINARIES_OPTIONAL = ['nacl_helper']
 # This list is created manually by inspecting
 # src/third_party/chromiumos-overlay/chromeos-base/chrome-binary-tests/
 # chrome-binary-tests-0.0.1.ebuild
@@ -276,8 +278,7 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
   return util.check_output(*cmd, cwd=chrome_src, env=env)
 
 
-def get_chrome_test_binaries(chrome_src, board):
-  result = []
+def determine_targets_to_build(chrome_src, board, with_tests=True):
   out_dir = os.path.join('out_%s' % board, 'Release')
   available_targets = simple_chrome_shell(
       chrome_src,
@@ -288,7 +289,17 @@ def get_chrome_test_binaries(chrome_src, board):
       '--as=output',
       out_dir,
       internal=True).splitlines()
-  for binary in CHROME_TEST_BINARIES:
+
+  mandatory = CHROME_BINARIES
+  optional = list(CHROME_BINARIES_OPTIONAL)
+  if with_tests:
+    optional += CHROME_TEST_BINARIES
+
+  result = []
+  for binary in mandatory:
+    assert binary in available_targets, 'build rule for %r is not found?' % binary
+    result.append(binary)
+  for binary in optional:
     if binary not in available_targets:
       continue
     result.append(binary)
@@ -312,9 +323,8 @@ def build_and_deploy(chrome_src,
     nodeploy: if True, only build, do not deploy
   """
   if not targets:
-    targets = CHROME_BINARIES
-    if with_tests:
-      targets += get_chrome_test_binaries(chrome_src, board)
+    targets = determine_targets_to_build(
+        chrome_src, board, with_tests=with_tests)
 
   logger.info('build %s', targets)
   out_dir = os.path.join('out_%s' % board, 'Release')
