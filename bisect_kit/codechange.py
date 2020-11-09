@@ -655,10 +655,6 @@ class CodeManager:
     # Sort alphabetically, so parent directories are handled before children
     # directories.
     for path in sorted(set(prev_float.entries) | set(next_float.entries)):
-      # b/169379167: modemmanager-next is unbuildable in upstream branch
-      if path == 'src/third_party/modemmanager-next':
-        continue
-
       # Add repo
       if path not in prev_float:
         if next_float[path].is_static():
@@ -880,9 +876,6 @@ class CodeManager:
         timestamp, comment='make up glitch for %s' % fixed_spec.name)
     for path in set(fixed_spec.entries) & set(synthesized.entries):
       if fixed_spec[path].at == synthesized[path].at:
-        continue
-      # b/169379167: modemmanager-next is unbuildable in upstream branch
-      if path == 'src/third_party/modemmanager-next':
         continue
       action = GitCheckoutCommit(timestamp, path, synthesized[path].repo_url,
                                  synthesized[path].at)

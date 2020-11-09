@@ -447,7 +447,10 @@ def get_revlist(git_repo, old, new):
   """
   assert old
   assert new
-  cmd = ['git', 'rev-list', '--reverse', '%s^..%s' % (old, new)]
+  cmd = [
+      'git', 'rev-list', '--first-parent', '--reverse',
+      '%s^..%s' % (old, new)
+  ]
   revlist = util.check_output(*cmd, cwd=git_repo).splitlines()
   return revlist
 
@@ -628,6 +631,7 @@ def get_revlist_by_period(git_repo, branch, period):
   text = util.check_output(
       'git',
       'rev-list',
+      '--first-parent',
       '--timestamp',
       '-1',
       '--before',
@@ -639,6 +643,7 @@ def get_revlist_by_period(git_repo, branch, period):
   text += util.check_output(
       'git',
       'rev-list',
+      '--first-parent',
       '--timestamp',
       '--reverse',
       '--after',
