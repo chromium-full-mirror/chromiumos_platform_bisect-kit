@@ -218,8 +218,7 @@ def main(args=None):
   # Sanity check. The OS version should not change.
   if opts.dut:
     assert dut_os_version == cros_util.query_dut_short_version(opts.dut), \
-              'Someone else reflashed the DUT. ' \
-              'DUT locking is not respected? b/126141102'
+              'Someone else reflashed the DUT. DUT locking is not respected?'
 
 
 if __name__ == '__main__':
