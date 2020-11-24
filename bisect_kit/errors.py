@@ -11,7 +11,7 @@ class ArgumentError(Exception):
   def __init__(self, argument_name, message):
     self.argument_name = argument_name
     self.message = message
-    super(ArgumentError, self).__init__(str(self))
+    super().__init__(str(self))
 
   def __str__(self):
     if self.argument_name:
@@ -73,23 +73,21 @@ class VerificationFailed(Exception):
                                                self.actual)
     if self.bad_times > 1:
       msg += ' %d times' % self.bad_times
-    super(VerificationFailed, self).__init__(msg)
+    super().__init__(msg)
 
 
 class VerifyOldBehaviorFailed(VerificationFailed):
   """Old version does not behave as old."""
 
   def __init__(self, rev, bad_times=1, term_old='OLD', term_new='NEW'):
-    super(VerifyOldBehaviorFailed, self).__init__(rev, term_old, term_new,
-                                                  bad_times)
+    super().__init__(rev, term_old, term_new, bad_times)
 
 
 class VerifyNewBehaviorFailed(VerificationFailed):
   """New version does not behave as new."""
 
   def __init__(self, rev, bad_times=1, term_old='OLD', term_new='NEW'):
-    super(VerifyNewBehaviorFailed, self).__init__(rev, term_new, term_old,
-                                                  bad_times)
+    super().__init__(rev, term_new, term_old, bad_times)
 
 
 class UnableToProceed(Exception):

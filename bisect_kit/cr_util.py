@@ -212,7 +212,7 @@ def query_git_rev(chrome_src, rev):
     try:
       # Query via git tag
       return git_util.get_commit_hash(chrome_src, rev)
-    except ValueError:
+    except ValueError as e:
       # Failed due to source code not synced yet? Anyway, query by web api
       url = 'https://omahaproxy.appspot.com/deps.json?version=' + rev
       logger.debug('fetch %s', url)
@@ -221,7 +221,8 @@ def query_git_rev(chrome_src, rev):
       rev = obj['chromium_commit']
       if not git_util.is_git_rev(rev):
         raise ValueError(
-            'The response of omahaproxy, %s, is not a git commit hash' % rev)
+            'The response of omahaproxy, %s, is not a git commit hash' %
+            rev) from e
 
   if git_util.is_git_rev(rev):
     return rev
@@ -297,7 +298,8 @@ def determine_targets_to_build(chrome_src, board, with_tests=True):
 
   result = []
   for binary in mandatory:
-    assert binary in available_targets, 'build rule for %r is not found?' % binary
+    assert binary in available_targets, ('build rule for %r is not found?' %
+                                         binary)
     result.append(binary)
   for binary in optional:
     if binary not in available_targets:
@@ -371,8 +373,9 @@ class ChromeSpecManager(codechange.SpecManager):
     path = os.path.join('releases', rev, 'DEPS')
     try:
       timestamp = git_util.get_commit_time(self.spec_dir, 'origin/master', path)
-    except ValueError:
-      raise errors.InternalError('%s does not have %s' % (self.spec_dir, path))
+    except ValueError as e:
+      raise errors.InternalError('%s does not have %s' %
+                                 (self.spec_dir, path)) from e
     return timestamp
 
   def generate_meta_deps(self, rev):

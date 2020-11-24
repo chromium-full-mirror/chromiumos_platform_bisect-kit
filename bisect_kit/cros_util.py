@@ -227,8 +227,9 @@ def query_dut_lsb_release(host):
   """
   try:
     output = util.ssh_cmd(host, 'cat', '/etc/lsb-release')
-  except subprocess.CalledProcessError:
-    raise errors.ExternalError('unable to read /etc/lsb-release; not a DUT')
+  except subprocess.CalledProcessError as e:
+    raise errors.ExternalError(
+        'unable to read /etc/lsb-release; not a DUT') from e
   return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
 
 
@@ -247,8 +248,9 @@ def query_dut_os_release(host):
   """
   try:
     output = util.ssh_cmd(host, 'cat', '/etc/os-release')
-  except subprocess.CalledProcessError:
-    raise errors.ExternalError('unable to read /etc/os-release; not a DUT')
+  except subprocess.CalledProcessError as e:
+    raise errors.ExternalError(
+        'unable to read /etc/os-release; not a DUT') from e
   return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
 
 
@@ -1029,8 +1031,8 @@ def cros_flash(chromeos_root,
 
   try:
     cros_sdk(chromeos_root, 'cros', 'flash', *args)
-  except subprocess.CalledProcessError:
-    raise errors.ExternalError('cros flash failed')
+  except subprocess.CalledProcessError as e:
+    raise errors.ExternalError('cros flash failed') from e
 
   if version:
     # In the past, cros flash may fail with returncode=0
@@ -1476,7 +1478,7 @@ def build_packages(chromeos_root,
     # so, notify the caller to recreate chroot and retry.
     reason = check_if_need_recreate_chroot(e.output, ''.join(stderr_lines))
     if reason:
-      raise NeedRecreateChrootException(reason)
+      raise NeedRecreateChrootException(reason) from e
 
     # For other failures, don't know how to handle. Just bail out.
     raise
@@ -1512,7 +1514,7 @@ def build_image(chromeos_root, board):
     # so, notify the caller to recreate chroot and retry.
     reason = check_if_need_recreate_chroot(e.output, ''.join(stderr_lines))
     if reason:
-      raise NeedRecreateChrootException(reason)
+      raise NeedRecreateChrootException(reason) from e
 
     # For other failures, don't know how to handle. Just bail out.
     raise
@@ -1856,9 +1858,10 @@ class ChromeOSSpecManager(codechange.SpecManager):
     try:
       timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
                                            'refs/heads/master', path)
-    except ValueError:
-      raise errors.InternalError('%s does not have %s' %
-                                 (self.historical_manifest_git_dir, path))
+    except ValueError as e:
+      raise errors.InternalError(
+          '%s does not have %s' %
+          (self.historical_manifest_git_dir, path)) from e
     return timestamp
 
   def detect_float_spec_branch_level(self, spec):

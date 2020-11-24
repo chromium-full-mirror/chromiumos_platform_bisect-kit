@@ -287,7 +287,7 @@ class CrosDiagnoser:
 
         android_old, android_new, self.noisy = bisector.narrow_down()
         verified = True
-      except errors.VerifyOldBehaviorFailed:
+      except errors.VerifyOldBehaviorFailed as e:
         self.make_decision(
             'Expect old Android has old behavior (%s) but failed' %
             self.config['term_old'])
@@ -296,7 +296,7 @@ class CrosDiagnoser:
             'but it became new behavior (%s) '
             'after deployed old android prebuilt' %
             (self._verified_chromeos_prebuilt(), self.config['term_old'],
-             self.config['term_new']))
+             self.config['term_new'])) from e
       except errors.VerifyNewBehaviorFailed:
         self.make_decision('Unable to reproduce, the culprit is not in Android')
         return verified
@@ -368,7 +368,7 @@ class CrosDiagnoser:
             'but it became new behavior (%s) '
             'after deployed old android prebuilt' %
             (self._verified_chromeos_prebuilt(), self.config['term_old'],
-             self.config['term_new']))
+             self.config['term_new'])) from e
       self.make_decision('Unable to reproduce, the culprit is not in Android')
       return verified
     return verified
@@ -459,14 +459,14 @@ class CrosDiagnoser:
         bisector.append_switch_command(extra_switch_cmd)
 
       bisector.narrow_down()
-    except errors.VerifyOldBehaviorFailed:
+    except errors.VerifyOldBehaviorFailed as e:
       self.make_decision('Expect old Chrome has old behavior (%s) but failed' %
                          self.config['term_old'])
       raise errors.DiagnoseContradiction(
           '%s that old chrome os has old behavior (%s); '
           'but it became new behavior (%s) after deployed chrome' %
           (self._verified_chromeos_prebuilt(), self.config['term_old'],
-           self.config['term_new']))
+           self.config['term_new'])) from e
     except errors.VerifyNewBehaviorFailed:
       self.make_decision('Unable to reproduce, the culprit is not in Chrome')
       return False
@@ -525,16 +525,16 @@ class CrosDiagnoser:
 
     try:
       bisector.narrow_down()
-    except errors.VerifyNewBehaviorFailed:
+    except errors.VerifyNewBehaviorFailed as e:
       raise errors.DiagnoseContradiction(
           '%s that the issue could be reproduced with chromeos prebuilt; '
           'but unable to reproduce with local build' %
-          self._verified_chromeos_prebuilt())
-    except errors.VerifyOldBehaviorFailed:
+          self._verified_chromeos_prebuilt()) from e
+    except errors.VerifyOldBehaviorFailed as e:
       raise errors.DiagnoseContradiction(
           '%s that the issue could only be reproduced with new chromeos '
           'prebuilt; but reproduced with both old and new local build' %
-          self._verified_chromeos_prebuilt())
+          self._verified_chromeos_prebuilt()) from e
 
   def cmd_log(self, json_output=False):
     result = []

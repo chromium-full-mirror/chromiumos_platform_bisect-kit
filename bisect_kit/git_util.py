@@ -489,10 +489,10 @@ def get_commit_hash(git_repo, rev):
     output = util.check_output(
         'git', 'rev-parse', '%s^{commit}' % rev, '--', cwd=git_repo)
     git_rev = output.rstrip('-\n')
-  except subprocess.CalledProcessError:
+  except subprocess.CalledProcessError as e:
     # Do not use 'git rev-parse --disambiguate' to determine uniqueness
     # because it searches objects other than commits as well.
-    raise ValueError('%s is not unique or does not exist' % rev)
+    raise ValueError('%s is not unique or does not exist' % rev) from e
   assert is_git_rev(git_rev)
   return git_rev
 

@@ -136,7 +136,7 @@ class Popen:
           logger.debug('child process time out (%.1f seconds), kill it',
                        timeout)
           self.p.kill()
-          raise TimeoutExpired
+          raise TimeoutExpired from None
       else:
         where, line = self.queue.get(block=True)
       # line includes '\n', will be '' if EOF.

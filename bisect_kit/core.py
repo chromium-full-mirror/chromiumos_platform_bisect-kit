@@ -202,7 +202,7 @@ class BisectStates(States):
     Args:
       session_file: path of session file.
     """
-    super(BisectStates, self).__init__(session_file)
+    super().__init__(session_file)
 
     # Mapping of rev to idx; constructed from data['revlist'].
     self.rev_index = {}
@@ -249,7 +249,7 @@ class BisectStates(States):
             stats=stats))
 
   def set_data(self, data):
-    super(BisectStates, self).set_data(data)
+    super().set_data(data)
 
     self.rev_index = {}
     for i, rev in enumerate(self.data['revlist']):

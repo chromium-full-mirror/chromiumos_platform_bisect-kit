@@ -40,7 +40,7 @@ class ArgTypeError(argparse.ArgumentTypeError):
     else:
       self.example = [example]
     full_msg = '%s (example value: %s)' % (self.msg, ', '.join(self.example))
-    super(ArgTypeError, self).__init__(full_msg)
+    super().__init__(full_msg)
 
 
 def argtype_notempty(s):
@@ -69,8 +69,8 @@ def argtype_int(s):
   """
   try:
     return str(int(s))
-  except ValueError:
-    raise ArgTypeError('should be a number', '123')
+  except ValueError as e:
+    raise ArgTypeError('should be a number', '123') from e
 
 
 def argtype_re(pattern, example):
@@ -155,7 +155,7 @@ def argtype_multiplier(argtype):
     except ArgTypeError as e:
       # It should be okay to gives multiplier example only for the first one
       # because it is just "example", no need to enumerate all possibilities.
-      raise ArgTypeError(e.msg, e.example + [e.example[0] + '*3'])
+      raise ArgTypeError(e.msg, e.example + [e.example[0] + '*3']) from e
 
   return helper
 

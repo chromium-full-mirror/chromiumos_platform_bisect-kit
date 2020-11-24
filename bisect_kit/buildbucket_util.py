@@ -244,7 +244,7 @@ class BuildbucketApi:
         result = return_class()
         result.ParseFromString(response_content)
         return result
-      except DecodeError:
+      except DecodeError as e:
         response_content = response_content.decode('utf-8')
         if not logged_in:
           self._refresh_token(self.buildbucket_domain_url)
@@ -252,7 +252,7 @@ class BuildbucketApi:
         else:
           logger.exception('Error in buildbucket post: %s', response_content)
           raise errors.ExternalError('buildbucket api response: ' +
-                                     response_content)
+                                     response_content) from e
       except (socket.timeout, ssl.SSLError):
         if max_retries <= 0:
           raise

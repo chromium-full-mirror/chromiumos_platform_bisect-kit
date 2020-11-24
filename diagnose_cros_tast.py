@@ -29,7 +29,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
   """Diagnose command line interface."""
 
   def check_options(self, opts, path_factory):
-    super(DiagnoseTastCommandLine, self).check_options(opts, path_factory)
+    super().check_options(opts, path_factory)
     if not opts.test_name:
       self.argument_parser.error('argument --test_name is required')
 

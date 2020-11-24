@@ -50,7 +50,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
   """Diagnose command line interface."""
 
   def check_options(self, opts, path_factory):
-    super(DiagnoseAutotestCommandLine, self).check_options(opts, path_factory)
+    super().check_options(opts, path_factory)
 
     is_cts = (
         opts.cts_revision or opts.cts_abi or opts.cts_prefix or

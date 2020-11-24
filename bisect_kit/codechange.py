@@ -348,7 +348,7 @@ class GitCheckoutCommit(Action):
   """
 
   def __init__(self, timestamp, path, repo_url, rev):
-    super(GitCheckoutCommit, self).__init__(timestamp, path)
+    super().__init__(timestamp, path)
     self.repo_url = repo_url
     self.rev = rev
 
@@ -379,7 +379,7 @@ class GitAddRepo(Action):
   """
 
   def __init__(self, timestamp, path, repo_url, rev):
-    super(GitAddRepo, self).__init__(timestamp, path)
+    super().__init__(timestamp, path)
     self.repo_url = repo_url
     self.rev = rev
 

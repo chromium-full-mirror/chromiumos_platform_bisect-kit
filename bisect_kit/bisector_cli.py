@@ -40,9 +40,10 @@ def _collect_bisect_result_values(values, line):
   if m:
     try:
       values.extend([float(v) for v in m.group(1).split()])
-    except ValueError:
+    except ValueError as e:
       raise errors.InternalError(
-          'BISECT_RESULT_VALUES should be list of floats: %r' % m.group(1))
+          'BISECT_RESULT_VALUES should be list of floats: %r' %
+          m.group(1)) from e
 
 
 def _is_fatal_returncode(returncode):
@@ -721,9 +722,10 @@ class BisectorCommandLine:
             'expected 1 value, %d values given' % len(opts.value))
       try:
         self.states.config[opts.key] = float(opts.value[0])
-      except ValueError:
+      except ValueError as e:
         raise errors.ArgumentError('confidence value',
-                                   'invalid float value: %r' % opts.value[0])
+                                   'invalid float value: %r' %
+                                   opts.value[0]) from e
 
     elif opts.key == 'noisy':
       if len(opts.value) != 1:

@@ -627,7 +627,7 @@ def dut_lease_manager(dut):
     try:
       e = error_queue.get_nowait()
       # Re-raise the actual exception got from lease_keeper thread.
-      raise e
+      raise e from None
     except queue.Empty:
       # No exception from lease_keeper, do nothing
       pass
