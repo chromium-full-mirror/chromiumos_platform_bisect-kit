@@ -142,8 +142,10 @@ def get_build_prop(host):
     dict of property
   """
   data = util.ssh_cmd(
-      host, 'cat',
-      '/opt/google/containers/android/rootfs/root/system/build.prop')
+      host,
+      'cat',
+      # Use wildcard to match 'arc', 'arcvm', or future variants.
+      '/usr/share/arc*/properties/build.prop')
   if not data:
     return None
   result = {}
