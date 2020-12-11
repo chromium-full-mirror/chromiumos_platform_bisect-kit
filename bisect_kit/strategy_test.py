@@ -11,6 +11,7 @@ import unittest
 
 from bisect_kit import core
 from bisect_kit import errors
+from bisect_kit import math_util
 from bisect_kit import strategy
 
 
@@ -246,7 +247,14 @@ class TestNoisyBinarySearch(unittest.TestCase):
     self.assertEqual(bsearch.remaining_steps(), 0)
     bsearch.show_summary()
 
-  def perform_search(self, size, ans, old_p, new_p, confidence, random_seed=0):
+  @staticmethod
+  def perform_search(size,
+                     ans,
+                     old_p,
+                     new_p,
+                     confidence,
+                     random_seed=0,
+                     cost_func=None):
     """Performs full noisy binary search.
 
     Args:
@@ -256,12 +264,16 @@ class TestNoisyBinarySearch(unittest.TestCase):
       new_p: True-positive probability for new candidates.
       confidence: Required confidence.
       random_seed: Random seed.
+      cost_func: cost function.
 
     Returns:
-      (count, guess):
-        count: Number of eval.
+      (switch_count, eval_count, guess):
+        switch_count: Number of switch candidates.
+        eval_count: Number of eval.
         guess: Best guess.
     """
+    if cost_func is None:
+      cost_func = lambda *a: None
     rev_info = [core.RevInfo(str(i)) for i in range(size)]
     bsearch = strategy.NoisyBinarySearch(
         rev_info,
@@ -271,17 +283,55 @@ class TestNoisyBinarySearch(unittest.TestCase):
         verify_confidence=1.0)
 
     rng = random.Random(random_seed)
-    count = 0
+    switch_count = 0
+    eval_count = 0
+    prev_idx = None
     while not bsearch.is_done():
-      idx = bsearch.next_idx()
+      cost_table = cost_func(prev_idx)
+      idx = bsearch.next_idx(cost_table)
       if rng.random() < (old_p if idx < ans else new_p):
         result = 'new'
       else:
         result = 'old'
-      count += 1
+      if idx != prev_idx:
+        switch_count += 1
+      eval_count += 1
       bsearch.add_sample(idx, result)
+      prev_idx = idx
 
-    return count, bsearch.get_best_guess()
+    return switch_count, eval_count, bsearch.get_best_guess()
+
+  def perform_stress(self,
+                     size,
+                     old_p,
+                     new_p,
+                     confidence,
+                     cost_func=None,
+                     num=None,
+                     answer=None):
+    if num is None:
+      num = size - 1
+    switch_counts = []
+    eval_counts = []
+    results = []
+    for i in range(num):
+      if answer is None:
+        # evenly distributed in range [1, size-1]
+        ans = 1 + i * (size - 1) // num
+      else:
+        ans = answer
+      switch_count, eval_count, result = self.perform_search(
+          size,
+          ans,
+          old_p,
+          new_p,
+          confidence,
+          random_seed=i,
+          cost_func=cost_func)
+      switch_counts.append(switch_count)
+      eval_counts.append(eval_count)
+      results.append(result)
+    return switch_counts, eval_counts, results
 
   def test_classic_search(self):
     # Settings for non-noisy case.
@@ -290,37 +340,36 @@ class TestNoisyBinarySearch(unittest.TestCase):
     confidence = 0.99  # Doesn't matter.
 
     # Extreme case.
-    count, result = self.perform_search(2, 1, old_p, new_p, confidence)
-    self.assertEqual(count, 2)
+    _, eval_count, result = self.perform_search(2, 1, old_p, new_p, confidence)
+    self.assertEqual(eval_count, 2)
     self.assertEqual(result, 1)
 
     # Tests answer positions.
-    for i in range(1, 50):
-      count, result = self.perform_search(50, i, old_p, new_p, confidence)
-      self.assertLessEqual(7, count)
-      self.assertLessEqual(count, 8)
-      self.assertEqual(result, i)
+    _, counts, results = self.perform_stress(50, old_p, new_p, confidence)
+    self.assertLessEqual(7, min(counts))
+    self.assertLessEqual(max(counts), 8)
+    self.assertEqual(results, list(range(1, 50)))
 
     # Slightly larger case.
-    count, result = self.perform_search(1000, 42, old_p, new_p, confidence)
-    self.assertEqual(count, 11)
+    _, eval_count, result = self.perform_search(1000, 42, old_p, new_p,
+                                                confidence)
+    self.assertLessEqual(eval_count, 12)  # either 11 or 12 by chance
     self.assertEqual(result, 42)
 
   def test_half_noisy_search(self):
     """Tests noisy search with single side flaky."""
     # Extreme case.
-    count, result = self.perform_search(2, 1, 0.0, 0.5, 0.999)
+    _, _, result = self.perform_search(2, 1, 0.0, 0.5, 0.999)
     self.assertEqual(result, 1)
 
-    count, result = self.perform_search(3, 2, 0.0, 0.5, 0.999)
+    _, eval_count, result = self.perform_search(3, 2, 0.0, 0.5, 0.999)
     # 1 - 0.5**10 > 0.999, at least 10 times to have enough confidence.
-    self.assertGreaterEqual(count, 10)
+    self.assertGreaterEqual(eval_count, 10)
     self.assertEqual(result, 2)
 
     # Tests answer positions.
-    for i in range(1, 10):
-      self.perform_search(10, i, 0, 0.3, 0.999)
-      self.perform_search(10, i, 0.3, 1, 0.999)
+    self.perform_stress(10, 0, 0.3, 0.999)
+    self.perform_stress(10, 0.3, 1, 0.999)
 
     # Larger case.
     # Only makes sure it works. Don't verify the values due to randomness.
@@ -332,22 +381,48 @@ class TestNoisyBinarySearch(unittest.TestCase):
     self.perform_search(1000, 42, 0.05, 0.7, 0.999)
 
     # Tests answer positions.
-    for i in range(1, 20):
-      self.perform_search(20, i, 0.1, 0.9, 0.999)
+    self.perform_stress(20, 0.1, 0.9, 0.999)
+
+  def test_non_uniform_costs(self):
+    size = 100
+    switch_cost = 600
+    eval_cost = 60
+    old_p = 0.05
+    new_p = 0.7
+    num_simulation = 10
+
+    def cost_func(prev_idx):
+      if prev_idx is None:
+        return None
+      result = []
+      for i in range(size):
+        if i == prev_idx:
+          cost = [eval_cost, eval_cost]
+        else:
+          cost = [switch_cost + eval_cost, switch_cost + eval_cost]
+        result.append(cost)
+      return result
+
+    switch_counts, eval_counts, _ = self.perform_stress(
+        size, old_p, new_p, 0.999, num=num_simulation)
+    cost1 = math_util.average(switch_counts) * switch_cost + math_util.average(
+        eval_counts) * eval_cost
+
+    switch_counts, eval_counts, _ = self.perform_stress(
+        size, old_p, new_p, 0.999, num=num_simulation, cost_func=cost_func)
+    cost2 = math_util.average(switch_counts) * switch_cost + math_util.average(
+        eval_counts) * eval_cost
+    # With more runs, the averages are actually near 14860 and 8990,
+    # respectively.
+    self.assertTrue(cost1 > cost2 + 4000)
 
   def test_confidence(self):
-    counter_guess = collections.Counter()
-    sum_count = 0
     n = 1000
     ans = 7
-    for i in range(n):
-      count, guess = self.perform_search(
-          10, ans, 0.1, 0.9, confidence=0.9, random_seed=i)
-      counter_guess[guess] += 1
-      sum_count += count
-
-    self.assertLess(float(sum_count) / n, 9)
-    common_guess = counter_guess.most_common(1)[0]
+    counts, _, results = self.perform_stress(
+        10, 0.1, 0.9, confidence=0.9, answer=ans, num=n)
+    self.assertLess(float(sum(counts)) / n, 9)
+    common_guess = collections.Counter(results).most_common(1)[0]
     self.assertEqual(common_guess[0], ans)
     # It's expected that not all guesses are correct.
     self.assertLess(common_guess[1], n)

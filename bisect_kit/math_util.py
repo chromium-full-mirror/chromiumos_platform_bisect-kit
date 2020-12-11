@@ -55,6 +55,23 @@ def average(values):
   return float(sum(values)) / len(values)
 
 
+class Averager:
+  """Helper class to calculate average."""
+
+  def __init__(self):
+    self.count = 0
+    self.total = 0
+
+  def add(self, value):
+    self.count += 1
+    self.total += value
+
+  def average(self):
+    if self.count == 0:
+      raise ValueError('calculate average of empty list')
+    return self.total / self.count
+
+
 class EntropyStats:
   r"""A data structure to maintain cross entropy of a set of values.
 

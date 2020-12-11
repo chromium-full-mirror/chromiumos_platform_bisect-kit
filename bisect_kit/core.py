@@ -212,10 +212,6 @@ class BisectStates(States):
     return self.data['config']
 
   @property
-  def stats(self):
-    return self.data['stats']
-
-  @property
   def details(self):
     return self.data['details']
 
@@ -227,12 +223,6 @@ class BisectStates(States):
       revlist: version list.
       details: dict of rev details.
     """
-    # Statistics of bisector's action count (switch, eval) and their
-    # accumulated duration.
-    # With this, noisy bisector may run evaluator more times as time
-    # optimization if evaluator is much faster than switcher.
-    stats = dict(switch_count=0, eval_count=0, switch_time=0, eval_time=0)
-
     self.set_data(
         dict(
             # Bisection configurations (dict), values are determined by cmd_init
@@ -244,9 +234,7 @@ class BisectStates(States):
             details=details or {},
             # What have been done so far. Each entry contains at least
             # timestamp, rev, and result.
-            history=[],
-            # Statistics values, see above.
-            stats=stats))
+            history=[]))
 
   def set_data(self, data):
     super().set_data(data)

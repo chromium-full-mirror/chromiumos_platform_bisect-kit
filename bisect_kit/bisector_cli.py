@@ -6,6 +6,7 @@
 
 from __future__ import print_function
 import argparse
+import collections
 import datetime
 import json
 import logging
@@ -20,6 +21,7 @@ from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import errors
+from bisect_kit import math_util
 from bisect_kit import strategy
 from bisect_kit import util
 
@@ -340,20 +342,60 @@ class BisectorCommandLine:
 
     return 'eval', sample
 
+  def _estimate_cost(self, prev_rev):
+    avg_switch_time = math_util.Averager()
+    avg_eval_time = math_util.Averager()
+    avg_eval_time_by_status = collections.defaultdict(math_util.Averager)
+    for entry in self.states.data['history']:
+      if entry['event'] != 'sample':
+        continue
+      if 'switch_time' in entry:
+        avg_switch_time.add(entry['switch_time'])
+      if 'eval_time' in entry:
+        avg_eval_time.add(entry['eval_time'])
+        avg_eval_time_by_status[entry['status']].add(entry['eval_time'])
+
+    if avg_switch_time.count == 0:
+      return None
+    if avg_eval_time.count == 0:
+      return None
+
+    cost_table = []
+    for info in self.strategy.rev_info:
+      if info.rev == prev_rev:
+        switch_time = 0
+      else:
+        # TODO(kcwu): estimate switch cost sophisticatedly
+        switch_time = avg_switch_time.average()
+      if (avg_eval_time_by_status['old'].count > 0 and
+          avg_eval_time_by_status['new'].count > 0):
+        cost = (
+            switch_time + avg_eval_time_by_status['old'].average(),
+            switch_time + avg_eval_time_by_status['new'].average(),
+        )
+      else:
+        cost = (
+            switch_time + avg_eval_time.average(),
+            switch_time + avg_eval_time.average(),
+        )
+      cost_table.append(cost)
+    return cost_table
+
   def _next_idx_iter(self, opts, force):
+    prev_rev = None
     if opts.revs:
       for rev in opts.revs:
         idx = self.states.rev2idx(rev)
         logger.info('try idx=%d rev=%s (command line specified)', idx, rev)
-        yield idx, rev
+        prev_rev = yield idx, rev
         if opts.once:
           break
     else:
       while force or not self.strategy.is_done():
-        idx = self.strategy.next_idx()
+        idx = self.strategy.next_idx(self._estimate_cost(prev_rev))
         rev = self.states.idx2rev(idx)
         logger.info('try idx=%d rev=%s', idx, rev)
-        yield idx, rev
+        prev_rev = yield idx, rev
         force = False
         if opts.once:
           break
@@ -399,9 +441,14 @@ class BisectorCommandLine:
       self.states.add_history(
           'start_range', old=self.config['old'], new=self.config['new'])
       term_map = self._get_term_map()
-      prev_rev = None
+      prev_rev = opts.current_rev
       force = opts.force
-      for idx, rev in self._next_idx_iter(opts, force):
+      idx_gen = self._next_idx_iter(opts, force)
+      while True:
+        try:
+          idx, rev = idx_gen.send(prev_rev)
+        except StopIteration:
+          break
         if not force:
           # Bail out if bisection range is unlikely true in order to prevent
           # wasting time. This is necessary because some configurations (say,
@@ -631,13 +678,13 @@ class BisectorCommandLine:
       else:
         print('%s %r' % (entry_time, entry))
 
-  def cmd_next(self, _opts):
+  def cmd_next(self, opts):
     """Prints next suggested rev to bisect."""
     if self.strategy.is_done():
       print('done')
       return
 
-    idx = self.strategy.next_idx()
+    idx = self.strategy.next_idx(self._estimate_cost(opts.current_rev))
     rev = self.states.idx2rev(idx)
     print(rev)
 
@@ -646,7 +693,7 @@ class BisectorCommandLine:
     assert self.config.get('switch')
 
     if opts.rev == 'next':
-      idx = self.strategy.next_idx()
+      idx = self.strategy.next_idx(self._estimate_cost(opts.current_rev))
       rev = self.states.idx2rev(idx)
     else:
       rev = self.domain_cls.intra_revtype(opts.rev)
@@ -866,6 +913,10 @@ class BisectorCommandLine:
         action='store_true',
         help="Run at least once even it's already done")
     parser_run.add_argument(
+        '--current_rev',
+        type=self.domain_cls.intra_revtype,
+        help='give hint the current rev')
+    parser_run.add_argument(
         'revs',
         nargs='*',
         type=self.domain_cls.intra_revtype,
@@ -879,6 +930,10 @@ class BisectorCommandLine:
         'rev',
         type=cli.argtype_multiplexer(self.domain_cls.intra_revtype,
                                      cli.argtype_re('next', 'next')))
+    parser_switch.add_argument(
+        '--current_rev',
+        type=self.domain_cls.intra_revtype,
+        help='if rev="next", give hint the current rev')
     parser_switch.set_defaults(func=self.cmd_switch)
 
     parser_old = subparsers.add_parser(
@@ -921,6 +976,10 @@ class BisectorCommandLine:
 
     parser_next = subparsers.add_parser(
         'next', help='Prints next suggested rev to bisect')
+    parser_next.add_argument(
+        '--current_rev',
+        type=self.domain_cls.intra_revtype,
+        help='give hint the current rev')
     parser_next.set_defaults(func=self.cmd_next)
 
     return parser

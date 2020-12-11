@@ -927,17 +927,18 @@ class NoisyBinarySearch:
     return self.prob.index(max(self.prob))
 
   @staticmethod
-  def _next_idx_entropy(old_p, new_p, prob):
-    """Determines next index to binary search according to information gain."""
+  def _next_idx_by_utility(old_p, new_p, prob, cost_table=None):
+    """Determines next index to binary search according to utility."""
     assert prob
+    if cost_table is None:
+      cost_table = [(1, 1)] * len(prob)
     orig_stats = math_util.EntropyStats([float(p) for p in prob])
+    orig_entropy = orig_stats.entropy()
     new_stats = orig_stats.multiply(old_p)
     old_stats = orig_stats.multiply(1.0 - old_p)
 
-    # Enumerate |i| as next to query, find best |i| to maximize
-    # information gain, i.e. minimize entropy.
-
-    best = float('inf')
+    # Enumerate |i| as next to query, find best |i| to maximize utility.
+    best = float('-inf')
     best_i = None
     # |s| = cumulative probability of [p_0,..., p_i]
     s = 0.0
@@ -957,8 +958,11 @@ class NoisyBinarySearch:
 
       # The expected entropy after getting the next result at rev[i].
       entropy = r * new_stats.entropy() + (1.0 - r) * old_stats.entropy()
-      if entropy < best:
-        best = entropy
+      information_gain = orig_entropy - entropy
+      cost = r * cost_table[i][1] + (1.0 - r) * cost_table[i][0]
+      utility = information_gain / cost
+      if utility > best:
+        best = utility
         best_i = i
 
     return best_i
@@ -1045,11 +1049,18 @@ class NoisyBinarySearch:
       return None
     return self.prob
 
-  def next_idx(self):
+  def next_idx(self, cost_table=None):
     """Determines next index to binary search.
 
+    Args:
+      cost_table: list of cost estimation of candidates, optional. Each
+                  estimation is a tuple (estimated_old, estimated_new) where
+        estimated_old: estimated cost if this candidate has old behavior
+        estimated_new: estimated cost if this candidate has new behavior
+
     Returns:
-      Index to try for binary search.
+      Index to try for binary search. The returned index is optimized for
+      minimal total cost.
     """
     if self.state == self.INITED:
       idx = self._next_idx_for_initial()
@@ -1058,4 +1069,5 @@ class NoisyBinarySearch:
 
     assert self.state == self.STARTED
     assert self.prob
-    return self._next_idx_entropy(self.old_p, self.new_p, self.prob)
+    return self._next_idx_by_utility(self.old_p, self.new_p, self.prob,
+                                     cost_table)

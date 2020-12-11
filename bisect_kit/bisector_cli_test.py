@@ -162,7 +162,7 @@ class TestBisectorCommandLine(unittest.TestCase):
       self.assertEqual(bisector.strategy.get_range(), (0, 99))
 
       bisector.main('run', '-1')
-      self.assertEqual(bisector.strategy.get_range(), (0, 49))
+      self.assertIn(bisector.strategy.get_range(), {(0, 49), (0, 50)})
 
       bisector.main('run')
       self.assertEqual(bisector.strategy.get_best_guess(), 42)
