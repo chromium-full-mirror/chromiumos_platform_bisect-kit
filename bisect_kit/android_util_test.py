@@ -24,7 +24,7 @@ class TestAndroidUtil(unittest.TestCase):
     with mock.patch.object(
         android_util, 'fetch_android_build_data', return_value=data):
       self.assertEqual(
-          android_util.get_build_ids_between('aosp-master', 'aosp_arm64-eng',
+          android_util.get_build_ids_between('foo-branch', 'aosp_arm64-eng',
                                              '4683349', '4683388'),
           ['4683349', '4683353', '4683364', '4683367', '4683388'])
 
@@ -33,7 +33,7 @@ class TestAndroidUtil(unittest.TestCase):
     with mock.patch.object(
         android_util, 'fetch_android_build_data', return_value=data):
       self.assertEqual(
-          android_util.get_build_ids_between('aosp-master', 'aosp_arm64-eng',
+          android_util.get_build_ids_between('foo-branch', 'aosp_arm64-eng',
                                              '9999999', '10000001'),
           ['9999999', '10000001'])
 
@@ -41,9 +41,9 @@ class TestAndroidUtil(unittest.TestCase):
     with testing.mock_function_by_file(android_util, 'fetch_android_build_data',
                                        'android-build-status-4683364.json'):
       self.assertFalse(
-          android_util.is_good_build('aosp-master', 'build_test', '4683364'))
+          android_util.is_good_build('foo-branch', 'build_test', '4683364'))
       self.assertTrue(
-          android_util.is_good_build('aosp-master', 'aosp_x86-eng', '4683364'))
+          android_util.is_good_build('foo-branch', 'aosp_x86-eng', '4683364'))
 
 
 if __name__ == '__main__':
