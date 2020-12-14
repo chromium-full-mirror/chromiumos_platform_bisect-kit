@@ -78,7 +78,7 @@ class TestManifestParser(unittest.TestCase):
     manifest = r"""<?xml version="1.0" encoding="UTF-8"?>
     <manifest>
       <remote name="goog" fetch=".." />
-      <default revision="master" remote="goog" />
+      <default revision="main" remote="goog" />
       <project path="frameworks/av" name="platform/frameworks/av"
                revision="foobar" />
       <project path="frameworks/base" name="platform/frameworks/base" />
@@ -101,7 +101,7 @@ class TestManifestParser(unittest.TestCase):
                      'https://example.com/platform/frameworks/av')
     self.assertEqual(result['frameworks/av'].at, 'foobar')
 
-    self.assertEqual(result['frameworks/base'].at, 'master')
+    self.assertEqual(result['frameworks/base'].at, 'main')
 
     self.assertNotIn('frameworks/foo', result)
 

@@ -11,7 +11,7 @@ References:
   - Chrome Performance Dashboard Data Format
     https://chromium.googlesource.com/catapult/+/HEAD/dashboard/docs/data-format.md
   - (code) How catapult dashboard parses.
-    https://github.com/catapult-project/catapult/blob/master/dashboard/dashboard/add_point.py
+    https://chromium.googlesource.com/catapult/+/HEAD/dashboard/dashboard/add_point.py
 """
 
 from __future__ import print_function

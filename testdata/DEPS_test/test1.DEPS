@@ -123,7 +123,6 @@ vars = {
 # https://chrome-internal.googlesource.com/chrome/browser/media/kaleidoscope/internal.git@df6b634f536d79e2e3920ccc39bf62e4e2a6bfde, DEPS
 # https://chrome-internal.googlesource.com/chrome/ios_internal.git@66a24438afba8b10564e8c14b2a847de0f5f0a9a, DEPS
 # https://chrome-internal.googlesource.com/chrome/src-internal.git@1ce9ecabecb1ac3bc4e6b21dc97c5cbc9cfee4ea, DEPS
-# https://chrome-internal.googlesource.com/chrome/tools/build_limited/scripts/slave.git@c241c6d04b38802fe78eb095f6e3099532552e3a, DEPS
 # https://chrome-internal.googlesource.com/clank/internal/apps.git@93d587af8d813de5966f8018f9b1f8ea26b05f4a, DEPS
 # https://chrome-internal.googlesource.com/external/gob/libassistant-internal/standalone/src.git@2d3822fe213fe8ec6b7037142ab267d1170fd745, DEPS
 # https://chromium.googlesource.com/a/chromium/src.git@c354f64fc8efb8cfaed803219c3acb334f5f7b61, DEPS

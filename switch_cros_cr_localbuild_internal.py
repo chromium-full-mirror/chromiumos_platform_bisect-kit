@@ -8,7 +8,7 @@
 This script will sync the chrome source tree to the specified version, build,
 and deploy.
 
-Typical usage companion with bisect_cr_localbuild_master:
+Typical usage companion with bisect_cr_localbuild_internal:
   $ ./bisect_cr_localbuild_internal.py config switch \
       ./switch_cros_cr_localbuild_internal.py
 

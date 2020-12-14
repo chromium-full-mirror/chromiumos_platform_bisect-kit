@@ -216,9 +216,9 @@ class TestCrosUtil(unittest.TestCase):
     with open(testing.get_testdata_path('partial-metadata.json')) as f:
       sample = f.read()
     with mock.patch.object(cros_util, 'gsutil', return_value=sample):
-      info = cros_util.version_info('caroline', '9462.0.0')
+      info = cros_util.version_info('caroline', '13664.0.0')
       self.assertEqual(info[cros_util.VERSION_KEY_CROS_SHORT_VERSION],
-                       '9462.0.0')
+                       '13664.0.0')
 
   def test_list_prebuilt_from_image_archive(self):
     gs_path = 'gs://chromeos-image-archive/foo-release/R59-9410.0.0/'

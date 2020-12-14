@@ -1010,7 +1010,7 @@ def cros_flash(chromeos_root,
       # For simplicity, we wait 60 seconds here, which is the timeout value of
       # jetstream_host.
       # https://chromium.googlesource.com/chromiumos/third_party/autotest
-      #     /+/master/server/hosts/jetstream_host.py#27
+      #     /+/HEAD/server/hosts/jetstream_host.py#27
       time.sleep(60)
       util.ssh_cmd(host, 'stop', 'ap-update-manager')
     except subprocess.CalledProcessError:
@@ -1882,7 +1882,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
     level_new = self.detect_float_spec_branch_level(new_spec)
 
     if not level_old or not level_new:
-      logger.warning('branch level detect failed, assume master')
+      logger.warning('branch level detect failed, assume not branched')
       return False
     return level_old != level_new
 

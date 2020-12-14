@@ -1,1 +1,89 @@
-{"metadata-version": "2", "toolchain-url": "2017/04/%(target)s-2017.04.13.123456.tar.xz", "build_id": 1357924, "version": {"full": "R60-9462.0.0", "android-branch": "git_aaa-aaa-bbb", "chrome": "59.0.4321.0", "platform": "9462.0.0", "milestone": "60", "android": "3333333"}, "sdk-version": "2017.04.13.123456", "unibuild": false, "master_build_id": 1122334, "tags": {"buildbot_master_name": "chromeos", "child_config_names": [], "builder_name": "caroline-release", "bot_config": "caroline-release", "id": ["Build", 1357924], "build_id": 1357924, "buildbot_url": "https://aaabbbcccdddeeeff.google.com/a/chromeos/","build_number": 111, "bot_hostname": "cros-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "sdk_version": "2017.04.13.123456", "version_platform": "9462.0.0", "master_build_id": 1122334, "bot_type": "aaa-bbbbb", "toolchain_tuples": ["x86_64-cros-linux-gnu,i686-pc-linux-gnu,arm-none-eabi"], "git_version": "git version 2.11.0 / Infra wrapper (infra/tools/git/linux-amd64 @ 1234567890abcdef1234567890abcdef12345678)", "important": true, "build_type": "canary", "boards": ["caroline"], "version_full": "R60-9462.0.0", "toolchain_url": "2017/04/%(target)s-2017.04.13.123456.tar.xz", "version_milestone": "60", "repo_version": "v1.22.33-cr1", "toolchains": ["i686-pc-linux-gnu", "x86_64-cros-linux-gnu", "arm-none-eabi"], "primary_toolchains": ["x86_64-cros-linux-gnu"]}, "buildbot-master-name": "chromeos", "buildbot-url": "https://aaabbbcccdddeeeff.google.com/a/chromeos/", "child-configs": [], "build-number": 111, "bot-hostname": "cros-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bot-config": "caroline-release", "important": true, "toolchain-tuple": ["x86_64-cros-linux-gnu", "i686-pc-linux-gnu", "arm-none-eabi"], "cl_actions": [], "build_type": "canary", "board-metadata": {"caroline": {"kernel-version": "3.99-r5555", "fingerprints": ["google/caroline/caroline_cheets:7.7.7/R60-9462.0.0/3333333:user/release-keys"], "ec-firmware-version": "caroline_v1.1.111-abcabcd", "android-container-branch": "git_aaa-aaa-bbb", "android-container-version": "3333333", "arc-use-set": true, "main-firmware-version": "Google_Caroline.2222.333.0"}}, "boards": ["caroline"], "db_type": "prod", "builder-name": "caroline-release", "time": {"start": "Fri, 14 Apr 2017 11:22:33 -0700 (PDT)"}}
+{
+  "board-metadata": {
+    "caroline": {
+      "android-container-branch": "git_pi-arc",
+      "android-container-target": "cheets",
+      "android-container-version": "7026951",
+      "arc-use-set": true,
+      "ec-firmware-version": "caroline_v1.9.414-67844a493",
+      "fingerprints": [
+        "google/caroline/caroline_cheets:9/R89-13664.0.0/7026951:user/release-keys"
+      ],
+      "kernel-version": "3.18-r2604",
+      "main-firmware-version": "Google_Caroline.7820.430.0"
+    }
+  },
+  "boards": [
+    "caroline"
+  ],
+  "bot-config": "caroline-release",
+  "bot-hostname": "chromeos-foo.c.chromeos-bot",
+  "build-number": 0,
+  "build_id": 4738822,
+  "build_type": "canary",
+  "buildbucket_id": "8860981718532549296",
+  "builder-name": "caroline-release",
+  "child-configs": [],
+  "cl_actions": [],
+  "db_type": "prod",
+  "goma_tmp_dir": "/b/s/w/ir/cache/cbuild/repository/chroot/tmp/goma_tmp_dir.u5l2r45z",
+  "important": true,
+  "metadata-version": "2",
+  "sdk-version": "2020.12.11.211041",
+  "suite_scheduling": true,
+  "tags": {
+    "boards": [
+      "caroline"
+    ],
+    "bot_config": "caroline-release",
+    "bot_hostname": "chromeos-foo.c.chromeos-bot",
+    "bot_type": "unknown",
+    "build_id": 4738822,
+    "build_number": 0,
+    "build_type": "canary",
+    "builder_name": "caroline-release",
+    "child_config_names": [],
+    "git_version": "git version 2.29.2.chromium.6 / Infra wrapper (infra/tools/git/linux-amd64 @ 9vExr5WCkxDZvR7JgOcab_qYYPdFu6T02df8-o90XMEC)",
+    "id": [
+      "Build",
+      4738822
+    ],
+    "important": true,
+    "primary_toolchains": [
+      "x86_64-cros-linux-gnu"
+    ],
+    "repo_version": "v2.10-cr1",
+    "sdk_version": "2020.12.11.211041",
+    "toolchain_tuples": [
+      "x86_64-cros-linux-gnu,i686-pc-linux-gnu,arm-none-eabi"
+    ],
+    "toolchain_url": "2020/12/%(target)s-2020.12.11.211041.tar.xz",
+    "toolchains": [
+      "i686-pc-linux-gnu",
+      "arm-none-eabi",
+      "x86_64-cros-linux-gnu"
+    ],
+    "version_full": "R89-13664.0.0",
+    "version_milestone": "89",
+    "version_platform": "13664.0.0"
+  },
+  "time": {
+    "start": "Sun, 13 Dec 2020 17:03:15 -0800 (PST)"
+  },
+  "toolchain-tuple": [
+    "x86_64-cros-linux-gnu",
+    "i686-pc-linux-gnu",
+    "arm-none-eabi"
+  ],
+  "toolchain-url": "2020/12/%(target)s-2020.12.11.211041.tar.xz",
+  "unibuild": false,
+  "version": {
+    "android": "7026951",
+    "android-branch": "git_pi-arc",
+    "android-target": "cheets",
+    "chrome": "89.0.4351.0",
+    "full": "R89-13664.0.0",
+    "milestone": "89",
+    "platform": "13664.0.0"
+  }
+}

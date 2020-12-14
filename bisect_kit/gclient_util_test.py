@@ -25,7 +25,7 @@ class TestDepsParser(unittest.TestCase):
     deps_content = textwrap.dedent("""\
         vars = {
           'chromium_git': 'https://chromium.googlesource.com',
-          'buildtools_revision': 'refs/heads/master',
+          'buildtools_revision': 'refs/heads/main',
           'checkout_foo': False,
           'checkout_bar': True,
         }
@@ -36,12 +36,12 @@ class TestDepsParser(unittest.TestCase):
                 Var('buildtools_revision'),
           'src/foo': {
             'url': Var('chromium_git') + '/chromium/foo.git' + '@' +
-                'refs/heads/master',
+                'refs/heads/main',
             'condition': 'checkout_foo',
           },
           'src/bar': {
             'url': Var('chromium_git') + '/chromium/bar.git' + '@' +
-                'refs/heads/master',
+                'refs/heads/main',
             'condition': 'checkout_bar',
           },
         }
@@ -61,7 +61,7 @@ class TestDepsParser(unittest.TestCase):
     self.assertEqual(
         buildtools.url,
         'https://chromium.googlesource.com/chromium/buildtools.git'
-        '@refs/heads/master')
+        '@refs/heads/main')
 
     self.assertIn(('src/buildtools', 'DEPS'), deps.recursedeps)
     self.assertNotIn(('src/foo', 'DEPS'), deps.recursedeps)
@@ -92,8 +92,8 @@ class TestDepsParser(unittest.TestCase):
   def test_parse_recursedeps(self):
     deps_content = textwrap.dedent("""\
         deps = {
-          'src/foo': 'http://example.com/foo.git@refs/heads/master',
-          'src/bar': 'http://example.com/bar.git@refs/heads/master',
+          'src/foo': 'http://example.com/foo.git@refs/heads/main',
+          'src/bar': 'http://example.com/bar.git@refs/heads/main',
         }
 
         recursedeps = [

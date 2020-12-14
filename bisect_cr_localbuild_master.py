@@ -27,7 +27,7 @@ will be set:
   BOARD (e.g. samus, if available), and
   DUT (e.g. samus-dut, if available).
 """
-# Note, this script only works for master branch of chrome.
+# Note, this script only works for the main branch of chrome.
 from __future__ import print_function
 import logging
 import os
@@ -105,7 +105,7 @@ def verify_gclient_dep(chrome_root):
 
 
 class ChromeSrcMasterDomain(core.BisectDomain):
-  """BisectDomain for Chrome master tree"""
+  """BisectDomain for Chrome main tree"""
   revtype = staticmethod(revtype)
   help = globals()['__doc__']
 
