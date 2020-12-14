@@ -26,7 +26,7 @@ class TestBisectCrLocalbuildMaster(unittest.TestCase):
 
   def test_verify_gclient_dep(self):
     shutil.copy(
-        testing.get_testdata_path('gclient_master'),
+        testing.get_testdata_path('gclient_chromium_src'),
         os.path.join(self.chrome_root, '.gclient'))
 
     self.assertTrue(

@@ -1759,6 +1759,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
                                               'manifest-internal.git')
     self.historical_manifest_git_dir = os.path.join(
         self.config['chromeos_mirror'], 'chromeos/manifest-versions.git')
+    self.historical_manifest_branch_name = 'refs/heads/master'
     if not os.path.exists(self.historical_manifest_git_dir):
       raise errors.InternalError('Manifest snapshots should be cloned into %s' %
                                  self.historical_manifest_git_dir)
@@ -1857,7 +1858,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
     path = os.path.join('buildspecs', milestone, short_version + '.xml')
     try:
       timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
-                                           'refs/heads/master', path)
+                                           self.historical_manifest_branch_name,
+                                           path)
     except ValueError as e:
       raise errors.InternalError(
           '%s does not have %s' %
@@ -2058,14 +2060,16 @@ class ChromeOSSpecManager(codechange.SpecManager):
 
     result = []
     for milestone in git_util.list_dir_from_revision(
-        self.historical_manifest_git_dir, 'refs/heads/master', 'buildspecs'):
+        self.historical_manifest_git_dir, self.historical_manifest_branch_name,
+        'buildspecs'):
       if not milestone.isdigit():
         continue
       if not int(old_milestone) <= int(milestone) <= int(new_milestone):
         continue
 
       files = git_util.list_dir_from_revision(
-          self.historical_manifest_git_dir, 'refs/heads/master',
+          self.historical_manifest_git_dir,
+          self.historical_manifest_branch_name,
           os.path.join('buildspecs', milestone))
 
       for fn in files:
@@ -2077,8 +2081,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
             util.is_version_lesseq(short_version, new_short_version) and
             util.is_direct_relative_version(short_version, new_short_version)):
           rev = make_cros_full_version(milestone, short_version)
-          timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
-                                               'refs/heads/master', path)
+          timestamp = git_util.get_commit_time(
+              self.historical_manifest_git_dir,
+              self.historical_manifest_branch_name, path)
           result.append(
               codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path))
 
@@ -2097,7 +2102,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
       milestone, short_version = version_split(rev)
       path = os.path.join('buildspecs', milestone, '%s.xml' % short_version)
       manifest = git_util.get_file_from_revision(
-          self.historical_manifest_git_dir, 'refs/heads/master', path)
+          self.historical_manifest_git_dir,
+          self.historical_manifest_branch_name, path)
     else:
       revisions = self.lookup_snapshot_manifest_revisions(rev, rev)
       commit_id = revisions[0][1]
