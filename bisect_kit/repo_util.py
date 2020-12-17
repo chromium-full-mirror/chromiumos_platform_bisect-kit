@@ -386,7 +386,9 @@ class ManifestParser:
         self.element_equal(node1, node2)
         for node1, node2 in zip(element1, element2))
 
-  def process_parsed_result(self, root):
+  def process_parsed_result(self, root, group_constraint='default'):
+    if group_constraint not in ('default', 'all'):
+      raise ValueError('only "default" and "all" are supported')
     result = {}
     default = root.find('default')
     if default is None:
@@ -406,8 +408,9 @@ class ManifestParser:
     assert root.find('include') is None
 
     for project in root.findall('.//project'):
-      if 'notdefault' in project.get('groups', ''):
-        continue
+      if group_constraint == 'default':
+        if 'notdefault' in project.get('groups', ''):
+          continue
       for subproject in project.findall('.//project'):
         logger.warning('nested project %s.%s is not supported and ignored',
                        project.get('name'), subproject.get('name'))

@@ -120,7 +120,12 @@ def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
     manifest_path = os.readlink(manifest_full_path)
 
   parser = repo_util.ManifestParser(manifest_dir)
-  latest = None
+  git_rev = git_util.get_commit_hash(manifest_dir, 'HEAD')
+  root = parser.parse_xml_recursive(git_rev, manifest_path)
+  latest_all = parser.process_parsed_result(root, group_constraint='all')
+  latest_default = parser.process_parsed_result(
+      root, group_constraint='default')
+
   removed = {}
   for _, git_rev in reversed(
       parser.enumerate_manifest_commits(last_sync_time, None, manifest_path)):
@@ -134,13 +139,13 @@ def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
         root.find('default').get('revision') != only_branch):
       break
     entries = parser.process_parsed_result(root)
-    if latest is None:
-      assert entries is not None
-      latest = entries
-      continue
-
     for path, path_spec in entries.items():
-      if path in latest:
+      if path in latest_default:
+        continue
+      if path in latest_all:
+        logger.warning(
+            'path=%s was removed from default group; assume skip is harmless',
+            path)
         continue
       if path in removed:
         continue
