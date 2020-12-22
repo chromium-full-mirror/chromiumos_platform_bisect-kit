@@ -41,6 +41,7 @@ CHROME_TEST_BINARIES = [
     'capture_unittests',
     'dawn_end2end_tests',
     'dawn_unittests',
+    'decode_test',
     'jpeg_decode_accelerator_unittest',
     'jpeg_encode_accelerator_unittest',
     'ozone_gl_unittests',
