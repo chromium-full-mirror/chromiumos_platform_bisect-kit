@@ -418,7 +418,7 @@ class GitRemoveRepo(Action):
   def apply(self, code_storage, root_dir):
     assert self.path
     git_repo = os.path.join(root_dir, self.path)
-    assert git_util.is_git_root(git_repo)
+    assert git_util.is_git_root(git_repo), '%r should be a git repo' % git_repo
     # TODO(kcwu): other projects may be sub-tree of `git_repo`.
     # They should not be deleted. (crbug/930047)
     shutil.rmtree(git_repo)
@@ -457,7 +457,8 @@ def apply_actions(code_storage, action_groups, root_dir):
 
     batch_apply(commits)
     commits = {}
-    action.apply(code_storage, root_dir)
+    logger.debug('[%d] applying "%r"', i, action_group.summary())
+    action_group.apply(code_storage, root_dir)
 
   batch_apply(commits)
 
