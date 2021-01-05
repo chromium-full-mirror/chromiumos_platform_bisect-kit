@@ -207,11 +207,13 @@ def main(args=None):
     logger.error('%r is not a valid DUT address', opts.dut)
     return FATAL
 
-  by_official_builder = cros_util.query_dut_is_by_official_builder(opts.dut)
-  if (opts.with_private_bundles and not opts.tast_build and
-      not by_official_builder):
-    version = cros_util.query_dut_short_version(opts.dut)
-    if cros_util.is_cros_localbuild_version(version):
+  # Private bundles are not included in the OS image, make sure they are
+  # available.
+  if opts.with_private_bundles and not opts.tast_build:
+    if not cros_util.query_dut_is_by_official_builder(opts.dut):
+      # Official builders uploaded private tast bundles and tast can download
+      # them with -downloadprivatebundles=true, so --tast_build is not
+      # required. Otherwise, we must build the bundles by ourselves.
       logger.error(
           'for non-official chromeos image, --tast_build must be specified')
       return FATAL

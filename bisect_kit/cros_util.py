@@ -42,7 +42,6 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 re_chromeos_full_version = r'^R\d+-\d+\.\d+\.\d+$'
-re_chromeos_localbuild_version = r'^\d+\.\d+\.\d{4}_\d\d_\d\d_\d{4}$'
 re_chromeos_short_version = r'^\d+\.\d+\.\d+$'
 re_chromeos_snapshot_version = r'^R\d+-\d+\.\d+\.\d+-\d+$'
 
@@ -109,11 +108,6 @@ def is_cros_short_version(s):
   This function doesn't accept version number of local build.
   """
   return bool(re.match(re_chromeos_short_version, s))
-
-
-def is_cros_localbuild_version(s):
-  """Determines if `s` is chromeos local build version."""
-  return bool(re.match(re_chromeos_localbuild_version, s))
 
 
 def is_cros_full_version(s):
@@ -318,9 +312,14 @@ def query_dut_prebuilt_version(host):
 
 
 def query_dut_is_by_official_builder(host):
-  """Query if given DUT is build by buildbucket builder"""
-  return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILD_TYPE',
-                                         '').startswith('Continuous Builder')
+  """Query if given DUT is build by official builder"""
+  build_type = query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILD_TYPE',
+                                               '')
+  build_type = build_type.split(' - ')[0]
+  assert build_type in ('Official Build', 'Continuous Builder',
+                        'Developer Build',
+                        'Test Build'), 'unknown build type (%s)' % build_type
+  return build_type in ['Official Build', 'Continuous Builder']
 
 
 def query_dut_boot_id(host, connect_timeout=None):
