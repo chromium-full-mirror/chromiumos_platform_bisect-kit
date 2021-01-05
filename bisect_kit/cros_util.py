@@ -1022,7 +1022,14 @@ def cros_flash(chromeos_root,
     image_path = os.path.join(chromeos_root_inside_chroot, image_path)
 
   args = [
-      '--debug', '--no-ping', '--send-payload-in-parallel', host, image_path
+      '--debug',
+      '--no-ping',
+      # Speed up for slow network connection.
+      '--send-payload-in-parallel',
+      # To reduce disk usage on DUT.
+      '--no-copy-payloads-to-device',
+      host,
+      image_path
   ]
   if clobber_stateful:
     args.append('--clobber-stateful')
