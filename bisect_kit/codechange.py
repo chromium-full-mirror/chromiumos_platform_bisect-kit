@@ -417,11 +417,21 @@ class GitRemoveRepo(Action):
 
   def apply(self, code_storage, root_dir):
     assert self.path
+    root_dir = os.path.normpath(root_dir)
     git_repo = os.path.join(root_dir, self.path)
     assert git_util.is_git_root(git_repo), '%r should be a git repo' % git_repo
     # TODO(kcwu): other projects may be sub-tree of `git_repo`.
     # They should not be deleted. (crbug/930047)
     shutil.rmtree(git_repo)
+
+    # Remove empty parents. (But don't delete `root_dir` and its upper parents.)
+    parent = os.path.dirname(git_repo)
+    while (parent != root_dir and
+           os.path.commonpath([parent, root_dir]) == root_dir):
+      if os.listdir(parent):
+        break
+      os.rmdir(parent)
+      parent = os.path.dirname(parent)
 
     code_storage.remove_from_project_list(root_dir, self.path)
 
