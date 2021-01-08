@@ -487,7 +487,9 @@ def query_lease_status(dut_name, verbose_log=True):
   status['bot_id'] = bot['bot_id']
   status['task_name'] = bot.get('task_name')
   status['task_id'] = bot.get('task_id') or None  # convert empty string to None
-  status['is_leased'] = (status['task_name'] == 'lease task')
+  status['is_leased'] = (
+      status['task_name'] == 'lease task' or
+      'dut_leaser' in status['task_name'])
   if not status['is_leased']:
     return status
 
