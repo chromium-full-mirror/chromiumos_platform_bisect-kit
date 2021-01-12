@@ -20,16 +20,16 @@ from google.protobuf import json_format
 from google.protobuf.field_mask_pb2 import FieldMask
 from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.message import DecodeError
+from infra_libs.buildbucket.proto.builder_pb2 import BuilderID
 from infra_libs.buildbucket.proto.build_pb2 import Build
-from infra_libs.buildbucket.proto.build_pb2 import BuilderID
+from infra_libs.buildbucket.proto.builds_service_pb2 import BuildPredicate
+from infra_libs.buildbucket.proto.builds_service_pb2 import GetBuildRequest
+from infra_libs.buildbucket.proto.builds_service_pb2 import ScheduleBuildRequest
+from infra_libs.buildbucket.proto.builds_service_pb2 import SearchBuildsRequest
+from infra_libs.buildbucket.proto.builds_service_pb2 import SearchBuildsResponse
 from infra_libs.buildbucket.proto.common_pb2 import Status
 from infra_libs.buildbucket.proto.common_pb2 import StringPair
 from infra_libs.buildbucket.proto.common_pb2 import TimeRange
-from infra_libs.buildbucket.proto.rpc_pb2 import BuildPredicate
-from infra_libs.buildbucket.proto.rpc_pb2 import GetBuildRequest
-from infra_libs.buildbucket.proto.rpc_pb2 import ScheduleBuildRequest
-from infra_libs.buildbucket.proto.rpc_pb2 import SearchBuildsRequest
-from infra_libs.buildbucket.proto.rpc_pb2 import SearchBuildsResponse
 
 from bisect_kit import errors
 from bisect_kit import gclient_util
