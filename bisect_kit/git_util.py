@@ -346,13 +346,16 @@ def is_ancestor_commit(git_repo, old, new):
     True only if `old` is the ancestor of `new`. One commit is not considered
     as ancestor of itself.
   """
-  return util.check_output(
-      'git',
-      'rev-list',
-      '--ancestry-path',
-      '-1',
-      '%s..%s' % (old, new),
-      cwd=git_repo) != ''
+  try:
+    return util.check_output(
+        'git',
+        'rev-list',
+        '--ancestry-path',
+        '-1',
+        '%s..%s' % (old, new),
+        cwd=git_repo) != ''
+  except subprocess.CalledProcessError:
+    return False
 
 
 def _parse_commit_object(s):

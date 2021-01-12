@@ -154,6 +154,15 @@ class TestGitOperationReadOnly(unittest.TestCase):
     self.assertFalse(
         git_util.is_ancestor_commit(self.git_repo, self.commits[2],
                                     self.commits[0]))
+    # Non-existent commits
+    self.assertFalse(
+        git_util.is_ancestor_commit(self.git_repo, 'a' * 40, self.commits[0]))
+    self.assertFalse(
+        git_util.is_ancestor_commit(self.git_repo, self.commits[0], 'a' * 40))
+    self.assertFalse(
+        git_util.is_ancestor_commit(self.git_repo, 'b' * 40, 'a' * 40))
+    self.assertFalse(
+        git_util.is_ancestor_commit(self.git_repo, 'a' * 40, 'a' * 40))
 
   def test_get_commit_metadata(self):
     self.assertNotIn(
