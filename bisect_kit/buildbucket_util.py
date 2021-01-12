@@ -62,7 +62,8 @@ class BuildbucketApi:
   _instance = None
   _build_fields = [
       'status', 'update_time', 'created_by', 'builder', 'create_time',
-      'critical', 'start_time', 'input', 'output', 'end_time', 'id', 'tags'
+      'critical', 'start_time', 'input', 'output', 'end_time', 'id', 'tags',
+      'summary_markdown'
   ]
   buildbucket_domain = 'cr-buildbucket.appspot.com'
   buildbucket_domain_url = 'https://cr-buildbucket.appspot.com/'
@@ -369,11 +370,11 @@ class BuildbucketApi:
     request.properties.update(properties)
     return self._post('ScheduleBuild', request, Build)
 
-  def is_running(self, buildbucket_id):
+  def is_running(self, build):
     """Check if a build is in running or scheduled status.
 
     Args:
-      buildbucket_id: buildbucket build id
+      build: A Build object returned from get_build
 
     Returns:
       True if the build is running or scheduled.
@@ -381,16 +382,14 @@ class BuildbucketApi:
     Raises:
       errors.ExternalError: If api request fail.
     """
-    assert isinstance(buildbucket_id, int)
     waiting_status = [Status.Value('SCHEDULED'), Status.Value('STARTED')]
-    status = self.get_build(buildbucket_id).status
-    return status in waiting_status
+    return build.status in waiting_status
 
-  def is_success(self, buildbucket_id):
+  def is_success(self, build):
     """Check if a build is successed.
 
     Args:
-      buildbucket_id: buildbucket build id
+      build: A Build object returned from get_build
 
     Returns:
       True if the build is successed.
@@ -398,9 +397,7 @@ class BuildbucketApi:
     Raises:
       errors.ExternalError: If api request fail.
     """
-    assert isinstance(buildbucket_id, int)
-    status = self.get_build(buildbucket_id).status
-    return status == Status.Value('SUCCESS')
+    return build.status == Status.Value('SUCCESS')
 
   def search_builds(self,
                     project='chromeos',

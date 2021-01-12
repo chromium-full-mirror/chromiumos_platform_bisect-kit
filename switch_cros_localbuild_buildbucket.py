@@ -346,21 +346,27 @@ def schedule_build(opts):
       'build url: %s',
       buildbucket_util.get_luci_link(opts.board, build_id, bucket=opts.bucket))
 
-  # If --nodeploy is given, the script will exit as soon as job scheduled and
-  # ignore potential build errors.
-  if opts.nodeploy:
-    return build_id
+  return build_id
 
+
+def wait_build_complete(build_id):
+  api = buildbucket_util.BuildbucketApi()
   last_log_time = 0
-  while api.is_running(build_id):
+  while True:
+    build = api.get_build(build_id)
+    if not api.is_running(build):
+      break
     now = time.time()
     if now - last_log_time >= 600:
       logger.info('Waiting for buildbucket build_id %d', build_id)
       last_log_time = now
     time.sleep(60)
 
-  if not api.is_success(build_id):
-    raise errors.ExternalError('buildbucket build fail, id = %d' % build_id)
+  if not api.is_success(build):
+    raise errors.ExternalError(
+        'buildbucket build fail, id=%d, status=%s, summary=%r' %
+        (build_id, buildbucket_util.Status.Name(
+            build.status), build.summary_markdown))
   return build_id
 
 
@@ -395,10 +401,13 @@ def switch(opts):
     else:
       buildbucket_id = schedule_build(opts)
 
+  # If --nodeploy is given, the script will exit as soon as job scheduled and
+  # ignore potential build errors.
   if opts.nodeploy:
     return 0
 
   if buildbucket_id:
+    wait_build_complete(buildbucket_id)
     image_path = prepare_image(image_folder, buildbucket_id)
   rel_path = os.path.relpath(image_path, opts.chromeos_root)
 
