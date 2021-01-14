@@ -149,6 +149,21 @@ def swarming_cancel(task_id):
   util.check_call(*cmd)
 
 
+def bb_cancel(build_id, reason):
+  """Cancels buildbucket build.
+
+  Args:
+    build_id: build id
+    reason: cancel reason
+  """
+  service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+  cmd = ['bb', 'cancel', '-reason', reason]
+  if service_account_json:
+    cmd += ['-service-account-json', service_account_json]
+  cmd.append(build_id)
+  util.check_call(*cmd)
+
+
 def _simplify_bot_dimensions(dimensions_pairs):
   # Convert list to dict, so it's easier to access.
   dimensions = {}
@@ -267,13 +282,13 @@ def is_dut_leased_by_me(status):
 
 
 async def create_async_skylab_proc(cmd, *args, **kwargs):
-  cmd_args = [cmd]
+  cmd_args = ['skylab', cmd]
   service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
   if service_account_json:
     cmd_args += ['-service-account-json', service_account_json]
   cmd_args += list(args)
+  logger.debug('run %r', cmd_args)
   return await asyncio.create_subprocess_exec(
-      'skylab',
       *cmd_args,
       stdout=kwargs.get('stdout', subprocess.PIPE),
       stderr=kwargs.get('stderr', subprocess.PIPE))
@@ -288,13 +303,15 @@ async def async_lease(dut_name, duration=None):
       '%d' % (duration // 60),
       dut_name,
   ]
-  logger.debug('run %r', cmd)
   proc = await create_async_skylab_proc(
       *cmd,
       # combine two streams, so the code becomes simpler
       stderr=subprocess.STDOUT)
 
+  # The lease job was a swarming task. Keep it for backward-compatible.
   pending_task = None
+  # Now it is wrapped as a buildbukcet build.
+  pending_build = None
   try:
     while True:
       line = await proc.stdout.readline()
@@ -306,8 +323,14 @@ async def async_lease(dut_name, duration=None):
       if m:
         pending_task = m.group(1)
         continue
+      m = re.search(r'Created lease .*/builders/test_runner/dut_leaser/b(\d+)',
+                    line)
+      if m:
+        pending_build = m.group(1)
+        continue
       if 'EXPIRED' in line:
         pending_task = None
+        pending_build = None
         return None
 
     await proc.wait()
@@ -316,6 +339,9 @@ async def async_lease(dut_name, duration=None):
                      proc.returncode)
       raise errors.InternalError('skylab command failed unexpectedly: %s' %
                                  proc.returncode)
+    if not (pending_task or pending_build):
+      raise errors.InternalError(
+          'not found lease info; skylab output format changed?')
 
     if not cros_util.is_good_dut(dut_name_to_address(dut_name)):
       logger.warning(
@@ -333,6 +359,7 @@ async def async_lease(dut_name, duration=None):
       raise errors.DutLeaseException('lease verification failed: %s' % status)
 
     pending_task = None
+    pending_build = None
     return dut_name
   except asyncio.CancelledError:
     logger.debug('lease(%s): got CancelledError', dut_name)
@@ -360,6 +387,10 @@ async def async_lease(dut_name, duration=None):
       logger.debug('lease(%s): cancel the lease task %s', dut_name,
                    pending_task)
       swarming_cancel(pending_task)
+    if pending_build:
+      logger.debug('lease(%s): cancel the lease build %s', dut_name,
+                   pending_build)
+      bb_cancel(pending_build, 'cancel pending lease')
 
 
 def skylab_lease_dut(dut_name, duration=None, timeout=None):
