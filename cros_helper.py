@@ -68,9 +68,10 @@ def _get_label_by_prefix(info, prefix):
 def cmd_lease_dut(opts):
   if opts.duration is not None and opts.duration < 60:
     raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
+  reason = opts.reason or cros_lab_util.make_lease_reason(opts.session)
   host = cros_lab_util.dut_host_name(opts.dut)
   logger.info('trying to lease %s', host)
-  if cros_lab_util.skylab_lease_dut(host, opts.duration):
+  if cros_lab_util.skylab_lease_dut(host, reason, opts.duration):
     logger.info('leased %s', host)
   else:
     raise Exception('unable to lease %s' % host)
@@ -149,14 +150,15 @@ def is_acceptable_bot(boards_with_prebuilt, bot):
   return True
 
 
-async def lease_dut_parallelly(duration, bots, timeout=None):
+async def lease_dut_parallelly(duration, bots, reason, timeout=None):
   tasks = []
   hosts = []
   for bot in bots:
     host = bot['dimensions']['dut_name'][0]
     hosts.append(host)
     tasks.append(
-        asyncio.create_task(cros_lab_util.async_lease(host, duration=duration)))
+        asyncio.create_task(
+            cros_lab_util.async_lease(host, reason, duration=duration)))
 
   try:
     logger.info('trying to lease %d DUTs: %s', len(hosts), hosts)
@@ -299,7 +301,9 @@ def do_allocate_dut(opts):
     if remaining_time <= 0:
       break
     timeout = min(120, remaining_time)
-    host = asyncio.run(lease_dut_parallelly(opts.duration, bots, timeout))
+    reason = cros_lab_util.make_lease_reason(opts.session)
+    host = asyncio.run(
+        lease_dut_parallelly(opts.duration, bots, reason, timeout))
     if host:
       # Resolve what board we should build during bisection.
       board_to_build = None
@@ -390,8 +394,9 @@ def main():
       help='Lease a DUT in the lab',
       description='Lease a DUT in the lab. '
       'This is implemented by `skylab lease-dut` with additional checking.')
-  # "skylab lease-dut" doesn't take reason, so this is not required=True.
-  parser_lease_dut.add_argument('--session', help='session name')
+  group = parser_lease_dut.add_mutually_exclusive_group(required=True)
+  group.add_argument('--session', help='session name')
+  group.add_argument('--reason', help='specify lease reason manually')
   parser_lease_dut.add_argument('dut')
   parser_lease_dut.add_argument(
       '--duration',

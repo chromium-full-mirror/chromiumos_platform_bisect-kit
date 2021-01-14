@@ -29,10 +29,11 @@ logger = logging.getLogger(__name__)
 
 
 def grab_dut(config):
+  reason = cros_lab_util.make_lease_reason(config['session'])
   if config.get('allocated_dut'):
     host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
     logger.info('try to lease the same host (%s) as last run', host_name)
-    status = cros_lab_util.skylab_lease_dut(host_name)
+    status = cros_lab_util.skylab_lease_dut(host_name, reason)
     if not status:
       return None
     return host_name
@@ -56,7 +57,7 @@ def grab_dut(config):
   bot = random.choice(bots)
   host = bot['dimensions']['dut_name'][0]
   logger.info('trying to lease %s', host)
-  if not cros_lab_util.skylab_lease_dut(host):
+  if not cros_lab_util.skylab_lease_dut(host, reason):
     logger.error('all DUTs are busy')
     return None
 

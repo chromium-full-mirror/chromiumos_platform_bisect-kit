@@ -294,13 +294,15 @@ async def create_async_skylab_proc(cmd, *args, **kwargs):
       stderr=kwargs.get('stderr', subprocess.PIPE))
 
 
-async def async_lease(dut_name, duration=None):
+async def async_lease(dut_name, reason, duration=None):
   if not duration:
     duration = LEASE_DURATION
   cmd = [
       'lease-dut',
       '-minutes',
       '%d' % (duration // 60),
+      '-reason',
+      reason,
       dut_name,
   ]
   proc = await create_async_skylab_proc(
@@ -393,13 +395,18 @@ async def async_lease(dut_name, duration=None):
       bb_cancel(pending_build, 'cancel pending lease')
 
 
-def skylab_lease_dut(dut_name, duration=None, timeout=None):
+def make_lease_reason(session):
+  return 'bisector: %s' % session
+
+
+def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
   """Lease DUT from skylab.
 
   Args:
     dut_name: DUT name
     duration: lease duration, in seconds. Default is LEASE_DURATION if None.
     timeout: lease wait limit, in seconds.
+    reason: lease reason
 
   Returns:
     dict of lease status if successful, otherwise None
@@ -415,6 +422,8 @@ def skylab_lease_dut(dut_name, duration=None, timeout=None):
         'lease-dut',
         '-minutes',
         '%d' % (duration // 60),
+        '-reason',
+        reason,
         dut_name,
         stdout_callback=stdout_lines.append,
         stderr_callback=stderr_lines.append,
@@ -549,7 +558,7 @@ def _notify_error_from_lease_keeper(exception, error_queue):
   os.kill(os.getpid(), signal.SIGINT)
 
 
-def lease_keeper(dut_name, quit_event, error_queue):
+def lease_keeper(dut_name, reason, quit_event, error_queue):
   """Monitors and maintains skylab lease status.
 
   This function checks DUT lease status periodically in order to ensure the DUT
@@ -559,6 +568,7 @@ def lease_keeper(dut_name, quit_event, error_queue):
 
   Args:
     dut_name: DUT name which is leased by me.
+    reason: lease reason
     quit_event: a threading.Event object, which indicates program stop event.
     error_queue: a queue.Queue object, for passing exception to main thread.
   """
@@ -597,7 +607,7 @@ def lease_keeper(dut_name, quit_event, error_queue):
         continue
 
       logger.info("Previous lease is near expiration, let's lease again")
-      this_lease = skylab_lease_dut(dut_name)
+      this_lease = skylab_lease_dut(dut_name, reason)
       if not this_lease:
         raise errors.DutLeaseException(
             'Lease is expired and unable to extend the lease')
@@ -631,7 +641,7 @@ def lease_keeper(dut_name, quit_event, error_queue):
 
 
 @contextlib.contextmanager
-def dut_lease_manager(dut):
+def dut_lease_manager(dut, reason):
   """Takes care DUT lease status.
 
   If the DUT is leased from skylab, this manager will spawn a thread to monitor
@@ -653,7 +663,7 @@ def dut_lease_manager(dut):
   error_queue = queue.Queue()
   try:
     thread = threading.Thread(
-        target=lease_keeper, args=(host, quit_event, error_queue))
+        target=lease_keeper, args=(host, reason, quit_event, error_queue))
     thread.start()
     yield
   except KeyboardInterrupt:
@@ -673,7 +683,7 @@ def dut_lease_manager(dut):
 
 
 @contextlib.contextmanager
-def dut_manager(dut, allocator):
+def dut_manager(dut, reason, allocator):
   """Context manager to handle host allocation.
 
   If `dut` is magic value, ":lab:", the context manager will call `allocator`
@@ -684,6 +694,7 @@ def dut_manager(dut, allocator):
 
   Args:
     dut: dut address
+    reason: lease reason
     allocator: host allocation callback function
 
   Returns:
@@ -697,13 +708,13 @@ def dut_manager(dut, allocator):
 
     try:
       # Append (partial) domain name of the lab
-      with dut_lease_manager(dut_name_to_address(host)):
+      with dut_lease_manager(dut_name_to_address(host), reason):
         yield dut_name_to_address(host)
     finally:
       logger.info('auto release DUT %s', host)
       skylab_release_dut(host)
   else:
-    with dut_lease_manager(dut):
+    with dut_lease_manager(dut, reason):
       yield dut
 
 

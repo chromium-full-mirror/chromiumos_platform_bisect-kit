@@ -141,8 +141,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       common_switch_cmd, common_eval_cmd = self._build_cmds()
 
       with cros_lab_util.dut_manager(
-          self.config['dut'], lambda: diagnoser_cros.grab_dut(self.config)
-      ) as dut:
+          self.config['dut'], lambda: diagnoser_cros.grab_dut(self.config),
+          cros_lab_util.make_lease_reason(opts.session)) as dut:
         if not dut:
           raise errors.NoDutAvailable('unable to allocate DUT')
 
