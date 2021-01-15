@@ -305,12 +305,12 @@ def cancel_pending_lease(pending_lease):
   assert pending_lease
   task_id = pending_lease.get('swarming_task_id')
   if task_id:
-    logger.info('cancel the lease task %s', task_id)
+    logger.debug('cancel the lease task %s', task_id)
     swarming_cancel(task_id)
 
   build_id = pending_lease.get('buildbucket_build_id')
   if build_id:
-    logger.info('cancel the lease build %s', build_id)
+    logger.debug('cancel the lease build %s', build_id)
     bb_cancel(build_id, 'cancel pending lease')
 
   assert task_id or build_id, 'lease is pending but nothing to cancel'
