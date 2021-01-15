@@ -281,6 +281,41 @@ def is_dut_leased_by_me(status):
   return True
 
 
+def extract_lease_info(text):
+  """Parse inflight lease info from output of 'skylab lease-dut'"""
+  info = {}
+
+  # The lease job was a swarming task. Keep it for backward-compatible.
+  m = re.search(r'Created lease task.*(http\S+task\?id=(\w+))', text)
+  if m:
+    info['link'] = m.group(1)
+    info['swarming_task_id'] = m.group(2)
+
+  # Now it is wrapped as a buildbukcet build.
+  m = re.search(
+      r'Created lease .*(http\S+/builders/test_runner/dut_leaser/b(\d+))', text)
+  if m:
+    info['link'] = m.group(1)
+    info['buildbucket_build_id'] = m.group(2)
+
+  return info
+
+
+def cancel_pending_lease(pending_lease):
+  assert pending_lease
+  task_id = pending_lease.get('swarming_task_id')
+  if task_id:
+    logger.info('cancel the lease task %s', task_id)
+    swarming_cancel(task_id)
+
+  build_id = pending_lease.get('buildbucket_build_id')
+  if build_id:
+    logger.info('cancel the lease build %s', build_id)
+    bb_cancel(build_id, 'cancel pending lease')
+
+  assert task_id or build_id, 'lease is pending but nothing to cancel'
+
+
 async def create_async_skylab_proc(cmd, *args, **kwargs):
   cmd_args = ['skylab', cmd]
   service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
@@ -310,10 +345,7 @@ async def async_lease(dut_name, reason, duration=None):
       # combine two streams, so the code becomes simpler
       stderr=subprocess.STDOUT)
 
-  # The lease job was a swarming task. Keep it for backward-compatible.
-  pending_task = None
-  # Now it is wrapped as a buildbukcet build.
-  pending_build = None
+  pending_lease = None
   try:
     while True:
       line = await proc.stdout.readline()
@@ -321,18 +353,10 @@ async def async_lease(dut_name, reason, duration=None):
         break
       line = line.decode('utf8')
       logger.debug('lease(%s): %s', dut_name, line)
-      m = re.search(r'Created lease task.*task\?id=(\w+)', line)
-      if m:
-        pending_task = m.group(1)
-        continue
-      m = re.search(r'Created lease .*/builders/test_runner/dut_leaser/b(\d+)',
-                    line)
-      if m:
-        pending_build = m.group(1)
-        continue
+      if not pending_lease:
+        pending_lease = extract_lease_info(line)
       if 'EXPIRED' in line:
-        pending_task = None
-        pending_build = None
+        pending_lease = None
         return None
 
     await proc.wait()
@@ -341,7 +365,7 @@ async def async_lease(dut_name, reason, duration=None):
                      proc.returncode)
       raise errors.InternalError('skylab command failed unexpectedly: %s' %
                                  proc.returncode)
-    if not (pending_task or pending_build):
+    if not pending_lease:
       raise errors.InternalError(
           'not found lease info; skylab output format changed?')
 
@@ -356,12 +380,12 @@ async def async_lease(dut_name, reason, duration=None):
       await asyncio.sleep(5)
       status = query_lease_status(dut_name, verbose_log=False)
       if is_dut_leased_by_me(status):
+        logging.info('lease: %s', pending_lease)
         break
     else:
       raise errors.DutLeaseException('lease verification failed: %s' % status)
 
-    pending_task = None
-    pending_build = None
+    pending_lease = None
     return dut_name
   except asyncio.CancelledError:
     logger.debug('lease(%s): got CancelledError', dut_name)
@@ -385,14 +409,8 @@ async def async_lease(dut_name, reason, duration=None):
         # Especially, our code and the process got ctrl-c at the same time and
         # race.
         pass
-    if pending_task:
-      logger.debug('lease(%s): cancel the lease task %s', dut_name,
-                   pending_task)
-      swarming_cancel(pending_task)
-    if pending_build:
-      logger.debug('lease(%s): cancel the lease build %s', dut_name,
-                   pending_build)
-      bb_cancel(pending_build, 'cancel pending lease')
+    if pending_lease:
+      cancel_pending_lease(pending_lease)
 
 
 def make_lease_reason(session):
@@ -429,11 +447,13 @@ def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
         stderr_callback=stderr_lines.append,
         timeout=timeout)
 
+    pending_lease = extract_lease_info(''.join(stdout_lines))
     # wait the state propagated
     for _ in range(10):
       time.sleep(5)
       status = query_lease_status(dut_name)
       if is_dut_leased_by_me(status):
+        logging.info('lease: %s', pending_lease)
         break
     else:
       raise errors.DutLeaseException('lease verification failed: %s' % status)
@@ -449,12 +469,9 @@ def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
     raise
   finally:
     if orphan_task:
-      m = re.search(r'Created lease task.*task\?id=(\w+)',
-                    ''.join(stdout_lines))
-      if m:
-        task_id = m.group(1)
-        logger.info('cancel the lease task %s', task_id)
-        swarming_cancel(task_id)
+      pending_lease = extract_lease_info(''.join(stdout_lines))
+      if pending_lease:
+        cancel_pending_lease(pending_lease)
 
   logger.info('leased dut %s for %.1f hours', dut_name, duration // 60 / 60.0)
   return status
