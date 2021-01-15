@@ -75,7 +75,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
       with cros_lab_util.dut_manager(
           self.config['dut'], lambda: diagnoser_cros.grab_dut(self.config),
-          cros_lab_util.make_lease_reason(opts.session)) as dut:
+          cros_lab_util.make_lease_reason(self.config['session'])) as dut:
         if not dut:
           raise errors.NoDutAvailable('unable to allocate DUT')
         if not cros_util.is_good_dut(dut):
