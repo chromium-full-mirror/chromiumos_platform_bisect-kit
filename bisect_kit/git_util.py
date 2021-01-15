@@ -326,7 +326,7 @@ def is_containing_commit(git_repo, rev):
 
   try:
     return util.check_output(
-        'git', 'cat-file', '-t', rev, cwd=git_repo) == 'commit\n'
+        'git', 'cat-file', '-t', rev, cwd=git_repo) in ['commit\n', 'tag\n']
   except subprocess.CalledProcessError:
     return False
   except OSError:
@@ -362,9 +362,9 @@ def _parse_commit_object(s):
   meta = {}
   header, meta['message'] = s.split('\n\n', 1)
   for line in header.splitlines():
-    m = re.match(r'^tree (\w+)', line)
+    m = re.match(r'^(object|tree|type) (\w+)', line)
     if m:
-      meta['tree'] = m.group(1)
+      meta[m.group(1)] = m.group(2)
       continue
 
     m = re.match(r'^parent (\w+)', line)
@@ -429,7 +429,8 @@ def get_batch_commit_metadata(git_repo, revs):
     if not m.group(3):
       metas[object_name] = None
       continue
-    assert object_type == 'commit', 'unsupported object type: %s' % object_type
+    assert object_type in ['commit',
+                           'tag'], 'unsupported object type: %s' % object_type
     object_size = int(m.group(3))
     assert data[object_size] == ord(b'\n'), repr(data[object_size])
     obj, data = data[:object_size], data[object_size + 1:]
