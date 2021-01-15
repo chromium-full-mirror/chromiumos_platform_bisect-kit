@@ -395,7 +395,7 @@ class CrosDiagnoser:
     """
     if self.old_info['cr_version'] == self.new_info['cr_version']:
       self.make_decision(
-          'Chrome version is identical, no need to bisect Chrome')
+          'The Chrome version is identical, no need to bisect Chrome')
       return False
 
     if self.config['bypass_chrome_build']:
