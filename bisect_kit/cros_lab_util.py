@@ -414,7 +414,8 @@ async def async_lease(dut_name, reason, duration=None):
 
 
 def make_lease_reason(session):
-  return 'bisector: %s' % session
+  # skylab only accepts reason up to 30 characters.
+  return 'bisector: %s' % session[:18]
 
 
 def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
