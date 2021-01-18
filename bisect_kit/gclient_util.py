@@ -39,7 +39,9 @@ def config(gclient_dir,
            cache_dir=None,
            deps_file=None,
            custom_var=None,
-           spec=None):
+           gclientfile=None,
+           spec=None,
+           target_os=None):
   """Simply wrapper of `gclient config`.
 
   Args:
@@ -48,7 +50,9 @@ def config(gclient_dir,
     cache_dir: gclient's git cache folder
     deps_file: override the default DEPS file name
     custom_var: custom variables
+    gclientfile: alternate .gclient file name
     spec: content of gclient file
+    target_os: target OS
   """
   cmd = ['gclient', 'config']
   if deps_file:
@@ -57,12 +61,22 @@ def config(gclient_dir,
     cmd += ['--cache-dir', cache_dir]
   if custom_var:
     cmd += ['--custom-var', custom_var]
+  if gclientfile:
+    cmd += ['--gclientfile', gclientfile]
   if spec:
     cmd += ['--spec', spec]
   if url:
     cmd.append(url)
 
   util.check_call(*cmd, cwd=gclient_dir)
+
+  # 'target_os' is mandatory for chromeos build, but 'gclient config' doesn't
+  # recognize it. Here add it to gclient file explicitly.
+  if target_os:
+    if not gclientfile:
+      gclientfile = '.gclient'
+    with open(os.path.join(gclient_dir, gclientfile), 'a') as f:
+      f.write('target_os = ["%s"]\n' % target_os)
 
 
 def sync(gclient_dir, with_branch_heads=False, with_tags=False, jobs=8):
@@ -125,14 +139,17 @@ def sync(gclient_dir, with_branch_heads=False, with_tags=False, jobs=8):
           ' keep it because it is not git root', path, old_git_dir)
 
 
-def runhook(gclient_dir, jobs=8):
+def runhook(gclient_dir, jobs=8, gclientfile=None):
   """Simply wrapper of `gclient runhook`.
 
   Args:
     gclient_dir: root directory of gclient project
     jobs: how many workers running in parallel
   """
-  util.check_call('gclient', 'runhook', '--jobs', str(jobs), cwd=gclient_dir)
+  cmd = ['gclient', 'runhook', '--job', str(jobs)]
+  if gclientfile:
+    cmd += ['--gclientfile', gclientfile]
+  util.check_call(*cmd, cwd=gclient_dir)
 
 
 def load_gclient_entries(gclient_dir):

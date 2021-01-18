@@ -584,12 +584,8 @@ class ChromeSpecManager(codechange.SpecManager):
         '/a/chrome/tools/buildspec.git',
         deps_file=deps_file,
         custom_var='checkout_src_internal=True',
-        cache_dir=self.config['chrome_mirror'])
-
-    # 'target_os' is mandatory for chromeos build, but 'gclient config' doesn't
-    # recognize it. Here add it to .gclient file explicitly.
-    with open(os.path.join(self.config['chrome_root'], '.gclient'), 'a') as f:
-      f.write('target_os = ["chromeos"]\n')
+        cache_dir=self.config['chrome_mirror'],
+        target_os='chromeos')
 
     gclient_util.sync(
         self.config['chrome_root'], with_branch_heads=True, with_tags=True)
