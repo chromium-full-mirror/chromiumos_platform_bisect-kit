@@ -17,8 +17,6 @@ import sys
 import tempfile
 import urllib.parse
 
-import six
-
 # from third_party
 from depot_tools import gclient_eval
 
@@ -143,7 +141,8 @@ def load_gclient_entries(gclient_dir):
   scope = {}
   with open(repo_project_list) as f:
     code = compile(f.read(), repo_project_list, 'exec')
-    six.exec_(code, scope)
+    # pylint: disable=exec-used
+    exec(code, scope)
   entries = scope.get('entries', {})
 
   # normalize path: remove trailing slash
@@ -716,7 +715,8 @@ class DepsParser:
 
     global_scope = dict(Var=var_function, Str=str_function)
     local_scope = {}
-    six.exec_(content, global_scope, local_scope)
+    # pylint: disable=exec-used
+    exec(content, global_scope, local_scope)
     return local_scope
 
   def parse_single_deps(self,

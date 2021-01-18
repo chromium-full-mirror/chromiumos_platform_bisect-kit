@@ -32,8 +32,6 @@ from __future__ import print_function
 import logging
 import os
 
-import six
-
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import configure
@@ -97,7 +95,8 @@ def verify_gclient_dep(chrome_root):
   context = {}
   with open(os.path.join(chrome_root, '.gclient')) as f:
     code = compile(f.read(), '.gclient', 'exec')
-    six.exec_(code, context)
+    # pylint: disable=exec-used
+    exec(code, context)
   for solution in context['solutions']:
     if solution['name'] == 'src':
       return 'deps_file' not in solution or solution['deps_file'] == '.DEPS.git'

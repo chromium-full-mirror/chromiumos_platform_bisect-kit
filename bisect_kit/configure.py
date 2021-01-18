@@ -12,8 +12,6 @@ import os
 import re
 import sys
 
-import six
-
 logger = logging.getLogger(__name__)
 
 SUPPRESS_CONFIG = 'none'
@@ -102,7 +100,8 @@ class ConfigStore:
       module = {}
       with open(path) as f:
         code = compile(f.read(), path, 'exec')
-        six.exec_(code, module)
+        # pylint: disable=exec-used
+        exec(code, module)
       loaded_func = module.get('loaded', None)
       if loaded_func:
         loaded_func()

@@ -3,4 +3,3 @@ googleapis_common_protos
 protobuf
 psutil
 setuptools
-six
