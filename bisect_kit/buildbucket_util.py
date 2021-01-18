@@ -386,13 +386,13 @@ class BuildbucketApi:
     return build.status in waiting_status
 
   def is_success(self, build):
-    """Check if a build is successed.
+    """Check if a build is succeeded.
 
     Args:
       build: A Build object returned from get_build
 
     Returns:
-      True if the build is successed.
+      True if the build is succeeded.
 
     Raises:
       errors.ExternalError: If api request fail.

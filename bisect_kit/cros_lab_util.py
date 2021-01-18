@@ -291,7 +291,7 @@ def extract_lease_info(text):
     info['link'] = m.group(1)
     info['swarming_task_id'] = m.group(2)
 
-  # Now it is wrapped as a buildbukcet build.
+  # Now it is wrapped as a buildbucket build.
   m = re.search(
       r'Created lease .*(http\S+/builders/test_runner/dut_leaser/b(\d+))', text)
   if m:
