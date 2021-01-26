@@ -56,6 +56,10 @@ gsutil_bin = 'gsutil'
 # info.
 snapshot_cutover_version = '12618.0.0'
 
+# http://crbug.com/1170601, small snapshot ids should be ignored
+# 21000 is R80-12617.0.0
+snapshot_cutover_id = 21000
+
 # current earliest buildbucket buildable versions
 # picked from https://crrev.com/c/2072618
 buildbucket_cutover_versions = [
@@ -670,8 +674,13 @@ def list_snapshots_from_image_archive(board, major_version):
       if result and result[-1][0] == snapshot_version:
         continue
 
-      # b/151054108: snapshot version in [29288, 29439] is broken
       _, _, snapshot_id = snapshot_version_split(snapshot_version)
+
+      # crbug/1170601: ignore small snapshot ids
+      if int(snapshot_id) <= snapshot_cutover_id:
+        continue
+
+      # b/151054108: snapshot version in [29288, 29439] is broken
       if 29288 <= int(snapshot_id) <= 29439:
         continue
 
