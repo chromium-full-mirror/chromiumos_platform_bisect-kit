@@ -334,6 +334,13 @@ def main(args=None):
     if not opts.chrome_root:
       logger.error('--chrome_root is mandatory for telemetry tests')
       return FATAL
+  if opts.prebuilt:
+    autotest_dir = os.path.join(opts.chromeos_root,
+                                cros_util.prebuilt_autotest_dir)
+    if not os.path.exists(autotest_dir):
+      parser.error('--prebuilt: no autotest prebuilt installed (%s); '
+                   'please run switch_autotest_prebuilt.py first' %
+                   autotest_dir)
 
   try:
     prepare_to_run_test(opts)
