@@ -10,6 +10,7 @@ tool that runs on top of git) and related utility functions.
 
 from __future__ import print_function
 import logging
+import multiprocessing
 import os
 import re
 import subprocess
@@ -258,14 +259,17 @@ def cleanup_unexpected_files(repo_dir):
         break
     nested[project_path] = []
 
-  for project_path in projects:
-    git_repo = os.path.join(repo_dir, project_path)
-    if not os.path.exists(git_repo):
-      # It should be harmless to ignore git repo nonexistence because 'repo
-      # sync' will restore them.
-      logger.warning('git repo not found: %s', git_repo)
-      continue
-    git_util.distclean(git_repo, nested[project_path])
+  with multiprocessing.Pool() as pool:
+    cleanup_jobs = []
+    for project_path in projects:
+      git_repo = os.path.join(repo_dir, project_path)
+      if not os.path.exists(git_repo):
+        # It should be harmless to ignore git repo nonexistence because 'repo
+        # sync' will restore them.
+        logger.warning('git repo not found: %s', git_repo)
+        continue
+      cleanup_jobs.append((git_repo, nested[project_path]))
+    pool.starmap(git_util.distclean, cleanup_jobs)
 
 
 def _urljoin(base, url):

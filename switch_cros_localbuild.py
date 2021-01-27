@@ -136,6 +136,7 @@ def mark_as_stable(opts):
 
 
 def cleanup(opts):
+  logger.info('clean up leftover in the source tree from the last build')
   repo_util.cleanup_unexpected_files(opts.chromeos_root)
 
   logger.info('clean up previous result of "mark as stable"')
