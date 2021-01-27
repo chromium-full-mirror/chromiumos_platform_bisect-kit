@@ -636,6 +636,10 @@ class DiagnoseCommandLineBase:
       opts.chrome_root = path_factory.get_chrome_tree()
       logger.info('chrome_root = %s', opts.chrome_root)
 
+    if not cros_util.is_ancestor_version(opts.old, opts.new):
+      self.argument_parser.error('%s is not ancestor of %s' %
+                                 (opts.old, opts.new))
+
     if opts.dut == cros_lab_util.LAB_DUT:
       if not opts.model and not opts.sku:
         self.argument_parser.error(

@@ -81,6 +81,9 @@ class ChromeOSVersionDomain(core.BisectDomain):
   def init(opts):
     if not opts.dut and not opts.board:
       raise errors.ArgumentError('--dut and --board', 'Neither is specified')
+    if not cros_util.is_ancestor_version(opts.old, opts.new):
+      raise errors.ArgumentError(
+          '--old and --new', '%s is not ancestor of %s' % (opts.old, opts.new))
     if opts.dut:
       assert cros_util.is_dut(opts.dut)
     if not opts.board:

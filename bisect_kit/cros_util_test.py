@@ -37,6 +37,29 @@ class TestCrosUtil(unittest.TestCase):
     self.assertTrue(cros_util.is_cros_version('1234.0.0'))
     self.assertTrue(cros_util.is_cros_version('R99-1234.0.0'))
 
+  def test_is_ancestor_version(self):
+    # One version is not ancestor of itself.
+    self.assertFalse(cros_util.is_ancestor_version('12345.0.0', '12345.0.0'))
+    self.assertFalse(
+        cros_util.is_ancestor_version('12345.0.0', 'R10-12345.0.0'))
+    self.assertFalse(
+        cros_util.is_ancestor_version('R10-12345.0.0-1000',
+                                      'R10-12345.0.0-1000'))
+
+    self.assertTrue(cros_util.is_ancestor_version('12345.0.0', '12346.0.0'))
+    self.assertTrue(
+        cros_util.is_ancestor_version('R10-12345.0.0', 'R10-12346.0.0'))
+    self.assertTrue(
+        cros_util.is_ancestor_version('R10-12345.0.0-1000',
+                                      'R10-12345.0.0-2000'))
+
+    self.assertFalse(cros_util.is_ancestor_version('12347.0.0', '12346.0.0'))
+    self.assertFalse(
+        cros_util.is_ancestor_version('R12-12345.0.0', 'R10-12346.0.0'))
+    self.assertFalse(
+        cros_util.is_ancestor_version('R10-12345.0.0-3000',
+                                      'R10-12345.0.0-2000'))
+
   def test_is_cros_snapshot_version(self):
     self.assertFalse(cros_util.is_cros_snapshot_version('1234.0.0'))
     self.assertFalse(cros_util.is_cros_snapshot_version('R99-1234.0.0'))
@@ -406,8 +429,10 @@ class TestCrosUtil(unittest.TestCase):
 
   def test_is_cros_version_lesseq(self):
     self.assertTrue(cros_util.is_cros_version_lesseq('R99-1.0.0', 'R99-1.0.0'))
-    self.assertTrue(cros_util.is_cros_version_lesseq('R99-1.0.0', 'R98-1.1.0'))
-    self.assertTrue(cros_util.is_cros_version_lesseq('R99-1.0.0', 'R98-1.0.1'))
+    self.assertTrue(cros_util.is_cros_version_lesseq('R99-1.0.0', 'R99-1.1.0'))
+    self.assertTrue(cros_util.is_cros_version_lesseq('R99-1.0.0', 'R99-1.0.1'))
+    self.assertFalse(cros_util.is_cros_version_lesseq('R99-1.0.0', 'R98-1.1.0'))
+    self.assertFalse(cros_util.is_cros_version_lesseq('R99-1.0.0', 'R98-1.0.1'))
     self.assertFalse(cros_util.is_cros_version_lesseq('R98-1.0.1', 'R99-1.0.0'))
     self.assertTrue(
         cros_util.is_cros_version_lesseq('R99-1.0.0', 'R99-1.0.0-123'))

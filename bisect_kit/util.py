@@ -333,6 +333,8 @@ def is_direct_relative_version(a, b):
       \                       \
        -> 2.1 -> 2.2 ....      -> 3.1 -> 3.2 -> 3.3 ....
 
+  Note, one version is direct-relative to itself.
+
   Args:
     a: version string
     b: version string

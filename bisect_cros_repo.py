@@ -90,6 +90,9 @@ class ChromeOSRepoDomain(core.BisectDomain):
     if not opts.board:
       opts.board = cros_util.query_dut_board(opts.dut)
 
+    if not cros_util.is_ancestor_version(opts.old, opts.new):
+      raise errors.ArgumentError(
+          '--old and --new', '%s is not ancestor of %s' % (opts.old, opts.new))
     if cros_util.is_cros_short_version(opts.old):
       opts.old = cros_util.version_to_full(opts.board, opts.old)
     if cros_util.is_cros_short_version(opts.new):

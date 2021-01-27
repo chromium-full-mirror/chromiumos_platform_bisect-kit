@@ -25,6 +25,7 @@ class TestUtilFunctions(unittest.TestCase):
     assert not util.is_version_lesseq('2.0.0', '1.1.1')
 
   def test_is_direct_relative_version(self):
+    assert util.is_direct_relative_version('9123.0.0', '9123.0.0')
     assert util.is_direct_relative_version('9123.0.0', '9100.0.0')
     assert util.is_direct_relative_version('9123.3.0', '9100.0.0')
     assert util.is_direct_relative_version('9123.0.5', '9100.0.0')
