@@ -234,6 +234,7 @@ class BuildbucketApi:
     """
     max_retries = 5
     logged_in = False
+    response_content = None
     while max_retries > 0:
       try:
         conn = http.client.HTTPSConnection(
@@ -246,11 +247,12 @@ class BuildbucketApi:
         result.ParseFromString(response_content)
         return result
       except DecodeError as e:
-        response_content = response_content.decode('utf-8')
         if not logged_in:
           self._refresh_token(self.buildbucket_domain_url)
           logged_in = True
         else:
+          if response_content:
+            response_content = response_content.decode('utf-8')
           logger.exception('Error in buildbucket post: %s', response_content)
           raise errors.ExternalError('buildbucket api response: ' +
                                      response_content) from e

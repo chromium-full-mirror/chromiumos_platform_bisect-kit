@@ -68,7 +68,7 @@ def fetch_android_build_data(url):
   logger.warning('fetch_android_build_data need to be hooked')
   try:
     return urllib.request.urlopen(url).read().decode('utf8')
-  except urllib.request.URLError as e:
+  except urllib.error.URLError as e:
     logger.exception('failed to fetch "%s"', url)
     raise errors.ExternalError(str(e))
 

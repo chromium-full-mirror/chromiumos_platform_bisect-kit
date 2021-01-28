@@ -342,7 +342,7 @@ def query_dut_prebuilt_version(host):
   """
   lsb_release = query_dut_lsb_release(host)
   release_version = lsb_release.get('CHROMEOS_RELEASE_VERSION')
-  builder_path = lsb_release.get('CHROMEOS_RELEASE_BUILDER_PATH')
+  builder_path = lsb_release.get('CHROMEOS_RELEASE_BUILDER_PATH', '')
   match = re.match(r'\S+-(?:snapshot|postsubmit)/(R\d+-\d+\.\d+\.\d+-\d+)-\d+',
                    builder_path)
   if match:
@@ -1283,33 +1283,40 @@ def convert_path_outside_chroot(chromeos_root, path):
   return os.path.join(chromeos_root, 'chroot', path[1:])
 
 
-def cros_sdk(chromeos_root, *args, **kwargs):
+def cros_sdk(chromeos_root,
+             *args,
+             chrome_root=None,
+             env=None,
+             log_stdout=True,
+             stdin=None,
+             stderr_callback=None,
+             goma_dir=None):
   """Run commands inside chromeos chroot.
 
   Args:
     chromeos_root: chromeos tree root
     *args: command to run
-    **kwargs:
-      chrome_root: pass to cros_sdk; mount this path into the SDK chroot
-      env: (dict) environment variables for the command
-      log_stdout: Whether write the stdout output of the child process to log.
-      stdin: standard input file handle for the command
-      stderr_callback: Callback function for stderr. Called once per line.
-      goma_dir: Goma installed directory to mount into the chroot
+    chrome_root: pass to cros_sdk; mount this path into the SDK chroot
+    env: (dict) environment variables for the command
+    log_stdout: Whether write the stdout output of the child process to log.
+    stdin: standard input file handle for the command
+    stderr_callback: Callback function for stderr. Called once per line.
+    goma_dir: Goma installed directory to mount into the chroot
   """
   envs = []
-  for k, v in kwargs.get('env', {}).items():
-    assert re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', k)
-    envs.append('%s=%s' % (k, v))
+  if env:
+    for k, v in env.items():
+      assert re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', k)
+      envs.append('%s=%s' % (k, v))
 
   # Use --no-ns-pid to prevent cros_sdk change our pgid, otherwise subsequent
   # commands would be considered as background process.
   prefix = ['chromite/bin/cros_sdk', '--no-ns-pid']
 
-  if kwargs.get('chrome_root'):
-    prefix += ['--chrome_root', kwargs['chrome_root']]
-  if kwargs.get('goma_dir'):
-    prefix += ['--goma_dir', kwargs['goma_dir']]
+  if chrome_root:
+    prefix += ['--chrome_root', chrome_root]
+  if goma_dir:
+    prefix += ['--goma_dir', goma_dir]
 
   prefix += envs + ['--']
 
@@ -1329,9 +1336,9 @@ def cros_sdk(chromeos_root, *args, **kwargs):
   return util.check_output(
       *cmd,
       cwd=chromeos_root,
-      log_stdout=kwargs.get('log_stdout', True),
-      stdin=kwargs.get('stdin'),
-      stderr_callback=kwargs.get('stderr_callback'))
+      log_stdout=log_stdout,
+      stdin=stdin,
+      stderr_callback=stderr_callback)
 
 
 def create_chroot(chromeos_root):
@@ -1594,6 +1601,7 @@ class AutotestControlInfo:
   """
 
   def __init__(self, path, variables):
+    assert 'NAME' in variables, 'invalid control file'
     self.name = variables['NAME']
     self.path = path
     self.variables = variables

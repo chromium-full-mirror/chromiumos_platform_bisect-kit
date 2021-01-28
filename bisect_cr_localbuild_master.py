@@ -97,7 +97,7 @@ def verify_gclient_dep(chrome_root):
     code = compile(f.read(), '.gclient', 'exec')
     # pylint: disable=exec-used
     exec(code, context)
-  for solution in context['solutions']:
+  for solution in context.get('solutions', []):
     if solution['name'] == 'src':
       return 'deps_file' not in solution or solution['deps_file'] == '.DEPS.git'
   return False

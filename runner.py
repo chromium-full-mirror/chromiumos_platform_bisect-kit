@@ -290,6 +290,7 @@ def main(args=None):
 
   counter = collections.Counter()
 
+  meet = None
   runtime = []
   for i in range(opts.repeat):
     t0 = time.time()

@@ -384,6 +384,7 @@ def build_revlist(opts):
 
 
 def switch(opts):
+  assert opts.board
   cached_name = 'bisect-%s' % util.escape_rev(opts.chromeos_rev)
   if opts.subcommand == 'bisect_chrome':
     cached_name += '-%s' % util.escape_rev(opts.chrome_rev)

@@ -787,7 +787,7 @@ class DepsParser:
         pre_deps_hook['cwd'] = os.path.join(parent_path,
                                             pre_deps_hook.get('cwd', ''))
 
-    for path, dep_entry in local_scope['deps'].items():
+    for path, dep_entry in local_scope.get('deps', {}).items():
       # recalculate path
       path = path.format(**deps.variables)
       if local_scope.get('use_relative_paths', False):

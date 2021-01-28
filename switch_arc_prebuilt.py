@@ -73,7 +73,7 @@ def main(args=None):
 
   arc_version = cros_util.query_dut_lsb_release(
       opts.dut).get('CHROMEOS_ARC_VERSION')
-  if str(opts.build_id) in arc_version:
+  if arc_version and str(opts.build_id) in arc_version:
     logger.info('updated to "%s", done', arc_version)
   else:
     raise errors.ExecutionFatalError(
