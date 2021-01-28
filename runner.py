@@ -60,6 +60,7 @@ def create_argument_parser():
   Returns:
     An argparse.ArgumentParser instance.
   """
+  parents = [common.common_argument_parser, common.session_optional_parser]
   parser = argparse.ArgumentParser(
       description=textwrap.dedent("""
           Helper script to report exit code according to execution result.
@@ -67,9 +68,9 @@ def create_argument_parser():
           If precondition specified but not meet, returns SKIP. Returns WANT
           only if any conditions meet.
       """),
-      formatter_class=argparse.RawDescriptionHelpFormatter)
+      formatter_class=argparse.RawDescriptionHelpFormatter,
+      parents=parents)
   cli.patching_argparser_exit(parser)
-  common.add_common_arguments(parser)
   group = parser.add_mutually_exclusive_group(required=True)
   group.add_argument(
       '--new',

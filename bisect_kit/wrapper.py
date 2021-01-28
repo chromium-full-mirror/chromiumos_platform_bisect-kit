@@ -23,7 +23,6 @@ class BisectorWrapper:
     self.name = name
     self.module = importlib.import_module(name)
     self.session = session
-    self.args = ['--session', session]
     self.switch_cmds = []
 
     self.domain_cls = None
@@ -33,9 +32,9 @@ class BisectorWrapper:
         break
     assert self.domain_cls
 
-  def call(self, *args, **kwargs):
+  def call(self, cmd, *args, **kwargs):
     bisector = bisector_cli.BisectorCommandLine(self.domain_cls)
-    full_args = self.args + list(args)
+    full_args = [cmd, '--session', self.session] + list(args)
     logger.debug('call %s: %s', self.name, full_args)
     stdout_bak = sys.stdout
     try:

@@ -352,15 +352,16 @@ def cmd_repair_dut(opts):
 @cli.fatal_error_handler
 def main():
   common.init()
+  parents = [common.common_argument_parser, common.session_optional_parser]
   parser = argparse.ArgumentParser()
   cli.patching_argparser_exit(parser)
-  common.add_common_arguments(parser)
   subparsers = parser.add_subparsers(
-      dest='command', title='commands', metavar='<command>')
+      dest='command', title='commands', metavar='<command>', required=True)
 
   parser_version_info = subparsers.add_parser(
       'version_info',
       help='Query version info of given chromeos build',
+      parents=parents,
       description='Given chromeos `board` and `version`, '
       'print version information of components.')
   parser_version_info.add_argument(
@@ -377,13 +378,14 @@ def main():
   parser_version_info.set_defaults(func=cmd_version_info)
 
   parser_query_dut_board = subparsers.add_parser(
-      'query_dut_board', help='Query board name of given DUT')
+      'query_dut_board', help='Query board name of given DUT', parents=parents)
   parser_query_dut_board.add_argument('dut')
   parser_query_dut_board.set_defaults(func=cmd_query_dut_board)
 
   parser_reboot = subparsers.add_parser(
       'reboot',
       help='Reboot a DUT',
+      parents=parents,
       description='Reboot a DUT and verify the reboot is successful.')
   parser_reboot.add_argument('--force', action='store_true')
   parser_reboot.add_argument('dut')
@@ -392,6 +394,7 @@ def main():
   parser_lease_dut = subparsers.add_parser(
       'lease_dut',
       help='Lease a DUT in the lab',
+      parents=[common.common_argument_parser],
       description='Lease a DUT in the lab. '
       'This is implemented by `skylab lease-dut` with additional checking.')
   group = parser_lease_dut.add_mutually_exclusive_group(required=True)
@@ -407,15 +410,16 @@ def main():
   parser_release_dut = subparsers.add_parser(
       'release_dut',
       help='Release a DUT in the lab',
+      parents=parents,
       description='Release a DUT in the lab. '
       'This is implemented by `skylab release-dut` with additional checking.')
-  parser_release_dut.add_argument('--session', help='session name')
   parser_release_dut.add_argument('dut')
   parser_release_dut.set_defaults(func=cmd_release_dut)
 
   parser_allocate_dut = subparsers.add_parser(
       'allocate_dut',
       help='Allocate a DUT in the lab',
+      parents=[common.common_argument_parser],
       description='Allocate a DUT in the lab. It will lease a DUT in the lab '
       'for bisecting. The caller (bisect-kit runner) of this command should '
       'retry this command again later if no DUT available now.')
@@ -461,6 +465,7 @@ def main():
   parser_repair_dut = subparsers.add_parser(
       'repair_dut',
       help='Repair a DUT in the lab',
+      parents=parents,
       description='Repair a DUT in the lab. '
       'This is simply wrapper of "deploy repair" with additional checking.')
   parser_repair_dut.add_argument('dut')
@@ -468,10 +473,6 @@ def main():
 
   opts = parser.parse_args()
   common.config_logging(opts)
-
-  # It's optional by default since python3.
-  if not opts.command:
-    parser.error('command is missing')
   opts.func(opts)
 
 

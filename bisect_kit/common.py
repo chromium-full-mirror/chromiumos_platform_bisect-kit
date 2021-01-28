@@ -5,6 +5,7 @@
 """Common functions used by almost of all bisect kit scripts."""
 
 from __future__ import print_function
+import argparse
 import logging
 import logging.config
 import os
@@ -19,6 +20,10 @@ DEFAULT_SESSION_NAME = 'default'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
 BISECT_KIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+common_argument_parser = None
+session_optional_parser = None
+session_required_parser = None
 
 
 def determine_session_dir(session):
@@ -107,31 +112,39 @@ def config_logging(opts):
   })
 
 
-def add_common_arguments(parser):
-  """Add common arguments to command line parser.
-
-  Args:
-    parser: An argparse.ArgumentParser instance.
-  """
-  parser.add_argument(
+def _setup_argument_parsers():
+  # pylint: disable=global-statement
+  global common_argument_parser
+  global session_optional_parser
+  global session_required_parser
+  if common_argument_parser:
+    return  # already done
+  common_argument_parser = argparse.ArgumentParser(add_help=False)
+  session_optional_parser = argparse.ArgumentParser(add_help=False)
+  session_required_parser = argparse.ArgumentParser(add_help=False)
+  common_argument_parser.add_argument(
       '--log_file',
       metavar='LOG_FILE',
       default=configure.get('LOG_FILE'),
       help='Override log filename')
-  parser.add_argument(
+  common_argument_parser.add_argument(
       '--debug', action='store_true', help='Output DEBUG log to console')
-
-  parser.add_argument(
+  common_argument_parser.add_argument(
       '--rc',
       metavar=configure.CONFIG_ENV_NAME,
       help='Specify config file to use. Otherwise searches default '
       'locations. Use "none" to suppress config file searching.')
-  parser.add_argument(
+
+  session_optional_parser.add_argument(
       '--session',
       default=DEFAULT_SESSION_NAME,
       help='Session name (default: %(default)r)')
+
+  session_required_parser.add_argument(
+      '--session', required=True, help='Session name')
 
 
 def init():
   configure.load_config()
   configure.root.load_plugins()
+  _setup_argument_parsers()

@@ -43,9 +43,9 @@ def add_build_and_deploy_arguments(parser_group):
       help="Don't disable rootfs verification after update is completed")
 
 
-def add_common_arguments(parser):
-  """add common arguments for both Chrome and Chrome OS builds"""
-  common.add_common_arguments(parser)
+def create_common_argument_parser():
+  """Common arguments parser for both Chrome and Chrome OS builds"""
+  parser = argparse.ArgumentParser(add_help=False)
   parser.add_argument(
       '--dut',
       type=cli.argtype_notempty,
@@ -90,6 +90,7 @@ def add_common_arguments(parser):
 
   group = parser.add_argument_group(title='Build and deploy options')
   add_build_and_deploy_arguments(group)
+  return parser
 
 
 def create_argument_parser():
@@ -97,10 +98,14 @@ def create_argument_parser():
   subparsers = parser.add_subparsers(dest='subcommand', required=True)
   cli.patching_argparser_exit(parser)
 
+  parents = [
+      common.common_argument_parser,
+      common.session_optional_parser,
+      create_common_argument_parser(),
+  ]
   # chromeos parser
   parser_cros = subparsers.add_parser(
-      'bisect_chromeos', help='Bisect on Chrome OS versions')
-  add_common_arguments(parser_cros)
+      'bisect_chromeos', help='Bisect on Chrome OS versions', parents=parents)
   parser_cros.add_argument(
       'chromeos_rev',
       nargs='?',
@@ -112,8 +117,7 @@ def create_argument_parser():
 
   # chrome parser
   parser_chrome = subparsers.add_parser(
-      'bisect_chrome', help='Bisect on Chrome versions')
-  add_common_arguments(parser_chrome)
+      'bisect_chrome', help='Bisect on Chrome versions', parents=parents)
   parser_chrome.add_argument(
       '--chrome_root',
       metavar='CHROME_ROOT',

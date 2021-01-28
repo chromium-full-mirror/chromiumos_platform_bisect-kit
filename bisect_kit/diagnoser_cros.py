@@ -792,12 +792,13 @@ class DiagnoseCommandLineBase:
     pass  # implemented by subclass if necessary
 
   def create_argument_parser(self):
+    parents = [common.common_argument_parser, common.session_optional_parser]
     parser = argparse.ArgumentParser()
-    common.add_common_arguments(parser)
     subparsers = parser.add_subparsers(
-        dest='command', title='commands', metavar='<command>')
+        dest='command', title='commands', metavar='<command>', required=True)
 
-    parser_init = subparsers.add_parser('init', help='Initialize')
+    parser_init = subparsers.add_parser(
+        'init', help='Initialize', parents=parents)
     group = parser_init.add_argument_group(
         title='Source tree path options',
         description="""
@@ -975,17 +976,18 @@ class DiagnoseCommandLineBase:
         help='Build Chrome on buildbucket')
     parser_init.set_defaults(func=self.cmd_init)
 
-    parser_run = subparsers.add_parser('run', help='Start auto bisection')
+    parser_run = subparsers.add_parser(
+        'run', help='Start auto bisection', parents=parents)
     parser_run.set_defaults(func=self.cmd_run)
 
     parser_log = subparsers.add_parser(
-        'log', help='Prints what has been done so far')
+        'log', help='Prints what has been done so far', parents=parents)
     parser_log.add_argument(
         '--json', action='store_true', help='Machine readable output')
     parser_log.set_defaults(func=self.cmd_log)
 
     parser_view = subparsers.add_parser(
-        'view', help='Prints summary of current status')
+        'view', help='Prints summary of current status', parents=parents)
     parser_view.add_argument('--verbose', '-v', action='store_true')
     parser_view.add_argument(
         '--json', action='store_true', help='Machine readable output')
@@ -996,9 +998,6 @@ class DiagnoseCommandLineBase:
   def main(self, args=None):
     opts = self.argument_parser.parse_args(args)
     common.config_logging(opts)
-    # It's optional by default since python3.
-    if not opts.command:
-      self.argument_parser.error('command is missing')
 
     session_dir = common.determine_session_dir(opts.session)
     session_file = os.path.join(session_dir, self.__class__.__name__)

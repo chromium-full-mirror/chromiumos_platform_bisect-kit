@@ -803,21 +803,24 @@ class BisectorCommandLine:
         variable, indicates current rev to switch/evaluate.
     """)
 
+    parents = [common.common_argument_parser, common.session_optional_parser]
     parser = argparse.ArgumentParser(
         prog=prog,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=description)
-    common.add_common_arguments(parser)
     subparsers = parser.add_subparsers(
-        dest='command', title='commands', metavar='<command>')
+        dest='command', title='commands', metavar='<command>', required=True)
 
     parser_reset = subparsers.add_parser(
-        'reset', help='Reset bisect session and clean up saved result')
+        'reset',
+        help='Reset bisect session and clean up saved result',
+        parents=parents)
     parser_reset.set_defaults(func=self.cmd_reset)
 
     parser_init = subparsers.add_parser(
         'init',
         help='Initializes bisect session',
+        parents=parents,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent("""
           Besides arguments for 'init' command, you also need to set 'switch'
@@ -873,7 +876,7 @@ class BisectorCommandLine:
     self.domain_cls.add_init_arguments(parser_init)
 
     parser_config = subparsers.add_parser(
-        'config', help='Configures additional setting')
+        'config', help='Configures additional setting', parents=parents)
     parser_config.add_argument(
         'key',
         choices=[
@@ -888,6 +891,7 @@ class BisectorCommandLine:
     parser_run = subparsers.add_parser(
         'run',
         help='Performs bisection',
+        parents=parents,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent("""
         This command does switch and eval to determine candidates having old or
@@ -925,7 +929,7 @@ class BisectorCommandLine:
     parser_run.set_defaults(func=self.cmd_run)
 
     parser_switch = subparsers.add_parser(
-        'switch', help='Switch to given rev without eval')
+        'switch', help='Switch to given rev without eval', parents=parents)
     parser_switch.add_argument(
         'rev',
         type=cli.argtype_multiplexer(self.domain_cls.intra_revtype,
@@ -937,7 +941,9 @@ class BisectorCommandLine:
     parser_switch.set_defaults(func=self.cmd_switch)
 
     parser_old = subparsers.add_parser(
-        'old', help='Tells bisect engine the said revs have "old" behavior')
+        'old',
+        help='Tells bisect engine the said revs have "old" behavior',
+        parents=parents)
     parser_old.add_argument(
         'revs',
         nargs='+',
@@ -945,7 +951,9 @@ class BisectorCommandLine:
     parser_old.set_defaults(func=self.cmd_old)
 
     parser_new = subparsers.add_parser(
-        'new', help='Tells bisect engine the said revs have "new" behavior')
+        'new',
+        help='Tells bisect engine the said revs have "new" behavior',
+        parents=parents)
     parser_new.add_argument(
         'revs',
         nargs='+',
@@ -953,7 +961,9 @@ class BisectorCommandLine:
     parser_new.set_defaults(func=self.cmd_new)
 
     parser_skip = subparsers.add_parser(
-        'skip', help='Tells bisect engine the said revs have "skip" behavior')
+        'skip',
+        help='Tells bisect engine the said revs have "skip" behavior',
+        parents=parents)
     parser_skip.add_argument(
         'revs',
         nargs='+',
@@ -961,13 +971,13 @@ class BisectorCommandLine:
     parser_skip.set_defaults(func=self.cmd_skip)
 
     parser_view = subparsers.add_parser(
-        'view', help='Shows current progress and candidates')
+        'view', help='Shows current progress and candidates', parents=parents)
     parser_view.add_argument('--verbose', '-v', action='store_true')
     parser_view.add_argument('--json', action='store_true')
     parser_view.set_defaults(func=self.cmd_view)
 
     parser_log = subparsers.add_parser(
-        'log', help='Prints what has been done so far')
+        'log', help='Prints what has been done so far', parents=parents)
     parser_log.add_argument('--before', type=float)
     parser_log.add_argument('--after', type=float)
     parser_log.add_argument(
@@ -975,7 +985,7 @@ class BisectorCommandLine:
     parser_log.set_defaults(func=self.cmd_log)
 
     parser_next = subparsers.add_parser(
-        'next', help='Prints next suggested rev to bisect')
+        'next', help='Prints next suggested rev to bisect', parents=parents)
     parser_next.add_argument(
         '--current_rev',
         type=self.domain_cls.intra_revtype,
@@ -998,10 +1008,6 @@ class BisectorCommandLine:
     parser = self.create_argument_parser(kwargs.get('prog'))
     opts = parser.parse_args(args or None)
     common.config_logging(opts)
-
-    # It's optional by default since python3.
-    if not opts.command:
-      parser.error('command is missing')
 
     self._create_states(session=opts.session)
     if opts.command not in ('init', 'reset', 'config'):

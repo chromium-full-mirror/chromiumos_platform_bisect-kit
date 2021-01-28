@@ -29,9 +29,9 @@ logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-  parser = argparse.ArgumentParser(description=__doc__)
+  parents = [common.common_argument_parser, common.session_optional_parser]
+  parser = argparse.ArgumentParser(description=__doc__, parents=parents)
   cli.patching_argparser_exit(parser)
-  common.add_common_arguments(parser)
   parser.add_argument(
       '--dut',
       type=cli.argtype_notempty,

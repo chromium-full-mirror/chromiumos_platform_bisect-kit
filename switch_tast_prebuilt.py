@@ -35,9 +35,9 @@ GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH = (
 
 
 def create_argument_parser():
-  parser = argparse.ArgumentParser(description=__doc__)
+  parents = [common.common_argument_parser, common.session_optional_parser]
+  parser = argparse.ArgumentParser(description=__doc__, parents=parents)
   cli.patching_argparser_exit(parser)
-  common.add_common_arguments(parser)
   parser.add_argument(
       '--chromeos_root',
       type=cli.argtype_dir_path,

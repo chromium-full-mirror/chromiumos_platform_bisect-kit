@@ -564,24 +564,34 @@ def cmd_delete(opts):
 
 
 def create_parser():
-  parser = argparse.ArgumentParser(
-      formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
-  parser.add_argument(
+  base_parser = argparse.ArgumentParser(add_help=False)
+  base_parser.add_argument(
       '--mirror_base',
       metavar='MIRROR_BASE',
       default=configure.get('MIRROR_BASE', DEFAULT_MIRROR_BASE),
       help='Directory for mirrors (default: %(default)s)')
-  parser.add_argument(
+  base_parser.add_argument(
       '--work_base',
       metavar='WORK_BASE',
       default=configure.get('WORK_BASE', DEFAULT_WORK_BASE),
-      help='Directory for bisection working directories (default: %(default)s)')
-  common.add_common_arguments(parser)
+      help='Directory for bisection working directories'
+      ' (default: %(default)s)')
+  parents_session_optional = [
+      common.common_argument_parser, common.session_optional_parser, base_parser
+  ]
+  parents_session_required = [
+      common.common_argument_parser, common.session_required_parser, base_parser
+  ]
+
+  parser = argparse.ArgumentParser(
+      formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
   subparsers = parser.add_subparsers(
-      dest='command', title='commands', metavar='<command>')
+      dest='command', title='commands', metavar='<command>', required=True)
 
   parser_init = subparsers.add_parser(
-      'init', help='Mirror source trees and create template checkout')
+      'init',
+      help='Mirror source trees and create template checkout',
+      parents=parents_session_optional)
   parser_init.add_argument(
       '--chrome', action='store_true', help='init chrome mirror and tree')
   parser_init.add_argument(
@@ -602,7 +612,8 @@ def create_parser():
       'sync',
       help='Sync source trees',
       description='Sync all if no projects are specified '
-      '(--chrome, --chromeos, or --android)')
+      '(--chrome, --chromeos, or --android)',
+      parents=parents_session_optional)
   parser_sync.add_argument(
       '--chrome', action='store_true', help='sync chrome mirror and tree')
   parser_sync.add_argument(
@@ -619,8 +630,8 @@ def create_parser():
       'new',
       help='Create new source checkout for bisect',
       description='Create for all if no projects are specified '
-      '(--chrome, --chromeos, or --android)')
-  parser_new.add_argument('--session', required=True)
+      '(--chrome, --chromeos, or --android)',
+      parents=parents_session_required)
   parser_new.add_argument(
       '--chrome', action='store_true', help='create chrome checkout')
   parser_new.add_argument(
@@ -634,11 +645,13 @@ def create_parser():
   parser_new.set_defaults(func=cmd_new)
 
   parser_list = subparsers.add_parser(
-      'list', help='List existing sessions with source checkout')
+      'list',
+      help='List existing sessions with source checkout',
+      parents=parents_session_optional)
   parser_list.set_defaults(func=cmd_list)
 
-  parser_delete = subparsers.add_parser('delete', help='Delete source checkout')
-  parser_delete.add_argument('--session', required=True)
+  parser_delete = subparsers.add_parser(
+      'delete', help='Delete source checkout', parents=parents_session_required)
   parser_delete.set_defaults(func=cmd_delete)
 
   return parser
@@ -649,10 +662,6 @@ def main():
   parser = create_parser()
   opts = parser.parse_args()
   common.config_logging(opts)
-
-  # It's optional by default since python3.
-  if not opts.command:
-    parser.error('command is missing')
   opts.func(opts)
 
 
