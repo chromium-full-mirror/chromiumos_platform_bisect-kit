@@ -1,7 +1,5 @@
 dummy
-\bhe\b
 master
 \bnative
 sanity
 white.?list
-\bwtf
