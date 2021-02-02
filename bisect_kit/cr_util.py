@@ -51,11 +51,11 @@ CHROME_TEST_BINARIES = [
     'video_decode_accelerator_tests',
     'video_encode_accelerator_perf_tests',
     'video_encode_accelerator_tests',
-    'video_encode_accelerator_unittest',
     'wayland_client_perftests',
 
     # Removed binaries. Keep them here for users to bisect old versions.
     'video_decode_accelerator_unittest',
+    'video_encode_accelerator_unittest',
 ]
 
 
