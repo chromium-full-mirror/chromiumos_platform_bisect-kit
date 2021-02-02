@@ -15,6 +15,7 @@ from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cros_lab_util
+from bisect_kit import cros_quick_provision
 from bisect_kit import cros_util
 
 logger = logging.getLogger(__name__)
@@ -58,11 +59,25 @@ def create_argument_parser():
       default=configure.get('DEFAULT_CHROMEOS_ROOT',
                             os.path.expanduser('~/chromiumos')),
       help='Default chromeos tree to run "cros flash" (default: %(default)s)')
+  parser.add_argument(
+      '--use-quick-provision',
+      '--use_quick_provision',
+      action='store_true',
+      help='Runs quick-provision instead of cros flash.')
+  parser.add_argument(
+      '--build',
+      type=cros_quick_provision.argtype_cros_build,
+      help='ChromeOS build to fetch from gs cache with quick-provision.')
 
   return parser
 
 
 def switch(opts):
+  if opts.use_quick_provision:
+    cros_quick_provision.quick_provision(
+        opts.default_chromeos_root, opts.dut, opts.build)
+    return 0
+
   # TODO(kcwu): clear cache of cros flash
   if cros_util.is_cros_snapshot_version(opts.version):
     image_path = cros_util.prepare_snapshot_image(opts.default_chromeos_root,
