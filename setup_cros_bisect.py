@@ -45,6 +45,7 @@ from bisect_kit import util
 DEFAULT_MIRROR_BASE = os.path.expanduser('~/git-mirrors')
 DEFAULT_WORK_BASE = os.path.expanduser('~/bisect-workdir')
 CHECKOUT_TEMPLATE_NAME = 'template'
+MANIFEST_FOR_DELETED = 'deleted-repos.xml'
 
 logger = logging.getLogger(__name__)
 
@@ -176,8 +177,8 @@ def setup_chromeos_repos(opts, path_factory):
         repo_url=repo_url,
         mirror=True)
 
-    local_manifest_dir = os.path.join(chromeos_mirror, '.repo',
-                                      'local_manifests')
+    local_manifest_dir = os.path.join(chromeos_mirror,
+                                      repo_util.LOCAL_MANIFESTS_DIR)
     os.mkdir(local_manifest_dir)
     with open(os.path.join(local_manifest_dir, 'manifest-versions.xml'),
               'w') as f:
@@ -220,10 +221,10 @@ def write_sync_time(repo_dir, sync_time):
 
 
 def write_extra_manifest_to_mirror(repo_dir, removed):
-  local_manifest_dir = os.path.join(repo_dir, '.repo', 'local_manifests')
+  local_manifest_dir = os.path.join(repo_dir, repo_util.LOCAL_MANIFESTS_DIR)
   if not os.path.exists(local_manifest_dir):
     os.mkdir(local_manifest_dir)
-  with open(os.path.join(local_manifest_dir, 'deleted-repos.xml'), 'w') as f:
+  with open(os.path.join(local_manifest_dir, MANIFEST_FOR_DELETED), 'w') as f:
     f.write("""<?xml version="1.0" encoding="UTF-8"?>\n<manifest>\n""")
     remotes = {}
     for path_spec in removed.values():
@@ -242,6 +243,13 @@ def write_extra_manifest_to_mirror(repo_dir, removed):
     f.write("""</manifest>\n""")
 
 
+def delete_extra_manifest(repo_dir):
+  path = os.path.join(repo_dir, repo_util.LOCAL_MANIFESTS_DIR,
+                      MANIFEST_FOR_DELETED)
+  if os.path.exists(path):
+    os.unlink(path)
+
+
 def generate_extra_manifest_for_deleted_repo(repo_dir, only_branch=None):
   last_sync_time = read_last_sync_time(repo_dir)
   removed = collect_removed_manifest_repos(
@@ -258,6 +266,7 @@ def sync_chromeos_code(opts, path_factory):
   chromeos_mirror = path_factory.get_chromeos_mirror()
 
   logger.info('repo sync for chromeos mirror')
+  delete_extra_manifest(chromeos_mirror)
   repo_util.sync(chromeos_mirror)
   # If there are repos deleted after last sync, generate custom manifest and
   # sync again for those repos. So we can mirror commits just before the repo
@@ -394,6 +403,7 @@ def sync_android_code(opts, path_factory, branch):
   with locking.lock_file(
       os.path.join(android_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
     logger.info('repo sync for android mirror branch=%s', branch)
+    delete_extra_manifest(android_mirror)
     repo_util.sync(android_mirror, current_branch=True)
     # Android usually big jump between milestone releases and add/delete lots of
     # repos when switch releases. Because it's infeasible to bisect between such

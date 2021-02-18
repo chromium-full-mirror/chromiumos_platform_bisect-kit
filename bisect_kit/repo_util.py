@@ -24,6 +24,10 @@ from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
+# Relative to repo root dir.
+REPO_META_DIR = '.repo'
+LOCAL_MANIFESTS_DIR = os.path.join(REPO_META_DIR, 'local_manifests')
+
 
 def get_manifest_url(manifest_dir):
   """Get manifest URL of repo project.
