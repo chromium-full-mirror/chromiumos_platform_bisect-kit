@@ -58,7 +58,8 @@ def config_logging(opts):
     else:
       opts.log_file = DEFAULT_LOG_FILENAME
   os.environ['LOG_FILE'] = opts.log_file
-  os.makedirs(os.path.dirname(opts.log_file), exist_ok=True)
+  if os.path.dirname(opts.log_file):
+    os.makedirs(os.path.dirname(opts.log_file), exist_ok=True)
   print('log file = %s' % opts.log_file, file=sys.stderr)
 
   if getattr(opts, 'debug'):
