@@ -231,14 +231,14 @@ def check_call(*args, timeout=None, **kwargs):
     raise subprocess.CalledProcessError(p.returncode, args)
 
 
-def ssh_cmd(host, *args, **kwargs):
+def ssh_cmd(host, *args, connect_timeout=None, allow_retry=False):
   """Runs remote command using ssh.
 
   Args:
     host: remote host address
     args: command and args running on the remote host
-    kwargs:
-      connect_timeout: connection timeout in seconds (int)
+    connect_timeout: connection timeout in seconds (int)
+    allow_retry: if True, retry when ssh connection failed
 
   Raises:
     subprocess.CalledProcessError if the exit code is non-zero.
@@ -246,17 +246,30 @@ def ssh_cmd(host, *args, **kwargs):
   cmd = ['ssh']
   # Avoid keyboard-interactive to prevent hang forever.
   cmd += ['-oPreferredAuthentications=publickey']
-  if kwargs.get('connect_timeout'):
-    cmd += ['-oConnectTimeout=%d' % kwargs['connect_timeout']]
+  if connect_timeout:
+    cmd += ['-oConnectTimeout=%d' % connect_timeout]
   cmd.append(host)
   cmd += list(args)
-  try:
-    return check_output(*cmd)
-  except subprocess.CalledProcessError as e:
-    # ssh's own error code is 255.
-    if e.returncode == 255:
+
+  tries = 0
+  while True:
+    tries += 1
+    try:
+      return check_output(*cmd)
+    except subprocess.CalledProcessError as e:
+      # ssh's own error code is 255. For other codes, they are returned from
+      # the remote command.
+      if e.returncode != 255:
+        raise
+      if allow_retry and tries < 3:
+        # ssh's ConnectionAttempts is not enough because we want to deal with
+        # situations needing several seconds to recover.
+        delay = 60
+        logger.warning('ssh connection failed, will retry %d seconds later',
+                       delay)
+        time.sleep(delay)
+        continue
       raise errors.SshConnectionError('ssh connection to %r failed' % host)
-    raise
 
 
 def escape_rev(rev):

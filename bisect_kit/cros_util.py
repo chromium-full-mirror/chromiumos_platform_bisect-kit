@@ -259,7 +259,7 @@ def query_dut_lsb_release(host):
     errors.ExternalError: lsb-release file doesn't exist
   """
   try:
-    output = util.ssh_cmd(host, 'cat', '/etc/lsb-release')
+    output = util.ssh_cmd(host, 'cat', '/etc/lsb-release', allow_retry=True)
   except subprocess.CalledProcessError as e:
     raise errors.ExternalError(
         'unable to read /etc/lsb-release; not a DUT') from e
@@ -280,7 +280,7 @@ def query_dut_os_release(host):
     errors.ExternalError: lsb-release file doesn't exist
   """
   try:
-    output = util.ssh_cmd(host, 'cat', '/etc/os-release')
+    output = util.ssh_cmd(host, 'cat', '/etc/os-release', allow_retry=True)
   except subprocess.CalledProcessError as e:
     raise errors.ExternalError(
         'unable to read /etc/os-release; not a DUT') from e
@@ -311,7 +311,7 @@ def is_good_dut(host):
 
   # Sometimes python is broken after 'cros flash'.
   try:
-    util.ssh_cmd(host, 'python', '-c', '1')
+    util.ssh_cmd(host, 'python', '-c', '1', allow_retry=True)
     return True
   except (subprocess.CalledProcessError, errors.SshConnectionError):
     return False

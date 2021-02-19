@@ -145,7 +145,8 @@ def get_build_prop(host):
       host,
       'cat',
       # Use wildcard to match 'arc', 'arcvm', or future variants.
-      '/usr/share/arc*/properties/build.prop')
+      '/usr/share/arc*/properties/build.prop',
+      allow_retry=True)
   if not data:
     return None
   result = {}
