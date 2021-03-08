@@ -176,14 +176,6 @@ class TestCrosUtil(unittest.TestCase):
     # Assume query_milestone_by_version is implemented via gsutil.
     def gsutil_ls(*args, **kwargs):
       logger.debug('gsutil_ls %r %r', args, kwargs)
-      if args == ('gs://chromeos-releases/dev-channel/samus/9300.0.0',):
-        path = args[0]
-        return [
-            path + '/ChromeOS-R58-9300.0.0-samus.tar.xz',
-            path + '/ChromeOS-test-R58-9300.0.0-samus.tar.xz',
-            path + '/stateful.tgz',
-        ]
-
       if args == ('-d',
                   'gs://chromeos-image-archive/samus-release/R*-10123.0.0'):
         return ['gs://chromeos-image-archive/samus-release/R64-10123.0.0/']
@@ -194,11 +186,6 @@ class TestCrosUtil(unittest.TestCase):
     with mock.patch.object(cros_util, 'gsutil_ls', gsutil_ls):
       self.assertEqual(
           cros_util.query_milestone_by_version('samus', '10123.0.0'), '64')
-
-    # Second case, old image, only exists in gs://chromeos-releases
-    with mock.patch.object(cros_util, 'gsutil_ls', gsutil_ls):
-      self.assertEqual(
-          cros_util.query_milestone_by_version('samus', '9300.0.0'), '58')
 
   def test_version_operation(self):
     with mock.patch.object(
@@ -248,44 +235,24 @@ class TestCrosUtil(unittest.TestCase):
       self.assertEqual(
           cros_util.list_prebuilt_from_image_archive('wrong-board'), [])
 
-  def test_list_prebuilt_from_chromeos_releases(self):
-    gs_path = 'gs://chromeos-releases/dev-channel/foo/9402.0.0/'
-    with mock.patch.object(cros_util, 'gsutil_ls', return_value=[gs_path]):
-      self.assertEqual(
-          cros_util.list_prebuilt_from_chromeos_releases('foo'),
-          [('9402.0.0', gs_path + 'ChromeOS-test-R*-9402.0.0-foo.tar.xz')])
-
-    with mock.patch.object(cros_util, 'gsutil_ls', return_value=[]):
-      self.assertEqual(
-          cros_util.list_prebuilt_from_chromeos_releases('wrong-board'), [])
-
   @staticmethod
   def _gsutil_ls(*args, **_kwargs):
     archive_base = 'gs://chromeos-image-archive/foo-release/'
-    release_base = 'gs://chromeos-releases/stable-channel/foo/'
     snapshot_base = 'gs://chromeos-image-archive/foo-snapshot/'
 
     gs_files = [
-        release_base + '9994.0.0/',
-        release_base + '9995.0.0/',
-        release_base + '9997.0.0/',
-        release_base + '9994.0.0/ChromeOS-test-R63-9994.0.0-foo.tar.xz',
-        release_base + '9995.0.0/ChromeOS-test-R63-9995.0.0-foo.tar.xz',
-        release_base + '9997.0.0/ChromeOS-test-R63-9997.0.0-foo.tar.xz',
-        snapshot_base + 'R63-9995.0.0-30100-000/',
-        snapshot_base + 'R63-9995.0.0-30101-000/',
-        snapshot_base + 'R63-9995.0.0-30102-000/',
         snapshot_base + 'R63-9996.0.0-30103-000/',
         snapshot_base + 'R63-9997.0.0-30104-000/',
         snapshot_base + 'R63-9998.0.0-30105-000/',
         snapshot_base + 'R63-9999.0.0-30106-000/',
-        snapshot_base + 'R63-9995.0.0-30100-000/image.zip',
-        snapshot_base + 'R63-9995.0.0-30101-000/image.zip',
-        snapshot_base + 'R63-9995.0.0-30102-000/image.zip',
         snapshot_base + 'R63-9996.0.0-30103-000/image.zip',
         snapshot_base + 'R63-9997.0.0-30104-000/image.zip',
         snapshot_base + 'R63-9998.0.0-30105-000/image.zip',
         snapshot_base + 'R63-9999.0.0-30106-000/image.zip',
+        archive_base + 'R63-9995.0.0/',
+        archive_base + 'R63-9995.0.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-9997.0.0/',
+        archive_base + 'R63-9997.0.0/chromiumos_test_image.tar.xz',
         archive_base + 'R63-9998.0.0/',
         archive_base + 'R63-9999.0.0/',
         archive_base + 'R63-9999.1.0/',
@@ -332,18 +299,6 @@ class TestCrosUtil(unittest.TestCase):
             'foo', '9998.0.0', '10001.0.0', only_good_build=True),
         ['R63-9999.0.0', 'R63-10001.0.0'])
 
-    # Some are in gs://chromeos-releases
-    self.assertEqual(
-        cros_util.list_chromeos_prebuilt_versions(
-            'foo', '9995.0.0', '9999.0.0', only_good_build=False),
-        ['R63-9995.0.0', 'R63-9997.0.0', 'R63-9998.0.0', 'R63-9999.0.0'])
-
-    # Some are in gs://chromeos-releases; only good build
-    self.assertEqual(
-        cros_util.list_chromeos_prebuilt_versions(
-            'foo', '9995.0.0', '9999.0.0', only_good_build=True),
-        ['R63-9995.0.0', 'R63-9997.0.0', 'R63-9999.0.0'])
-
   @mock.patch('bisect_kit.cros_util.snapshot_cutover_version', '0.0.0')
   @mock.patch('bisect_kit.cros_util.gsutil_ls', _gsutil_ls.__func__)
   @mock.patch('bisect_kit.cros_util.version_to_full', _version_to_full.__func__)
@@ -358,20 +313,21 @@ class TestCrosUtil(unittest.TestCase):
             'R63-9997.0.0',
             only_good_build=True,
             use_snapshot=True), [
-                'R63-9995.0.0', 'R63-9995.0.0-30100', 'R63-9995.0.0-30101',
-                'R63-9995.0.0-30102', 'R63-9996.0.0-30103', 'R63-9997.0.0'
+                'R63-9995.0.0',
+                'R63-9996.0.0-30103',
+                'R63-9997.0.0',
             ])
 
     self.assertEqual(
         cros_util.list_chromeos_prebuilt_versions(
             'foo',
-            'R63-9995.0.0',
+            'R63-9996.0.0',
             'R63-9998.0.0',
             only_good_build=True,
             use_snapshot=True), [
-                'R63-9995.0.0', 'R63-9995.0.0-30100', 'R63-9995.0.0-30101',
-                'R63-9995.0.0-30102', 'R63-9996.0.0-30103', 'R63-9997.0.0',
-                'R63-9997.0.0-30104'
+                'R63-9996.0.0-30103',
+                'R63-9997.0.0',
+                'R63-9997.0.0-30104',
             ])
 
     # snapshot 2: release ~ snapshot or snapshot ~ release
@@ -381,10 +337,7 @@ class TestCrosUtil(unittest.TestCase):
             'R63-9995.0.0-30100',
             'R63-9997.0.0',
             only_good_build=True,
-            use_snapshot=True), [
-                'R63-9995.0.0-30100', 'R63-9995.0.0-30101',
-                'R63-9995.0.0-30102', 'R63-9996.0.0-30103', 'R63-9997.0.0'
-            ])
+            use_snapshot=True), ['R63-9996.0.0-30103', 'R63-9997.0.0'])
 
     self.assertEqual(
         cros_util.list_chromeos_prebuilt_versions(
@@ -401,8 +354,7 @@ class TestCrosUtil(unittest.TestCase):
             'R63-9997.0.0-30104',
             only_good_build=True,
             use_snapshot=True), [
-                'R63-9995.0.0', 'R63-9995.0.0-30100', 'R63-9995.0.0-30101',
-                'R63-9995.0.0-30102', 'R63-9996.0.0-30103', 'R63-9997.0.0',
+                'R63-9995.0.0', 'R63-9996.0.0-30103', 'R63-9997.0.0',
                 'R63-9997.0.0-30104'
             ])
 

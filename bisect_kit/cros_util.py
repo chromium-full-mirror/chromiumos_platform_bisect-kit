@@ -46,8 +46,6 @@ re_chromeos_short_version = r'^\d+\.\d+\.\d+$'
 re_chromeos_snapshot_version = r'^R\d+-\d+\.\d+\.\d+-\d+$'
 
 gs_archive_path = 'gs://chromeos-image-archive/{board}-release'
-gs_release_path = (
-    'gs://chromeos-releases/{channel}-channel/{boardpath}/{short_version}')
 
 # Assume gsutil is in PATH.
 gsutil_bin = 'gsutil'
@@ -549,17 +547,6 @@ def query_milestone_by_version(board, short_version):
       continue
     return m.group(1)
 
-  for channel in ['canary', 'dev', 'beta', 'stable']:
-    path = gs_release_path.format(
-        channel=channel,
-        boardpath=gs_release_boardpath(board),
-        short_version=short_version)
-    for line in gsutil_ls(path, ignore_errors=True):
-      m = re.search(r'\bR(\d+)-' + short_version, line)
-      if not m:
-        continue
-      return m.group(1)
-
   logger.debug('unable to query milestone of %s for %s', short_version, board)
   return None
 
@@ -729,12 +716,6 @@ def list_snapshots_from_image_archive(board, major_version):
 def list_prebuilt_from_image_archive(board):
   """Lists ChromeOS prebuilt image available from gs://chromeos-image-archive.
 
-  gs://chromeos-image-archive contains only recent builds (in two years).
-  We prefer this function to list_prebuilt_from_chromeos_releases() because
-    - this is what "cros flash" supports directly.
-    - the paths have milestone information, so we don't need to do slow query
-      by ourselves.
-
   Args:
     board: ChromeOS board name
 
@@ -755,35 +736,6 @@ def list_prebuilt_from_image_archive(board):
   return result
 
 
-def list_prebuilt_from_chromeos_releases(board):
-  """Lists ChromeOS versions available from gs://chromeos-releases.
-
-  gs://chromeos-releases contains more builds. However, 'cros flash' doesn't
-  support it.
-
-  Args:
-    board: ChromeOS board name
-
-  Returns:
-    list of (version, gs_path):
-      version: Chrome OS version in short format
-      gs_path: gs path of test image (with wildcard)
-  """
-  result = []
-  for line in gsutil_ls(
-      gs_release_path.format(
-          channel='*', boardpath=gs_release_boardpath(board), short_version=''),
-      ignore_errors=True):
-    m = re.match(r'gs:\S+/(\d+\.\d+\.\d+)/$', line)
-    if m:
-      short_version = m.group(1)
-      test_image = 'ChromeOS-test-R*-{short_version}-{board}.tar.xz'.format(
-          short_version=short_version, board=board)
-      gs_path = line + test_image
-      result.append((short_version, gs_path))
-  return result
-
-
 def has_test_image(board, version):
   if is_cros_snapshot_version(version):
     return bool(query_snapshot_buildbucket_id(board, version))
@@ -794,19 +746,12 @@ def has_test_image(board, version):
     # version_to_full() is implemented by checking image, thus its failure
     # means no image.
     return False
-  short_version = version_to_short(version)
-  paths = [
+  path = (
       gs_archive_path.format(board=board) +
-      '/%s/chromiumos_test_image.tar.xz' % full_version,
-      gs_release_path.format(
-          channel='*',
-          boardpath=gs_release_boardpath(board),
-          short_version=short_version),
-  ]
+      '/%s/chromiumos_test_image.tar.xz' % full_version)
 
-  for path in paths:
-    if gsutil_ls(path, ignore_errors=True):
-      return True
+  if gsutil_ls(path, ignore_errors=True):
+    return True
   return False
 
 
@@ -814,7 +759,6 @@ def list_chromeos_prebuilt_versions(board,
                                     old,
                                     new,
                                     only_good_build=True,
-                                    include_older_build=True,
                                     use_snapshot=False):
   """Lists ChromeOS version numbers with prebuilt between given range
 
@@ -823,7 +767,6 @@ def list_chromeos_prebuilt_versions(board,
     old: start version (inclusive)
     new: end version (inclusive)
     only_good_build: only if test image is available
-    include_older_build: include prebuilt in gs://chromeos-releases
     use_snapshot: return snapshot versions if found
 
   Returns:
@@ -838,11 +781,6 @@ def list_chromeos_prebuilt_versions(board,
   for full_version, gs_path in list_prebuilt_from_image_archive(board):
     short_version = version_to_short(full_version)
     rev_map[short_version] = [(full_version, gs_path)]
-
-  if include_older_build and old_short not in rev_map:
-    for short_version, gs_path in list_prebuilt_from_chromeos_releases(board):
-      if short_version not in rev_map:
-        rev_map[short_version] = [(short_version, gs_path)]
 
   if use_snapshot:
     for major_version in range(
@@ -969,47 +907,17 @@ def prepare_prebuilt_image(chromeos_root, board, version):
     version: ChromeOS version number in short or full format
 
   Returns:
-    xbuddy path or file path (relative to chromeos_root)
+    xbuddy path or None
   """
+  del chromeos_root  # unused
   assert is_cros_version(version)
   full_version = version_to_full(board, version)
-  short_version = version_to_short(full_version)
 
-  image_path = None
   gs_path = gs_archive_path.format(board=board) + '/' + full_version
   if gsutil_ls('-d', gs_path, ignore_errors=True):
-    image_path = 'xbuddy://remote/{board}/{full_version}/test'.format(
+    return 'xbuddy://remote/{board}/{full_version}/test'.format(
         board=board, full_version=full_version)
-  else:
-    tmp_dir = os.path.join(chromeos_root, 'tmp',
-                           'ChromeOS-test-%s-%s' % (full_version, board))
-    full_path = os.path.join(tmp_dir, test_image_filename)
-    rel_path = os.path.relpath(full_path, chromeos_root)
-    if os.path.exists(full_path):
-      return rel_path
-
-    if not os.path.exists(tmp_dir):
-      os.makedirs(tmp_dir)
-    # gs://chromeos-releases may have more old images than
-    # gs://chromeos-image-archive, but 'cros flash' doesn't support it. We have
-    # to fetch the image by ourselves
-    for channel in ['canary', 'dev', 'beta', 'stable']:
-      fn = 'ChromeOS-test-{full_version}-{board}.tar.xz'.format(
-          full_version=full_version, board=board)
-      gs_path = gs_release_path.format(
-          channel=channel,
-          boardpath=gs_release_boardpath(board),
-          short_version=short_version)
-      gs_path += '/' + fn
-      if gsutil_ls(gs_path, ignore_errors=True):
-        # TODO(kcwu): delete tmp
-        gsutil('cp', gs_path, tmp_dir)
-        util.check_call('tar', 'Jxvf', fn, cwd=tmp_dir)
-        image_path = os.path.relpath(full_path, chromeos_root)
-        break
-
-  assert image_path
-  return image_path
+  return None
 
 
 def cros_flash(chromeos_root,
