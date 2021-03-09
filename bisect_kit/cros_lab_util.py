@@ -562,7 +562,7 @@ def query_lease_status(dut_name, verbose_log=True):
 
   request = swarming_task_request(status['task_id'], verbose_log=verbose_log)
   status['leased_by'] = request['authenticated']
-  status['is_leased_by_me'] = (user in status['leased_by'])
+  status['is_leased_by_me'] = bool(status['leased_by'])
   status['duration'] = int(request['properties']['execution_timeout_secs'])
 
   result = swarming_task_result(status['task_id'], verbose_log=verbose_log)
