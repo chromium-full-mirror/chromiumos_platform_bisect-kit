@@ -270,7 +270,7 @@ class AndroidSpecManager(codechange.SpecManager):
     return content
 
   def parse_spec(self, spec):
-    logging.debug('parse_spec %s', spec.name)
+    logger.debug('parse_spec %s', spec.name)
     manifest_content = self._load_manifest_content(spec)
     parser = repo_util.ManifestParser(self.manifest_dir)
     root = parser.parse_single_xml(manifest_content, allow_include=False)

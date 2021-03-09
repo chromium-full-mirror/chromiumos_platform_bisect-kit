@@ -522,7 +522,7 @@ class ChromeSpecManager(codechange.SpecManager):
     if spec.entries:
       return
 
-    logging.debug('parse_spec %s', spec.name)
+    logger.debug('parse_spec %s', spec.name)
     code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
     parser = gclient_util.DepsParser(self.config['chrome_root'], code_storage)
 

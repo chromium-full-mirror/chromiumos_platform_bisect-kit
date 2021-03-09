@@ -380,7 +380,7 @@ async def async_lease(dut_name, reason, duration=None):
       await asyncio.sleep(5)
       status = query_lease_status(dut_name, verbose_log=False)
       if is_dut_leased_by_me(status):
-        logging.info('lease: %s', pending_lease)
+        logger.info('lease: %s', pending_lease)
         break
     else:
       raise errors.DutLeaseException('lease verification failed: %s' % status)
@@ -454,7 +454,7 @@ def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
       time.sleep(5)
       status = query_lease_status(dut_name)
       if is_dut_leased_by_me(status):
-        logging.info('lease: %s', pending_lease)
+        logger.info('lease: %s', pending_lease)
         break
     else:
       raise errors.DutLeaseException('lease verification failed: %s' % status)
