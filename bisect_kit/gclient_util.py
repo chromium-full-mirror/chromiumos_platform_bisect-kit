@@ -337,6 +337,13 @@ class Dep:
         'True': True,
     }
     vars_dict.update(self.variables)
+
+    # Work around b/182219439
+    # TODO(kcwu): mimic gclient's behavior, which convert undefined variables
+    # to strings
+    if 'use_rts' not in vars_dict:
+      vars_dict['use_rts'] = True
+
     # pylint: disable=eval-used
     return eval(self.condition, vars_dict)
 
