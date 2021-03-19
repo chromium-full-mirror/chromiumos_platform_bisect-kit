@@ -210,11 +210,14 @@ def build_and_deploy(opts, do_mark_as_stable=True):
   if opts.noimage or opts.nodeploy:
     return 0
 
-  if cros_util.cros_flash_with_retry(
+  image_info = cros_util.ImageInfo()
+  image_info[cros_util.ImageType.DISK_IMAGE] = image_path
+
+  if cros_util.provision_image_with_retry(
       opts.chromeos_root,
       opts.dut,
       opts.board,
-      image_path,
+      image_info,
       clobber_stateful=opts.clobber_stateful,
       disable_rootfs_verification=opts.disable_rootfs_verification,
       repair_callback=cros_lab_util.repair,
@@ -275,6 +278,8 @@ def main(args=None):
 
   if cros_util.is_cros_short_version(opts.rev):
     opts.rev = cros_util.version_to_full(opts.board, opts.rev)
+
+  cros_util.prepare_chroot(opts.chromeos_root)
 
   try:
     returncode = switch(opts)

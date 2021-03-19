@@ -24,7 +24,6 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import repo_util
-from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
@@ -298,8 +297,7 @@ def get_manifest(opts):
   return result.to_string()
 
 
-def prepare_image(image_folder, buildbucket_id):
-  image_path = os.path.join(image_folder, cros_util.test_image_filename)
+def search_build_image(buildbucket_id):
   api = buildbucket_util.BuildbucketApi()
   properties = api.get_build(buildbucket_id).output.properties
 
@@ -307,19 +305,13 @@ def prepare_image(image_folder, buildbucket_id):
     raise errors.ExternalError('artifacts not found in buildbucket_id: %s' %
                                buildbucket_id)
 
-  gs_path = 'gs://%s/%s/image.zip' % (properties['artifacts']['gs_bucket'],
-                                      properties['artifacts']['gs_path'])
-  cros_util.gsutil('cp', gs_path, image_folder)
-  util.check_call(
-      'unzip',
-      '-j',
-      'image.zip',
-      cros_util.test_image_filename,
-      cwd=image_folder)
-  os.remove(os.path.join(image_folder, 'image.zip'))
+  gs_path = 'gs://%s/%s' % (properties['artifacts']['gs_bucket'],
+                            properties['artifacts']['gs_path'])
 
-  assert os.path.exists(image_path)
-  return image_path
+  image_info = cros_util.ImageInfo()
+  image_info[cros_util.ImageType.PARTITION_IMAGE] = gs_path
+  image_info[cros_util.ImageType.ZIP_FILE] = gs_path + '/image.zip'
+  return image_info
 
 
 def schedule_build(opts):
@@ -389,39 +381,27 @@ def build_revlist(opts):
 
 def switch(opts):
   assert opts.board
-  cached_name = 'bisect-%s' % util.escape_rev(opts.chromeos_rev)
-  if opts.subcommand == 'bisect_chrome':
-    cached_name += '-%s' % util.escape_rev(opts.chrome_rev)
-  image_folder = os.path.join(opts.chromeos_root, cros_util.cached_images_dir,
-                              opts.board, cached_name)
-  image_path = os.path.join(image_folder, cros_util.test_image_filename)
-  if not os.path.exists(image_folder):
-    os.makedirs(image_folder)
 
   # schedule build request and prepare image
-  buildbucket_id = None
-  if not os.path.exists(image_path):
-    if opts.buildbucket_id:
-      buildbucket_id = opts.buildbucket_id
-    else:
-      buildbucket_id = schedule_build(opts)
+  if opts.buildbucket_id:
+    buildbucket_id = opts.buildbucket_id
+  else:
+    buildbucket_id = schedule_build(opts)
 
   # If --nodeploy is given, the script will exit as soon as job scheduled and
   # ignore potential build errors.
   if opts.nodeploy:
     return 0
 
-  if buildbucket_id:
-    wait_build_complete(buildbucket_id)
-    image_path = prepare_image(image_folder, buildbucket_id)
-  rel_path = os.path.relpath(image_path, opts.chromeos_root)
+  wait_build_complete(buildbucket_id)
+  image_info = search_build_image(buildbucket_id)
 
   # deploy and flash
-  if cros_util.cros_flash_with_retry(
+  if cros_util.provision_image_with_retry(
       opts.chromeos_root,
       opts.dut,
       opts.board,
-      rel_path,
+      image_info,
       clobber_stateful=opts.clobber_stateful,
       disable_rootfs_verification=opts.disable_rootfs_verification,
       repair_callback=cros_lab_util.repair,
@@ -457,6 +437,8 @@ def main(args=None):
 
   if opts.build_revlist:
     build_revlist(opts)
+
+  cros_util.prepare_chroot(opts.chromeos_root)
 
   try:
     returncode = switch(opts)

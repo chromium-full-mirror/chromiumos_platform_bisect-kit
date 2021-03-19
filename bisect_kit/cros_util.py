@@ -16,6 +16,7 @@ from __future__ import print_function
 import ast
 import calendar
 import datetime
+import enum
 import errno
 import glob
 import json
@@ -25,13 +26,16 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
+import urllib.parse
 
 from google.protobuf import json_format
 
 from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import common
 from bisect_kit import cr_util
 from bisect_kit import errors
 from bisect_kit import git_util
@@ -45,6 +49,7 @@ re_chromeos_full_version = r'^R\d+-\d+\.\d+\.\d+$'
 re_chromeos_short_version = r'^\d+\.\d+\.\d+$'
 re_chromeos_snapshot_version = r'^R\d+-\d+\.\d+\.\d+-\d+$'
 
+gs_archive_base = 'gs://chromeos-image-archive/'
 gs_archive_path = 'gs://chromeos-image-archive/{board}-release'
 
 # Assume gsutil is in PATH.
@@ -85,11 +90,14 @@ buildbucket_cutover_versions = [
 
 chromeos_root_inside_chroot = '/mnt/host/source'
 # relative to chromeos_root
+in_tree_autotest_dir = 'src/third_party/autotest/files'
 prebuilt_autotest_dir = 'tmp/autotest-prebuilt'
 prebuilt_tast_dir = 'tmp/tast-prebuilt'
-# Relative to chromeos root. Images are cached_images_dir/$board/$image_name.
-cached_images_dir = 'src/build/images'
+# Relative to chromeos root. Images are build_images_dir/$board/$image_name.
+build_images_dir = 'src/build/images'
+cached_images_dir = 'tmp/images'
 test_image_filename = 'chromiumos_test_image.bin'
+sample_partition_filename = 'full_dev_part_KERN.bin.gz'
 
 VERSION_KEY_CROS_SHORT_VERSION = 'cros_short_version'
 VERSION_KEY_CROS_FULL_VERSION = 'cros_full_version'
@@ -98,6 +106,41 @@ VERSION_KEY_CR_VERSION = 'cr_version'
 VERSION_KEY_ANDROID_BUILD_ID = 'android_build_id'
 VERSION_KEY_ANDROID_BRANCH = 'android_branch'
 CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
+
+autotest_shadow_config = """
+[CROS]
+enable_ssh_tunnel_for_servo: True
+enable_ssh_tunnel_for_chameleon: True
+enable_ssh_connection_for_devserver: True
+enable_ssh_tunnel_for_moblab: True
+"""
+
+
+class ImageType(enum.Enum):
+  """Chrome OS image type
+
+  It describes the image format, not image location.
+  """
+  # Full disk image like chromiumos_test_image.bin and
+  # chromiumos_test_image.tar.xz.
+  # Supported by 'cros flash'.
+  DISK_IMAGE = enum.auto()
+  # Contains files like full_dev_part_KERN.bin.gz.
+  # Supported by quick-provision and newer 'cros flash'.
+  PARTITION_IMAGE = enum.auto()
+  # Contains files like image.zip. We need to unzip first.
+  ZIP_FILE = enum.auto()
+
+
+class ImageInfo(dict):
+  """Image info (dict: image type -> path).
+
+  For a given Chrome OS version, there are several image formats available.
+  This class describes a collection of images for a certain Chrome OS version.
+  cros_flash() or quick_provision() can resolve a compatible image from this
+  object. `image type` is an ImageType enum. `path` could be a path on the
+  local disk or a remote URI.
+  """
 
 
 class NeedRecreateChrootException(Exception):
@@ -420,22 +463,6 @@ def wait_reboot_done(host, boot_id):
       time.sleep(1)
 
   raise errors.ExternalError('reboot failed?')
-
-
-def gs_release_boardpath(board):
-  """Normalizes board name for gs://chromeos-releases/
-
-  This follows behavior of PushImage() in chromite/scripts/pushimage.py
-  Note, only gs://chromeos-releases/ needs normalization,
-  gs://chromeos-image-archive does not.
-
-  Args:
-    board: ChromeOS board name
-
-  Returns:
-    normalized board name
-  """
-  return board.replace('_', '-')
 
 
 def gsutil(*args, **kwargs):
@@ -852,54 +879,181 @@ def list_chromeos_prebuilt_versions(board,
   return result
 
 
-def prepare_snapshot_image(chromeos_root, board, snapshot_version):
-  """Prepare chromeos snapshot image.
+def search_snapshot_image(board, snapshot_version):
+  """Searches chromeos snapshot image.
 
   Args:
-    chromeos_root: chromeos tree root
     board: ChromeOS board name
     snapshot_version: ChromeOS snapshot version number
 
   Returns:
-    local file path of test image relative to chromeos_root
+    ImageInfo object
   """
   assert is_cros_snapshot_version(snapshot_version)
-  milestone, short_version, snapshot_id = snapshot_version_split(
-      snapshot_version)
-  full_version = make_cros_full_version(milestone, short_version)
-  tmp_dir = os.path.join(
-      chromeos_root, 'tmp',
-      'ChromeOS-test-%s-%s-%s' % (full_version, board, snapshot_id))
-  if not os.path.exists(tmp_dir):
-    os.makedirs(tmp_dir)
+  image_info = ImageInfo()
+  gs_path = gs_archive_base + '{board}-snapshot/{snapshot_version}-*'.format(
+      board=board, snapshot_version=snapshot_version)
+  files = gsutil_ls(
+      gs_path + '/' + sample_partition_filename, ignore_errors=True)
+  if files:
+    image_info[ImageType.PARTITION_IMAGE] = files[0].replace(
+        sample_partition_filename, '')
+  files = gsutil_ls(gs_path + '/image.zip', ignore_errors=True)
+  if files:
+    image_info[ImageType.ZIP_FILE] = files[0]
+  return image_info
 
-  gs_path = ('gs://chromeos-image-archive/{board}-snapshot/' +
-             '{snapshot_version}-*/image.zip')
-  gs_path = gs_path.format(board=board, snapshot_version=snapshot_version)
 
-  full_path = os.path.join(tmp_dir, test_image_filename)
-  rel_path = os.path.relpath(full_path, chromeos_root)
-  if os.path.exists(full_path):
-    return rel_path
+def prepare_image_for_quick_provision(image_info):
+  path = image_info.get(ImageType.PARTITION_IMAGE)
+  if path and path.startswith(gs_archive_base):
+    return urllib.parse.urlparse(path).path[1:]
 
-  files = gsutil_ls(gs_path, ignore_errors=True)
-  if len(files) >= 1:
-    gs_path = files[0]
-    gsutil('cp', gs_path, tmp_dir)
-    util.check_call(
-        'unzip', '-j', 'image.zip', test_image_filename, cwd=tmp_dir)
-    os.remove(os.path.join(tmp_dir, 'image.zip'))
-    return rel_path
-
-  assert False
+  logger.warning(
+      'image format or location are not supported by quick-provision: %s',
+      image_info)
   return None
 
 
-def prepare_prebuilt_image(chromeos_root, board, version):
-  """Prepare chromeos prebuilt image.
+def _cache_path_for_download(chromeos_root, url):
+  cache_folder = os.path.join(chromeos_root, cached_images_dir)
+  os.makedirs(cache_folder, exist_ok=True)
+  name = urllib.parse.quote(url, safe='')
+  return os.path.join(cache_folder, name)
 
-  It searches for xbuddy image which "cros flash" can use, or fetch image to
-  local disk.
+
+def prepare_image_for_cros_flash(chromeos_root, image_info):
+  path = image_info.get(ImageType.DISK_IMAGE)
+  if path:
+    # local path
+    if '://' not in path:
+      return path
+
+    m = re.search(gs_archive_base + r'([^/]+)-[a-z]+/([^/]+)/', path)
+    if m:
+      return 'xbuddy://remote/%s/%s/test' % (m.group(1), m.group(2))
+    if path.startswith(gs_archive_base):
+      return path.replace('chromiumos_test_image.tar.xz', 'test')
+
+    # 'cros flash' doesn't support other gs bucket, download to local.
+    if path.startswith('gs://'):
+      cache_path = _cache_path_for_download(chromeos_root, path)
+      if os.path.exists(cache_path):
+        return cache_path
+      gsutil('cp', path, cache_path)
+      return cache_path
+
+  path = image_info.get(ImageType.PARTITION_IMAGE)
+  if path and path.startswith(gs_archive_base):
+    # newer 'cros flash' support partition images
+    # TODO(kcwu): update the commit hash after new flash is enabled
+    if git_util.is_ancestor_commit(
+        os.path.join(chromeos_root, 'chromite'), '153f91684a9a59', 'HEAD'):
+      return path
+
+  path = image_info.get(ImageType.ZIP_FILE)
+  if path:
+    cached_image_full_path = _cache_path_for_download(
+        chromeos_root, path + '.' + test_image_filename)
+    if os.path.exists(cached_image_full_path):
+      return cached_image_full_path
+
+    tmp_dir = tempfile.mkdtemp()
+    try:
+      if path.startswith('gs://'):
+        gsutil('cp', path, tmp_dir)
+        path = os.path.join(tmp_dir, os.path.basename(path))
+        assert os.path.exists(path)
+      util.check_call('unzip', '-j', path, test_image_filename, cwd=tmp_dir)
+      shutil.move(
+          os.path.join(tmp_dir, test_image_filename), cached_image_full_path)
+    finally:
+      shutil.rmtree(tmp_dir)
+
+    return cached_image_full_path
+
+  return None
+
+
+def quick_provision(chromeos_root, host, image_info):
+  # TODO(kimjae): Transition to using TLS ProvisionDut for F20.
+  logger.debug('quick_provision %s %s', host, image_info)
+  build = prepare_image_for_quick_provision(image_info)
+  if not build:
+    return False
+
+  autotest_path = os.path.join(chromeos_root_inside_chroot,
+                               in_tree_autotest_dir)
+  quick_provision_cmd = [
+      'test_that', '--args',
+      "value='%s'" % build, host, 'provision_QuickProvision', '--autotest_dir',
+      autotest_path
+  ]
+  try:
+    cros_sdk(chromeos_root, *quick_provision_cmd)
+  except subprocess.CalledProcessError as e:
+    raise errors.ExternalError('quick-provision failed') from e
+  return True
+
+
+def verify_dut_version(host, board, version):
+  if version:
+    # In the past, cros flash may fail with returncode=0
+    # So let's have an extra check.
+    if is_cros_snapshot_version(version):
+      builder_path = query_dut_lsb_release(host).get(
+          'CHROMEOS_RELEASE_BUILDER_PATH', '')
+      expect_prefix = '%s-snapshot/%s-' % (board, version)
+      if not builder_path.startswith(expect_prefix):
+        raise errors.ExternalError(
+            'although provision succeeded, the OS builder path is '
+            'unexpected: actual=%s expect=%s' % (builder_path, expect_prefix))
+    else:
+      expect_version = version_to_short(version)
+      dut_version = query_dut_short_version(host)
+      if dut_version != expect_version:
+        raise errors.ExternalError(
+            'although provision succeeded, the OS version is unexpected: '
+            'actual=%s expect=%s' % (dut_version, expect_version))
+
+  # "cros flash" may terminate successfully but the DUT starts self-repairing
+  # (b/130786578), so it's necessary to do sanity check.
+  if not is_good_dut(host):
+    raise errors.ExternalError(
+        'although provision succeeded, the DUT is in bad state')
+
+
+def provision_image(chromeos_root,
+                    host,
+                    board,
+                    image_info,
+                    version=None,
+                    clobber_stateful=False,
+                    disable_rootfs_verification=True,
+                    force_reboot_callback=None):
+  # Try quick_provision first, but fallback to cros flash.
+  # TODO(kcwu): only use quick_provision for DUTs in the lab
+  try:
+    if quick_provision(chromeos_root, host, image_info):
+      verify_dut_version(host, board, version)
+      return
+    logger.debug('quick-provision is not supported; fallback to cros flash')
+  except errors.ExternalError as e:
+    logger.warning('quick-provision failed; fallback to cros flash: %s', e)
+
+  if not cros_flash(
+      chromeos_root,
+      host,
+      image_info,
+      clobber_stateful=clobber_stateful,
+      disable_rootfs_verification=disable_rootfs_verification,
+      force_reboot_callback=force_reboot_callback):
+    raise errors.InternalError('unsupported image: ' + str(image_info))
+  verify_dut_version(host, board, version)
+
+
+def search_prebuilt_image(board, version):
+  """Searches chromeos prebuilt image.
 
   Args:
     chromeos_root: chromeos tree root
@@ -907,24 +1061,29 @@ def prepare_prebuilt_image(chromeos_root, board, version):
     version: ChromeOS version number in short or full format
 
   Returns:
-    xbuddy path or None
+    ImageInfo object
   """
-  del chromeos_root  # unused
   assert is_cros_version(version)
   full_version = version_to_full(board, version)
 
+  image_info = ImageInfo()
   gs_path = gs_archive_path.format(board=board) + '/' + full_version
-  if gsutil_ls('-d', gs_path, ignore_errors=True):
-    return 'xbuddy://remote/{board}/{full_version}/test'.format(
-        board=board, full_version=full_version)
-  return None
+  if gsutil_ls(gs_path + '/chromiumos_test_image.tar.xz', ignore_errors=True):
+    image_info[ImageType.DISK_IMAGE] = gs_path + '/chromiumos_test_image.tar.xz'
+  if gsutil_ls(gs_path + '/' + sample_partition_filename, ignore_errors=True):
+    image_info[ImageType.PARTITION_IMAGE] = gs_path
+  return image_info
+
+
+def search_image(board, version):
+  if is_cros_snapshot_version(version):
+    return search_snapshot_image(board, version)
+  return search_prebuilt_image(board, version)
 
 
 def cros_flash(chromeos_root,
                host,
-               board,
-               image_path,
-               version=None,
+               image_info,
                clobber_stateful=False,
                disable_rootfs_verification=True,
                force_reboot_callback=None):
@@ -936,18 +1095,20 @@ def cros_flash(chromeos_root,
     chromeos_root: use 'cros flash' of which chromeos tree
     host: DUT address
     board: ChromeOS board name
-    image_path: chromeos image xbuddy path or file path. For relative
-        path, it should be relative to chromeos_root.
+    image_info: ImageInfo object
     version: ChromeOS version in short or full format
     clobber_stateful: Clobber stateful partition when performing update
     disable_rootfs_verification: Disable rootfs verification after update
         is completed
     force_reboot_callback: powerful reboot hook (via servo)
 
+  Returns:
+    False for unsupported images
+
   Raises:
     errors.ExternalError: cros flash failed
   """
-  logger.info('cros_flash %s %s %s %s', host, board, version, image_path)
+  logger.info('cros_flash %s %s', host, image_info)
 
   # Reboot is necessary because sometimes previous 'cros flash' failed and
   # entered a bad state.
@@ -966,6 +1127,10 @@ def cros_flash(chromeos_root,
       util.ssh_cmd(host, 'stop', 'ap-update-manager')
     except subprocess.CalledProcessError:
       pass  # not started; do nothing
+
+  image_path = prepare_image_for_cros_flash(chromeos_root, image_info)
+  if not image_path:
+    return False
 
   # Handle relative path.
   if '://' not in image_path and not os.path.isabs(image_path):
@@ -991,46 +1156,27 @@ def cros_flash(chromeos_root,
   if disable_rootfs_verification:
     args.append('--disable-rootfs-verification')
 
+  # TODO(kcwu): remove this flag once the new flash code enabled by default
+  if git_util.is_ancestor_commit(
+      os.path.join(chromeos_root, 'chromite'), '153f91684a9a59', 'HEAD'):
+    args.append('--exp-new-flash')
+
   try:
     cros_sdk(chromeos_root, 'cros', 'flash', *args)
   except subprocess.CalledProcessError as e:
     raise errors.ExternalError('cros flash failed') from e
-
-  if version:
-    # In the past, cros flash may fail with returncode=0
-    # So let's have an extra check.
-    if is_cros_snapshot_version(version):
-      builder_path = query_dut_lsb_release(host).get(
-          'CHROMEOS_RELEASE_BUILDER_PATH', '')
-      expect_prefix = '%s-snapshot/%s-' % (board, version)
-      if not builder_path.startswith(expect_prefix):
-        raise errors.ExternalError(
-            'although cros flash succeeded, the OS builder path is '
-            'unexpected: actual=%s expect=%s' % (builder_path, expect_prefix))
-    else:
-      expect_version = version_to_short(version)
-      dut_version = query_dut_short_version(host)
-      if dut_version != expect_version:
-        raise errors.ExternalError(
-            'although cros flash succeeded, the OS version is unexpected: '
-            'actual=%s expect=%s' % (dut_version, expect_version))
-
-  # "cros flash" may terminate successfully but the DUT starts self-repairing
-  # (b/130786578), so it's necessary to do sanity check.
-  if not is_good_dut(host):
-    raise errors.ExternalError(
-        'although cros flash succeeded, the DUT is in bad state')
+  return True
 
 
-def cros_flash_with_retry(chromeos_root,
-                          host,
-                          board,
-                          image_path,
-                          version=None,
-                          clobber_stateful=False,
-                          disable_rootfs_verification=True,
-                          repair_callback=None,
-                          force_reboot_callback=None):
+def provision_image_with_retry(chromeos_root,
+                               host,
+                               board,
+                               image_info,
+                               version=None,
+                               clobber_stateful=False,
+                               disable_rootfs_verification=True,
+                               repair_callback=None,
+                               force_reboot_callback=None):
   # 'cros flash' is not 100% reliable, retry if necessary.
   for attempt in range(2):
     if attempt > 0:
@@ -1038,11 +1184,11 @@ def cros_flash_with_retry(chromeos_root,
       time.sleep(60)
 
     try:
-      cros_flash(
+      provision_image(
           chromeos_root,
           host,
           board,
-          image_path,
+          image_info,
           version=version,
           clobber_stateful=clobber_stateful,
           disable_rootfs_verification=disable_rootfs_verification,
@@ -1307,6 +1453,25 @@ def copy_into_chroot(chromeos_root, src, dst, overwrite=True):
   shutil.copy(src, dst_outside)
 
 
+def _copy_template_files(src, dst):
+  if not os.path.exists(src):
+    return
+
+  def copy_if_nonexistent(src, dst):
+    if not os.path.exists(dst):
+      shutil.copy2(src, dst)
+
+  shutil.copytree(
+      src, dst, dirs_exist_ok=True, copy_function=copy_if_nonexistent)
+
+
+def override_autotest_config(autotest_dir):
+  shadow_config_path = os.path.join(autotest_dir, 'shadow_config.ini')
+  if not os.path.exists(shadow_config_path):
+    with open(shadow_config_path, 'w') as f:
+      f.write(autotest_shadow_config)
+
+
 def prepare_chroot(chromeos_root):
   mount_chroot(chromeos_root)
 
@@ -1316,6 +1481,16 @@ def prepare_chroot(chromeos_root):
   creds_path = '~/.config/chrome_infra/auth/creds.json'
   if os.path.exists(os.path.expanduser(creds_path)):
     copy_into_chroot(chromeos_root, creds_path, creds_path, overwrite=False)
+
+  # quick-provision requires special config for autotest.
+  override_autotest_config(os.path.join(chromeos_root, in_tree_autotest_dir))
+
+  # Copy optional configure files into the home directory inside chromeos
+  # chroot. For example, quick-provision may need special ssh config.
+  assert os.environ.get('USER')
+  _copy_template_files(
+      os.path.join(common.BISECT_KIT_ROOT, 'cros_template_files', 'at_home'),
+      os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER']))
 
 
 def check_if_need_recreate_chroot(stdout, stderr):
@@ -1488,11 +1663,10 @@ def build_image(chromeos_root, board):
     # For other failures, don't know how to handle. Just bail out.
     raise
 
-  image_symlink = os.path.join(chromeos_root, cached_images_dir, board,
-                               'latest')
+  image_symlink = os.path.join(chromeos_root, build_images_dir, board, 'latest')
   assert os.path.exists(image_symlink)
   image_name = os.readlink(image_symlink)
-  image_folder = os.path.join(cached_images_dir, board, image_name)
+  image_folder = os.path.join(build_images_dir, board, image_name)
   assert os.path.exists(
       os.path.join(chromeos_root, image_folder, test_image_filename))
   return image_folder

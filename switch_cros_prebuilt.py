@@ -15,7 +15,6 @@ from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cros_lab_util
-from bisect_kit import cros_quick_provision
 from bisect_kit import cros_util
 
 logger = logging.getLogger(__name__)
@@ -59,38 +58,22 @@ def create_argument_parser():
       default=configure.get('DEFAULT_CHROMEOS_ROOT',
                             os.path.expanduser('~/chromiumos')),
       help='Default chromeos tree to run "cros flash" (default: %(default)s)')
-  parser.add_argument(
-      '--use-quick-provision',
-      '--use_quick_provision',
-      action='store_true',
-      help='Runs quick-provision instead of cros flash.')
-  parser.add_argument(
-      '--build',
-      type=cros_quick_provision.argtype_cros_build,
-      help='ChromeOS build to fetch from gs cache with quick-provision.')
 
   return parser
 
 
 def switch(opts):
-  if opts.use_quick_provision:
-    cros_quick_provision.quick_provision(
-        opts.default_chromeos_root, opts.dut, opts.build)
-    return 0
-
   # TODO(kcwu): clear cache of cros flash
-  if cros_util.is_cros_snapshot_version(opts.version):
-    image_path = cros_util.prepare_snapshot_image(opts.default_chromeos_root,
-                                                  opts.board, opts.version)
-  else:
-    image_path = cros_util.prepare_prebuilt_image(opts.default_chromeos_root,
-                                                  opts.board, opts.version)
+  image_info = cros_util.search_image(opts.board, opts.version)
+  if not image_info:
+    logger.error('no images available for %s %s', opts.board, opts.version)
+    return cli.EXIT_CODE_FATAL
 
-  if cros_util.cros_flash_with_retry(
+  if cros_util.provision_image_with_retry(
       opts.default_chromeos_root,
       opts.dut,
       opts.board,
-      image_path,
+      image_info,
       version=opts.version,
       clobber_stateful=opts.clobber_stateful,
       disable_rootfs_verification=opts.disable_rootfs_verification,
@@ -113,6 +96,8 @@ def main(args=None):
       sys.exit(cli.EXIT_CODE_FATAL)
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
+
+  cros_util.prepare_chroot(opts.default_chromeos_root)
 
   try:
     returncode = switch(opts)

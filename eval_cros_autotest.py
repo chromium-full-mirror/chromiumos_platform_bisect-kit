@@ -17,7 +17,6 @@ import os
 import re
 import subprocess
 import sys
-import textwrap
 
 from bisect_kit import catapult_util
 from bisect_kit import cli
@@ -175,7 +174,8 @@ def prepare_to_run_test(opts):
                                 cros_util.prebuilt_autotest_dir)
   else:
     autotest_dir = os.path.join(opts.chromeos_root,
-                                'src/third_party/autotest/files')
+                                cros_util.in_tree_autotest_dir)
+  cros_util.override_autotest_config(autotest_dir)
   sox_path = os.path.join(opts.chromeos_root, 'chroot/usr/bin/sox')
   if not os.path.exists(sox_path):
     try:
@@ -185,17 +185,6 @@ def prepare_to_run_test(opts):
       # chromeos (b/136136270), so ignore the failure.
       logger.debug('Sox is only required by some audio tests. '
                    'Assume the failure of installing sox is harmless')
-  shadow_config_path = os.path.join(autotest_dir, 'shadow_config.ini')
-  if not os.path.exists(shadow_config_path):
-    with open(shadow_config_path, 'w') as f:
-      f.write(
-          textwrap.dedent("""
-            [CROS]
-            enable_ssh_tunnel_for_servo: True
-            enable_ssh_tunnel_for_chameleon: True
-            enable_ssh_connection_for_devserver: True
-            enable_ssh_tunnel_for_moblab: True
-          """))
 
   # test_that may use this ssh key and ssh complains its permission is too open.
   # chmod every time just before run test_that because the permission may change
