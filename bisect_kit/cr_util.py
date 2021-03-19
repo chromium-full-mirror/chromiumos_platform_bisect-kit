@@ -578,6 +578,19 @@ class ChromeSpecManager(codechange.SpecManager):
       deps_file: path to gclient DEPS file. If relative, relative to
           chrome_root's buildspec/.
     """
+    # Work around None entry in DEPS file (b/179855917)
+    # TODO(kcwu): migrate off buildspec
+    deps_path = os.path.join(self.config['chrome_root'], 'buildspec', deps_file)
+    with open(deps_path) as f:
+      deps_content = f.read()
+    if '"url": "None",' in deps_content:
+      deps_file = os.path.join(self.config['chrome_root'], 'deps-workaround', deps_file)
+      os.makedirs(os.path.dirname(deps_file), exist_ok=True)
+      deps_content = deps_content.replace('"url": "None",', '"url": "/None/workaround",')
+      with open(deps_file, 'w') as f:
+        f.write(deps_content)
+      logger.warning('work around b/179855917 with deps_file=%s', deps_file)
+
     gclient_util.config(
         self.config['chrome_root'],
         url='https://chrome-internal.googlesource.com'
