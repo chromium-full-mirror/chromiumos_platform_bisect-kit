@@ -1193,6 +1193,8 @@ def provision_image_with_retry(chromeos_root,
           clobber_stateful=clobber_stateful,
           disable_rootfs_verification=disable_rootfs_verification,
           force_reboot_callback=force_reboot_callback)
+      workaround_b183567529(
+          host, board, version, force_reboot_callback=force_reboot_callback)
       return True
     except errors.ExternalError:
       logger.exception('cros flash failed')
@@ -1670,6 +1672,41 @@ def build_image(chromeos_root, board):
   assert os.path.exists(
       os.path.join(chromeos_root, image_folder, test_image_filename))
   return image_folder
+
+
+def workaround_b183567529(host, board, version=None,
+                          force_reboot_callback=None):
+  """Workaround for volteer failure.
+
+  See b/183567529#comment8 and b/183020319#comment26 for more details.
+  """
+  broken_range = [
+      ('13836.0.0', '13854.0.0'),
+      ('13816.13.0', '13816.19.0'),
+  ]
+  if board != 'volteer' or not version:
+    return
+
+  if is_cros_short_version(version):
+    short_version = version
+  else:
+    _, short_version = version_split(version)
+  for old, new in broken_range:
+    if util.is_version_lesseq(old, short_version) and util.is_version_lesseq(
+        short_version,
+        new) and (util.is_direct_relative_version(old, short_version) and
+                  util.is_direct_relative_version(short_version, new)):
+      logger.info('applying b183567529 cbi patch for volteer')
+      cbi_override = os.path.join(
+          common.BISECT_KIT_ROOT,
+          'patching/b183567529/volteer-cbi-override.conf')
+      util.scp_cmd(cbi_override, 'root@%s:/etc/init/' % host)
+
+      patch_script = os.path.join(common.BISECT_KIT_ROOT,
+                                  'patching/b183567529/test_cbi_script.sh')
+      util.check_output(patch_script, host)
+      reboot(host, force_reboot_callback)
+      break
 
 
 class AutotestControlInfo:

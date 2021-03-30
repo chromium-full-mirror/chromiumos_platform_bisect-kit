@@ -272,6 +272,50 @@ def ssh_cmd(host, *args, connect_timeout=None, allow_retry=False):
       raise errors.SshConnectionError('ssh connection to %r failed' % host)
 
 
+def scp_cmd(from_file, to_file, connect_timeout=None, allow_retry=False):
+  """Copies a file through scp.
+
+  Args:
+    from_file: from file name
+    to_file: target file name
+    connect_timeout: connection timeout in seconds (int)
+    allow_retry: if True, retry when ssh connection failed
+
+  Raises:
+    subprocess.CalledProcessError if the exit code is non-zero.
+  """
+  cmd = ['scp']
+  # Avoid keyboard-interactive to prevent hang forever.
+  cmd += ['-oPreferredAuthentications=publickey']
+  if connect_timeout:
+    cmd += ['-oConnectTimeout=%d' % connect_timeout]
+  cmd += [
+      from_file,
+      to_file,
+  ]
+
+  tries = 0
+  while True:
+    tries += 1
+    try:
+      return check_output(*cmd)
+    except subprocess.CalledProcessError as e:
+      # ssh's own error code is 255. For other codes, they are returned from
+      # the remote command.
+      if e.returncode != 255:
+        raise
+      if allow_retry and tries < 3:
+        # ssh's ConnectionAttempts is not enough because we want to deal with
+        # situations needing several seconds to recover.
+        delay = 60
+        logger.warning('ssh connection failed, will retry %d seconds later',
+                       delay)
+        time.sleep(delay)
+        continue
+      raise errors.SshConnectionError('scp %s to %s failed' %
+                                      (from_file, to_file))
+
+
 def escape_rev(rev):
   """Escapes special characters in version string.
 
