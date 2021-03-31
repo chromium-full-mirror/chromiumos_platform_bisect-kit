@@ -109,6 +109,34 @@ def skylab_cmd(cmd, *args, **kwargs):
   return _run_labtools_command('skylab', cmd, *args, **kwargs)
 
 
+def crosfleet_cmd(cmd, *args, **kwargs):
+  """Wrapper of crosfleet cli.
+
+  Args:
+    cmd: crosfleet command, such as 'dut info'.
+    args: additional arguments passed to crosfleet command line
+    kwargs: additional arguments to control how to run the command
+  """
+  service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+  if service_account_json:
+    args = ['-service-account-json', service_account_json] + list(args)
+  cmd = cmd.split(' ')
+  return _run_labtools_command('crosfleet', *cmd, *args, **kwargs)
+
+
+def crosfleet_dut_info(dut_name):
+  """Run crosfleet dut info.
+
+  Args:
+    dut_name: A skylab dut name without .cros suffix.
+  """
+  duts = json.loads(crosfleet_cmd('dut info', '-json',
+                                  dut_name)).get('DUTs', [])
+  if len(duts) > 0:
+    return duts[0]
+  return None
+
+
 def swarming_query(method, limit=None, verbose_log=True):
   """Wrapper of 'swarming.py query'.
 
@@ -751,14 +779,14 @@ def reboot_via_servo(dut):
   if not is_lab_dut(dut):
     return False
 
-  info = skylab_cmd('dut-info', dut_host_name(dut))
-  m1 = re.search(r'servo_host\s+(\S+)', info)
-  m2 = re.search(r'servo_port\s+(\d+)', info)
-  if not m1 or not m2:
+  servo_info = util.dict_get(
+      crosfleet_dut_info(dut_host_name(dut)), 'LabSetup', 'chromeosMachineLse',
+      'deviceLse', 'dut', 'peripherals', 'servo')
+  servo_host = util.dict_get(servo_info, 'servoHostname')
+  servo_port = util.dict_get(servo_info, 'servoPort')
+  if not servo_host or not servo_port:
     logger.debug('this DUT has no servo?')
     return False
-  servo_host = dut_name_to_address(m1.group(1))
-  servo_port = m2.group(1)
 
   try:
     util.ssh_cmd(servo_host, 'start', 'servod', 'PORT=' + servo_port)

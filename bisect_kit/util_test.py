@@ -59,6 +59,12 @@ class TestPopen(unittest.TestCase):
     self.assertEqual(util.call('true'), 0)
     self.assertEqual(util.call('false'), 1)
 
+  def test_dict_get(self):
+    test_dict = {'a': {'b': 123}}
+    self.assertEqual(util.dict_get(test_dict, 'a', 'b'), 123)
+    self.assertEqual(util.dict_get(test_dict, 'a', 'c', 'd'), None)
+    self.assertEqual(util.dict_get(None, 'a', 'c', 'd'), None)
+
 
 if __name__ == '__main__':
   unittest.main()

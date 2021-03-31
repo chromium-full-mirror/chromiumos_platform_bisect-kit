@@ -383,3 +383,20 @@ def show_similar_candidates(key, value, candidates):
     return
   for candidate in similar_candidates:
     logger.error('    %s', candidate)
+
+
+def dict_get(element, *args):
+  """Recursively get a deep attribute in dict.
+
+  Args:
+    element: A dict element or None.
+    args: Attributes wanted to get.
+
+  Returns:
+    An attribute or None if attribute does not exist.
+  """
+  for arg in args:
+    if element is None:
+      break
+    element = element.get(arg)
+  return element

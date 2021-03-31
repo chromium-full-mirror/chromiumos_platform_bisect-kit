@@ -503,13 +503,6 @@ class BuildbucketApi:
       An build object if found, or None if no existing build.
     """
 
-    def recursive_get(element, *args):
-      for arg in args:
-        if element is None:
-          break
-        element = element.get(arg)
-      return element
-
     builds = self.search_builds(
         bucket=bucket,
         builder='%s-%s' % (board, bucket),
@@ -525,12 +518,12 @@ class BuildbucketApi:
       if build.status not in valid_status:
         continue
       input_properties = json_format.MessageToDict(build.input.properties)
-      build_manifest_hash = recursive_get(input_properties,
+      build_manifest_hash = util.dict_get(input_properties,
                                           '$chromeos/cros_source',
                                           'snapshot_cas', 'digest')
-      build_deps_hash = recursive_get(input_properties, '$chromeos/chrome',
+      build_deps_hash = util.dict_get(input_properties, '$chromeos/chrome',
                                       'deps_cas', 'digest')
-      build_src_ver = recursive_get(input_properties, '$chromeos/chrome',
+      build_src_ver = util.dict_get(input_properties, '$chromeos/chrome',
                                     'version')
       if (build_manifest_hash == manifest_digest and
           build_deps_hash == deps_digest and build_src_ver == deps_src_ver):
