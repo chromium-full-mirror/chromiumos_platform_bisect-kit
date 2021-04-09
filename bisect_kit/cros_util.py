@@ -987,7 +987,7 @@ def quick_provision(chromeos_root, host, image_info):
   quick_provision_cmd = [
       'test_that', '--args',
       "value='%s'" % build, host, 'provision_QuickProvision', '--autotest_dir',
-      autotest_path
+      autotest_path, '--debug'
   ]
   try:
     cros_sdk(chromeos_root, *quick_provision_cmd)
