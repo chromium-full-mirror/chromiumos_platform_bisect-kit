@@ -1134,7 +1134,6 @@ def cros_flash(chromeos_root,
 
   # Handle relative path.
   if '://' not in image_path and not os.path.isabs(image_path):
-    assert os.path.exists(os.path.join(chromeos_root, image_path))
     image_path = os.path.join(chromeos_root_inside_chroot, image_path)
 
   args = [

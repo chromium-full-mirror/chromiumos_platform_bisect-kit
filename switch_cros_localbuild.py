@@ -187,14 +187,21 @@ def build(opts, do_mark_as_stable=True):
   image_path = os.path.join(image_folder, cros_util.test_image_filename)
 
   # If the given version is already built, reuse it.
-  if not os.path.exists(os.path.join(chromeos_root, image_path)):
+  chromeos_root_image_folder = os.path.join(chromeos_root, image_folder)
+  chromeos_root_image_path = os.path.join(chromeos_root, image_path)
+  if not os.path.exists(chromeos_root_image_path):
     _build_packages(opts)
     built_image_folder = cros_util.build_image(chromeos_root, opts.board)
     image_name = os.path.basename(
         os.path.join(chromeos_root, built_image_folder))
-    os.symlink(image_name, os.path.join(chromeos_root, image_folder))
+    os.makedirs(os.path.dirname(chromeos_root_image_folder), exist_ok=True)
+    if os.path.exists(chromeos_root_image_folder):
+      os.unlink(chromeos_root_image_folder)
+    # Create a relative symlink, so the condition actually only comes in here if
+    # the image folder is actually missing.
+    os.symlink(os.path.join('../../..', built_image_folder),
+               chromeos_root_image_folder)
 
-  assert os.path.exists(os.path.join(chromeos_root, image_path))
   return image_path
 
 
