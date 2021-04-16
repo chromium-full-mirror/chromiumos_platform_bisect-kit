@@ -425,7 +425,7 @@ def reboot(host, force_reboot_callback=None):
   Args:
     host: DUT address
     force_reboot_callback: powerful reboot hook (via servo). This will be
-        invoked if normal reboot failed.
+      invoked if normal reboot failed.
   """
   logger.debug('reboot %s', host)
   boot_id = None
@@ -472,7 +472,7 @@ def gsutil(*args, **kwargs):
     args: command line arguments passed to gsutil
     kwargs:
       ignore_errors: if true, return '' for failures, for example 'gsutil ls'
-          but the path not found.
+        but the path not found.
 
   Returns:
     stdout of gsutil
@@ -509,8 +509,8 @@ def gsutil_ls(*args, **kwargs):
   Args:
     args: arguments passed to 'gsutil ls'
     kwargs: extra parameters, where
-      ignore_errors: if true, return empty list instead of raising
-          exception, ex. path not found.
+      ignore_errors: if true, return empty list instead of raising exception,
+        ex. path not found.
 
   Returns:
     list of 'gsutil ls' result. One element for one line of gsutil output.
@@ -1098,8 +1098,8 @@ def cros_flash(chromeos_root,
     image_info: ImageInfo object
     version: ChromeOS version in short or full format
     clobber_stateful: Clobber stateful partition when performing update
-    disable_rootfs_verification: Disable rootfs verification after update
-        is completed
+    disable_rootfs_verification: Disable rootfs verification after update is
+      completed
     force_reboot_callback: powerful reboot hook (via servo)
 
   Returns:
@@ -1493,6 +1493,15 @@ def prepare_chroot(chromeos_root):
       os.path.join(common.BISECT_KIT_ROOT, 'cros_template_files', 'at_home'),
       os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER']))
 
+  # Copy ssh keys into chromeos root.
+  for name in ['testing_rsa', 'testing_rsa.pub']:
+    path = os.path.join(chromeos_root, 'src', 'scripts', 'mod_for_test_scripts',
+                        'ssh_keys', name)
+    shutil.copy(
+        path,
+        os.path.join(chromeos_root, 'chroot', 'home', os.environ('USER'),
+                     '.ssh'))
+
 
 def check_if_need_recreate_chroot(stdout, stderr):
   """Analyze build log and determine if chroot should be recreated.
@@ -1550,10 +1559,10 @@ def build_packages(chromeos_root,
   Args:
     chromeos_root: chromeos tree root
     board: ChromeOS board name
-    chrome_root: Chrome tree root. If specified, build chrome using the
-        provided tree
+    chrome_root: Chrome tree root. If specified, build chrome using the provided
+      tree
     goma_dir: Goma installed directory to mount into the chroot. If specified,
-        build chrome with goma.
+      build chrome with goma.
     afdo_use: build chrome with AFDO optimization
   """
 
@@ -1673,7 +1682,9 @@ def build_image(chromeos_root, board):
   return image_folder
 
 
-def workaround_b183567529(host, board, version=None,
+def workaround_b183567529(host,
+                          board,
+                          version=None,
                           force_reboot_callback=None):
   """Workaround for volteer failure.
 
@@ -1715,7 +1726,7 @@ class AutotestControlInfo:
     name: test name
     path: control file path
     variables: dict of top-level control variables. Sample keys: NAME, AUTHOR,
-        DOC, ATTRIBUTES, DEPENDENCIES, etc.
+      DOC, ATTRIBUTES, DEPENDENCIES, etc.
   """
 
   def __init__(self, path, variables):
@@ -2347,3 +2358,62 @@ class ChromeOSSpecManager(codechange.SpecManager):
     # build steps (inside mark_as_stable) executes "git describe" which
     # needs git tag information.
     repo_util.sync(self.config['chromeos_root'])
+
+
+def repair_dut(chromeos_root, dut):
+  """Repairs the DUT based off the host-info files.
+
+  Currently, the host-info file stores are under the stores folders.
+  Only jetstream support exists at this time.
+
+  The host-info files can be fetched from AdminRepair tasks from stainless to
+  make this a generic solution for all CrOS devices.
+
+  Args:
+    chromeos_root: the chromeos tree
+    dut: the CrOS DUT to repair
+
+  Returns:
+    True on success, False otherwise
+  """
+  host_info_subdir = 'stores'
+  repair_cmd = [
+      os.path.join(chromeos_root_inside_chroot, in_tree_autotest_dir,
+                   'server/autoserv'), '-s', '--host-info-subdir',
+      host_info_subdir, '-m', dut, '--lab', 'True', '--local-only-host-info',
+      'True', '-R', '-r', 'results', '-p'
+  ]
+
+  # Reuse results if it exists.
+  autoserv_results = os.path.join(chromeos_root, 'src', 'scripts', 'results')
+  if os.path.exists(autoserv_results):
+    repair_cmd.append('--use-existing-results')
+
+  # Copy the stores.
+  autoserv_results_stores = os.path.join(autoserv_results, host_info_subdir)
+  if os.path.exists(autoserv_results_stores):
+    shutil.rmtree(autoserv_results_stores)
+  shutil.copytree(
+      'autoserv-stores',
+      autoserv_results_stores,
+      symlinks=True,
+      dirs_exist_ok=True)
+
+  # The USB in the servo might have flaked or SSH connections.
+  try:
+    retries = 0
+    while True:
+      # Repair the DUT.
+      cros_sdk(chromeos_root, *repair_cmd)
+      logger.info('Repair successful')
+      return True
+  except subprocess.CalledProcessError:
+    retries += 1
+    if retries == 3:
+      logger.info('Repair failed')
+      return False
+    logger.info('Retrying repair')
+  finally:
+    # Cleanup the stores.
+    if os.path.exists(autoserv_results_stores):
+      shutil.rmtree(autoserv_results_stores)

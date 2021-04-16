@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Copyright 2021 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Eval for ChromeOS localbuild to handle bad images"""
+
+from __future__ import print_function
+import logging
+import sys
+
+import switch_cros_localbuild
+from bisect_kit import cli
+from bisect_kit import common
+from bisect_kit import cros_util
+
+logger = logging.getLogger(__name__)
+
+OLD = 'old'
+NEW = 'new'
+FATAL = 'fatal'
+
+EXIT_CODE_MAP = {
+    OLD: cli.EXIT_CODE_OLD,
+    NEW: cli.EXIT_CODE_NEW,
+    FATAL: cli.EXIT_CODE_FATAL,
+}
+
+
+def evaluate(opts):
+  switch_cros_localbuild.inner_main(opts)
+
+  if not cros_util.is_good_dut(opts.dut):
+    return NEW
+
+  # Need to check if the DUT actually flashed with requested version.
+  short_version = opts.rev
+  if not cros_util.is_cros_short_version(opts.rev):
+    _, short_version = cros_util.version_split(opts.rev)
+  if cros_util.query_dut_short_version(opts.dut) != short_version:
+    return NEW
+
+  return OLD
+
+
+@cli.fatal_error_handler
+def main(args=None):
+  common.init()
+  opts = switch_cros_localbuild.parse_args(args)
+  common.config_logging(opts)
+
+  try:
+    logger.info('Starting evaluate')
+    returncode = evaluate(opts)
+    # TODO(kimjae/kcwu): Add fail to pass, not urgent.
+  except Exception:
+    logger.exception('evaluate failed')
+    returncode = FATAL
+
+  # Whether success or not, DUT must be returned in a good state.
+  if not cros_util.is_good_dut(opts.dut):
+    logger.fatal('%r is not a good DUT, going to repair', opts.dut)
+    if not cros_util.repair_dut(opts.chromeos_root, opts.dut):
+      returncode = FATAL
+
+  logger.info('done with evaluate')
+  sys.exit(EXIT_CODE_MAP[returncode])
+
+
+if __name__ == '__main__':
+  main()

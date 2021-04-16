@@ -1,0 +1,45 @@
+{
+    "attributes": {
+        "HWID": "MISTRAL C2B-A2B-A3M-I4Y",
+        "serial_number": "98160EXANZZ52C",
+        "servo_fw_channel": "STABLE",
+        "servo_host": "jetstream-b946-cq-labstation.mtv.corp.google.com",
+        "servo_port": "9992",
+        "servo_serial": "C1804021315",
+        "servo_setup": "REGULAR",
+        "servo_type": "servo_v4_with_servo_micro"
+    },
+    "labels": [
+        "os:jetstream",
+        "cr50:prepvt",
+        "cr50-ro-keyid:0xaa66150f",
+        "cr50-ro-keyid:prod",
+        "phase:DVT",
+        "servo_type:servo_v4_with_servo_micro",
+        "rpm_state:MISSING_CONFIG",
+        "pool:quota",
+        "servo",
+        "servo_state:WORKING",
+        "board:mistral",
+        "hwid_component:wireless/wireless_dff9834a",
+        "wifi_chip:wireless_dff9834a",
+        "model:mistral",
+        "arc",
+        "platform:mistral",
+        "hwid_component:dram/K4B4G1646E-BYMA_512mb_1",
+        "sku:mistral_ARMv8_1GB",
+        "cros-version:mistral-release/R89-13729.57.4",
+        "variant:",
+        "hwid_component:storage/004GA0",
+        "hwid_component:dram/K4B4G1646E-BYMA_512mb_0",
+        "servo_usb_state:NORMAL",
+        "servo_topology:eyJtYWluIjp7InVzYl9odWJfcG9ydCI6IjEuMi40LjMuMSIsInNlcmlhbCI6IkMxODA0MDIxMzE1IiwidHlwZSI6InNlcnZvX3Y0Iiwic3lzZnNfcHJvZHVjdCI6IlNlcnZvIFY0In0sImNoaWxkcmVuIjpbeyJ1c2JfaHViX3BvcnQiOiIxLjIuNC4zLjMiLCJzZXJpYWwiOiJDTU82NTMtMDAxNjYtMDQwNDg5SjAyNzYwIiwidHlwZSI6InNlcnZvX21pY3JvIiwic3lzZnNfcHJvZHVjdCI6IlNlcnZvIE1pY3JvIn1dfQ=="
+    ],
+    "serializer_version": 1,
+    "stable_versions": {
+        "cros": "R89-13729.57.4",
+        "faft": "",
+        "firmware": "Google_Mistral.12422.59.0",
+        "servo-cros": "R90-13816.19.0"
+    }
+}

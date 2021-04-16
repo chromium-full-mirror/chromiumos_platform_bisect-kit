@@ -83,17 +83,16 @@ def switch(opts):
   return 1
 
 
-@cli.fatal_error_handler
-def main(args=None):
-  common.init()
+def parse_args(args):
   parser = create_argument_parser()
-  opts = parser.parse_args(args)
-  common.config_logging(opts)
+  return parser.parse_args(args)
 
+
+def inner_main(opts):
   if not cros_util.is_good_dut(opts.dut):
     logger.error('%r is not a good DUT', opts.dut)
     if not cros_lab_util.repair(opts.dut):
-      sys.exit(cli.EXIT_CODE_FATAL)
+      return cli.EXIT_CODE_FATAL
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 
@@ -111,7 +110,15 @@ def main(args=None):
     logger.fatal('%r is not a good DUT', opts.dut)
     returncode = cli.EXIT_CODE_FATAL
   logger.info('done')
-  sys.exit(returncode)
+  return returncode
+
+
+@cli.fatal_error_handler
+def main(args=None):
+  common.init()
+  opts = parse_args(args)
+  common.config_logging(opts)
+  sys.exit(inner_main(opts))
 
 
 if __name__ == '__main__':

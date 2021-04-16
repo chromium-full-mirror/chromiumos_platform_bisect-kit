@@ -42,6 +42,12 @@ def add_build_and_deploy_arguments(parser_group):
       dest='disable_rootfs_verification',
       action='store_false',
       help="Don't disable rootfs verification after update is completed")
+  parser_group.add_argument(
+      '--no-mark-as-stable',
+      '--no_mark_as_stable',
+      dest='mark_as_stable',
+      action='store_false',
+      help="Don't mark repo stable")
 
 
 def create_argument_parser():
@@ -199,20 +205,21 @@ def build(opts, do_mark_as_stable=True):
       os.unlink(chromeos_root_image_folder)
     # Create a relative symlink, so the condition actually only comes in here if
     # the image folder is actually missing.
-    os.symlink(os.path.join('../../..', built_image_folder),
-               chromeos_root_image_folder)
+    os.symlink(
+        os.path.join('../../..', built_image_folder),
+        chromeos_root_image_folder)
 
   return image_path
 
 
-def build_and_deploy(opts, do_mark_as_stable=True):
+def build_and_deploy(opts):
   try:
-    image_path = build(opts, do_mark_as_stable=do_mark_as_stable)
+    image_path = build(opts, do_mark_as_stable=opts.mark_as_stable)
   except cros_util.NeedRecreateChrootException as e:
     logger.warning('recreate chroot and retry again, reason: %s', e)
     util.check_output(
         'chromite/bin/cros_sdk', '--delete', cwd=opts.chromeos_root)
-    image_path = build(opts, do_mark_as_stable=do_mark_as_stable)
+    image_path = build(opts, do_mark_as_stable=opts.mark_as_stable)
 
   if opts.noimage or opts.nodeploy:
     return 0
@@ -254,13 +261,12 @@ def switch(opts):
   return build_and_deploy(opts)
 
 
-@cli.fatal_error_handler
-def main(args=None):
-  common.init()
+def parse_args(args):
   parser = create_argument_parser()
-  opts = parser.parse_args(args)
-  common.config_logging(opts)
+  return parser.parse_args(args)
 
+
+def inner_main(opts):
   # --nobuild imply --nodeploy
   if opts.nobuild:
     opts.nodeploy = True
@@ -279,7 +285,7 @@ def main(args=None):
     if not cros_util.is_good_dut(opts.dut):
       logger.fatal('%r is not a good DUT', opts.dut)
       if not cros_lab_util.repair(opts.dut):
-        sys.exit(cli.EXIT_CODE_FATAL)
+        return cli.EXIT_CODE_FATAL
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 
@@ -301,7 +307,15 @@ def main(args=None):
       logger.fatal('%r is not a good DUT', opts.dut)
       returncode = cli.EXIT_CODE_FATAL
   logger.info('done')
-  sys.exit(returncode)
+  return returncode
+
+
+@cli.fatal_error_handler
+def main(args=None):
+  common.init()
+  opts = parse_args(args)
+  common.config_logging(opts)
+  sys.exit(inner_main(opts))
 
 
 if __name__ == '__main__':
