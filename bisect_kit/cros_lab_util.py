@@ -788,6 +788,7 @@ def reboot_via_servo(dut):
     logger.debug('this DUT has no servo?')
     return False
 
+  servo_port = str(servo_port)
   try:
     util.ssh_cmd(servo_host, 'start', 'servod', 'PORT=' + servo_port)
   except subprocess.CalledProcessError:
