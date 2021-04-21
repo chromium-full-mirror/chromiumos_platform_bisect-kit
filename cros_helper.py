@@ -113,10 +113,13 @@ def select_available_bots_randomly(dimensions,
   return random.sample(bots, min(num, len(bots)))
 
 
-def filter_dimensions_by_board(boards_with_prebuilt, dimensions):
-  result = []
+def filter_dimensions_by_board(boards_with_prebuilt, dimensions, pool):
+  result = set()
   for dimension in dimensions:
-    bots = cros_lab_util.swarming_bots_list([dimension], is_busy=None, limit=1)
+    constraints = [dimension]
+    if pool:
+      constraints.append('label-pool:' + pool)
+    bots = cros_lab_util.swarming_bots_list(constraints, is_busy=None, limit=1)
     if not bots:
       continue
     board = bots[0]['dimensions']['label-board'][0]
@@ -125,8 +128,8 @@ def filter_dimensions_by_board(boards_with_prebuilt, dimensions):
           'dimension=%s (board=%s) does not have corresponding '
           'prebuilt image, ignore', dimension, board)
       continue
-    result.append(dimension)
-  return result
+    result.add(dimension)
+  return list(result)
 
 
 def is_acceptable_bot(boards_with_prebuilt, bot):
@@ -216,7 +219,10 @@ def do_allocate_dut(opts):
 
   t0 = time.time()
   dimensions = ['dut_state:ready']
-  if not opts.dut_name:
+  if opts.dut_name:
+    # If dut_name is specified, pool is ignored.
+    opts.pool = None
+  else:
     dimensions.append('label-pool:' + opts.pool)
 
   variants = []
@@ -271,7 +277,8 @@ def do_allocate_dut(opts):
       raise errors.ArgumentError(
           '--version_hint',
           'given builders have no prebuilt for %s' % opts.version_hint)
-    variants = filter_dimensions_by_board(boards_with_prebuilt, variants)
+    variants = filter_dimensions_by_board(boards_with_prebuilt, variants,
+                                          opts.pool)
     if not variants:
       raise errors.NoDutAvailable(
           'Devices with specified constraints have no prebuilt. '
