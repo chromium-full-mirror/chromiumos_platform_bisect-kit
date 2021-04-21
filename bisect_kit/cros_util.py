@@ -1499,7 +1499,7 @@ def prepare_chroot(chromeos_root):
                         'ssh_keys', name)
     shutil.copy(
         path,
-        os.path.join(chromeos_root, 'chroot', 'home', os.environ('USER'),
+        os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER'],
                      '.ssh'))
 
 
