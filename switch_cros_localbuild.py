@@ -198,8 +198,6 @@ def build(opts, do_mark_as_stable=True):
   if not os.path.exists(chromeos_root_image_path):
     _build_packages(opts)
     built_image_folder = cros_util.build_image(chromeos_root, opts.board)
-    image_name = os.path.basename(
-        os.path.join(chromeos_root, built_image_folder))
     os.makedirs(os.path.dirname(chromeos_root_image_folder), exist_ok=True)
     if os.path.exists(chromeos_root_image_folder):
       os.unlink(chromeos_root_image_folder)

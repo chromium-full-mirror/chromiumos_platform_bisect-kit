@@ -916,13 +916,18 @@ def prepare_image_for_quick_provision(image_info):
 
 
 def _cache_path_for_download(chromeos_root, url):
-  cache_folder = os.path.join(chromeos_root, cached_images_dir)
-  os.makedirs(cache_folder, exist_ok=True)
+  os.makedirs(os.path.join(chromeos_root, cached_images_dir), exist_ok=True)
   name = urllib.parse.quote(url, safe='')
-  return os.path.join(cache_folder, name)
+  return os.path.join(cached_images_dir, name)
 
 
 def prepare_image_for_cros_flash(chromeos_root, image_info):
+  """Prepares image path for 'cros flash'.
+
+  Returns:
+    path recognized by 'cros flash'. Local disk path will be relative to
+    chromeos_root.
+  """
   path = image_info.get(ImageType.DISK_IMAGE)
   if path:
     # local path
@@ -938,25 +943,26 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
     # 'cros flash' doesn't support other gs bucket, download to local.
     if path.startswith('gs://'):
       cache_path = _cache_path_for_download(chromeos_root, path)
-      if os.path.exists(cache_path):
+      cache_path_full = os.path.join(chromeos_root, cache_path)
+      if os.path.exists(cache_path_full):
         return cache_path
-      gsutil('cp', path, cache_path)
+      gsutil('cp', path, cache_path_full)
       return cache_path
 
   path = image_info.get(ImageType.PARTITION_IMAGE)
   if path and path.startswith(gs_archive_base):
     # newer 'cros flash' support partition images
-    # TODO(kcwu): update the commit hash after new flash is enabled
     if git_util.is_ancestor_commit(
-        os.path.join(chromeos_root, 'chromite'), '153f91684a9a59', 'HEAD'):
+        os.path.join(chromeos_root, 'chromite'), '191e7333cbeb7b', 'HEAD'):
       return path
 
   path = image_info.get(ImageType.ZIP_FILE)
   if path:
-    cached_image_full_path = _cache_path_for_download(
-        chromeos_root, path + '.' + test_image_filename)
-    if os.path.exists(cached_image_full_path):
-      return cached_image_full_path
+    cache_path = _cache_path_for_download(chromeos_root,
+                                          path + '.' + test_image_filename)
+    cache_path_full = os.path.join(chromeos_root, cache_path)
+    if os.path.exists(cache_path_full):
+      return cache_path_full
 
     tmp_dir = tempfile.mkdtemp()
     try:
@@ -965,12 +971,11 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
         path = os.path.join(tmp_dir, os.path.basename(path))
         assert os.path.exists(path)
       util.check_call('unzip', '-j', path, test_image_filename, cwd=tmp_dir)
-      shutil.move(
-          os.path.join(tmp_dir, test_image_filename), cached_image_full_path)
+      shutil.move(os.path.join(tmp_dir, test_image_filename), cache_path_full)
     finally:
       shutil.rmtree(tmp_dir)
 
-    return cached_image_full_path
+    return cache_path
 
   return None
 
@@ -1154,11 +1159,6 @@ def cros_flash(chromeos_root,
     args.append('--clobber-stateful')
   if disable_rootfs_verification:
     args.append('--disable-rootfs-verification')
-
-  # TODO(kcwu): remove this flag once the new flash code enabled by default
-  if git_util.is_ancestor_commit(
-      os.path.join(chromeos_root, 'chromite'), '153f91684a9a59', 'HEAD'):
-    args.append('--exp-new-flash')
 
   try:
     cros_sdk(chromeos_root, 'cros', 'flash', *args)
