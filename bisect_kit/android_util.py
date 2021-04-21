@@ -310,7 +310,8 @@ class AndroidInternalApi:
         'androidbuildinternal',
         'v3',
         credentials=self.credentials,
-        cache_discovery=False)
+        cache_discovery=False,
+        static_discovery=False)
 
   def get_credentials(self):
     # TODO(zjchang): support compute engine type credential
