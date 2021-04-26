@@ -25,9 +25,6 @@ logger = logging.getLogger(__name__)
 
 models_to_avoid = {
     # model: reason
-    'kasumi': 'b/160458394 stateful partition is too small',
-    'mimrock': 'b/160458394 stateful partition is too small',
-    'vorticon': 'b/160458394 stateful partition is too small',
 }
 
 
