@@ -92,6 +92,8 @@ def subvolume_or_makedirs(opts, path):
 
 
 def is_btrfs_subvolume(path):
+  if os.path.islink(path):
+    return False
   if util.check_output('stat', '-f', '--format=%T', path).strip() != 'btrfs':
     return False
   return util.check_output('stat', '--format=%i', path).strip() == '256'
