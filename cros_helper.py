@@ -80,7 +80,8 @@ def cmd_release_dut(opts):
   logger.info('%s released', host)
 
 
-def verify_dimensions_by_lab(dimensions):
+def verify_dimensions_by_lab(dimensions, tolerate_unknown=False):
+  dimensions = sorted(set(dimensions))
   result = []
   bots_dimensions = cros_lab_util.swarming_bots_dimensions()
   for dimension in dimensions:
@@ -88,8 +89,12 @@ def verify_dimensions_by_lab(dimensions):
     if value in bots_dimensions.get(key, []):
       result.append(dimension)
     else:
-      logger.warning('dimension=%s is unknown in the lab, typo? ignored',
-                     dimension)
+      if tolerate_unknown:
+        logger.warning('dimension=%s is unknown in the lab, typo? ignored',
+                       dimension)
+      else:
+        raise Exception('dimension=%s is unknown in the lab, typo? ignored' %
+                        dimension)
   return result
 
 
@@ -221,6 +226,9 @@ def do_allocate_dut(opts):
     opts.pool = None
   else:
     dimensions.append('label-pool:' + opts.pool)
+  for key, value in opts.dimensions:
+    dimensions.append('%s:%s' % (key, value))
+  dimensions = verify_dimensions_by_lab(dimensions)
 
   variants = []
   if opts.board:
@@ -244,8 +252,7 @@ def do_allocate_dut(opts):
     for dut_name in opts.dut_name.split(','):
       variants.append('dut_name:' + dut_name)
 
-  variants = verify_dimensions_by_lab(variants)
-  variants = sorted(set(variants))  # dedup
+  variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
   if not variants:
     raise errors.NoDutAvailable(
         'Invalid constraints: %s;%s;%s;%s' %
@@ -353,6 +360,13 @@ def cmd_repair_dut(opts):
   cros_lab_util.repair(opts.dut)
 
 
+def parse_dimension(s):
+  splitted = s.split('=')
+  if len(splitted) != 2:
+    raise argparse.ArgumentTypeError('Invalid dimension: %s' % s)
+  return splitted
+
+
 @cli.fatal_error_handler
 def main():
   common.init()
@@ -433,6 +447,11 @@ def main():
       '--pool',
       help='Pool to search DUT (default: %(default)s)',
       default=DEFAULT_DUT_POOL)
+  parser_allocate_dut.add_argument(
+      '--dimensions',
+      help='Dimension filters used for searching DUTs, in format key1=val1 key2=val2 ...',
+      type=parse_dimension,
+      nargs='+')
   group = parser_allocate_dut.add_mutually_exclusive_group(required=True)
   group.add_argument('--board', help='allocation criteria; comma separated')
   group.add_argument('--model', help='allocation criteria; comma separated')
