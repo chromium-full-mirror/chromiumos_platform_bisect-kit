@@ -2081,19 +2081,19 @@ class ChromeOSSpecManager(codechange.SpecManager):
 
   def _determine_float_branch(self, old, new, fixed_specs):
     # There is no revision tag in snapshot's xml. We know snapshot
-    # builds are on master branch.
-    master_refname = 'refs/remotes/origin/master'
+    # builds are on main branch.
+    main_refname = 'refs/remotes/origin/main'
     if fixed_specs[0].revision:
       old_branches = git_util.get_branches(
           self.manifest_dir, commit=fixed_specs[0].revision, remote=True)
     else:
-      old_branches = [master_refname]
+      old_branches = [main_refname]
 
     if fixed_specs[-1].revision:
       new_branches = git_util.get_branches(
           self.manifest_dir, commit=fixed_specs[-1].revision, remote=True)
     else:
-      new_branches = [master_refname]
+      new_branches = [main_refname]
 
     common_branches = list(set(old_branches) & set(new_branches))
     assert common_branches, '%s and %s are not on common branches?' % (old, new)
