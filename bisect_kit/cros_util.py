@@ -1682,9 +1682,7 @@ def build_image(chromeos_root, board):
   return image_folder
 
 
-def workaround_b183567529(host,
-                          board,
-                          version=None,
+def workaround_b183567529(host, board, version=None,
                           force_reboot_callback=None):
   """Workaround for volteer failure.
 
