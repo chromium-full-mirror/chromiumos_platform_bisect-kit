@@ -451,7 +451,8 @@ def main():
       '--dimensions',
       help='Dimension filters used for searching DUTs, in format key1=val1 key2=val2 ...',
       type=parse_dimension,
-      nargs='+')
+      nargs='+',
+      default=[])
   group = parser_allocate_dut.add_mutually_exclusive_group(required=True)
   group.add_argument('--board', help='allocation criteria; comma separated')
   group.add_argument('--model', help='allocation criteria; comma separated')
