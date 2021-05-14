@@ -2142,7 +2142,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
     # file, the branch with "smallest" number guarantees where the release is.
 
     def branch_key(s):
-      if s == master_refname:
+      if s == main_refname:
         return 0, 0, 0
       m = re.search(r'-(\d+)\.B$', s)
       if m:
