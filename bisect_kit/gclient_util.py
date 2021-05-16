@@ -5,6 +5,7 @@
 """Gclient utility."""
 
 from __future__ import print_function
+import ast
 import collections
 import itertools
 import logging
@@ -231,6 +232,104 @@ def _detect_host_os():
   return _PLATFORM_MAPPING[sys.platform]
 
 
+def evaluate_condition(condition, variables, referenced_variables=None):
+  """Evaluate condition in gclient DEPS.
+
+  This function is copied from gclient_eval.py EvalulateCondition().
+
+  Returns:
+    evaluate result
+  """
+  if not referenced_variables:
+    referenced_variables = set()
+  _allowed_names = {'None': None, 'True': True, 'False': False}
+  main_node = ast.parse(condition, mode='eval')
+  if isinstance(main_node, ast.Expression):
+    main_node = main_node.body
+
+  def _convert(node, allow_tuple=False):
+    if isinstance(node, ast.Str):
+      return node.s
+    elif isinstance(node, ast.Tuple) and allow_tuple:
+      return tuple(map(_convert, node.elts))
+    elif isinstance(node, ast.Name):
+      if node.id in referenced_variables:
+        raise ValueError('invalid cyclic reference to %r (inside %r)' %
+                         (node.id, condition))
+      elif node.id in _allowed_names:
+        return _allowed_names[node.id]
+      elif node.id in variables:
+        value = variables[node.id]
+
+        # Allow using "native" types, without wrapping everything in strings.
+        # Note that schema constraints still apply to variables.
+        if not isinstance(value, str):
+          return value
+
+        # Recursively evaluate the variable reference.
+        return evaluate_condition(variables[node.id], variables,
+                                  referenced_variables.union([node.id]))
+      else:
+        # Implicitly convert unrecognized names to strings.
+        # If we want to change this, we'll need to explicitly distinguish
+        # between arguments for GN to be passed verbatim, and ones to
+        # be evaluated.
+        return node.id
+    elif not sys.version_info[:2] < (3, 4) and isinstance(
+        node, ast.NameConstant):  # Since Python 3.4
+      return node.value
+    elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
+      bool_values = []
+      for value in node.values:
+        bool_values.append(_convert(value))
+        if not isinstance(bool_values[-1], bool):
+          raise ValueError('invalid "or" operand %r (inside %r)' %
+                           (bool_values[-1], condition))
+      return any(bool_values)
+    elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.And):
+      bool_values = []
+      for value in node.values:
+        bool_values.append(_convert(value))
+        if not isinstance(bool_values[-1], bool):
+          raise ValueError('invalid "and" operand %r (inside %r)' %
+                           (bool_values[-1], condition))
+      return all(bool_values)
+    elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+      value = _convert(node.operand)
+      if not isinstance(value, bool):
+        raise ValueError('invalid "not" operand %r (inside %r)' %
+                         (value, condition))
+      return not value
+    elif isinstance(node, ast.Compare):
+      if len(node.ops) != 1:
+        raise ValueError(
+            'invalid compare: exactly 1 operator required (inside %r)' %
+            (condition))
+      if len(node.comparators) != 1:
+        raise ValueError(
+            'invalid compare: exactly 1 comparator required (inside %r)' %
+            (condition))
+
+      left = _convert(node.left)
+      right = _convert(
+          node.comparators[0], allow_tuple=isinstance(node.ops[0], ast.In))
+
+      if isinstance(node.ops[0], ast.Eq):
+        return left == right
+      if isinstance(node.ops[0], ast.NotEq):
+        return left != right
+      if isinstance(node.ops[0], ast.In):
+        return left in right
+
+      raise ValueError('unexpected operator: %s %s (inside %r)' %
+                       (node.ops[0], ast.dump(node), condition))
+    else:
+      raise ValueError('unexpected AST node: %s %s (inside %r)' %
+                       (node, ast.dump(node), condition))
+
+  return _convert(main_node)
+
+
 class Dep:
   """Represent one entry of DEPS's deps.
 
@@ -338,14 +437,7 @@ class Dep:
     }
     vars_dict.update(self.variables)
 
-    # Work around b/182219439
-    # TODO(kcwu): mimic gclient's behavior, which convert undefined variables
-    # to strings
-    if 'use_rts' not in vars_dict:
-      vars_dict['use_rts'] = True
-
-    # pylint: disable=eval-used
-    return eval(self.condition, vars_dict)
+    return evaluate_condition(self.condition, vars_dict)
 
   def to_lines(self):
     s = []

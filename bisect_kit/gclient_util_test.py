@@ -148,6 +148,77 @@ class TestDepsParser(unittest.TestCase):
         parser.load_single_deps(expected))
 
 
+class TestDep(unittest.TestCase):
+
+  def test_simple(self):
+    url = 'http://example.com@12345'
+    dep = gclient_util.Dep('src', {}, url)
+    self.assertTrue(dep == dep)
+    self.assertEqual(dep.url, url)
+    self.assertEqual(dep.parse_url(), ('http://example.com', '12345'))
+    # True by default.
+    self.assertTrue(dep.eval_condition())
+
+    dep = gclient_util.Dep('src', {}, {'url': url})
+    self.assertTrue(dep.eval_condition())
+
+  def test_variable(self):
+    url = 'http://example.com@{var1}'
+    dep = gclient_util.Dep('src', {'var1': 'foobar'}, url)
+    self.assertEqual(dep.url, 'http://example.com@foobar')
+
+  def test_eval_condition(self):
+    url = 'http://example.com@12345'
+    dep = gclient_util.Dep('src', {}, {'url': url, 'condition': 'True'})
+    self.assertTrue(dep.eval_condition())
+    dep = gclient_util.Dep('src', {}, {'url': url, 'condition': 'False'})
+    self.assertFalse(dep.eval_condition())
+
+    # variable
+    dep = gclient_util.Dep('src', {'var1': True}, {
+        'url': url,
+        'condition': 'var1'
+    })
+    self.assertTrue(dep.eval_condition())
+    dep = gclient_util.Dep('src', {'var1': False}, {
+        'url': url,
+        'condition': 'var1'
+    })
+    self.assertFalse(dep.eval_condition())
+
+    # simple expression
+    dep = gclient_util.Dep('src', {'var1': 'abc'}, {
+        'url': url,
+        'condition': 'var1 == "abc"'
+    })
+    self.assertTrue(dep.eval_condition())
+
+    dep = gclient_util.Dep('src', {
+        'var1': 'a or b',
+        'a': False,
+        'b': False
+    }, {
+        'url': url,
+        'condition': 'var1'
+    })
+    self.assertFalse(dep.eval_condition())
+
+    dep = gclient_util.Dep('src', {
+        'var1': 'abc',
+        'abc': 'foo'
+    }, {
+        'url': url,
+        'condition': 'var1 == "foo"'
+    })
+    self.assertTrue(dep.eval_condition())
+
+    dep = gclient_util.Dep('src', {'var1': 'abc'}, {
+        'url': url,
+        'condition': 'var1 == "abc"'
+    })
+    self.assertTrue(dep.eval_condition())
+
+
 # TODO(kcwu): refactor into normal unittest.
 class TestBug123161903(unittest.TestCase):
   """Reproduce b/123161903.
