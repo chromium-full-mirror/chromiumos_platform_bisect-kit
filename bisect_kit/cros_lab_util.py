@@ -391,7 +391,7 @@ async def async_lease(dut_name, reason, duration=None):
     if proc.returncode != 0:
       logger.warning('lease(%s): skylab command failed: %s', dut_name,
                      proc.returncode)
-      raise errors.InternalError('skylab command failed unexpectedly: %s' %
+      raise errors.ExternalError('skylab command failed unexpectedly: %s' %
                                  proc.returncode)
     if not pending_lease:
       raise errors.InternalError(
@@ -439,6 +439,21 @@ async def async_lease(dut_name, reason, duration=None):
         pass
     if pending_lease:
       cancel_pending_lease(pending_lease)
+
+
+async def async_lease_with_retry(dut_name, reason, duration=None):
+  tries = 0
+  while True:
+    try:
+      tries += 1
+      return await async_lease(dut_name, reason, duration)
+    except errors.ExternalError:
+      if tries < 3:
+        delay = 60
+        logger.warning('async_lease failed, will retry %d seconds later', delay)
+        time.sleep(delay)
+        continue
+      raise
 
 
 def make_lease_reason(session):

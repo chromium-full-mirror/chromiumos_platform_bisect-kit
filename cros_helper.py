@@ -163,7 +163,8 @@ async def lease_dut_parallelly(duration, bots, reason, timeout=None):
     hosts.append(host)
     tasks.append(
         asyncio.create_task(
-            cros_lab_util.async_lease(host, reason, duration=duration)))
+            cros_lab_util.async_lease_with_retry(
+                host, reason, duration=duration)))
 
   try:
     logger.info('trying to lease %d DUTs: %s', len(hosts), hosts)
