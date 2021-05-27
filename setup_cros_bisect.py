@@ -200,7 +200,7 @@ def setup_chromeos_repos(opts, path_factory):
   with locking.lock_file(
       os.path.join(chromeos_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
     logger.info('repo sync for chromeos mirror (this takes hours; be patient)')
-    repo_util.sync(chromeos_mirror)
+    repo_util.sync(chromeos_mirror, current_branch=False)
 
   logger.info('repo sync for chromeos tree')
   repo_util.sync(chromeos_tree)
@@ -269,20 +269,14 @@ def sync_chromeos_code(opts, path_factory):
 
   logger.info('repo sync for chromeos mirror')
   delete_extra_manifest(chromeos_mirror)
-  repo_util.sync(chromeos_mirror)
+  # current_branch=False to ignore "sync-c=true" in the manifest file.
+  repo_util.sync(chromeos_mirror, current_branch=False)
   # If there are repos deleted after last sync, generate custom manifest and
   # sync again for those repos. So we can mirror commits just before the repo
   # deletion.
   if generate_extra_manifest_for_deleted_repo(chromeos_mirror) != 0:
     logger.info('repo sync again')
-    repo_util.sync(chromeos_mirror)
-
-  # Work around for b/149883148: 'repo' tool does not fetch all branches in
-  # mirror mode.
-  chromiumos_overlay_mirror = os.path.join(
-      chromeos_mirror, 'chromiumos/overlays/chromiumos-overlay.git')
-  git_util.fetch(chromiumos_overlay_mirror, 'cros')
-
+    repo_util.sync(chromeos_mirror, current_branch=False)
   write_sync_time(chromeos_mirror, start_sync_time)
 
   logger.info('repo sync for chromeos tree')

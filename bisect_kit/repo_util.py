@@ -148,14 +148,15 @@ def cleanup_repo_generated_files(repo_dir, manifest_name='default.xml'):
     os.unlink(dest_path)
 
 
-def sync(repo_dir, jobs=16, manifest_name=None, current_branch=False):
+def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
   """Repo sync.
 
   Args:
     repo_dir: root directory of repo
     jobs: projects to fetch simultaneously
     manifest_name: filename of manifest
-    current_branch: fetch only current branch
+    current_branch: fetch only current branch if True; None means following
+        repo's default behavior
   """
   # Workaround to prevent garbage files left between repo syncs
   # (http://crbug.com/881783).
@@ -166,8 +167,8 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=False):
     cmd += ['-j', str(jobs)]
   if manifest_name:
     cmd += ['--manifest-name', manifest_name]
-  if current_branch:
-    cmd += ['--current-branch']
+  if current_branch is not None:
+    cmd += ['--current-branch' if current_branch else "--no-current-branch"]
   util.check_call(*cmd, cwd=repo_dir, env=_get_repo_sync_env())
 
 
