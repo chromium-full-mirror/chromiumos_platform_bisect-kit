@@ -102,6 +102,10 @@ def init(git_repo, initial_branch='main'):
       'git', 'init', '-q', '--initial-branch', initial_branch, cwd=git_repo)
 
 
+def pull(git_repo):
+  util.check_call('git', 'pull', cwd=git_repo)
+
+
 def commit_file(git_repo,
                 path,
                 message,
@@ -935,6 +939,15 @@ def get_branches(git_repo, all_branches=True, commit=None, remote=False):
 
   result = []
   for line in util.check_output(*cmd, cwd=git_repo).splitlines():
+    result.append(line.strip())
+  return result
+
+
+def get_tags(git_repo):
+  cmd = ['git', 'tag', '--list']
+  result = []
+  for line in util.check_output(
+      *cmd, cwd=git_repo, log_stdout=False).splitlines():
     result.append(line.strip())
   return result
 

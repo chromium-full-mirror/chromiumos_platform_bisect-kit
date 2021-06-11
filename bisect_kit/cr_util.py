@@ -359,8 +359,8 @@ def build_and_deploy(chrome_src,
 class ChromeSpecManager(codechange.SpecManager):
   """Gclient DEPS related operations.
 
-  This class enumerates DEPS files in chrome's buildspec folder, parses them,
-  and sync to disk state according to them.
+  This class enumerates DEPS files of chrome, parses them, and sync to disk
+  state according to them.
   """
 
   def __init__(self, config):
@@ -371,27 +371,18 @@ class ChromeSpecManager(codechange.SpecManager):
   def lookup_build_timestamp(self, rev):
     assert is_chrome_version(rev)
 
-    path = os.path.join('releases', rev, 'DEPS')
-    try:
-      timestamp = git_util.get_commit_time(self.spec_dir, 'origin/master', path)
-    except ValueError as e:
-      raise errors.InternalError('%s does not have %s' %
-                                 (self.spec_dir, path)) from e
-    return timestamp
+    return git_util.get_commit_time(self.chrome_src, rev, 'DEPS')
 
   def generate_meta_deps(self, rev):
-    """Synthesize branch DEPS with continuous history.
+    """Generates a root DEPS file.
 
-    Although chrome uses DEPS in its tree as source of truth, we need to use
-    DEPS in buildspec in order to match the release DEPS files. However,
-    branches/xx/DEPS is created during branching and it doesn't contain history
-    before branching point (which conceptually refers to chrome master branch).
-
-    This function synthesizes a new DEPS with full history including branch
-    DEPS history and earlier history.
+    This is kind of workaround for the limitation of our DEPS parser. When
+    parsing src/, it returns content of src/DEPS but the revision of src/
+    itself is lost. It is non-trivial to revise the recursive parser, so I
+    created a root DEPS file to include src/ instead.
 
     Args:
-      rev:
+      rev: chrome src/ branch or tag
 
     Returns:
       path to the synthesized repo
@@ -411,28 +402,15 @@ class ChromeSpecManager(codechange.SpecManager):
     }
 
     deps = {
-      "src": "https://chromium.googlesource.com/a/chromium/src.git@master",
-      "tools_internal": "https://chrome-internal.googlesource.com/a/chrome/tools/build/internal.DEPS.git@master",
+      "src": "https://chromium.googlesource.com/chromium/src.git@%s",
     }
 
     recursedeps = [
       "src",
-      "tools_internal",
     ]
-    """)
+    """ % rev)
     git_util.commit_file(
         meta_dir, 'DEPS', 'initial DEPS', meta_deps, commit_time=init_timestamp)
-
-    # 2. Copy history from buildspec branch DEPS file.
-    # TODO(kcwu): support branch of branch
-    branch = extract_branch_from_version(rev)
-    branch_path = os.path.join('branches', branch, 'DEPS')
-    for timestamp, git_hash in git_util.get_history(self.spec_dir, branch_path):
-      message = 'copy of %s' % git_hash
-      content = git_util.get_file_from_revision(self.spec_dir, git_hash,
-                                                branch_path)
-      git_util.commit_file(
-          meta_dir, 'DEPS', message, content, commit_time=timestamp)
 
     return meta_dir
 
@@ -467,7 +445,8 @@ class ChromeSpecManager(codechange.SpecManager):
     # See crbug.com/900514 for a real case. 16 hours threshold is not enough.
     old_timestamp -= 86400  # 1 day
 
-    meta_dir = self.generate_meta_deps(new)
+    branch = 'branch-heads/' + extract_branch_from_version(new)
+    meta_dir = self.generate_meta_deps(branch)
 
     result = []
     code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
@@ -484,9 +463,8 @@ class ChromeSpecManager(codechange.SpecManager):
     return result
 
   def enumerate_ancestor(self, new):
-    releases_dir = os.path.join(self.spec_dir, 'releases')
     result = []
-    for rev in os.listdir(releases_dir):
+    for rev in git_util.get_tags(self.chrome_src):
       # 74.0.3696.0/DEPS is bad and rejected by gclient (crbug/929544)
       if rev in ['74.0.3696.0']:
         continue
@@ -500,42 +478,33 @@ class ChromeSpecManager(codechange.SpecManager):
     logger.info('collect_fixed_spec')
     assert is_direct_relative_version(old, new)
     result = []
-    for rev in self.enumerate_ancestor(new):
-      if is_version_lesseq(old, rev):
-        path = os.path.join('releases', rev, 'DEPS')
-        timestamp = git_util.get_commit_time(self.spec_dir, 'HEAD', path)
-        spec = codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path)
-        self.parse_spec(spec)
-        self._hack_trim_libassistant(old, new, spec)
-        result.append(spec)
+    code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
+    parser = gclient_util.DepsParser(self.config['chrome_root'], code_storage)
+    for tag in self.enumerate_ancestor(new):
+      if not is_version_lesseq(old, tag):
+        continue
+      tag_rev = git_util.get_commit_hash(self.chrome_src, tag)
+      meta_dir = self.generate_meta_deps(tag_rev)
+      meta_head_rev = git_util.get_commit_hash(meta_dir, 'HEAD')
+
+      timestamp = git_util.get_commit_time(self.chrome_src, tag, 'DEPS')
+      spec = codechange.Spec(codechange.SPEC_FIXED, tag, timestamp, 'DEPS')
+      path_specs_result = list(
+          parser.enumerate_path_specs(timestamp, timestamp, meta_dir,
+                                      meta_head_rev))
+      assert len(path_specs_result) == 1
+      spec.entries = path_specs_result[0][1]
+      self._hack_trim_libassistant(old, new, spec)
+      result.append(spec)
 
     assert result[0].name == old, '%s != %s' % (result[0].name, old)
     assert result[-1].name == new, '%s != %s' % (result[-1].name, new)
     return result
 
   def parse_spec(self, spec):
-    # Return if already parsed during collect_float_spec() and
-    # collect_fixed_spec().
-    # Fully parsing during collect_float_spec() is more efficient than
-    # calling parsing here because we lost knowledge of commit ordering here
-    # and calling get_rev_by_time() is very slow.
-    if spec.entries:
-      return
-
     logger.debug('parse_spec %s', spec.name)
     code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
-    parser = gclient_util.DepsParser(self.config['chrome_root'], code_storage)
-
-    git_rev = git_util.get_rev_by_time(
-        self.spec_dir, spec.timestamp, 'origin/master', path=spec.path)
-    content = git_util.get_file_from_revision(self.spec_dir, git_rev, spec.path)
-    deps = parser.parse_single_deps(content)
-    assert not deps.recursedeps
-
-    path_specs = {}
-    for path, dep in deps.entries.items():
-      path_specs[path] = dep.as_path_spec()
-    spec.entries = path_specs
+    assert spec.entries, 'it should already be parsed earlier'
 
     # Mirror git repos if they do not exist.
     with locking.lock_file(
@@ -558,6 +527,8 @@ class ChromeSpecManager(codechange.SpecManager):
     # committed by release bot.
     for path_spec in spec.entries.values():
       git_repo = code_storage.cached_git_root(path_spec.repo_url)
+      if not path_spec.is_static():  # only surgery for fixed spec
+        continue
       while True:
         metadata = git_util.get_commit_metadata(git_repo, path_spec.at)
         if 'parent' not in metadata:
@@ -569,73 +540,30 @@ class ChromeSpecManager(codechange.SpecManager):
 
         path_spec.at = metadata['parent'][0]
 
-    assert spec.is_static()
-
-  def _gclient_sync_depfile(self, deps_file):
-    """Gclient sync with given DEPS file.
-
-    Args:
-      deps_file: path to gclient DEPS file. If relative, relative to
-          chrome_root's buildspec/.
-    """
-    # Work around None entry in DEPS file (b/179855917)
-    # TODO(kcwu): migrate off buildspec
-    deps_path = os.path.join(self.config['chrome_root'], 'buildspec', deps_file)
-    with open(deps_path) as f:
-      deps_content = f.read()
-    if '"url": "None",' in deps_content:
-      deps_file = os.path.join(self.config['chrome_root'], 'deps-workaround',
-                               deps_file)
-      os.makedirs(os.path.dirname(deps_file), exist_ok=True)
-      deps_content = deps_content.replace('"url": "None",',
-                                          '"url": "/None/workaround",')
-      with open(deps_file, 'w') as f:
-        f.write(deps_content)
-      logger.warning('work around b/179855917 with deps_file=%s', deps_file)
-
-    gclient_util.config(
-        self.config['chrome_root'],
-        url='https://chrome-internal.googlesource.com'
-        '/a/chrome/tools/buildspec.git',
-        deps_file=deps_file,
-        custom_var='checkout_src_internal=True',
-        cache_dir=self.config['chrome_mirror'],
-        target_os='chromeos')
-
-    gclient_util.sync(
-        self.config['chrome_root'], with_branch_heads=True, with_tags=True)
-
   def sync_to_release(self, rev):
     """Switch source tree to given release version.
 
     Args:
       rev: chrome release version
     """
-    release_deps_file = self.get_release_deps_file(rev)
-    path = os.path.join(self.spec_dir, release_deps_file)
-    # The buildspec repo is already sync'ed using setup_cros_bisect.py, so DEPS
-    # files should exist.
-    assert os.path.exists(path), '%s not found' % path
-
+    assert is_chrome_version(rev)
     with locking.lock_file(
         os.path.join(self.config['chrome_mirror'],
                      locking.LOCK_FILE_FOR_MIRROR_SYNC)):
-      self._gclient_sync_depfile(release_deps_file)
+      git_util.checkout_version(self.chrome_src, rev)
+      gclient_util.config(
+          self.config['chrome_root'],
+          url='https://chromium.googlesource.com/chromium/src.git',
+          custom_var='checkout_src_internal=True',
+          cache_dir=self.config['chrome_mirror'],
+          managed=False,
+          target_os='chromeos')
+
+      gclient_util.sync(
+          self.config['chrome_root'], with_branch_heads=True, with_tags=True)
 
   def sync_disk_state(self, rev):
     self.sync_to_release(rev)
-
-  @staticmethod
-  def get_release_deps_file(rev):
-    """Get DEPS file path of given release.
-
-    Args:
-      rev: chrome release version number
-
-    Returns:
-      DEPS file path, relative to buildspec/ folder
-    """
-    return 'releases/%s/DEPS' % rev
 
   def get_release_deps(self, rev):
     """Get DEPS content of given release.
@@ -646,8 +574,5 @@ class ChromeSpecManager(codechange.SpecManager):
     Returns:
       DEPS string
     """
-    release_deps_file = self.get_release_deps_file(rev)
-    path = os.path.join(self.spec_dir, release_deps_file)
-    with open(path) as f:
-      deps = f.read()
-    return deps
+    # TODO(kcwu): flatten recursive DEPS content
+    return git_util.get_file_from_revision(self.chrome_src, rev, 'DEPS')

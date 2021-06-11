@@ -185,7 +185,8 @@ def get_chrome_managers(opts):
 def get_chrome_buildspec_by_time(opts, timestamp, old_rev, new_rev):
   """Get a Chrome Deps buildspec (float spec) at given timestamp"""
   spec_manager, _code_manager, cache_manager = get_chrome_managers(opts)
-  deps_path = spec_manager.generate_meta_deps(new_rev)
+  branch = 'branch-heads/' + cr_util.extract_branch_from_version(new_rev)
+  deps_path = spec_manager.generate_meta_deps(branch)
   old_timestamp = spec_manager.lookup_build_timestamp(old_rev)
   new_timestamp = spec_manager.lookup_build_timestamp(new_rev)
   if not old_timestamp <= timestamp <= new_timestamp:
@@ -319,6 +320,8 @@ def schedule_build(opts):
   api = buildbucket_util.BuildbucketApi()
 
   if opts.subcommand == 'bisect_chrome':
+    logger.warning('DEPS file flatten is not reimplemented and thus '
+                   'building chrome with builder is broken (b/178680123)')
     manifest = get_release_manifest(opts)
     deps = get_deps(opts)
     build_tags['bisector_chrome_version'] = opts.chrome_rev

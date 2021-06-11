@@ -219,6 +219,45 @@ class TestDep(unittest.TestCase):
     self.assertTrue(dep.eval_condition())
 
 
+class TestTimeSeriesTree(unittest.TestCase):
+
+  def test_trivial(self):
+    base = 'http://example.com'
+    deps = gclient_util.Deps()
+    deps.entries['src'] = gclient_util.Dep('src', {}, base)
+    tstree = gclient_util.TimeSeriesTree(None, 'root', 0, 1000)
+    tstree.add_snapshot(0, deps, [])
+    tstree.no_more_snapshot()
+
+    self.assertEqual(tstree.subtrees, [])
+
+  def test_simple(self):
+    base = 'http://example.com'
+    tstree = gclient_util.TimeSeriesTree(None, 'root', 0, 1000)
+
+    deps = gclient_util.Deps()
+    deps.entries['src'] = gclient_util.Dep('src', {}, base)
+    tstree.add_snapshot(0, deps, [])
+
+    tstree.add_snapshot(0, deps, [])
+
+    tstree.no_more_snapshot()
+
+    self.assertEqual(tstree.subtrees, [])
+
+    tstree.iter_path_specs()
+
+  def test_simple(self):
+    base = 'http://example.com'
+    deps = gclient_util.Deps()
+    deps.entries['src'] = gclient_util.Dep('src', {}, base)
+    tstree = gclient_util.TimeSeriesTree(None, 'root', 0, 0)
+    tstree.add_snapshot(0, deps, [])
+    tstree.no_more_snapshot()
+
+    self.assertEqual(tstree.subtrees, [])
+
+
 # TODO(kcwu): refactor into normal unittest.
 class TestBug123161903(unittest.TestCase):
   """Reproduce b/123161903.

@@ -230,8 +230,8 @@ class Spec:
     # for debugging
     print(self.name, self.path, self.timestamp)
     print('size', len(self.entries))
-    for path, path_spec in sorted(self.entries.items()):
-      print(path, path_spec.at)
+    for i, (path, path_spec) in enumerate(sorted(self.entries.items())):
+      print(i, path, path_spec.at)
 
   def diff(self, rhs):
     logger.info('diff between %s and %s', self.name, rhs.name)

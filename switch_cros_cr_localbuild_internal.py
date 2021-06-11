@@ -179,14 +179,6 @@ def main(args=None):
   spec_manager = cr_util.ChromeSpecManager(config)
   code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
 
-  if cr_util.is_chrome_version(opts.rev):
-    release_deps_file = spec_manager.get_release_deps_file(opts.rev)
-    path = os.path.join(spec_manager.spec_dir, release_deps_file)
-    if not os.path.exists(path):
-      raise errors.ArgumentError(
-          'rev',
-          '%s does not exists; run setup_cros_bisect.py sync first' % path)
-
   if not opts.skip_sync_code:
     logger.info('switch source code')
     code_manager.switch(opts.rev)

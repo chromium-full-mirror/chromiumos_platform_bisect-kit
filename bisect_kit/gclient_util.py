@@ -22,6 +22,7 @@ import urllib.parse
 from depot_tools import gclient_eval
 
 from bisect_kit import codechange
+from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import locking
 from bisect_kit import util
@@ -41,6 +42,7 @@ def config(gclient_dir,
            deps_file=None,
            custom_var=None,
            gclientfile=None,
+           managed=True,
            spec=None,
            target_os=None):
   """Simply wrapper of `gclient config`.
@@ -52,6 +54,7 @@ def config(gclient_dir,
     deps_file: override the default DEPS file name
     custom_var: custom variables
     gclientfile: alternate .gclient file name
+    managed: use managed dependencies
     spec: content of gclient file
     target_os: target OS
   """
@@ -64,6 +67,8 @@ def config(gclient_dir,
     cmd += ['--custom-var', custom_var]
   if gclientfile:
     cmd += ['--gclientfile', gclientfile]
+  if not managed:
+    cmd.append('--unmanaged')
   if spec:
     cmd += ['--spec', spec]
   if url:
@@ -728,7 +733,7 @@ class TimeSeriesTree:
     add_snapshot() should not be invoked after no_more_snapshot().
     """
     for child_entry, (timestamp, deps) in self.alive_children.items():
-      if timestamp == self.end_time:
+      if timestamp == self.end_time and timestamp != self.start_time:
         continue
       self.subtrees.append(
           TimeSeriesTree(deps, child_entry, timestamp, self.end_time))
@@ -769,8 +774,10 @@ class TimeSeriesTree:
   def iter_forest(self):
     """Iterates snapshots of project dependency state.
 
+    In terms of DEPS parsing, `forest` is a collection of Deps objects.
+
     Yields:
-      (timestamp, path_specs):
+      (timestamp, forest):
         timestamp: time of snapshot
         forest: A dict indicates path => deps mapping
     """
@@ -799,6 +806,8 @@ class TimeSeriesTree:
 
   def iter_path_specs(self):
     """Iterates snapshots of project dependency state.
+
+    In terms of DEPS parsing, `path_specs` is flatten of recursive Deps objects.
 
     Yields:
       (timestamp, path_specs):
@@ -945,7 +954,8 @@ class DepsParser:
                           parent_vars=None,
                           parent_path='',
                           parent_dep=None,
-                          deps_file='DEPS'):
+                          deps_file='DEPS',
+                          allow_floating=True):
     """Processes DEPS recursively of given time period.
 
     This method parses all commits of DEPS between time `after` and `before`,
@@ -965,6 +975,7 @@ class DepsParser:
       parent_path: the path of parent project of current DEPS file
       parent_dep: A corresponding Dep object in parent DEPS
       deps_file: filename of DEPS file, relative to the git repo, repo_rul
+      allow_floating: True if allow floating commit references
     """
     if '://' in repo_url:
       git_repo = self.code_storage.cached_git_root(repo_url)
@@ -982,6 +993,9 @@ class DepsParser:
           (before, at),
       ]
     else:
+      if not allow_floating:
+        raise errors.ExternalError(
+            'Reference to floating commit (%s) is not allowed' % at)
       history = git_util.get_history(
           git_repo,
           deps_file,
@@ -1021,12 +1035,20 @@ class DepsParser:
           parent_vars=subtree.parent_deps.variables,
           parent_path=path,
           parent_dep=subtree.parent_deps.entries[path],
-          deps_file=deps_file)
+          deps_file=deps_file,
+          allow_floating=allow_floating)
 
-  def enumerate_path_specs(self, start_time, end_time, path):
+  def enumerate_path_specs(self, start_time, end_time, path, branch=None):
     tstree = TimeSeriesTree(None, path, start_time, end_time)
-    self.construct_deps_tree(tstree, path, DEFAULT_BRANCH_NAME, start_time,
-                             end_time)
+    if not branch:
+      branch = DEFAULT_BRANCH_NAME
+    self.construct_deps_tree(
+        tstree,
+        path,
+        branch,
+        start_time,
+        end_time,
+        allow_floating=(start_time != end_time))
     return tstree.iter_path_specs()
 
   def enumerate_gclient_solutions(self, start_time, end_time, path):

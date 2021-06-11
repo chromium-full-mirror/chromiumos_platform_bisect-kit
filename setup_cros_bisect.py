@@ -284,29 +284,16 @@ def sync_chromeos_code(opts, path_factory):
   repo_util.sync(chromeos_tree)
 
 
-def query_chrome_latest_branch():
-  result = 0
-  r = urllib.request.urlopen('https://omahaproxy.appspot.com/all')
-  for row in csv.DictReader(io.TextIOWrapper(r, encoding='utf-8')):
-    if row['true_branch'].isdigit():
-      result = max(result, int(row['true_branch']))
-  return result
-
-
 def setup_chrome_repos(opts, path_factory):
   chrome_cache = path_factory.get_chrome_cache()
   subvolume_or_makedirs(opts, chrome_cache)
   chrome_tree = path_factory.get_chrome_tree()
   subvolume_or_makedirs(opts, chrome_tree)
 
-  latest_branch = query_chrome_latest_branch()
-  logger.info('latest chrome branch is %d', latest_branch)
-  assert latest_branch
   spec = """
 solutions = [
-  { "name"        : "buildspec",
-    "url"         : "https://chrome-internal.googlesource.com/a/chrome/tools/buildspec.git",
-    "deps_file"   : "branches/%d/DEPS",
+  { "name"        : "src",
+    "url"         : "https://chromium.googlesource.com/a/chromium/src.git",
     "custom_deps" : {
     },
     "custom_vars": {'checkout_src_internal': True},
@@ -314,7 +301,8 @@ solutions = [
 ]
 target_os = ['chromeos']
 cache_dir = %r
-""" % (latest_branch, chrome_cache)
+""" % (
+      chrome_cache)
 
   with locking.lock_file(
       os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
