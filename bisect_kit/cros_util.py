@@ -763,25 +763,6 @@ def list_prebuilt_from_image_archive(board):
   return result
 
 
-def has_test_image(board, version):
-  if is_cros_snapshot_version(version):
-    return bool(query_snapshot_buildbucket_id(board, version))
-
-  try:
-    full_version = version_to_full(board, version)
-  except errors.ExternalError:
-    # version_to_full() is implemented by checking image, thus its failure
-    # means no image.
-    return False
-  path = (
-      gs_archive_path.format(board=board) +
-      '/%s/chromiumos_test_image.tar.xz' % full_version)
-
-  if gsutil_ls(path, ignore_errors=True):
-    return True
-  return False
-
-
 def list_chromeos_prebuilt_versions(board,
                                     old,
                                     new,
@@ -1069,9 +1050,14 @@ def search_prebuilt_image(board, version):
     ImageInfo object
   """
   assert is_cros_version(version)
-  full_version = version_to_full(board, version)
-
   image_info = ImageInfo()
+  try:
+    full_version = version_to_full(board, version)
+  except errors.ExternalError:
+    # version_to_full() is implemented by checking image, thus its failure
+    # means no image.
+    return image_info
+
   gs_path = gs_archive_path.format(board=board) + '/' + full_version
   if gsutil_ls(gs_path + '/chromiumos_test_image.tar.xz', ignore_errors=True):
     image_info[ImageType.DISK_IMAGE] = gs_path + '/chromiumos_test_image.tar.xz'
@@ -1084,6 +1070,10 @@ def search_image(board, version):
   if is_cros_snapshot_version(version):
     return search_snapshot_image(board, version)
   return search_prebuilt_image(board, version)
+
+
+def has_test_image(board, version):
+  return bool(search_image(board, version))
 
 
 def cros_flash(chromeos_root,
