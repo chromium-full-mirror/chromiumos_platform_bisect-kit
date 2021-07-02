@@ -71,6 +71,12 @@ def create_argument_parser():
       '--reboot_before_test',
       action='store_true',
       help='Reboot before test run')
+  parser.add_argument(
+      '--args',
+      help='Extra variables passed to `tast -var`, as "key=value"',
+      type=cli.argtype_key_value,
+      action='append',
+      default=[])
 
   group = parser.add_argument_group(title='Options for normal autotest tests')
   group.add_argument(
@@ -110,6 +116,9 @@ def tast_cmd(opts, cmd, *args):
       flags += ['-defaultvarsdir', os.path.join(tast_dir, 'vars', 'private')]
   else:
     tast_bin = 'tast'
+
+  if cmd == 'run':
+    flags += ["-var=%s=%s" % x for x in opts.args]
 
   # TODO(zjchang): ensure the tast version for buildbucket builds is correct
   if not opts.tast_build:

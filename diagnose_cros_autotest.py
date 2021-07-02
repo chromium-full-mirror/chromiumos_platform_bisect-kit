@@ -56,9 +56,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         opts.cts_revision or opts.cts_abi or opts.cts_prefix or
         opts.cts_module or opts.cts_test or opts.cts_timeout)
     if is_cts:
-      if opts.test_name or opts.metric or opts.args:
-        self.argument_parser.error(
-            'do not specify --test_name, --metric, --args for CTS/GTS tests')
+      if opts.test_name or opts.metric or opts.extra_test_variables:
+        self.argument_parser.error('do not specify --test_name, --metric, ' +
+                                   '--extra_test_variables for CTS/GTS tests')
       if not opts.cts_prefix:
         self.argument_parser.error(
             '--cts_prefix should be specified for CTS/GTS tests')
@@ -78,7 +78,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         cts_module=opts.cts_module,
         cts_test=opts.cts_test,
         cts_timeout=opts.cts_timeout,
-        test_that_args=opts.args,
     )
 
     # Unpack old autotest prebuilt, assume following information don't change
@@ -115,8 +114,10 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       common_eval_cmd.append('--fail_to_pass')
     if self.config['reboot_before_test']:
       common_eval_cmd.append('--reboot_before_test')
-    if self.config['test_that_args']:
-      common_eval_cmd += ['--args', self.config['test_that_args']]
+    for var in self.config['extra_test_variables']:
+      common_eval_cmd.append('--args')
+      common_eval_cmd.append(var)
+
     if self.config['test_name'].startswith('telemetry_'):
       common_eval_cmd += ['--chrome_root', self.config['chrome_root']]
 
@@ -265,11 +266,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         help='CTS/GTS test name, like '
         '"android.hardware.cts.CameraTest#testDisplayOrientation"')
     group.add_argument('--cts_timeout', type=float, help='timeout, in seconds')
-
-    group = parser_init.add_argument_group(title='Options passed to test_that')
-    group.add_argument(
-        '--args',
-        help='Extra args passed to "test_that --args"; Overrides the default')
 
 
 if __name__ == '__main__':

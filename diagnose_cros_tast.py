@@ -59,6 +59,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
       common_eval_cmd.append('--fail_to_pass')
     if self.config['reboot_before_test']:
       common_eval_cmd.append('--reboot_before_test')
+    for var in self.config['extra_test_variables']:
+      common_eval_cmd.append('--args')
+      common_eval_cmd.append(var)
 
     return common_switch_cmd, common_eval_cmd
 

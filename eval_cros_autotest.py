@@ -92,7 +92,9 @@ def create_argument_parser():
       '"cheets_SystemRawImageSize"')
   group.add_argument(
       '--args',
-      help='Extra args passed to "test_that --args"; Overrides the default')
+      help='Extra args passed to "test_that --args"; Overrides the default',
+      action='append',
+      default=[])
 
   group = parser.add_argument_group(title='Options for CTS/GTS tests')
   group.add_argument('--cts_revision', help='CTS revision, like "9.0_r3"')
@@ -149,11 +151,11 @@ def get_additional_test_args(test_name):
     test_name: test name
 
   Returns:
-    arguments (str)
+    arguments (list[str])
   """
   if test_name.startswith('telemetry_'):
-    return 'local=True'
-  return ''
+    return ['local=True']
+  return []
 
 
 def prepare_to_run_test(opts):
@@ -236,9 +238,9 @@ def run_test(opts):
       logger.info(
           'default test_that args `%s` is overridden by '
           'command line option `%s`', args, opts.args)
-    cmd += ['--args', opts.args]
+    cmd += ['--args', ' '.join(opts.args)]
   elif args:
-    cmd += ['--args', args]
+    cmd += ['--args', ' '.join(args)]
 
   try:
     output = cros_util.cros_sdk(
@@ -302,14 +304,16 @@ def main(args=None):
     if not opts.cts_module:
       parser.error('--cts_module should be specified for CTS/GTS tests')
     opts.test_name = '%s.tradefed-run-test' % opts.cts_prefix
-    opts.args = 'module=%s test=%s max_retry=0' % (opts.cts_module,
-                                                   opts.cts_test)
+    opts.args = [
+        'module=%s' % opts.cts_module,
+        'test=%s' % opts.cts_test, 'max_retry=0'
+    ]
     if opts.cts_revision:
-      opts.args += ' revision=%s' % opts.cts_revision
+      opts.args.append('revision=%s' % opts.cts_revision)
     if opts.cts_abi:
-      opts.args += ' abi=%s' % opts.cts_abi
+      opts.args.append('abi=%s' % opts.cts_abi)
     if opts.cts_timeout:
-      opts.args += ' timeout=%s' % opts.cts_timeout
+      opts.args.append('timeout=%s' % opts.cts_timeout)
   else:
     if not opts.test_name:
       parser.error('argument --test_name is required')

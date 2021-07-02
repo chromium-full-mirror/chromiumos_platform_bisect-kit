@@ -180,6 +180,26 @@ def argtype_dir_path(s):
   return s
 
 
+def argtype_key_value(s):
+  """Validate argument is a valid `key=value` string.
+
+  Args:
+    s: string to validate.
+
+  Returns:
+    A (key, value) tuple, if valid.
+
+  Raises:
+    ArgTypeError if argument is invalid format.
+  """
+  splitted = s.split('=')
+  if len(splitted) != 2:
+    raise ArgTypeError('Invalid key value string: %s' % s, 'key=value')
+  if not re.match('^[A-Za-z0-9_.-]+$', splitted[0]):
+    raise ArgTypeError('Invalid key: %s' % s, 'key=value')
+  return tuple(splitted)
+
+
 def check_executable(program):
   """Checks whether a program is executable.
 

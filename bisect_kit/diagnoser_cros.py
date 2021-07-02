@@ -762,6 +762,7 @@ class DiagnoseCommandLineBase:
         disable_snapshot=opts.disable_snapshot,
         disable_buildbucket_chromeos=opts.disable_buildbucket_chromeos,
         enable_buildbucket_chrome=opts.enable_buildbucket_chrome,
+        extra_test_variables=opts.extra_test_variables,
     )
 
     self.states.init(config)
@@ -974,6 +975,11 @@ class DiagnoseCommandLineBase:
         '--enable_buildbucket_chrome',
         action='store_true',
         help='Build Chrome on buildbucket')
+    group.add_argument(
+        '--extra_test_variables',
+        help='Extra variables passed to `test_that --args` or `tast -var`',
+        action='append',
+        default=[])
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser(

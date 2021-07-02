@@ -361,13 +361,6 @@ def cmd_repair_dut(opts):
   cros_lab_util.repair(opts.dut)
 
 
-def parse_dimension(s):
-  splitted = s.split('=')
-  if len(splitted) != 2:
-    raise argparse.ArgumentTypeError('Invalid dimension: %s' % s)
-  return splitted
-
-
 @cli.fatal_error_handler
 def main():
   common.init()
@@ -451,7 +444,7 @@ def main():
   parser_allocate_dut.add_argument(
       '--dimensions',
       help='Dimension filters used for searching DUTs, in format key1=val1 key2=val2 ...',
-      type=parse_dimension,
+      type=cli.argtype_key_value,
       nargs='+',
       default=[])
   group = parser_allocate_dut.add_mutually_exclusive_group(required=True)

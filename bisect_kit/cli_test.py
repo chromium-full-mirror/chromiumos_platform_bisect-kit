@@ -92,6 +92,20 @@ class TestCli(unittest.TestCase):
       parser.parse_args(['--necessary', 'foo', '--value', 'bar'])
     self.assertEqual(e.exception.code, cli.EXIT_CODE_FATAL)
 
+  def test_argtype_key_value(self):
+    self.assertEqual(cli.argtype_key_value('key=value'), ('key', 'value'))
+    self.assertEqual(cli.argtype_key_value('key='), ('key', ''))
+    self.assertEqual(cli.argtype_key_value('aa_bb-cc.dd='), ('aa_bb-cc.dd', ''))
+
+    with self.assertRaises(cli.ArgTypeError):
+      cli.argtype_key_value('key')
+
+    with self.assertRaises(cli.ArgTypeError):
+      cli.argtype_key_value('key=value=value2')
+
+    with self.assertRaises(cli.ArgTypeError):
+      cli.argtype_key_value('?=value')
+
   def test_fatal_error_handler(self):
 
     @cli.fatal_error_handler
