@@ -2288,7 +2288,11 @@ class ChromeOSSpecManager(codechange.SpecManager):
       commit_id = revisions[0][1]
       manifest = git_util.get_file_from_revision(self.manifest_internal_dir,
                                                  commit_id, 'snapshot.xml')
-    return manifest
+
+    # workaround removed revisions
+    parser = repo_util.Manifest(self.manifest_internal_dir)
+    parser.load_from_string(manifest)
+    return parser.to_string()
 
   def get_manifest_file(self, rev):
     assert is_cros_full_version(rev) or is_cros_snapshot_version(rev)

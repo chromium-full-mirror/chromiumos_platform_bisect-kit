@@ -557,6 +557,7 @@ class Manifest:
     Returns:
       A string of xml.
     """
+    self.workaround_b193341595()
     return ManifestParser.element_to_string(self.xml)
 
   def is_static_manifest(self):
@@ -663,3 +664,25 @@ class Manifest:
         upstream = project.get('upstream')
         if upstream:
           self.apply_upstream(path, upstream)
+
+  def workaround_b193341595(self):
+    """Apply workaround to fix removed branches in remote."""
+    repos = [
+        'chromiumos/third_party/zephyr/cmsis',
+        'chromiumos/third_party/zephyr/hal_stm32',
+    ]
+    removed_revisions = [
+        'refs/heads/chromeos-v2.5',
+        'refs/heads/chromeos-v2.6',
+    ]
+    tags = [
+        'upstream',
+        'dest-branch',
+    ]
+    to_revision = 'refs/heads/chromeos-main'
+    for project in self.xml.findall('.//project'):
+      if project.get('name') not in repos:
+        continue
+      for tag in tags:
+        if project.get(tag) in removed_revisions:
+          project.set(tag, to_revision)
