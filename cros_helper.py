@@ -282,12 +282,17 @@ def do_allocate_dut(opts):
       raise errors.ArgumentError(
           '--version_hint',
           'given builders have no prebuilt for %s' % opts.version_hint)
-    variants = filter_dimensions_by_board(boards_with_prebuilt, variants,
-                                          opts.pool)
+    variants = filter_dimensions_by_board(boards_with_prebuilt, variants, None)
     if not variants:
       raise errors.NoDutAvailable(
           'Devices with specified constraints have no prebuilt. '
           'Wrong version number?')
+    variants = filter_dimensions_by_board(boards_with_prebuilt, variants,
+                                          opts.pool)
+    if not variants:
+      raise errors.NoDutAvailable(
+          'The pool(%s) does not have desired boards: %s' %
+          (opts.pool, boards_with_prebuilt))
 
   while True:
     filter_func = lambda bot: is_acceptable_bot(boards_with_prebuilt, bot)
