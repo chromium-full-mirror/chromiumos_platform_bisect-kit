@@ -121,16 +121,17 @@ def filter_dimensions_by_board(boards_with_prebuilt, dimensions, pool):
     constraints = [dimension]
     if pool:
       constraints.append('label-pool:' + pool)
-    bots = cros_lab_util.swarming_bots_list(constraints, is_busy=None, limit=1)
-    if not bots:
-      continue
-    board = bots[0]['dimensions']['label-board'][0]
-    if board not in boards_with_prebuilt:
-      logger.warning(
-          'dimension=%s (board=%s) does not have corresponding '
-          'prebuilt image, ignore', dimension, board)
-      continue
-    result.add(dimension)
+    # Ideally, we need only one result. Here we get more (limit=10) in order to
+    # cope with incorrect metadata in swarming database (b/196499726).
+    bots = cros_lab_util.swarming_bots_list(constraints, is_busy=None, limit=10)
+    for bot in bots:
+      board = bot['dimensions']['label-board'][0]
+      if board not in boards_with_prebuilt:
+        logger.warning(
+            'dimension=%s (board=%s) does not have corresponding '
+            'prebuilt image, ignore', dimension, board)
+        continue
+      result.add(dimension)
   return list(result)
 
 
