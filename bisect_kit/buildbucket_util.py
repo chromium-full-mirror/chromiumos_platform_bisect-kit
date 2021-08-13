@@ -384,7 +384,11 @@ class BuildbucketApi:
     Raises:
       errors.ExternalError: If api request fail.
     """
-    waiting_status = [Status.Value('SCHEDULED'), Status.Value('STARTED')]
+    waiting_status = [
+        Status.Value('SCHEDULED'),
+        Status.Value('STARTED'),
+        Status.Value('STATUS_UNSPECIFIED'),
+    ]
     return build.status in waiting_status
 
   def is_success(self, build):
