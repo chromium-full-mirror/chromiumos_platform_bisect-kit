@@ -284,7 +284,7 @@ class BuildbucketApi:
   def schedule_build(self,
                      board,
                      manifest_xml,
-                     recipe='build_target',
+                     recipe='build_postsubmit',
                      deps=None,
                      git_auth=True,
                      bucket='bisector',
