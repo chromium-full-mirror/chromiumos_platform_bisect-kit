@@ -352,8 +352,8 @@ def main(args=None):
     return FATAL
 
   # Sanity check. The OS version should not change.
-  assert dut_os_version == cros_util.query_dut_short_version(opts.dut), \
-            'Someone else reflashed the DUT. DUT locking is not respected?'
+  assert dut_os_version == cros_util.query_dut_short_version(opts.dut), (
+      'Someone else reflashed the DUT. DUT locking is not respected?')
 
   if opts.metric:
     if not values:

@@ -118,7 +118,7 @@ def tast_cmd(opts, cmd, *args):
     tast_bin = 'tast'
 
   if cmd == 'run':
-    flags += ["-var=%s=%s" % x for x in opts.args]
+    flags += ['-var=%s=%s' % x for x in opts.args]
 
   # TODO(zjchang): ensure the tast version for buildbucket builds is correct
   if not opts.tast_build:

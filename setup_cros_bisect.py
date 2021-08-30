@@ -23,9 +23,7 @@ Typical usage:
 """
 from __future__ import print_function
 import argparse
-import csv
 import glob
-import io
 import logging
 import os
 import subprocess

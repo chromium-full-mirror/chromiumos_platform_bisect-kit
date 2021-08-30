@@ -168,7 +168,7 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
   if manifest_name:
     cmd += ['--manifest-name', manifest_name]
   if current_branch is not None:
-    cmd += ['--current-branch' if current_branch else "--no-current-branch"]
+    cmd += ['--current-branch' if current_branch else '--no-current-branch']
   util.check_call(*cmd, cwd=repo_dir, env=_get_repo_sync_env())
 
 

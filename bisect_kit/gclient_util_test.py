@@ -153,7 +153,7 @@ class TestDep(unittest.TestCase):
   def test_simple(self):
     url = 'http://example.com@12345'
     dep = gclient_util.Dep('src', {}, url)
-    self.assertTrue(dep == dep)
+    self.assertTrue(dep == dep)  # pylint: disable=comparison-with-itself
     self.assertEqual(dep.url, url)
     self.assertEqual(dep.parse_url(), ('http://example.com', '12345'))
     # True by default.

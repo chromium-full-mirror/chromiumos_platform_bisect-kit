@@ -211,8 +211,8 @@ def run_once(opts):
       logger.warning('got signal, FATAL')
       return FATAL
 
-  if opts.precondition_output and \
-      not output_result['precondition_output_matched']:
+  if (opts.precondition_output and
+      not output_result['precondition_output_matched']):
     logger.warning("precondition doesn't meet, SKIP")
     return SKIP
 

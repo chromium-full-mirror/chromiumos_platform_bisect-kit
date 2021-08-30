@@ -192,8 +192,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         # Assume it's ok to leave random version of android prebuilt on DUT.
 
         # Sanity check. The OS version should not change after android bisect.
-        assert dut_os_version == cros_util.query_dut_short_version(dut), \
-            'Someone else reflashed the DUT. DUT locking is not respected?'
+        assert dut_os_version == cros_util.query_dut_short_version(dut), (
+            'Someone else reflashed the DUT. DUT locking is not respected?')
 
         eval_cmd = common_eval_cmd + ['--prebuilt']
 
@@ -227,8 +227,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         if not self.config['chrome_deploy_image'] and not buildbucket_build:
           # Sanity check. The OS version should not change after chrome bisect.
-          assert dut_os_version == cros_util.query_dut_short_version(dut), \
-              'Someone else reflashed the DUT. DUT locking is not respected?'
+          assert dut_os_version == cros_util.query_dut_short_version(dut), (
+              'Someone else reflashed the DUT. DUT locking is not respected?')
 
         buildbucket_build = (
             cros_util.is_buildbucket_buildable(self.config['old']) and

@@ -449,7 +449,8 @@ def main():
       default=DEFAULT_DUT_POOL)
   parser_allocate_dut.add_argument(
       '--dimensions',
-      help='Dimension filters used for searching DUTs, in format key1=val1 key2=val2 ...',
+      help='Dimension filters used for searching DUTs, in format '
+      'key1=val1 key2=val2 ...',
       type=cli.argtype_key_value,
       nargs='+',
       default=[])
