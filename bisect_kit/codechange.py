@@ -352,10 +352,40 @@ class GitCheckoutCommit(Action):
     self.repo_url = repo_url
     self.rev = rev
 
+  def _ensure_remote(self, code_storage, root_dir):
+    git_repo = os.path.join(root_dir, self.path)
+    remotes = git_util.get_remotes(git_repo)
+
+    # Because is_containing_commit is slow, do fast check first.
+    assert remotes, 'every git directory should have a remote'
+    expected_remote_url = code_storage.cached_git_root(self.repo_url)
+    for remote in remotes:
+      remote_url = git_util.get_remote_url(git_repo, remote)
+      if remote_url == expected_remote_url:
+        return
+
+    if len(remotes) > 1:
+      # There are more than one tracking remotes, we don't know which one
+      # changed.
+      logger.warning('%s has more than one tracking remotes: %s', self.path,
+                     remotes)
+      logger.warning(
+          'This is unexpected for clean repo/gclient maintained tree')
+      if git_util.is_containing_commit(git_repo, self.rev):
+        # Anyway, the target commit exists. Safe.
+        return
+      raise errors.InternalError(
+          '%r has more than one tracking remote '
+          'and we do not know how to handle remote change' % self.path)
+
+    remote = remotes[0]
+    git_util.set_remote_url(git_repo, remote, expected_remote_url)
+    git_util.fetch(git_repo, remote)
+
   def apply(self, code_storage, root_dir):
-    del code_storage  # unused
     git_repo = os.path.join(root_dir, self.path)
     assert git_util.is_git_root(git_repo)
+    self._ensure_remote(code_storage, root_dir)
     git_util.checkout_version(git_repo, self.rev)
 
   def summary(self):

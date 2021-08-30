@@ -952,6 +952,22 @@ def get_tags(git_repo):
   return result
 
 
+def get_remotes(git_repo):
+  """Gets lists of git remote."""
+  return util.check_output('git', 'remote', cwd=git_repo).splitlines()
+
+
+def get_remote_url(git_repo, remote_name):
+  """Gets url of given remote."""
+  return util.check_output(
+      'git', 'remote', 'get-url', remote_name, cwd=git_repo).strip()
+
+
+def set_remote_url(git_repo, remote_name, url):
+  """Sets url of given remote."""
+  util.check_call('git', 'remote', 'set-url', remote_name, url, cwd=git_repo)
+
+
 def list_commits_between_commits(git_repo, old, new):
   """Get all commits between (old, new].
 
