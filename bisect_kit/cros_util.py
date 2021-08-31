@@ -1938,7 +1938,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
                                               'manifest-internal.git')
     self.historical_manifest_git_dir = os.path.join(
         self.config['chromeos_mirror'], 'chromeos/manifest-versions.git')
-    self.historical_manifest_branch_name = 'refs/heads/master'
+    self.historical_manifest_branch_name = 'refs/heads/main'
     if not os.path.exists(self.historical_manifest_git_dir):
       raise errors.InternalError('Manifest snapshots should be cloned into %s' %
                                  self.historical_manifest_git_dir)
