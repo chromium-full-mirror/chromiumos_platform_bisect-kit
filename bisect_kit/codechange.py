@@ -828,47 +828,37 @@ class CodeManager:
     return Spec(SPEC_FIXED, name, timestamp, float_spec.path, result)
 
   def match_spec(self, target, specs, start_index=0):
-    threshold = 3600
     # ideal_index is the index of last spec before target
-    # begin and end are the range of indexes within threshold (inclusive)
     ideal_index = None
-    begin, end = None, None
     for i, spec in enumerate(specs[start_index:], start_index):
       if spec.timestamp <= target.timestamp:
         ideal_index = i
-      if abs(spec.timestamp - target.timestamp) < threshold:
-        if begin is None:
-          begin = i
-        end = i
-
-    candidates = []
-    if ideal_index is not None:
-      candidates.append(ideal_index)
-    if begin is not None:
-      candidates.extend(list(range(begin, end + 1)))
-    if not candidates:
+      else:
+        break
+    if ideal_index is None:
       logger.error('unable to match %s: all specs are after it', target.name)
       return None
 
-    compatible_candidates = [
-        i for i in candidates if specs[i].is_subset(target)
-    ]
-    if not compatible_candidates:
+    scores = []
+    for i, spec in enumerate(specs[start_index:], start_index):
+      if not spec.is_subset(target):
+        continue  # incompatible, ignore
+
+      # Tie-break: prefer earlier timestamp and smaller difference.
+      if spec.timestamp <= target.timestamp:
+        timediff = 0, target.timestamp - spec.timestamp
+      else:
+        timediff = 1, spec.timestamp - target.timestamp
+      score = spec.similar_score(target)
+      scores.append((score, timediff, i))
+
+    if not scores:
       logger.error('unable to match %s: no compatible specs', target.name)
-      spec = specs[candidates[0]]
+      spec = specs[start_index]
       target.diff(spec)
       return None
 
-    scores = []
-    for i in compatible_candidates:
-      # Tie-break: prefer earlier timestamp and smaller difference.
-      if specs[i].timestamp <= target.timestamp:
-        timediff = 0, target.timestamp - specs[i].timestamp
-      else:
-        timediff = 1, specs[i].timestamp - target.timestamp
-      scores.append((specs[i].similar_score(target), timediff, i))
     scores.sort()
-
     score, _, index = scores[0]
     if score != 0:
       logger.warning('not exactly match (score=%s): %s', score, target.name)
