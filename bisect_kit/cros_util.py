@@ -15,10 +15,12 @@ Terminology used in this module.
 from __future__ import print_function
 import ast
 import calendar
+import concurrent.futures
 import datetime
 import enum
 import errno
 import glob
+import itertools
 import json
 import logging
 import os
@@ -58,6 +60,7 @@ gsutil_bin = 'gsutil'
 # Since snapshots with version >= 12618.0.0 have android and chrome version
 # info.
 snapshot_cutover_version = '12618.0.0'
+snapshot_buckets = ['snapshot']
 
 # http://crbug.com/1170601, small snapshot ids should be ignored
 # 21000 is R80-12617.0.0
@@ -702,18 +705,27 @@ def list_snapshots_from_image_archive(board, major_version):
     assert m
     return int(m.group(1))
 
+  def iterate_gspath_alias(board, milestone, short_version):
+    path = ('gs://chromeos-image-archive/{board}-{bucket}/R{milestone}-'
+            '{short_version}-*/image.zip')
+
+    for bucket in snapshot_buckets:
+      yield path.format(
+          board=board,
+          bucket=bucket,
+          milestone=milestone,
+          short_version=short_version,
+      )
+
   short_version = '%s.0.0' % major_version
   milestone = query_milestone_by_version(board, short_version)
   if not milestone:
     milestone = '*'
 
-  path = ('gs://chromeos-image-archive/{board}-snapshot/R{milestone}-'
-          '{short_version}-*/image.zip')
   result = []
-  output = gsutil_ls(
-      path.format(
-          board=board, milestone=milestone, short_version=short_version),
-      ignore_errors=True)
+  output = itertools.chain(
+      *(gsutil_ls(alias, ignore_errors=True)
+        for alias in iterate_gspath_alias(board, milestone, short_version)))
 
   for gs_path in sorted(output):
     m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)', gs_path)
@@ -790,42 +802,49 @@ def list_chromeos_prebuilt_versions(board,
     short_version = version_to_short(full_version)
     rev_map[short_version] = [(full_version, gs_path)]
 
-  if use_snapshot:
-    for major_version in range(
-        int(extract_major_version(old)),
-        int(extract_major_version(new)) + 1):
-      short_version = '%s.0.0' % major_version
-      next_short_version = '%s.0.0' % (major_version + 1)
-      # If current version is smaller than cutover, ignore it as it might not
-      # contain enough information for continuing android and chrome bisection.
-      if not util.is_version_lesseq(snapshot_cutover_version, short_version):
-        continue
+  with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+    jobs = []
+    if use_snapshot:
+      for major_version in range(
+          int(extract_major_version(old)),
+          int(extract_major_version(new)) + 1):
+        short_version = '%s.0.0' % major_version
+        next_short_version = '%s.0.0' % (major_version + 1)
+        # If current version is smaller than cutover, ignore it as it might not
+        # contain enough information for continuing android and chrome bisection.
+        if not util.is_version_lesseq(snapshot_cutover_version, short_version):
+          continue
 
-      # Given the fact that snapshots are images between two release versions.
-      # Adding snapshots of 12345.0.0 should be treated as adding commits
-      # between [12345.0.0, 12346.0.0).
-      # So in the following lines we check two facts:
-      # 1) If 12346.0.0(next_short_version) is a version between old and new
-      if not util.is_direct_relative_version(next_short_version, old_short):
-        continue
-      if not util.is_direct_relative_version(next_short_version, new_short):
-        continue
-      # 2) If 12345.0.0(short_version) is a version between old and new
-      if not util.is_direct_relative_version(short_version, old_short):
-        continue
-      if not util.is_direct_relative_version(short_version, new_short):
-        continue
+        # Given the fact that snapshots are images between two release versions.
+        # Adding snapshots of 12345.0.0 should be treated as adding commits
+        # between [12345.0.0, 12346.0.0).
+        # So in the following lines we check two facts:
+        # 1) If 12346.0.0(next_short_version) is a version between old and new
+        if not util.is_direct_relative_version(next_short_version, old_short):
+          continue
+        if not util.is_direct_relative_version(next_short_version, new_short):
+          continue
+        # 2) If 12345.0.0(short_version) is a version between old and new
+        if not util.is_direct_relative_version(short_version, old_short):
+          continue
+        if not util.is_direct_relative_version(short_version, new_short):
+          continue
+        future_result = executor.submit(list_snapshots_from_image_archive, board,
+                                        str(major_version))
+        jobs.append((short_version, future_result))
 
-      snapshots = list_snapshots_from_image_archive(board, str(major_version))
-      if snapshots:
-        # if snapshots found, we can append them after the release version,
-        # so the prebuilt image list of this version will be
-        # release_image, snapshot1, snapshot2,...
-        if short_version not in rev_map:
-          rev_map[short_version] = []
-        rev_map[short_version] += snapshots
+      for short_version, future in jobs:
+        snapshots = future.result()
+        if snapshots:
+          # if snapshots found, we can append them after the release version,
+          # so the prebuilt image list of this version will be
+          # release_image, snapshot1, snapshot2,...
+          if short_version not in rev_map:
+            rev_map[short_version] = []
+          rev_map[short_version] += snapshots
 
   result = []
+  details = {}
   for rev in sorted(rev_map, key=util.version_key_func):
     if not util.is_direct_relative_version(new_short, rev):
       continue
@@ -856,8 +875,9 @@ def list_chromeos_prebuilt_versions(board,
       if is_cros_version_lesseq(old, version) and is_cros_version_lesseq(
           version, new):
         result.append(version)
+        details[version] = {'gs_path': gs_path}
 
-  return result
+  return result, details
 
 
 def search_snapshot_image(board, snapshot_version):

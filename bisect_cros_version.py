@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 def get_revlist(board, old, new, use_snapshot=False):
   logger.info('get_revlist %s %s %s', board, old, new)
   logger.info('use_snapshot: %s', use_snapshot)
-  full_versions = cros_util.list_chromeos_prebuilt_versions(
+  full_versions, details = cros_util.list_chromeos_prebuilt_versions(
       board, old, new, use_snapshot=use_snapshot)
   short_versions = [cros_util.version_to_short(v) for v in full_versions]
 
@@ -49,7 +49,7 @@ def get_revlist(board, old, new, use_snapshot=False):
     new_idx = full_versions.index(new)
   else:
     new_idx = short_versions.index(cros_util.version_to_short(new))
-  return full_versions[old_idx], full_versions[new_idx], full_versions
+  return full_versions[old_idx], full_versions[new_idx], full_versions, details
 
 
 class ChromeOSVersionDomain(core.BisectDomain):
@@ -95,14 +95,13 @@ class ChromeOSVersionDomain(core.BisectDomain):
       raise errors.ArgumentError(
           '--new', '%s has no image for %s' % (opts.board, opts.new))
 
-    old, new, revlist = get_revlist(
+    old, new, revlist, details = get_revlist(
         opts.board, opts.old, opts.new, use_snapshot=not opts.disable_snapshot)
     config = dict(dut=opts.dut, board=opts.board, old=old, new=new)
 
-    details = {}
     for i in range(1, len(revlist)):
       link = cros_util.get_crosland_link(revlist[i - 1], revlist[i])
-      details[revlist[i]] = {'actions': [{'link': link}]}
+      details[revlist[i]]['actions'] = [{'link': link}]
 
     return config, {'revlist': revlist, 'details': details}
 
