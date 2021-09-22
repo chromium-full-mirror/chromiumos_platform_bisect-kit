@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Bisection core module."""
 
+from __future__ import annotations
 from __future__ import print_function
 import json
 import logging
@@ -11,7 +12,9 @@ import os
 import shutil
 import tempfile
 import time
+import typing
 
+from bisect_kit import common
 from bisect_kit import math_util
 
 logger = logging.getLogger(__name__)
@@ -207,13 +210,20 @@ class BisectStates(States):
     # Mapping of rev to idx; constructed from data['revlist'].
     self.rev_index = {}
 
+  @classmethod
+  def from_bisector_class(cls, bisector_cls: str, session: str) -> BisectStates:
+    """Initializes BisectStates from a bisector class name."""
+    session_dir = common.determine_session_dir(session)
+    session_file = os.path.join(session_dir, bisector_cls)
+    return cls(session_file)
+
   @property
   def config(self):
     return self.data['config']
 
   @property
-  def details(self):
-    return self.data['details']
+  def details(self) -> typing.Dict[str, typing.Any]:
+    return self.data.get('details', {})
 
   def init(self, config, revlist, details=None):
     """Initializes attributes data, rev_info and rev_index.

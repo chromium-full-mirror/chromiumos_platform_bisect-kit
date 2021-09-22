@@ -12,6 +12,7 @@ Terminology used in this module.
   version: if not specified, it could be in short or full format.
 """
 
+from __future__ import annotations
 from __future__ import print_function
 import ast
 import calendar
@@ -22,6 +23,7 @@ import errno
 import glob
 import itertools
 import json
+import typing
 import logging
 import os
 import re
@@ -39,6 +41,7 @@ from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
+from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import errors
 from bisect_kit import git_util
@@ -61,7 +64,7 @@ gsutil_bin = 'gsutil'
 # Since snapshots with version >= 12618.0.0 have android and chrome version
 # info.
 snapshot_cutover_version = '12618.0.0'
-snapshot_buckets = ['snapshot']
+snapshot_buckets = ['postsubmit', 'snapshot']
 
 # http://crbug.com/1170601, small snapshot ids should be ignored
 # 21000 is R80-12617.0.0
@@ -100,7 +103,9 @@ prebuilt_tast_dir = 'tmp/tast-prebuilt'
 # Relative to chromeos root. Images are build_images_dir/$board/$image_name.
 build_images_dir = 'src/build/images'
 cached_images_dir = 'tmp/images'
+disk_image_bundle_filename = 'chromiumos_test_image.tar.xz'
 test_image_filename = 'chromiumos_test_image.bin'
+test_image_zip_filename = 'image.zip'
 sample_partition_filename = 'full_dev_part_KERN.bin.gz'
 
 VERSION_KEY_CROS_SHORT_VERSION = 'cros_short_version'
@@ -135,6 +140,18 @@ class ImageType(enum.Enum):
   # Contains files like image.zip. We need to unzip first.
   ZIP_FILE = enum.auto()
 
+  @classmethod
+  def determine(cls, path: str) -> typing.Optional[ImageType]:
+    """Determine a filetype."""
+    filename = path.split('/')[-1]
+    if filename == sample_partition_filename:
+      return cls.PARTITION_IMAGE
+    if filename == test_image_zip_filename:
+      return cls.ZIP_FILE
+    if filename in [disk_image_bundle_filename, test_image_filename]:
+      return cls.DISK_IMAGE
+    return None
+
 
 class ImageInfo(dict):
   """Image info (dict: image type -> path).
@@ -149,6 +166,142 @@ class ImageInfo(dict):
 
 class NeedRecreateChrootException(Exception):
   """Failed to build ChromeOS because of chroot mismatch or corruption"""
+
+
+class SnapshotStore:
+  default_path = ('gs://chromeos-image-archive/{board}-{bucket}'
+                  '/{snapshot_version}-*/{filename}')
+  images: typing.Dict[str][typing.Dict[str, ImageType]] = {}
+
+  @classmethod
+  def init_with_state(cls, states: core.BisectStates):
+    """Read snapshot information from ChromeOSVersionDomain state object.
+
+    This is a optional step to speedup and reuse the image list fetched in
+    bisect_cros_version. If the state file is not given, SnapshotStore may try
+    to fetch images from gs bucket directly.
+
+    Args:
+      states: A ChromeOSVersionDomain state.
+    """
+    if not states.data:
+      raise errors.InternalError('BisectStates should be loaded')
+
+    for version, detail in states.details.items():
+      cls.images[version] = ImageInfo()
+      for img_type_str, path in detail['images'].items():
+        cls.images[version][ImageType[img_type_str]] = path
+
+  @classmethod
+  def query_snapshot_image(cls, board: str,
+                           snapshot_version: str) -> typing.Optional[str]:
+    """Query a snapshot image path from SnapshotStore or gs bucket.
+
+    Return a zip image if exists, else return a partition image.
+
+    Args:
+      board: CrOS board name
+      snapshot_version: CrOS snapshot version
+
+    Returns:
+      A gs path for specific version or None if not exists.
+    """
+    if not cls.images.get(snapshot_version):
+      logger.warning(
+          '%s not found in SnapshotStore, try to fetch from buckets %s',
+          snapshot_version, snapshot_buckets)
+      cls.images[snapshot_version] = ImageInfo()
+      for bucket in snapshot_buckets:
+        for filename in [test_image_zip_filename, sample_partition_filename]:
+          path = cls.default_path.format(
+              board=board,
+              bucket=bucket,
+              snapshot_version=snapshot_version,
+              filename=filename)
+          output = gsutil_ls(path, ignore_errors=True)
+          if output:
+            cls.images[snapshot_version][ImageType.determine(path)] = path
+
+    zip_image = cls.images[snapshot_version].get(ImageType.ZIP_FILE)
+    partition_image = cls.images[snapshot_version].get(
+        ImageType.PARTITION_IMAGE)
+    return zip_image if zip_image else partition_image
+
+  @classmethod
+  def query_snapshot_buildbucket_id(cls, board: str, snapshot_version: str
+                                   ) -> typing.Optional[str]:
+    """Query buildbucket id of a snapshot"""
+    assert is_cros_snapshot_version(snapshot_version)
+    path = cls.query_snapshot_image(board, snapshot_version)
+    return cls.parse_snapshot_path(path).get('buildbucket_id')
+
+  @classmethod
+  def query_snapshot_version_by_id(cls, board: str,
+                                   snapshot_id: str) -> typing.Optional[str]:
+    """Given a snapshot id, return its corresponding snapshot version."""
+    for snapshot_version in cls.images.keys():
+      gs_path = cls.query_snapshot_image(snapshot_version)
+      if cls.parse_snapshot_path(gs_path).get('snapshot_id') == snapshot_id:
+        return snapshot_version
+
+    # No existing BisectStates or version not found in the state file,
+    # fetch snapshots from cloud storage
+    logger.warning(
+        'snapshot_id %s not found in SnapshotStore, try to fetch from buckets %s',
+        snapshot_id, snapshot_buckets)
+    for bucket in snapshot_buckets:
+      gs_path = ('gs://chromeos-image-archive/{board}-{bucket}/'
+                 'R*-{snapshot_id}-*'.format(
+                     board=board, bucket=bucket, snapshot_id=snapshot_id))
+      for line in gsutil_ls(gs_path, ignore_errors=True):
+        info = cls.parse_snapshot_path(line)
+        if info.get('snapshot_id') == snapshot_id:
+          return info.get('snapshot_version')
+
+    return None
+
+  @classmethod
+  def search_snapshot_image(cls, board: str,
+                            snapshot_version: str) -> ImageInfo:
+    """Searches chromeos snapshot image.
+
+    Args:
+      board: ChromeOS board name
+      snapshot_version: ChromeOS snapshot version number
+
+    Returns:
+      ImageInfo object
+    """
+    assert is_cros_snapshot_version(snapshot_version)
+    image_info = ImageInfo()
+
+    # No existing BisectStates or version not found in the state file
+    if not cls.images.get(snapshot_version):
+      cls.query_snapshot_image(board, snapshot_version)
+
+    for img_type, gs_path in cls.images[snapshot_version].items():
+      if img_type == ImageType.PARTITION_IMAGE:
+        gs_path = gs_path.replace('/' + sample_partition_filename, '')
+      image_info[img_type] = gs_path
+    return image_info
+
+  @classmethod
+  def parse_snapshot_path(cls, path: str) -> typing.Dict[str, str]:
+    """Parse information in snapshot path."""
+    m = re.match(
+        r"""
+      .*/ # gs://.../
+      (?P<board>[^/]+)-(?P<bucket>[^-/]+)/ # eve-postsubmit/
+      (?P<snapshot_version>R\d+-\d+\.\d+\.\d+-(?P<snapshot_id>\d+))
+      -(?P<buildbucket_id>.+)/ # R91-12345.0.0-67890-123456/
+      (?P<filename>[^/]+) # image.zip
+    """, path, re.VERBOSE)
+    return m.groupdict()
+
+  @classmethod
+  def query_snapshot_info(cls, board, version) -> typing.Dict[str, str]:
+    """Query snapshot information by board and version."""
+    return cls.parse_snapshot_path(cls.query_snapshot_image(board, version))
 
 
 def is_cros_short_version(s):
@@ -265,22 +418,6 @@ def snapshot_version_split(snapshot_version):
   assert is_cros_snapshot_version(snapshot_version)
   milestone, short_version, snapshot_id = snapshot_version.split('-')
   return milestone[1:], short_version, snapshot_id
-
-
-def query_snapshot_buildbucket_id(board, snapshot_version):
-  """Query buildbucket id of a snapshot"""
-  assert is_cros_snapshot_version(snapshot_version)
-  path = ('gs://chromeos-image-archive/{board}-snapshot'
-          '/{snapshot_version}-*/image.zip')
-  output = gsutil_ls(
-      '-d',
-      path.format(board=board, snapshot_version=snapshot_version),
-      ignore_errors=True)
-  for line in output:
-    m = re.match(r'.*-snapshot/R\d+-\d+\.\d+\.\d+-\d+-(.+)/image\.zip', line)
-    if m:
-      return m.group(1)
-  return None
 
 
 def argtype_cros_version(s):
@@ -688,7 +825,9 @@ def version_to_full(board, version):
   return make_cros_full_version(milestone, version)
 
 
-def list_snapshots_from_image_archive(board, major_version):
+def list_snapshots_from_image_archive(
+    board: str,
+    major_version: str) -> typing.List[typing.Tuple[str, typing.List[str]]]:
   """List ChromeOS snapshot image available from gs://chromeos-image-archive.
 
   Args:
@@ -696,9 +835,9 @@ def list_snapshots_from_image_archive(board, major_version):
     major_version: ChromeOS major version
 
   Returns:
-    list of (version, gs_path):
+    list of (version, gs_paths):
       version: Chrome OS snapshot version
-      gs_path: gs path of test image
+      gs_paths: A list of gs images of corresponding version
   """
 
   def extract_snapshot_id(result):
@@ -707,50 +846,44 @@ def list_snapshots_from_image_archive(board, major_version):
     return int(m.group(1))
 
   def iterate_gspath_alias(board, milestone, short_version):
-    path = ('gs://chromeos-image-archive/{board}-{bucket}/R{milestone}-'
-            '{short_version}-*/image.zip')
-
     for bucket in snapshot_buckets:
-      yield path.format(
-          board=board,
-          bucket=bucket,
-          milestone=milestone,
-          short_version=short_version,
-      )
+      for filename in [test_image_zip_filename, sample_partition_filename]:
+        yield SnapshotStore.default_path.format(
+            board=board,
+            bucket=bucket,
+            snapshot_version='R%s-%s-*' % (milestone, short_version),
+            filename=filename,
+        )
 
   short_version = '%s.0.0' % major_version
   milestone = query_milestone_by_version(board, short_version)
   if not milestone:
     milestone = '*'
 
-  result = []
   output = itertools.chain(
       *(gsutil_ls(alias, ignore_errors=True)
         for alias in iterate_gspath_alias(board, milestone, short_version)))
 
+  images = {}
   for gs_path in sorted(output):
-    m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)', gs_path)
-    if m:
-      snapshot_version = m.group(1)
-      # we should skip if there is duplicate snapshot
-      if result and result[-1][0] == snapshot_version:
-        continue
+    info = SnapshotStore.parse_snapshot_path(gs_path)
+    assert 'snapshot_version' in info
+    snapshot_version = info['snapshot_version']
+    snapshot_id = info['snapshot_id']
 
-      _, _, snapshot_id = snapshot_version_split(snapshot_version)
+    # crbug/1170601: ignore small snapshot ids
+    if int(snapshot_id) <= snapshot_cutover_id:
+      continue
 
-      # crbug/1170601: ignore small snapshot ids
-      if int(snapshot_id) <= snapshot_cutover_id:
-        continue
+    # b/151054108: snapshot version in [29288, 29439] is broken
+    if 29288 <= int(snapshot_id) <= 29439:
+      continue
 
-      # b/151054108: snapshot version in [29288, 29439] is broken
-      if 29288 <= int(snapshot_id) <= 29439:
-        continue
+    if snapshot_version not in images:
+      images[snapshot_version] = []
+    images[snapshot_version].append(gs_path)
 
-      result.append((snapshot_version, gs_path))
-
-  # sort by its snapshot_id
-  result.sort(key=extract_snapshot_id)
-  return result
+  return sorted(images.items(), key=extract_snapshot_id)
 
 
 def list_prebuilt_from_image_archive(board):
@@ -802,10 +935,10 @@ def list_chromeos_prebuilt_versions(
   new_short = version_to_short(new)
 
   rev_map = {
-  }  # dict: short version -> list of (short/full or snapshot version, gs path)
+  }  # dict: short version -> list of (short/full or snapshot version, list of gs paths)
   for full_version, gs_path in list_prebuilt_from_image_archive(board):
     short_version = version_to_short(full_version)
-    rev_map[short_version] = [(full_version, gs_path)]
+    rev_map[short_version] = [(full_version, [gs_path])]
 
   with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
     jobs = []
@@ -858,13 +991,13 @@ def list_chromeos_prebuilt_versions(
     if not util.is_version_lesseq(rev, new_short):
       continue
 
-    for version, gs_path in rev_map[rev]:
+    for version, gs_paths in rev_map[rev]:
 
       # version_to_full() and gsutil_ls() may take long time if versions are a
       # lot. This is acceptable because we usually bisect only short range.
 
       if only_good_build and not is_cros_snapshot_version(version):
-        gs_result = gsutil_ls(gs_path, ignore_errors=True)
+        gs_result = gsutil_ls(gs_paths[0], ignore_errors=True)
         if not gs_result:
           logger.warning('%s is not a good build, ignore', version)
           continue
@@ -880,34 +1013,15 @@ def list_chromeos_prebuilt_versions(
       if is_cros_version_lesseq(old, version) and is_cros_version_lesseq(
           version, new):
         result.append(version)
-        details[version] = {'gs_path': gs_path}
+
+        for gs_path in gs_paths:
+          img_type = ImageType.determine(gs_path)
+          if img_type:
+            if version not in details:
+              details[version] = {'images': {}}
+            details[version]['images'][img_type.name] = gs_path
 
   return result, details
-
-
-def search_snapshot_image(board, snapshot_version):
-  """Searches chromeos snapshot image.
-
-  Args:
-    board: ChromeOS board name
-    snapshot_version: ChromeOS snapshot version number
-
-  Returns:
-    ImageInfo object
-  """
-  assert is_cros_snapshot_version(snapshot_version)
-  image_info = ImageInfo()
-  gs_path = gs_archive_base + '{board}-snapshot/{snapshot_version}-*'.format(
-      board=board, snapshot_version=snapshot_version)
-  files = gsutil_ls(
-      gs_path + '/' + sample_partition_filename, ignore_errors=True)
-  if files:
-    image_info[ImageType.PARTITION_IMAGE] = files[0].replace(
-        sample_partition_filename, '')
-  files = gsutil_ls(gs_path + '/image.zip', ignore_errors=True)
-  if files:
-    image_info[ImageType.ZIP_FILE] = files[0]
-  return image_info
 
 
 def prepare_image_for_quick_provision(image_info):
@@ -1014,7 +1128,8 @@ def verify_dut_version(host, board, version):
     if is_cros_snapshot_version(version):
       builder_path = query_dut_lsb_release(host).get(
           'CHROMEOS_RELEASE_BUILDER_PATH', '')
-      expect_prefix = '%s-snapshot/%s-' % (board, version)
+      snapshot_info = SnapshotStore.query_snapshot_info(board, version)
+      expect_prefix = '%s-%s/%s-' % (board, snapshot_info['bucket'], version)
       if not builder_path.startswith(expect_prefix):
         raise errors.ExternalError(
             'although provision succeeded, the OS builder path is '
@@ -1093,7 +1208,7 @@ def search_prebuilt_image(board, version):
 
 def search_image(board, version):
   if is_cros_snapshot_version(version):
-    return search_snapshot_image(board, version)
+    return SnapshotStore.search_snapshot_image(board, version)
   return search_prebuilt_image(board, version)
 
 
@@ -1237,7 +1352,7 @@ def version_info(board, version):
   if is_cros_snapshot_version(version):
     api = buildbucket_util.BuildbucketApi()
     milestone, short_version, _ = snapshot_version_split(version)
-    buildbucket_id = query_snapshot_buildbucket_id(board, version)
+    buildbucket_id = SnapshotStore.query_snapshot_buildbucket_id(board, version)
     data = api.get_build(int(buildbucket_id)).output.properties
     target_versions = json_format.MessageToDict(data['target_versions'])
     return {
@@ -1980,19 +2095,17 @@ class ChromeOSSpecManager(codechange.SpecManager):
     assert is_cros_snapshot_version(old)
     assert is_cros_snapshot_version(new)
 
-    gs_path = (
-        'gs://chromeos-image-archive/{board}-snapshot/{version}-*/image.zip')
     # Try to guess the commit time of a snapshot manifest, it is usually a few
     # minutes different between snapshot manifest commit and image.zip
     # generate.
     try:
       old_timestamp = gsutil_stat_creation_time(
-          gs_path.format(board=self.config['board'], version=old)) - 86400
+          SnapshotStore.query_snapshot_image(self.config['board'], old)) - 86400
     except subprocess.CalledProcessError:
       old_timestamp = None
     try:
       new_timestamp = gsutil_stat_creation_time(
-          gs_path.format(board=self.config['board'], version=new)) + 86400
+          SnapshotStore.query_snapshot_image(self.config['board'], new)) + 86400
       # 1558657989 is snapshot_id 5982's commit time, this ensures every time
       # we can find snapshot 5982
       # snapshot_id <= 5982 has different commit message format, so we need
@@ -2228,26 +2341,12 @@ class ChromeOSSpecManager(codechange.SpecManager):
     assert is_cros_snapshot_version(old)
     assert is_cros_snapshot_version(new)
 
-    def guess_snapshot_version(board, snapshot_id, old, new):
-      if old.endswith('-' + snapshot_id):
-        return old
-      if new.endswith('-' + snapshot_id):
-        return new
-      gs_path = ('gs://chromeos-image-archive/{board}-snapshot/'
-                 'R*-{snapshot_id}-*'.format(
-                     board=board, snapshot_id=snapshot_id))
-      for line in gsutil_ls(gs_path, ignore_errors=True):
-        m = re.match(r'^gs:\S+(R\d+-\d+\.\d+\.\d+-\d+)\S+', line)
-        if m:
-          return m.group(1)
-      return None
-
     result = []
     path = 'snapshot.xml'
     revisions = self.lookup_snapshot_manifest_revisions(old, new)
     for timestamp, _git_rev, snapshot_id in revisions:
-      snapshot_version = guess_snapshot_version(self.config['board'],
-                                                snapshot_id, old, new)
+      snapshot_version = SnapshotStore.query_snapshot_version_by_id(
+          self.config['board'], snapshot_id)
       if snapshot_version:
         result.append(
             codechange.Spec(codechange.SPEC_FIXED, snapshot_version, timestamp,

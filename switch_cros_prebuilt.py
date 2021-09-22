@@ -14,6 +14,7 @@ import sys
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 
@@ -63,6 +64,11 @@ def create_argument_parser():
 
 
 def switch(opts):
+  if opts.session:
+    states = core.BisectStates.from_bisector_class('ChromeOSVersionDomain',
+                                                   opts.session)
+    states.load()
+    cros_util.SnapshotStore.init_with_state(states)
   # TODO(kcwu): clear cache of cros flash
   image_info = cros_util.search_image(opts.board, opts.version)
   if not image_info:

@@ -246,6 +246,7 @@ class TestCrosUtil(unittest.TestCase):
         snapshot_base + 'R63-9998.0.0-30105-000/',
         snapshot_base + 'R63-9999.0.0-30106-000/',
         snapshot_base + 'R63-9996.0.0-30103-000/image.zip',
+        snapshot_base + 'R63-9996.0.0-30103-000/full_dev_part_KERN.bin.gz',
         snapshot_base + 'R63-9997.0.0-30104-000/image.zip',
         snapshot_base + 'R63-9998.0.0-30105-000/image.zip',
         snapshot_base + 'R63-9999.0.0-30106-000/image.zip',
@@ -293,20 +294,28 @@ class TestCrosUtil(unittest.TestCase):
             'foo', '9998.0.0', '10001.0.0', only_good_build=False),
         (['R63-9998.0.0', 'R63-9999.0.0', 'R63-10000.0.0', 'R63-10001.0.0'], {
             'R63-9998.0.0': {
-                'gs_path':
-                    'gs://chromeos-image-archive/foo-release/R63-9998.0.0/chromiumos_test_image.tar.xz'
+                'images': {
+                    'DISK_IMAGE':
+                        'gs://chromeos-image-archive/foo-release/R63-9998.0.0/chromiumos_test_image.tar.xz'
+                }
             },
             'R63-9999.0.0': {
-                'gs_path':
-                    'gs://chromeos-image-archive/foo-release/R63-9999.0.0/chromiumos_test_image.tar.xz'
+                'images': {
+                    'DISK_IMAGE':
+                        'gs://chromeos-image-archive/foo-release/R63-9999.0.0/chromiumos_test_image.tar.xz'
+                }
             },
             'R63-10000.0.0': {
-                'gs_path':
-                    'gs://chromeos-image-archive/foo-release/R63-10000.0.0/chromiumos_test_image.tar.xz'
+                'images': {
+                    'DISK_IMAGE':
+                        'gs://chromeos-image-archive/foo-release/R63-10000.0.0/chromiumos_test_image.tar.xz'
+                }
             },
             'R63-10001.0.0': {
-                'gs_path':
-                    'gs://chromeos-image-archive/foo-release/R63-10001.0.0/chromiumos_test_image.tar.xz'
+                'images': {
+                    'DISK_IMAGE':
+                        'gs://chromeos-image-archive/foo-release/R63-10001.0.0/chromiumos_test_image.tar.xz'
+                }
             }
         }))
 
@@ -336,16 +345,24 @@ class TestCrosUtil(unittest.TestCase):
             'R63-9997.0.0',
         ], {
             'R63-9995.0.0': {
-                'gs_path':
-                    'gs://chromeos-image-archive/foo-release/R63-9995.0.0/chromiumos_test_image.tar.xz'
+                'images': {
+                    'DISK_IMAGE':
+                        'gs://chromeos-image-archive/foo-release/R63-9995.0.0/chromiumos_test_image.tar.xz'
+                }
             },
             'R63-9996.0.0-30103': {
-                'gs_path':
-                    'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-000/image.zip'
+                'images': {
+                    'PARTITION_IMAGE':
+                        'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-000/full_dev_part_KERN.bin.gz',
+                    'ZIP_FILE':
+                        'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-000/image.zip'
+                }
             },
             'R63-9997.0.0': {
-                'gs_path':
-                    'gs://chromeos-image-archive/foo-release/R63-9997.0.0/chromiumos_test_image.tar.xz'
+                'images': {
+                    'DISK_IMAGE':
+                        'gs://chromeos-image-archive/foo-release/R63-9997.0.0/chromiumos_test_image.tar.xz'
+                }
             }
         }))
 
@@ -508,6 +525,53 @@ class TestCrosUtil(unittest.TestCase):
           cros_util.convert_path_outside_chroot('/path/to/root',
                                                 '~/path/to/file'),
           '/path/to/root/chroot/home/foouser/path/to/file')
+
+  def test_parse_snapshot_path(self):
+    self.assertDictEqual(
+        cros_util.SnapshotStore.parse_snapshot_path(
+            'gs://my-bucket/hatch-snapshot/R96-14171.0.0-53037-123456789/image.zip'
+        ), {
+            'board': 'hatch',
+            'bucket': 'snapshot',
+            'snapshot_version': 'R96-14171.0.0-53037',
+            'snapshot_id': '53037',
+            'buildbucket_id': '123456789',
+            'filename': 'image.zip',
+        })
+
+    self.assertDictEqual(
+        cros_util.SnapshotStore.parse_snapshot_path(
+            'gs://my-bucket/eve-kernelnext-postsubmit/R96-14171.0.0-53037-123456789/full_dev_part_KERN.bin.gz'
+        ), {
+            'board': 'eve-kernelnext',
+            'bucket': 'postsubmit',
+            'snapshot_version': 'R96-14171.0.0-53037',
+            'snapshot_id': '53037',
+            'buildbucket_id': '123456789',
+            'filename': 'full_dev_part_KERN.bin.gz',
+        })
+
+  def test_determine_image_type(self):
+    self.assertEqual(
+        cros_util.ImageType.determine(
+            'gs://my-bucket/hatch-snapshot/R96-14171.0.0-53037-123456789/image.zip'
+        ), cros_util.ImageType.ZIP_FILE)
+    self.assertEqual(
+        cros_util.ImageType.determine(
+            'gs://my-bucket/hatch-snapshot/R96-14171.0.0-53037-123456789/full_dev_part_KERN.bin.gz'
+        ), cros_util.ImageType.PARTITION_IMAGE)
+    self.assertEqual(
+        cros_util.ImageType.determine(
+            'gs://my-bucket/hatch-snapshot/R96-14171.0.0-53037-123456789/chromiumos_test_image.tar.xz'
+        ), cros_util.ImageType.DISK_IMAGE)
+    self.assertEqual(
+        cros_util.ImageType.determine(
+            'gs://my-bucket/hatch-snapshot/R96-14171.0.0-53037-123456789/chromiumos_test_image.bin'
+        ), cros_util.ImageType.DISK_IMAGE)
+    self.assertEqual(
+        cros_util.ImageType.determine(
+            'gs://my-bucket/hatch-snapshot/R96-14171.0.0-53037-123456789/mystery.bin'
+        ), None)
 
 
 if __name__ == '__main__':

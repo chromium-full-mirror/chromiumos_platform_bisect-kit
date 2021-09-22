@@ -138,7 +138,9 @@ class CrosDiagnoser:
           session=self.config['session'])
       bisector = wrapper.BisectorWrapper('bisect_cros_version',
                                          self.config['session'])
-      switch_cmd = ['./switch_cros_prebuilt.py']
+      switch_cmd = [
+          './switch_cros_prebuilt.py', '--session', self.config['session']
+      ]
       if not self.config['disable_rootfs_verification']:
         switch_cmd.append('--no_disable_rootfs_verification')
 
@@ -162,6 +164,10 @@ class CrosDiagnoser:
 
       self.cros_old, self.cros_new, self.noisy = bisector.narrow_down()
 
+    prebuilt_states = core.BisectStates.from_bisector_class(
+        'ChromeOSVersionDomain', self.config['session'])
+    prebuilt_states.load()
+    cros_util.SnapshotStore.init_with_state(prebuilt_states)
     self.old_info = cros_util.version_info(self.config['board'], self.cros_old)
     self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
 
@@ -193,8 +199,8 @@ class CrosDiagnoser:
       if cros_util.query_dut_prebuilt_version(self.dut) == version:
         return
     cmd = [
-        './switch_cros_prebuilt.py', '--board', self.config['board'], '--dut',
-        self.dut, self.cros_old
+        './switch_cros_prebuilt.py', '--session', self.config['session'],
+        '--board', self.config['board'], '--dut', self.dut, self.cros_old
     ]
     if not self.config['disable_rootfs_verification']:
       cmd.append('--no_disable_rootfs_verification')
