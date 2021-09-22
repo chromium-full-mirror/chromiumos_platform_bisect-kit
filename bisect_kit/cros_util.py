@@ -30,6 +30,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import typing
 import urllib.parse
 
 from google.protobuf import json_format
@@ -775,11 +776,13 @@ def list_prebuilt_from_image_archive(board):
   return result
 
 
-def list_chromeos_prebuilt_versions(board,
-                                    old,
-                                    new,
-                                    only_good_build=True,
-                                    use_snapshot=False):
+def list_chromeos_prebuilt_versions(
+    board: str,
+    old: str,
+    new: str,
+    only_good_build: bool = True,
+    use_snapshot: bool = False
+) -> typing.Tuple[typing.List[str], typing.Dict[str, typing.Any]]:
   """Lists ChromeOS version numbers with prebuilt between given range
 
   Args:
@@ -790,8 +793,10 @@ def list_chromeos_prebuilt_versions(board,
     use_snapshot: return snapshot versions if found
 
   Returns:
-    list of sorted version numbers (in full format) between [old, new] range
-    (inclusive).
+    (result, details)
+      result: list of sorted version numbers (in full format) between
+        [old, new] range (inclusive).
+      details: A dict that contains detailed information for each version.
   """
   old_short = version_to_short(old)
   new_short = version_to_short(new)
@@ -829,8 +834,8 @@ def list_chromeos_prebuilt_versions(board,
           continue
         if not util.is_direct_relative_version(short_version, new_short):
           continue
-        future_result = executor.submit(list_snapshots_from_image_archive, board,
-                                        str(major_version))
+        future_result = executor.submit(list_snapshots_from_image_archive,
+                                        board, str(major_version))
         jobs.append((short_version, future_result))
 
       for short_version, future in jobs:
