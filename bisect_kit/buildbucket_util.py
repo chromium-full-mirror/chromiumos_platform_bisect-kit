@@ -323,6 +323,9 @@ class BuildbucketApi:
         '$chromeos/failures': {
             'disable_silences': True,
         },
+        '$chromeos/cros_relevance': {
+            'force_postsubmit_relevance': True,
+        },
         '$chromeos/cros_source': {
             'snapshot_cas': {
                 'digest': chromeos_digest,
