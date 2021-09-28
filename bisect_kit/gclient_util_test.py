@@ -233,22 +233,6 @@ class TestTimeSeriesTree(unittest.TestCase):
 
   def test_simple(self):
     base = 'http://example.com'
-    tstree = gclient_util.TimeSeriesTree(None, 'root', 0, 1000)
-
-    deps = gclient_util.Deps()
-    deps.entries['src'] = gclient_util.Dep('src', {}, base)
-    tstree.add_snapshot(0, deps, [])
-
-    tstree.add_snapshot(0, deps, [])
-
-    tstree.no_more_snapshot()
-
-    self.assertEqual(tstree.subtrees, [])
-
-    tstree.iter_path_specs()
-
-  def test_simple(self):
-    base = 'http://example.com'
     deps = gclient_util.Deps()
     deps.entries['src'] = gclient_util.Dep('src', {}, base)
     tstree = gclient_util.TimeSeriesTree(None, 'root', 0, 0)
