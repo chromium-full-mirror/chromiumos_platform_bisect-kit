@@ -12,6 +12,7 @@ import logging
 import os
 import random
 import time
+import typing
 
 from bisect_kit import cli
 from bisect_kit import common
@@ -23,7 +24,7 @@ from bisect_kit import errors
 DEFAULT_DUT_POOL = 'DUT_POOL_QUOTA'
 logger = logging.getLogger(__name__)
 
-models_to_avoid = {
+models_to_avoid: typing.Dict[str, str] = {
     # model: reason
 }
 

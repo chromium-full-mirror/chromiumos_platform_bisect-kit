@@ -235,7 +235,6 @@ class TestCrosUtil(unittest.TestCase):
       self.assertEqual(
           cros_util.list_prebuilt_from_image_archive('wrong-board'), [])
 
-  @staticmethod
   def _gsutil_ls(*args, **_kwargs):
     archive_base = 'gs://chromeos-image-archive/foo-release/'
     snapshot_base = 'gs://chromeos-image-archive/foo-snapshot/'
@@ -275,18 +274,16 @@ class TestCrosUtil(unittest.TestCase):
         result.append(gs_path)
     return result
 
-  @staticmethod
   def _query_milestone_by_version(_1, _2):
     return '63'
 
-  @staticmethod
   def _version_to_full(_board, version):
     return 'R63-' + version
 
-  @mock.patch('bisect_kit.cros_util.gsutil_ls', _gsutil_ls.__func__)
-  @mock.patch('bisect_kit.cros_util.version_to_full', _version_to_full.__func__)
+  @mock.patch('bisect_kit.cros_util.gsutil_ls', _gsutil_ls)
+  @mock.patch('bisect_kit.cros_util.version_to_full', _version_to_full)
   @mock.patch('bisect_kit.cros_util.query_milestone_by_version',
-              _query_milestone_by_version.__func__)
+              _query_milestone_by_version)
   def test_list_chromeos_prebuilt_versions(self):
     # Both ends are in gs://chromeos-image-archive
     self.assertEqual(
@@ -326,10 +323,10 @@ class TestCrosUtil(unittest.TestCase):
         ['R63-9999.0.0', 'R63-10001.0.0'])
 
   @mock.patch('bisect_kit.cros_util.snapshot_cutover_version', '0.0.0')
-  @mock.patch('bisect_kit.cros_util.gsutil_ls', _gsutil_ls.__func__)
-  @mock.patch('bisect_kit.cros_util.version_to_full', _version_to_full.__func__)
+  @mock.patch('bisect_kit.cros_util.gsutil_ls', _gsutil_ls)
+  @mock.patch('bisect_kit.cros_util.version_to_full', _version_to_full)
   @mock.patch('bisect_kit.cros_util.query_milestone_by_version',
-              _query_milestone_by_version.__func__)
+              _query_milestone_by_version)
   def test_list_chromeos_prebuilt_versions_with_snapshots(self):
     # snapshot 1: release ~ release
     self.assertEqual(
