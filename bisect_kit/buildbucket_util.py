@@ -525,6 +525,9 @@ class BuildbucketApi:
       if build.status not in valid_status:
         continue
       input_properties = json_format.MessageToDict(build.input.properties)
+      output_properties = json_format.MessageToDict(build.output.properties)
+      gs_bucket = util.dict_get(output_properties, 'artifacts', 'gs_bucket')
+      gs_path = util.dict_get(output_properties, 'artifacts', 'gs_path')
       build_manifest_hash = util.dict_get(input_properties,
                                           '$chromeos/cros_source',
                                           'snapshot_cas', 'digest')
@@ -533,6 +536,7 @@ class BuildbucketApi:
       build_src_ver = util.dict_get(input_properties, '$chromeos/chrome',
                                     'version')
       if (build_manifest_hash == manifest_digest and
-          build_deps_hash == deps_digest and build_src_ver == deps_src_ver):
+          build_deps_hash == deps_digest and build_src_ver == deps_src_ver and
+          gs_bucket and gs_path):
         return build
     return None
