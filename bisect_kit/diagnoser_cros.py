@@ -166,8 +166,8 @@ class CrosDiagnoser:
 
     prebuilt_states = core.BisectStates.from_bisector_class(
         'ChromeOSVersionDomain', self.config['session'])
-    prebuilt_states.load()
-    cros_util.SnapshotStore.init_with_state(prebuilt_states)
+    if prebuilt_states.load():
+      cros_util.SnapshotStore.init_with_state(prebuilt_states)
     self.old_info = cros_util.version_info(self.config['board'], self.cros_old)
     self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
 
