@@ -171,7 +171,7 @@ class NeedRecreateChrootException(Exception):
 class SnapshotStore:
   default_path = ('gs://chromeos-image-archive/{board}-{bucket}'
                   '/{snapshot_version}-*/{filename}')
-  images: typing.Dict[str][typing.Dict[str, ImageType]] = {}
+  images: typing.Dict[str, ImageInfo] = {}
 
   @classmethod
   def init_with_state(cls, states: core.BisectStates):
@@ -219,8 +219,9 @@ class SnapshotStore:
               snapshot_version=snapshot_version,
               filename=filename)
           output = gsutil_ls(path, ignore_errors=True)
-          if output:
-            cls.images[snapshot_version][ImageType.determine(path)] = path
+          img_type = ImageType.determine(path)
+          if output and img_type:
+            cls.images[snapshot_version][img_type] = path
 
     zip_image = cls.images[snapshot_version].get(ImageType.ZIP_FILE)
     partition_image = cls.images[snapshot_version].get(
@@ -233,6 +234,9 @@ class SnapshotStore:
     """Query buildbucket id of a snapshot"""
     assert is_cros_snapshot_version(snapshot_version)
     path = cls.query_snapshot_image(board, snapshot_version)
+    if not path:
+      raise errors.ExternalError('board=%s snapshot=%s not found' %
+                                 (board, snapshot_version))
     return cls.parse_snapshot_path(path).get('buildbucket_id')
 
   @classmethod
@@ -240,8 +244,9 @@ class SnapshotStore:
                                    snapshot_id: str) -> typing.Optional[str]:
     """Given a snapshot id, return its corresponding snapshot version."""
     for snapshot_version in cls.images.keys():
-      gs_path = cls.query_snapshot_image(snapshot_version)
-      if cls.parse_snapshot_path(gs_path).get('snapshot_id') == snapshot_id:
+      gs_path = cls.query_snapshot_image(board, snapshot_version)
+      if gs_path and cls.parse_snapshot_path(gs_path).get(
+          'snapshot_id') == snapshot_id:
         return snapshot_version
 
     # No existing BisectStates or version not found in the state file,
@@ -296,12 +301,16 @@ class SnapshotStore:
       -(?P<buildbucket_id>.+)/ # R91-12345.0.0-67890-123456/
       (?P<filename>[^/]+) # image.zip
     """, path, re.VERBOSE)
-    return m.groupdict()
+    return m.groupdict() if m else {}
 
   @classmethod
   def query_snapshot_info(cls, board, version) -> typing.Dict[str, str]:
     """Query snapshot information by board and version."""
-    return cls.parse_snapshot_path(cls.query_snapshot_image(board, version))
+    path = cls.query_snapshot_image(board, version)
+    if not path:
+      raise errors.ExternalError('board=%s snapshot=%s not found' %
+                                 (board, version))
+    return cls.parse_snapshot_path(path)
 
 
 def is_cros_short_version(s):
@@ -864,7 +873,7 @@ def list_snapshots_from_image_archive(
       *(gsutil_ls(alias, ignore_errors=True)
         for alias in iterate_gspath_alias(board, milestone, short_version)))
 
-  images = {}
+  images: typing.Dict[str, typing.List[str]] = {}
   for gs_path in sorted(output):
     info = SnapshotStore.parse_snapshot_path(gs_path)
     assert 'snapshot_version' in info
@@ -982,7 +991,7 @@ def list_chromeos_prebuilt_versions(
           rev_map[short_version] += snapshots
 
   result = []
-  details = {}
+  details: typing.Dict[str, dict] = {}
   for rev in sorted(rev_map, key=util.version_key_func):
     if not util.is_direct_relative_version(new_short, rev):
       continue
