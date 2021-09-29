@@ -162,7 +162,7 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
   # (http://crbug.com/881783).
   cleanup_repo_generated_files(repo_dir)
 
-  cmd = ['repo', 'sync', '-q', '--force-sync']
+  cmd = ['repo', 'sync', '-q', '--force-sync', '--no-use-superproject']
   if jobs:
     cmd += ['-j', str(jobs)]
   if manifest_name:
