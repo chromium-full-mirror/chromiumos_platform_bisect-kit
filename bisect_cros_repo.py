@@ -111,6 +111,10 @@ class ChromeOSRepoDomain(core.BisectDomain):
     cache = repo_util.RepoMirror(opts.chromeos_mirror)
     code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager,
                                           cache)
+    states = core.BisectStates.from_bisector_class('ChromeOSVersionDomain',
+                                                   opts.session)
+    if states.load():
+      cros_util.SnapshotStore.init_with_state(states)
 
     revlist, details = code_manager.build_revlist(opts.old, opts.new)
     for detail in details.values():

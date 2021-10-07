@@ -206,7 +206,7 @@ class SnapshotStore:
     Returns:
       A gs path for specific version or None if not exists.
     """
-    if not cls.images.get(snapshot_version):
+    if snapshot_version not in cls.images:
       logger.warning(
           '%s not found in SnapshotStore, try to fetch from buckets %s',
           snapshot_version, snapshot_buckets)
@@ -219,9 +219,9 @@ class SnapshotStore:
               snapshot_version=snapshot_version,
               filename=filename)
           output = gsutil_ls(path, ignore_errors=True)
-          img_type = ImageType.determine(path)
-          if output and img_type:
-            cls.images[snapshot_version][img_type] = path
+          if output:
+            img_type = ImageType.determine(output[0])
+            cls.images[snapshot_version][img_type] = output[0]
 
     zip_image = cls.images[snapshot_version].get(ImageType.ZIP_FILE)
     partition_image = cls.images[snapshot_version].get(
@@ -2107,21 +2107,20 @@ class ChromeOSSpecManager(codechange.SpecManager):
     # Try to guess the commit time of a snapshot manifest, it is usually a few
     # minutes different between snapshot manifest commit and image.zip
     # generate.
-    try:
-      old_timestamp = gsutil_stat_creation_time(
-          SnapshotStore.query_snapshot_image(self.config['board'], old)) - 86400
-    except subprocess.CalledProcessError:
-      old_timestamp = None
-    try:
-      new_timestamp = gsutil_stat_creation_time(
-          SnapshotStore.query_snapshot_image(self.config['board'], new)) + 86400
+    old_timestamp = None
+    new_timestamp = None
+    old_path = SnapshotStore.query_snapshot_image(self.config['board'], old)
+    new_path = SnapshotStore.query_snapshot_image(self.config['board'], new)
+    if old_path:
+      old_timestamp = gsutil_stat_creation_time(old_path) - 86400
+    if new_path:
+      new_timestamp = gsutil_stat_creation_time(new_path) + 86400
       # 1558657989 is snapshot_id 5982's commit time, this ensures every time
       # we can find snapshot 5982
       # snapshot_id <= 5982 has different commit message format, so we need
       # to identify its id in different ways, see below comment for more info.
       new_timestamp = max(new_timestamp, 1558657989 + 1)
-    except subprocess.CalledProcessError:
-      new_timestamp = None
+
     result = []
     _, _, old_snapshot_id = snapshot_version_split(old)
     _, _, new_snapshot_id = snapshot_version_split(new)
