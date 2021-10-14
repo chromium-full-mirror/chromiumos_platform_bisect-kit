@@ -236,6 +236,7 @@ class BuildbucketApi:
     logged_in = False
     response_content = None
     while max_retries > 0:
+      max_retries -= 1
       try:
         conn = http.client.HTTPSConnection(
             self.buildbucket_domain, timeout=timeout)
@@ -256,10 +257,10 @@ class BuildbucketApi:
           logger.exception('Error in buildbucket post: %s', response_content)
           raise errors.ExternalError('buildbucket api response: ' +
                                      response_content) from e
-      except (socket.timeout, ssl.SSLError):
+      except (ConnectionError, socket.timeout, ssl.SSLError) as e:
         if max_retries <= 0:
-          raise
-      max_retries -= 1
+          raise errors.ExternalError('buildbucket api %s failed' % api) from e
+        logger.warning('retry buildbucket api due to connection problem (%r)', e)
 
     raise errors.ExternalError('buildbucket api %s failed' % api)
 
