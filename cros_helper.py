@@ -238,6 +238,11 @@ def do_allocate_dut(opts):
     for board in opts.board.split(','):
       variants.append('label-board:' +
                       normalize_board_name(opts.chromeos_root, board))
+    variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
+    if not variants:
+      raise errors.NoDutAvailable(
+          'Invalid constraints: no board=%s in the lab' % opts.board)
+
   if opts.model:
     for model in opts.model.split(','):
       if model in models_to_avoid:
@@ -248,18 +253,26 @@ def do_allocate_dut(opts):
     if not variants:
       raise errors.ArgumentError('--model',
                                  'all specified models are not supported')
+    variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
+    if not variants:
+      raise errors.NoDutAvailable(
+          'Invalid constraints: no model=%s in the lab' % opts.model)
+
   if opts.sku:
     for sku in opts.sku.split(','):
       variants.append('label-hwid_sku:' + cros_lab_util.normalize_sku_name(sku))
+    variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
+    if not variants:
+      raise errors.NoDutAvailable('Invalid constraints: no sku=%s in the lab' %
+          opts.sku)
+
   if opts.dut_name:
     for dut_name in opts.dut_name.split(','):
       variants.append('dut_name:' + dut_name)
-
-  variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
-  if not variants:
-    raise errors.NoDutAvailable(
-        'Invalid constraints: %s;%s;%s;%s' %
-        (opts.board, opts.model, opts.sku, opts.dut_name))
+    variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
+    if not variants:
+      raise errors.NoDutAvailable(
+          'Invalid constraints: no dut_name=%s in the lab' % opts.dut_name)
 
   # Filter variants by prebuilt images.
   boards_with_prebuilt = None
