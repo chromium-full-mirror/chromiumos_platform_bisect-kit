@@ -153,12 +153,13 @@ def config(git_repo, *args):
   util.check_call('git', 'config', *args, cwd=git_repo)
 
 
-def fetch(git_repo, *args):
+def fetch(git_repo, *args, retry_prune_if_conflict=False):
   """Wrapper of 'git fetch' with retry support.
 
   Args:
     git_repo: path of git repo.
     args: parameters pass to 'git fetch'
+    retry_prune_if_conflict: retry with --prune if git references conflict
   """
   tries = 0
   while True:
@@ -177,11 +178,23 @@ def fetch(git_repo, *args):
         logger.error('git fetch failed too much times')
         raise
       stderr = ''.join(stderr_lines)
-      # only retry 5xx internal server error
+      # retry 5xx internal server error
       if 'The requested URL returned error: 5' in stderr:
         delay = min(60, 10 * 2**tries)
         logger.warning('git fetch failed, will retry %s seconds later', delay)
         time.sleep(delay)
+        continue
+
+      # We have `retry_prune_if_conflict` instead of always pruning because as
+      # a bisector, we want to keep historical references as long as possible,
+      # even if they have been deleted on remote server. We prune references
+      # only if conflict is detected.
+      if ('(unable to update local ref)' in stderr and
+          retry_prune_if_conflict and '--prune' not in args):
+        logger.warning(
+            'git fetch failed due to conflicting references; try again with --prune'
+        )
+        args = '--prune', *args
         continue
       raise
 

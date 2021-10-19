@@ -326,7 +326,7 @@ cache_dir = %r
       git_repo = os.path.join(chrome_cache, git_repo_name)
       if not git_util.is_git_bare_dir(git_repo):
         continue
-      git_util.fetch(git_repo)
+      git_util.fetch(git_repo, retry_prune_if_conflict=True)
 
     # Some repos were removed from the DEPS and won't be synced here. They will
     # be synced during DEPS file processing because the necessary information
