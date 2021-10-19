@@ -970,8 +970,10 @@ def list_chromeos_prebuilt_versions(
       details: A dict that contains detailed information for each version.
   """
   # Normalize.
-  old = version_to_full(board, old)
-  new = version_to_full(board, new)
+  if is_cros_short_version(old):
+    old = version_to_full(board, old)
+  if is_cros_short_version(new):
+    new = version_to_full(board, new)
 
   versions = []
   details: typing.Dict[str, typing.Any] = {}
