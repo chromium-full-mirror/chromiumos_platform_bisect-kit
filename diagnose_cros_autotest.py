@@ -133,7 +133,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
   def cmd_run(self, opts):
     del opts  # unused
 
-    self.states.load()
+    self.states.load_states()
 
     try:
       path_factory = setup_cros_bisect.DefaultProjectPathFactory(

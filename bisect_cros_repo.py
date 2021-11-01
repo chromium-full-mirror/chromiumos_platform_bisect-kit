@@ -113,7 +113,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
                                           cache)
     states = core.BisectStates.from_bisector_class('ChromeOSVersionDomain',
                                                    opts.session)
-    if states.load():
+    if states.load_states():
       cros_util.SnapshotStore.init_with_state(states)
 
     revlist, details = code_manager.build_revlist(opts.old, opts.new)

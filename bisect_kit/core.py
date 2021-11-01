@@ -133,8 +133,8 @@ class RevInfo:
 class States:
   """Base class for serializing program state to disk.
 
-  After instantiation, set_data() or load() should be invoked before access
-  state values.
+  After instantiation, init_done() or load_states() should be invoked before
+  access state values.
   """
 
   def __init__(self, session_file):
@@ -146,10 +146,15 @@ class States:
     self.session_file = session_file
     logger.debug('session file: %s', self.session_file)
 
+    # `inited` means that init_done() has ever been invoked (including the good
+    # session loaded via load_states()). On the other hand, if the session has
+    # never successfully initialized, `inited` will be still False after
+    # load_states().
+    self.inited = False
+
     # Persistent data (dict). This is the canonical source of data. All other
     # fields are derived from this one. The whole dict will be serialized as
     # json to session file. Semantic of sub-fields are defined by subclasses.
-    # Before initialization, its value is None.
     self.data = None
 
   def reset(self):
@@ -157,17 +162,14 @@ class States:
     self.data = None
     os.unlink(self.session_file)
 
-  def set_data(self, data):
-    """Sets state dict data.
+  def init_done(self):
+    """Reconstruct derived fields.
 
     Subclass may override this method for post-processing.
-
-    Args:
-      data: program state data (dict)
     """
-    self.data = data
+    self.inited = True
 
-  def load(self):
+  def load_states(self) -> bool:
     """Loads saved data from file.
 
     Returns:
@@ -176,7 +178,8 @@ class States:
     if not os.path.exists(self.session_file):
       return False
     with open(self.session_file) as f:
-      self.set_data(json.load(f))
+      self.data = json.load(f)
+      self.init_done()
     return True
 
   def save(self):
@@ -195,8 +198,8 @@ class States:
 class BisectStates(States):
   """Bisection states.
 
-  After instantiation, init() or load() should be invoked before access state
-  values.
+  After instantiation, init_states() or load_states() should be invoked before
+  access state values.
   """
 
   def __init__(self, session_file):
@@ -206,6 +209,11 @@ class BisectStates(States):
       session_file: path of session file.
     """
     super().__init__(session_file)
+
+    self.data = dict(
+        # What have been done so far. Each entry contains at least
+        # timestamp, rev, and result.
+        history=[])
 
     # Mapping of rev to idx; constructed from data['revlist'].
     self.rev_index = {}
@@ -219,13 +227,14 @@ class BisectStates(States):
 
   @property
   def config(self):
-    return self.data['config']
+    return self.data.get('config')
 
   @property
   def details(self) -> typing.Dict[str, typing.Any]:
+    assert self.inited
     return self.data.get('details', {})
 
-  def init(self, config, revlist, details=None):
+  def init_states(self, config, revlist, details=None):
     """Initializes attributes data, rev_info and rev_index.
 
     Args:
@@ -233,27 +242,39 @@ class BisectStates(States):
       revlist: version list.
       details: dict of rev details.
     """
-    self.set_data(
-        dict(
-            # Bisection configurations (dict), values are determined by cmd_init
-            # and each domain's init functions. There will be 'old' and 'new' at
-            # least.
-            config=config,
-            # List of bisect candidates (version numbers).
-            revlist=revlist,
-            details=details or {},
-            # What have been done so far. Each entry contains at least
-            # timestamp, rev, and result.
-            history=[]))
+    self.data.update(
+        # Bisection configurations (dict), values are determined by cmd_init
+        # and each domain's init functions. There will be 'old' and 'new' at
+        # least.
+        config=config,
+        # List of bisect candidates (version numbers).
+        revlist=revlist,
+        details=details or {},
+    )
+    self.init_done()
 
-  def set_data(self, data):
-    super().set_data(data)
-
+  def init_done(self):
+    # reset variables
     self.rev_index = {}
+
+    if 'revlist' not in self.data:
+      # The session is not fully initialized.
+      return
+
     for i, rev in enumerate(self.data['revlist']):
       self.rev_index[rev] = i
+    super().init_done()
 
-  def load_rev_info(self, term_map=None):
+  def get_rev_info(self, term_map=None) -> typing.List[RevInfo]:
+    """Gets aggregated rev info.
+
+    Args:
+      term_map: Alternative term for states
+
+    Returns:
+      list of RevInfo, which aggregated previous test samples.
+    """
+    assert self.inited
     rev_info = []
     for rev in self.data['revlist']:
       rev_info.append(RevInfo(rev, term_map=term_map))
@@ -265,12 +286,16 @@ class BisectStates(States):
     return rev_info
 
   def idx2rev(self, idx):
+    assert self.inited
     return self.data['revlist'][idx]
 
   def rev2idx(self, rev):
+    assert self.inited
     return self.rev_index[rev]
 
   def add_history(self, event, **kwargs):
+    # This function is allowed to be called before fully initialized
+    # (self.inited=False) in order to record error events.
     entry = dict(event=event, timestamp=time.time(), **kwargs)
     self.data['history'].append(entry)
 

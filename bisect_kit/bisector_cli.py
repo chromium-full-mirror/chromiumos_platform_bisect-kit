@@ -232,44 +232,54 @@ class BisectorCommandLine:
 
     See init command's help message for more detail.
     """
-    if (opts.old_value is None) != (opts.new_value is None):
-      raise errors.ArgumentError('--old_value and --new_value',
-                                 'both should be specified')
-    if opts.old_value is not None and opts.old_value == opts.new_value:
-      raise errors.ArgumentError('--old_value and --new_value',
-                                 'their values should be different')
-    if opts.recompute_init_values and opts.old_value is None:
-      raise errors.ArgumentError(
-          '--recompute_init_values',
-          '--old_value and --new_value must be specified '
-          'when --recompute_init_values is present')
+    try:
+      if (opts.old_value is None) != (opts.new_value is None):
+        raise errors.ArgumentError('--old_value and --new_value',
+                                   'both should be specified')
+      if opts.old_value is not None and opts.old_value == opts.new_value:
+        raise errors.ArgumentError('--old_value and --new_value',
+                                   'their values should be different')
+      if opts.recompute_init_values and opts.old_value is None:
+        raise errors.ArgumentError(
+            '--recompute_init_values',
+            '--old_value and --new_value must be specified '
+            'when --recompute_init_values is present')
 
-    config, candidates = self.domain_cls.init(opts)
-    revlist = candidates['revlist']
-    logger.info('found %d candidates to bisect', len(revlist))
-    logger.debug('revlist %r', revlist)
-    if 'new' not in config:
-      config['new'] = opts.new
-    if 'old' not in config:
-      config['old'] = opts.old
-    assert len(revlist) >= 2
-    assert config['new'] in revlist
-    assert config['old'] in revlist
-    old_idx = revlist.index(config['old'])
-    new_idx = revlist.index(config['new'])
-    assert old_idx < new_idx
+      config, candidates = self.domain_cls.init(opts)
+      revlist = candidates['revlist']
+      logger.info('found %d candidates to bisect', len(revlist))
+      logger.debug('revlist %r', revlist)
+      if 'new' not in config:
+        config['new'] = opts.new
+      if 'old' not in config:
+        config['old'] = opts.old
+      assert len(revlist) >= 2
+      assert config['new'] in revlist
+      assert config['old'] in revlist
+      old_idx = revlist.index(config['old'])
+      new_idx = revlist.index(config['new'])
+      assert old_idx < new_idx
 
-    config.update(
-        confidence=opts.confidence,
-        noisy=opts.noisy,
-        term_old=opts.term_old,
-        term_new=opts.term_new,
-        old_value=opts.old_value,
-        new_value=opts.new_value,
-        recompute_init_values=opts.recompute_init_values)
+      config.update(
+          confidence=opts.confidence,
+          noisy=opts.noisy,
+          term_old=opts.term_old,
+          term_new=opts.term_new,
+          old_value=opts.old_value,
+          new_value=opts.new_value,
+          recompute_init_values=opts.recompute_init_values)
 
-    details = candidates.get('details', {})
-    self.states.init(config, revlist, details)
+      details = candidates.get('details', {})
+      self.states.init_states(config, revlist, details)
+    except Exception as e:
+      exception_name = e.__class__.__name__
+      self.states.add_history(
+          'failed',
+          text='%s: %s' % (exception_name, e),
+          exception_name=exception_name)
+      self.states.save()
+      raise
+
     self.states.save()
 
   def _step_log_path(self, rev, step):
@@ -489,7 +499,11 @@ class BisectorCommandLine:
     except Exception as e:
       exception_name = e.__class__.__name__
       self.states.add_history(
-          'failed', text='%s: %s' % (exception_name, e), index=idx, rev=rev)
+          'failed',
+          text='%s: %s' % (exception_name, e),
+          index=idx,
+          rev=rev,
+          exception_name=exception_name)
       self.states.save()
       raise
     finally:
@@ -504,6 +518,13 @@ class BisectorCommandLine:
 
   def cmd_view(self, opts):
     """Shows remaining candidates."""
+    if not self.states.inited:
+      if opts.json:
+        print('{}')
+      else:
+        print('not init yet')
+      return
+
     summary = {
         'rev_info': [],
     }
@@ -601,11 +622,13 @@ class BisectorCommandLine:
             print('\t%s' % action['link'])
 
   def _strategy_factory(self):
+    if not self.states.inited:
+      return None
     term_map = {
         'old': self.config['term_old'],
         'new': self.config['term_new'],
     }
-    rev_info = self.states.load_rev_info(term_map)
+    rev_info = self.states.get_rev_info(term_map)
     assert rev_info
     return strategy.NoisyBinarySearch(
         rev_info,
@@ -632,20 +655,24 @@ class BisectorCommandLine:
         done: True if bisection is done, otherwise False.
     """
     self._create_states(session=session)
-    if self.states.load():
-      self.strategy = self._strategy_factory()
-      left, right = self.strategy.get_range()
-      estimated_noise = self.strategy.get_noise_observation()
+    if not self.states.inited and not self.states.load_states():
+      # Unable to load session file.
+      return dict(inited=False)
+    if not self.states.inited:
+      # Session file loaded but the initialization is not successful.
+      return dict(inited=False)
 
-      result = dict(
-          inited=True,
-          old=self.states.idx2rev(left),
-          new=self.states.idx2rev(right),
-          verified=self.strategy.is_range_verified(),
-          estimated_noise=estimated_noise,
-          done=self.strategy.is_done())
-    else:
-      result = dict(inited=False)
+    self.strategy = self._strategy_factory()
+    left, right = self.strategy.get_range()
+    estimated_noise = self.strategy.get_noise_observation()
+
+    result = dict(
+        inited=True,
+        old=self.states.idx2rev(left),
+        new=self.states.idx2rev(right),
+        verified=self.strategy.is_range_verified(),
+        estimated_noise=estimated_noise,
+        done=self.strategy.is_done())
     return result
 
   def cmd_log(self, opts):
@@ -748,7 +775,7 @@ class BisectorCommandLine:
 
     See config command's help message for more detail.
     """
-    if not self.states.load():
+    if not self.states.inited and not self.states.load_states():
       raise errors.Uninitialized
     self.domain = self.domain_cls(self.states.config)
     if not opts.value:
@@ -1011,7 +1038,7 @@ class BisectorCommandLine:
 
     self._create_states(session=opts.session)
     if opts.command not in ('init', 'reset', 'config'):
-      if not self.states.load():
+      if not self.states.inited and not self.states.load_states():
         raise errors.Uninitialized
       self.domain = self.domain_cls(self.states.config)
       self.strategy = self._strategy_factory()

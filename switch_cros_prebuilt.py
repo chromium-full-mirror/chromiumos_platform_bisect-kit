@@ -67,7 +67,7 @@ def switch(opts):
   if opts.session:
     states = core.BisectStates.from_bisector_class('ChromeOSVersionDomain',
                                                    opts.session)
-    if states.load():
+    if states.load_states():
       cros_util.SnapshotStore.init_with_state(states)
   # TODO(kcwu): clear cache of cros flash
   image_info = cros_util.search_image(opts.board, opts.version)

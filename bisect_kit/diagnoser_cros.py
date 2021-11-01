@@ -69,7 +69,8 @@ class DiagnoseStates(core.States):
   """Diagnose states."""
 
   def init(self, config):
-    self.set_data(dict(config=config, history=[]))
+    self.data = dict(config=config, history=[])
+    self.init_done()
 
   @property
   def config(self):
@@ -166,7 +167,7 @@ class CrosDiagnoser:
 
     prebuilt_states = core.BisectStates.from_bisector_class(
         'ChromeOSVersionDomain', self.config['session'])
-    if prebuilt_states.load():
+    if prebuilt_states.load_states():
       cros_util.SnapshotStore.init_with_state(prebuilt_states)
     self.old_info = cros_util.version_info(self.config['board'], self.cros_old)
     self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
@@ -779,7 +780,7 @@ class DiagnoseCommandLineBase:
     raise NotImplementedError  # implemented by subclass
 
   def cmd_log(self, opts):
-    self.states.load()
+    self.states.load_states()
     path_factory = setup_cros_bisect.DefaultProjectPathFactory(
         self.config['mirror_base'], self.config['work_base'],
         self.config['session'])
@@ -788,7 +789,7 @@ class DiagnoseCommandLineBase:
     diagnoser.cmd_log(opts.json)
 
   def cmd_view(self, opts):
-    self.states.load()
+    self.states.load_states()
     path_factory = setup_cros_bisect.DefaultProjectPathFactory(
         self.config['mirror_base'], self.config['work_base'],
         self.config['session'])

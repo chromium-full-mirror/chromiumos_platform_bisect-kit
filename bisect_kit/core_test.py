@@ -69,26 +69,26 @@ class TestBisectStates(unittest.TestCase):
 
   def test_simple(self):
     states = core.BisectStates(self.session_file)
-    states.init({}, ['a', 'b', 'c'])
+    states.init_states({}, ['a', 'b', 'c'])
     self.assertEqual(states.idx2rev(1), 'b')
     self.assertEqual(states.rev2idx('b'), 1)
 
   def test_save_and_load(self):
     states = core.BisectStates(self.session_file)
     revlist = [str(i) for i in range(10)]
-    states.init({}, revlist)
+    states.init_states({}, revlist)
     states.config['foo'] = 'bar'
     states.save()
 
     states = core.BisectStates(self.session_file)
-    states.load()
+    states.load_states()
     self.assertEqual(states.config.get('foo'), 'bar')
     self.assertEqual(states.rev2idx('5'), 5)
 
   def test_reset(self):
     states = core.BisectStates(self.session_file)
     revlist = [str(i) for i in range(10)]
-    states.init({}, revlist)
+    states.init_states({}, revlist)
     states.config['foo'] = 'bar'
     states.save()
 
@@ -96,7 +96,7 @@ class TestBisectStates(unittest.TestCase):
     states.reset()
 
     states = core.BisectStates(self.session_file)
-    self.assertFalse(states.load())
+    self.assertFalse(states.load_states())
 
 
 if __name__ == '__main__':
