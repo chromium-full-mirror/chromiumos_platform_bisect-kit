@@ -264,7 +264,7 @@ def do_allocate_dut(opts):
     variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
     if not variants:
       raise errors.NoDutAvailable('Invalid constraints: no sku=%s in the lab' %
-          opts.sku)
+                                  opts.sku)
 
   if opts.dut_name:
     for dut_name in opts.dut_name.split(','):

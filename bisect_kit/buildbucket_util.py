@@ -260,7 +260,8 @@ class BuildbucketApi:
       except (ConnectionError, socket.timeout, ssl.SSLError) as e:
         if max_retries <= 0:
           raise errors.ExternalError('buildbucket api %s failed' % api) from e
-        logger.warning('retry buildbucket api due to connection problem (%r)', e)
+        logger.warning('retry buildbucket api due to connection problem (%r)',
+                       e)
 
     raise errors.ExternalError('buildbucket api %s failed' % api)
 
