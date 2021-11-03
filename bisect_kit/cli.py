@@ -192,12 +192,12 @@ def argtype_key_value(s):
   Raises:
     ArgTypeError if argument is invalid format.
   """
-  splitted = s.split('=')
-  if len(splitted) != 2:
+  split = s.split('=')
+  if len(split) != 2:
     raise ArgTypeError('Invalid key value string: %s' % s, 'key=value')
-  if not re.match('^[A-Za-z0-9_.-]+$', splitted[0]):
+  if not re.match('^[A-Za-z0-9_.-]+$', split[0]):
     raise ArgTypeError('Invalid key: %s' % s, 'key=value')
-  return tuple(splitted)
+  return tuple(split)
 
 
 def check_executable(program):

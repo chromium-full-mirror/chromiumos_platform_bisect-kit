@@ -240,7 +240,7 @@ def _detect_host_os():
 def evaluate_condition(condition, variables, referenced_variables=None):
   """Evaluate condition in gclient DEPS.
 
-  This function is copied from gclient_eval.py EvalulateCondition().
+  This function is copied from gclient_eval.py EvaluateCondition().
 
   Returns:
     evaluate result

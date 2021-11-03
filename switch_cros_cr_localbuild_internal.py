@@ -193,7 +193,7 @@ def main(args=None):
   else:
     # Because the DEPS file referenced in .gclient file is pointing to the DEPS
     # snapshot, runhook may fail due to DEPS file changes in the infra versions
-    # (b/129100282). Here we create a temprorary gclient file pointing to the
+    # (b/129100282). Here we create a temporary gclient file pointing to the
     # live DEPS in the tree. Note this gclient file is used only for runhook,
     # not for code sync.
     gclientfile = '.gclient-for-runhook'
