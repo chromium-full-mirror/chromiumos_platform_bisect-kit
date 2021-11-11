@@ -263,6 +263,15 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
   if os.path.exists(os.path.join(goma_dir, 'gomacc')):
     prefix += ['--gomadir', goma_dir]
 
+  lkgm_file = os.path.join(chrome_src, 'chromeos', 'CHROMEOS_LKGM')
+  if os.path.exists(lkgm_file):
+    with open(lkgm_file) as f:
+      lkgm_version = f.read().strip()
+      # This work around b/205818006
+      if (util.is_version_lesseq('14285.0.0', lkgm_version) and
+          util.is_version_lesseq(lkgm_version, '14309.0.0')):
+        prefix += ['--version', '14284.0.0']
+
   env = kwargs.get('env', os.environ).copy()
 
   # This work around http://crbug.com/658104, which depot_tool can't find GN
