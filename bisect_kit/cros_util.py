@@ -116,6 +116,7 @@ VERSION_KEY_ANDROID_BRANCH = 'android_branch'
 CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
 
 autotest_shadow_config = """
+# This file is created by src/platform/bisect-kit/bisect_kit/cros_util.py
 [CROS]
 enable_ssh_tunnel_for_servo: True
 enable_ssh_tunnel_for_chameleon: True
@@ -1568,9 +1569,8 @@ def _copy_template_files(src, dst):
 
 def override_autotest_config(autotest_dir):
   shadow_config_path = os.path.join(autotest_dir, 'shadow_config.ini')
-  if not os.path.exists(shadow_config_path):
-    with open(shadow_config_path, 'w') as f:
-      f.write(autotest_shadow_config)
+  with open(shadow_config_path, 'w') as f:
+    f.write(autotest_shadow_config)
 
 
 def prepare_chroot(chromeos_root):
