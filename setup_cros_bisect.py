@@ -304,10 +304,6 @@ cache_dir = %r
 
   with locking.lock_file(
       os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
-    if os.path.exists(os.path.join(chrome_tree, '.gclient_entries')):
-      old_projects = gclient_util.load_gclient_entries(chrome_tree)
-    else:
-      old_projects = {}
     logger.info('gclient config for chrome')
     gclient_util.config(chrome_tree, spec=spec)
 
@@ -320,17 +316,16 @@ cache_dir = %r
 
     # It's possible that some repos are removed from latest branch and thus
     # their commit history is not fetched in recent gclient sync. So we call
-    # 'git fetch' for removed projects.
-    new_projects = gclient_util.load_gclient_entries(chrome_tree)
-    code_storage = gclient_util.GclientCache(chrome_cache)
+    # 'git fetch' for all existing git mirrors.
+    # TODO(kcwu): only sync repos not in DEPS files of latest branch
     logger.info('additional sync for chrome mirror')
-    for project in set(old_projects) - set(new_projects):
-      if ':' in project:  # (cipd) not git, ignore
+    for git_repo_name in os.listdir(chrome_cache):
+      # another gclient is running or leftover of previous run; skip
+      if git_repo_name.startswith('_cache_tmp'):
         continue
-      repo_url = old_projects[project]
-      if '@' in repo_url:
-        repo_url = repo_url.split('@')[0]
-      git_repo = code_storage.cached_git_root(repo_url)
+      git_repo = os.path.join(chrome_cache, git_repo_name)
+      if not git_util.is_git_bare_dir(git_repo):
+        continue
       git_util.fetch(git_repo, retry_prune_if_conflict=True)
 
     # Some repos were removed from the DEPS and won't be synced here. They will
