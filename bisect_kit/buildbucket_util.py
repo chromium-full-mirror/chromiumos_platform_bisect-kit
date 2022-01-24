@@ -87,15 +87,12 @@ class BuildbucketApi:
                                  'please check if swarming.py is installed, ' +
                                  ' go/lab-tools for more information.')
 
-    folder = os.path.dirname(os.path.realpath(swarming_py))
     self.default_service_account_json = os.environ.get(
         'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
     self.default_service_account_client_id = self._get_client_id(
         self.default_service_account_json)
-    self.auth_py = os.path.join(folder, 'auth.py')
-    if not os.path.exists(self.auth_py):
-      raise errors.InternalError('auth.py not found in swarming folder: %s' %
-                                 folder)
+    if not find_executable('luci-auth'):
+      raise errors.InternalError('luci-auth not found')
 
   def _get_client_id(self, json_file):
     """Get client id from account json.
@@ -156,37 +153,18 @@ class BuildbucketApi:
     return cas_digest
 
   def _get_token(self):
-    """Returns access_token saved in cache file.
-
-    Currently this function loads cache from swarming login,
-    which is in `~/.isolated_oauth`.
+    """Returns access_token from luci-auth.
 
     Returns:
-      access_token: token loaded from token cache.
-
-    Raises:
-      errors.InternalError: If token cache file is not found
+      access_token: token loaded.
     """
-    if self._token is None:
-      if not os.path.exists(self.token_cache):
-        raise errors.InternalError(
-            'buildbucket api cannot find ' +
-            'token cache file, please run %s manually to login.' % self.auth_py)
-      with open(self.token_cache) as f:
-        data = json.load(f)['data']
-      # if service account is set, use service account first
-      if self.default_service_account_client_id:
-        for x in data:
-          client_id = x.get('credential', {}).get('client_id')
-          if client_id == self.default_service_account_client_id:
-            self._token = x['credential']['access_token']
-      # use user account if service account is not found
-      if not self._token:
-        logger.warning(
-            'No token for the given service account is found in the token file,'
-            ' use the first token instead.')
-        self._token = data[0]['credential']['access_token']
-    return self._token
+    cmd = ['luci-auth', 'token', '-lifetime', '30m']
+    if self.default_service_account_json:
+      cmd += [
+          '-service-account-json',
+          self.default_service_account_json,
+      ]
+    return util.check_output(*cmd).strip()
 
   def _get_header(self):
     """Returns a header includes token for api request."""
@@ -194,28 +172,6 @@ class BuildbucketApi:
         'Content-Type': 'application/prpc; encoding=binary',
         'Authorization': 'Bearer %s' % self._get_token()
     }
-
-  def _refresh_token(self, domain):
-    """Trigger swarming's auth library to renew access_token"""
-    if self.default_service_account_json:
-      util.check_call(
-          self.auth_py,
-          'check',
-          '--service',
-          domain,
-          '--auth-service-account-json',
-          self.default_service_account_json,
-      )
-    else:
-      # refresh user account token
-      util.check_call(
-          self.auth_py,
-          'check',
-          '--service',
-          domain,
-      )
-    logger.debug('buildbucket token refreshed')
-    self._token = None
 
   def _post(self, api, request, return_class, timeout=10):
     """Post a rpc request to buildbucket server.
@@ -233,7 +189,6 @@ class BuildbucketApi:
       errors.ExternalError: api request fail
     """
     max_retries = 5
-    logged_in = False
     response_content = None
     while max_retries > 0:
       max_retries -= 1
@@ -248,15 +203,11 @@ class BuildbucketApi:
         result.ParseFromString(response_content)
         return result
       except DecodeError as e:
-        if not logged_in:
-          self._refresh_token(self.buildbucket_domain_url)
-          logged_in = True
-        else:
-          if response_content:
-            response_content = response_content.decode('utf-8')
-          logger.exception('Error in buildbucket post: %s', response_content)
-          raise errors.ExternalError('buildbucket api response: ' +
-                                     response_content) from e
+        if response_content:
+          response_content = response_content.decode('utf-8')
+        logger.exception('Error in buildbucket post: %s', response_content)
+        raise errors.ExternalError('buildbucket api response: ' +
+                                   response_content) from e
       except (ConnectionError, socket.timeout, ssl.SSLError) as e:
         if max_retries <= 0:
           raise errors.ExternalError('buildbucket api %s failed' % api) from e
