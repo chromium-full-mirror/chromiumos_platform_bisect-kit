@@ -145,6 +145,11 @@ def _setup_argument_parsers():
       '--session', required=True, help='Session name')
 
 
+def under_luci_context():
+  """Returns True if current process is under a luci auth context."""
+  return bool(os.getenv('LUCI_CONTEXT'))
+
+
 def init():
   configure.load_config()
   configure.root.load_plugins()

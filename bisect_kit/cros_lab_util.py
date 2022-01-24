@@ -28,6 +28,7 @@ import threading
 import time
 import urllib.parse
 
+from bisect_kit import common
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
@@ -153,7 +154,7 @@ def swarming_query(method, limit=None, verbose_log=True):
   """
   service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
   cmd = ['swarming.py', 'query', '--swarming', SWARMING_SERVER, method]
-  if service_account_json:
+  if not common.under_luci_context() and service_account_json:
     cmd += ['--auth-service-account-json', service_account_json]
   if limit:
     cmd += ['--limit', str(limit)]
@@ -172,7 +173,7 @@ def swarming_cancel(task_id):
       'swarming.py', 'cancel', '--swarming', SWARMING_SERVER, '--kill-running',
       task_id
   ]
-  if service_account_json:
+  if not common.under_luci_context() and service_account_json:
     cmd += ['--auth-service-account-json', service_account_json]
   util.check_call(*cmd)
 
