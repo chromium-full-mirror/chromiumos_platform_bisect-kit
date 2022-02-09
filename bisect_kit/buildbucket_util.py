@@ -164,7 +164,8 @@ class BuildbucketApi:
           '-service-account-json',
           self.default_service_account_json,
       ]
-    return util.check_output(*cmd).strip()
+    # luci-auth outputs service account token in stdout
+    return util.check_output(*cmd, log_stdout=False).strip()
 
   def _get_header(self):
     """Returns a header includes token for api request."""
