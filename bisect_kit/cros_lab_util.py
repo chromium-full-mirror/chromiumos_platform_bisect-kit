@@ -158,7 +158,7 @@ def swarming_query(method, limit=None, verbose_log=True):
     cmd += ['--auth-service-account-json', service_account_json]
   if limit:
     cmd += ['--limit', str(limit)]
-  data = util.check_output(*cmd, log_stdout=verbose_log)
+  data = util.check_output(*cmd, retry=5, log_stdout=verbose_log)
   return json.loads(data)
 
 
@@ -175,7 +175,7 @@ def swarming_cancel(task_id):
   ]
   if not common.under_luci_context() and service_account_json:
     cmd += ['--auth-service-account-json', service_account_json]
-  util.check_call(*cmd)
+  util.check_call(*cmd, retry=5)
 
 
 def bb_cancel(build_id, reason):

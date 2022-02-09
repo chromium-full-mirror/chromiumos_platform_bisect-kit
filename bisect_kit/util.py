@@ -189,7 +189,7 @@ def call(*args, timeout=None, **kwargs):
   return p.wait(timeout=timeout)
 
 
-def check_output(*args, timeout=None, **kwargs):
+def check_output(*args, timeout=None, retry=1, **kwargs):
   """Runs command and return output.
 
   Modeled after subprocess.check_output.
@@ -200,24 +200,32 @@ def check_output(*args, timeout=None, **kwargs):
   Raises:
     subprocess.CalledProcessError if the exit code is non-zero.
   """
-  stdout_lines = []
 
   def collect_stdout(line):
     stdout_lines.append(line)
 
-  p = Popen(args, stdout_callback=collect_stdout, **kwargs)
-  p.wait(timeout=timeout)
-  if kwargs.get('binary'):
-    stdout = b''.join(stdout_lines)
-  else:
-    stdout = ''.join(stdout_lines)
-  if p.returncode != 0:
-    raise subprocess.CalledProcessError(p.returncode, args, stdout)
+  delay_duration = 1
+  while retry > 0:
+    retry -= 1
+    stdout_lines = []
+    p = Popen(args, stdout_callback=collect_stdout, **kwargs)
+    p.wait(timeout=timeout)
+    if kwargs.get('binary'):
+      stdout = b''.join(stdout_lines)
+    else:
+      stdout = ''.join(stdout_lines)
+
+    if p.returncode == 0:
+      break
+    if retry <= 0:
+      raise subprocess.CalledProcessError(p.returncode, args, stdout)
+    time.sleep(delay_duration)
+    delay_duration = min(delay_duration * 2, 100)
 
   return stdout
 
 
-def check_call(*args, timeout=None, **kwargs):
+def check_call(*args, timeout=None, retry=1, **kwargs):
   """Runs command and ensures it succeeded.
 
   Modeled after subprocess.check_call.
@@ -225,10 +233,18 @@ def check_call(*args, timeout=None, **kwargs):
   Raises:
     subprocess.CalledProcessError if the exit code is non-zero.
   """
-  p = Popen(args, **kwargs)
-  p.wait(timeout=timeout)
-  if p.returncode != 0:
-    raise subprocess.CalledProcessError(p.returncode, args)
+  delay_duration = 1
+  while retry > 0:
+    retry -= 1
+    p = Popen(args, **kwargs)
+    p.wait(timeout=timeout)
+
+    if p.returncode == 0:
+      break
+    if retry <= 0:
+      raise subprocess.CalledProcessError(p.returncode, args)
+    time.sleep(delay_duration)
+    delay_duration = min(delay_duration * 2, 100)
 
 
 def ssh_cmd(host, *args, connect_timeout=None, allow_retry=False):
