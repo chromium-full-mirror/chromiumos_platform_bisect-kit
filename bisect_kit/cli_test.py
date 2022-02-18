@@ -9,6 +9,7 @@ import argparse
 import unittest
 
 from bisect_kit import cli
+from bisect_kit import errors
 
 
 class TestCli(unittest.TestCase):
@@ -84,13 +85,11 @@ class TestCli(unittest.TestCase):
     # Nothing happened.
     parser.parse_args(['--necessary', 'foo'])
 
-    with self.assertRaises(SystemExit) as e:
+    with self.assertRaises(errors.ArgumentError):
       parser.parse_args(['foo'])
-    self.assertEqual(e.exception.code, cli.EXIT_CODE_FATAL)
 
-    with self.assertRaises(SystemExit) as e:
+    with self.assertRaises(errors.ArgumentError):
       parser.parse_args(['--necessary', 'foo', '--value', 'bar'])
-    self.assertEqual(e.exception.code, cli.EXIT_CODE_FATAL)
 
   def test_argtype_key_value(self):
     self.assertEqual(cli.argtype_key_value('key=value'), ('key', 'value'))

@@ -8,9 +8,12 @@
 from __future__ import print_function
 import argparse
 import logging
+import sys
+import typing
 
 from bisect_kit import android_util
 from bisect_kit import arc_util
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
@@ -26,6 +29,10 @@ def create_argument_parser():
   parents = [common.common_argument_parser, common.session_optional_parser]
   parser = argparse.ArgumentParser(parents=parents)
   cli.patching_argparser_exit(parser)
+  parser.add_argument(
+      '--rich_result',
+      action='store_true',
+      help='Instead of mere exit code, output detailed information in json')
   parser.add_argument(
       '--dut',
       type=cli.argtype_notempty,
@@ -89,8 +96,7 @@ def switch(opts):
     arc_util.push_localbuild_to_device(opts.android_root, opts.dut, opts.flavor)
 
 
-@cli.fatal_error_handler
-def main(args=None):
+def switch_main(args: typing.Optional[tuple[str]]):
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
@@ -112,5 +118,9 @@ def main(args=None):
   switch(opts)
 
 
+def main(args: typing.Optional[tuple[str]] = None) -> int:
+  return bisector_cli.switch_main_wrapper(switch_main, args)
+
+
 if __name__ == '__main__':
-  main()
+  sys.exit(main())

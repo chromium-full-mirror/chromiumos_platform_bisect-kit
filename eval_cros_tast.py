@@ -13,13 +13,17 @@ import re
 import shutil
 import subprocess
 import sys
+import typing
 
+from bisect_kit import bisector_cli
 from bisect_kit import catapult_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -41,6 +45,10 @@ def create_argument_parser():
   parents = [common.common_argument_parser, common.session_optional_parser]
   parser = argparse.ArgumentParser(description=__doc__, parents=parents)
   cli.patching_argparser_exit(parser)
+  parser.add_argument(
+      '--rich_result',
+      action='store_true',
+      help='Instead of mere exit code, output detailed information in json')
   parser.add_argument(
       'dut',
       nargs='?',
@@ -141,7 +149,11 @@ def get_tast_bundle_info(opts, pattern=None):
   result = {}
   for bundle in bundles:
     cmd = tast_cmd(opts, 'list', '-json', '-buildbundle=' + bundle, *args)
-    json_text = cros_util.cros_sdk(opts.chromeos_root, *cmd, log_stdout=False)
+    try:
+      json_text = cros_util.cros_sdk(opts.chromeos_root, *cmd, log_stdout=False)
+    except subprocess.CalledProcessError as e:
+      raise errors.ExternalError(
+          'failed to get tast bundle info, assume it is temporary: %s' % e)
     for entry in json.loads(json_text):
       result[entry['name']] = bundle
 
@@ -178,43 +190,69 @@ def run_test(opts, bundle):
   return results_dir_output_chroot
 
 
-def gather_test_result(opts, result_dir):
+# Be careful that both tauto and tast generate results.json, but their format
+# is totally different.
+def parse_results_json(result_dir,
+                       test_name) -> tuple[bool, typing.Optional[str]]:
+  passed = None
+  reason = None
+  results_path = os.path.join(result_dir, 'results.json')
+  with open(results_path) as f:
+    for result in json.load(f):
+      if result['name'] != test_name:
+        logger.warning('unexpected test ran: %s', result['name'])
+        continue
+      if not result['errors']:
+        passed = True
+      else:
+        passed = False
+        # We capture the reason of the last error because usually the last one
+        # is fatal.
+        for error in reversed(result['errors']):
+          reason = error.get('reason')
+          if reason:
+            break
+  if passed is None:
+    raise errors.ExternalError('no test result for "%s"?' % test_name)
+  return passed, reason
+
+
+def gather_test_result(opts, result_dir) -> core.StepResult:
   error_path = os.path.join(result_dir, 'run_error.txt')
   if os.path.exists(error_path):
     with open(error_path) as f:
       message = f.read()
-    raise Exception('tast global error: %s' % message)
+    raise errors.ExternalError('tast global error: %s' % message)
 
-  results_path = os.path.join(result_dir, 'results.json')
-  passed = None
-  with open(results_path) as f:
-    for result in json.load(f):
-      if result['name'] != opts.test_name:
-        logger.warning('unexpected test ran: %s', result['name'])
-        continue
-      passed = result['errors'] is None
-  if passed is None:
-    raise Exception('no test result for "%s"?' % opts.test_name)
-
-  values = []
+  passed, reason = parse_results_json(result_dir, opts.test_name)
   if opts.metric:
     chart_path = os.path.join(result_dir, 'tests', opts.test_name,
                               'results-chart.json')
-    values = catapult_util.get_benchmark_values(chart_path, opts.metric)
+    return core.StepResult(
+        'value',
+        values=catapult_util.get_benchmark_values(chart_path, opts.metric))
 
-  return passed, values
+  if opts.fail_to_pass:
+    if passed:
+      logger.info('passed')
+      return core.StepResult('new', reason)
+    logger.info('failed')
+    return core.StepResult('old', reason)
+  if passed:
+    logger.info('passed')
+    return core.StepResult('old', reason)
+  logger.info('failed')
+  return core.StepResult('new', reason)
 
 
-@cli.fatal_error_handler
-def main(args=None):
+def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
   common.config_logging(opts)
 
   if not cros_util.is_dut(opts.dut):
-    logger.error('%r is not a valid DUT address', opts.dut)
-    return FATAL
+    raise errors.BrokenDutException('%r is not a valid DUT address' % opts.dut)
 
   # Private bundles are not included in the OS image, make sure they are
   # available.
@@ -223,78 +261,51 @@ def main(args=None):
       # Official builders uploaded private tast bundles and tast can download
       # them with -downloadprivatebundles=true, so --tast_build is not
       # required. Otherwise, we must build the bundles by ourselves.
-      logger.error(
+      raise errors.ArgumentError(
+          '--tast_build',
           'for non-official chromeos image, --tast_build must be specified')
-      return FATAL
 
   # Verify command line options.
   if opts.metric:
     if opts.fail_to_pass:
-      logger.error('--fail_to_pass is not for benchmark test (--metric)')
-      return FATAL
+      raise errors.ArgumentError(
+          '--fail_to_pass',
+          '--fail_to_pass is not for benchmark test (--metric)')
   # Remove the "tast." prefix prepended by autotest.
   opts.test_name = re.sub(r'^tast\.', '', opts.test_name)
 
-  try:
-    tast_bundle_info = get_tast_bundle_info(opts, opts.test_name)
-    if not tast_bundle_info:
-      tast_bundle_info = get_tast_bundle_info(opts)
-      util.show_similar_candidates('test name', opts.test_name,
+  tast_bundle_info = get_tast_bundle_info(opts, opts.test_name)
+  if not tast_bundle_info:
+    tast_bundle_info = get_tast_bundle_info(opts)
+    util.report_similar_candidates('test name', opts.test_name,
                                    list(tast_bundle_info))
-      return FATAL
-  except subprocess.CalledProcessError:
-    logger.exception(
-        'failed to get tast bundle info, assume it is temporary; SKIP')
-    return SKIP
+    assert 0  # unreachable
 
   if len(tast_bundle_info) != 1 or opts.test_name not in tast_bundle_info:
     # For example, tast in chroot after 12205.0.0 is IPC incompatible with
     # tast on DUT earlier than 12028.0.0 (crbug/932307)
-    logger.fatal('"tast list" returns unexpected tests; '
-                 'incompatible tast on DUT and in chroot?')
-    return FATAL
+    raise errors.ExecutionFatalError('"tast list" returns unexpected tests; '
+                                     'incompatible tast on DUT and in chroot?')
 
   try:
     prepare_to_run_test(opts)
-  except Exception:
-    logger.exception('failed when prepare, assume it is temporary; SKIP')
-    return SKIP
+  except Exception as e:
+    raise errors.BisectionTemporaryError(
+        'failed when prepare, assume it is temporary: %s' % e)
 
   bundle = tast_bundle_info[opts.test_name]
   try:
     result_dir = run_test(opts, bundle)
   except subprocess.CalledProcessError:
-    logger.error('failed to run tast; maybe build, ssh, or setup failures')
-    return SKIP
+    raise errors.BisectionTemporaryError(
+        'failed to run tast; maybe build, ssh, or setup failures')
 
-  try:
-    passed, values = gather_test_result(opts, result_dir)
-  except Exception:
-    logger.exception('failed to parse test result')
-    return FATAL
+  return gather_test_result(opts, result_dir)
 
-  if opts.metric:
-    if not values:
-      logger.warning('no values found; SKIP')
-      return SKIP
 
-    print('BISECT_RESULT_VALUES=', ' '.join(str(v) for v in values))
-    logger.info('values=%s', values)
-    # The exit code doesn't matter.
-    return OLD
-
-  if opts.fail_to_pass:
-    if passed:
-      logger.info('passed')
-      return NEW
-    logger.info('failed')
-    return OLD
-  if passed:
-    logger.info('passed')
-    return OLD
-  logger.info('failed')
-  return NEW
+def main(args: typing.Optional[tuple[str]] = None) -> int:
+  return bisector_cli.step_main_wrapper(step_main, args)
 
 
 if __name__ == '__main__':
-  sys.exit(EXIT_CODE_MAP[main()])
+  sys.exit(main())

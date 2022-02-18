@@ -140,7 +140,11 @@ class CrosDiagnoser:
       bisector = wrapper.BisectorWrapper('bisect_cros_version',
                                          self.config['session'])
       switch_cmd = [
-          './switch_cros_prebuilt.py', '--session', self.config['session']
+          './switch_cros_prebuilt.py',
+          '--rich_result',
+          '--session',
+          self.config['session'],
+          '--rich_result',
       ]
       if not self.config['disable_rootfs_verification']:
         switch_cmd.append('--no_disable_rootfs_verification')
@@ -187,10 +191,10 @@ class CrosDiagnoser:
     Args:
       force: always do 'cros flash' no matter the current version number of DUT
     """
-    util.check_call('./switch_cros_localbuild.py', '--chromeos_root',
-                    self.config['chromeos_root'], '--chromeos_mirror',
-                    self.config['chromeos_mirror'], '--board',
-                    self.config['board'], '--nobuild', self.cros_old)
+    util.check_call('./switch_cros_localbuild.py', '--rich_result',
+                    '--chromeos_root', self.config['chromeos_root'],
+                    '--chromeos_mirror', self.config['chromeos_mirror'],
+                    '--board', self.config['board'], '--nobuild', self.cros_old)
 
     if not force:
       if cros_util.is_cros_full_version(self.cros_old):
@@ -200,8 +204,9 @@ class CrosDiagnoser:
       if cros_util.query_dut_prebuilt_version(self.dut) == version:
         return
     cmd = [
-        './switch_cros_prebuilt.py', '--session', self.config['session'],
-        '--board', self.config['board'], '--dut', self.dut, self.cros_old
+        './switch_cros_prebuilt.py', '--rich_result', '--session',
+        self.config['session'], '--board', self.config['board'], '--dut',
+        self.dut, self.cros_old
     ]
     if not self.config['disable_rootfs_verification']:
       cmd.append('--no_disable_rootfs_verification')
@@ -282,7 +287,7 @@ class CrosDiagnoser:
                 '--branch',
                 self.old_info['android_branch'],
             ],
-            switch_cmd=['./switch_arc_prebuilt.py'],
+            switch_cmd=['./switch_arc_prebuilt.py', '--rich_result'],
             eval_cmd=eval_cmd,
             old_value=self.config['old_value'],
             new_value=self.config['new_value'],
@@ -350,7 +355,7 @@ class CrosDiagnoser:
               '--dut', self.dut, '--android_root', android_root,
               '--android_mirror', android_mirror
           ],
-          switch_cmd=['./switch_arc_localbuild.py'],
+          switch_cmd=['./switch_arc_localbuild.py', '--rich_result'],
           eval_cmd=eval_cmd,
           old_value=self.config['old_value'],
           new_value=self.config['new_value'],
@@ -419,6 +424,7 @@ class CrosDiagnoser:
       switch_cmd = [
           './switch_cros_localbuild_buildbucket.py',
           'bisect_chrome',
+          '--rich_result',
           '--dut',
           self.dut,
           '--chromeos_root',
@@ -432,7 +438,8 @@ class CrosDiagnoser:
         switch_cmd.append('--no_disable_rootfs_verification')
     else:
       switch_cmd = [
-          './switch_cros_cr_localbuild_internal.py', '--dut', self.dut
+          './switch_cros_cr_localbuild_internal.py', '--rich_result', '--dut',
+          self.dut
       ]
       if not with_tests:
         switch_cmd.append('--without_tests')
@@ -503,10 +510,11 @@ class CrosDiagnoser:
     bisector = wrapper.BisectorWrapper('bisect_cros_repo',
                                        self.config['session'])
     if not buildbucket_build:
-      switch_cmd = ['./switch_cros_localbuild.py']
+      switch_cmd = ['./switch_cros_localbuild.py', '--rich_result']
     else:
       switch_cmd = [
-          './switch_cros_localbuild_buildbucket.py', 'bisect_chromeos'
+          './switch_cros_localbuild_buildbucket.py', 'bisect_chromeos',
+          '--rich_result'
       ]
 
     if not self.config['disable_rootfs_verification']:
@@ -664,8 +672,8 @@ class DiagnoseCommandLineBase:
 
     names = cros_util.list_board_names(opts.chromeos_root)
     if opts.board not in names:
-      util.show_similar_candidates('board name', opts.board, names)
-      self.argument_parser.error('incorrect board name: %r' % opts.board)
+      util.report_similar_candidates('board name', opts.board, names)
+      assert 0  # unreachable
 
     if cros_util.is_cros_short_version(opts.old):
       opts.old = cros_util.version_to_full(opts.board, opts.old)

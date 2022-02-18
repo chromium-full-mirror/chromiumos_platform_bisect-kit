@@ -38,6 +38,10 @@ class DutLeaseException(Exception):
   """Issues of skylab DUT lease."""
 
 
+class BrokenDutException(Exception):
+  """The DUT is broken."""
+
+
 class WrongAssumption(Exception):
   """Wrong assumption.
 
@@ -102,12 +106,22 @@ class InternalError(Exception):
   """
 
 
-class ExternalError(Exception):
+class BisectionTemporaryError(Exception):
+  """Temporary error during bisection switch/eval step.
+
+  This error might be temporary and would be recovered next time. In term of
+  bisection decision, this is "skip", which means "the current candidate is
+  undecidable to have old or new behavior, should skip the result of this
+  run, retry may help".
+  """
+
+
+class ExternalError(BisectionTemporaryError):
   """Errors in external dependency.
 
   Like configuration errors, network errors, DUT issues, etc.
   """
 
 
-class SshConnectionError(Exception):
+class SshConnectionError(BisectionTemporaryError):
   """SSH connection error."""

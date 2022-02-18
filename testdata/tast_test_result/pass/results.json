@@ -1,0 +1,24 @@
+[
+  {
+    "name": "example.Pass",
+    "pkg": "chromiumos/tast/local/bundles/cros/example",
+    "desc": "Always passes",
+    "contacts": [
+      "nya@chromium.org",
+      "tast-owners@google.com"
+    ],
+    "attr": [
+      "group:mainline",
+      "name:example.Pass",
+      "bundle:cros"
+    ],
+    "data": null,
+    "timeout": 120000000000,
+    "bundle": "cros",
+    "errors": null,
+    "start": "2022-02-17T07:49:13.102203282Z",
+    "end": "2022-02-17T07:49:13.259106947Z",
+    "outDir": "/mnt/host/source/tmp/tast_results_tmp/tests/example.Pass",
+    "skipReason": ""
+  }
+]

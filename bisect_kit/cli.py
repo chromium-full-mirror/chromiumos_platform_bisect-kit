@@ -23,6 +23,8 @@ EXIT_CODE_OLD = 0
 EXIT_CODE_NEW = 1
 EXIT_CODE_SKIP = 125
 EXIT_CODE_FATAL = 128
+# Doesn't matter for value output.
+EXIT_CODE_VALUE = 0
 
 
 class ArgTypeError(argparse.ArgumentTypeError):
@@ -260,7 +262,7 @@ def format_returncode(returncode):
 
 
 def patching_argparser_exit(parser):
-  """Patching argparse.ArgumentParser.exit to exit with fatal exit code.
+  """Patching argparse.ArgumentParser.exit to raise exception for failures.
 
   Args:
     parser: argparse.ArgumentParser object
@@ -269,7 +271,9 @@ def patching_argparser_exit(parser):
 
   def exit_hack(status=0, message=None):
     if status != 0:
-      status = EXIT_CODE_FATAL
+      if message:
+        message = message.strip()
+      raise errors.ArgumentError(None, message)
     orig_exit(status, message)
 
   parser.exit = exit_hack

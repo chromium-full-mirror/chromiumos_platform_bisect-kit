@@ -15,9 +15,11 @@ from __future__ import print_function
 import argparse
 import logging
 import sys
+import typing
 
 from bisect_kit import android_util
 from bisect_kit import arc_util
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
@@ -32,6 +34,10 @@ def create_argument_parser():
   parents = [common.common_argument_parser, common.session_optional_parser]
   parser = argparse.ArgumentParser(description=__doc__, parents=parents)
   cli.patching_argparser_exit(parser)
+  parser.add_argument(
+      '--rich_result',
+      action='store_true',
+      help='Instead of mere exit code, output detailed information in json')
   parser.add_argument(
       '--dut',
       type=cli.argtype_notempty,
@@ -52,8 +58,7 @@ def create_argument_parser():
   return parser
 
 
-@cli.fatal_error_handler
-def main(args=None):
+def switch_main(args: typing.Optional[tuple[str]]):
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
@@ -67,19 +72,23 @@ def main(args=None):
   if not cros_util.is_good_dut(opts.dut):
     logger.fatal('%r is not a good DUT', opts.dut)
     if not cros_lab_util.repair(opts.dut):
-      sys.exit(cli.EXIT_CODE_FATAL)
+      raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
 
   arc_util.push_prebuilt_to_device(opts.dut, opts.flavor, opts.build_id)
 
   arc_version = cros_util.query_dut_lsb_release(
       opts.dut).get('CHROMEOS_ARC_VERSION')
-  if arc_version and str(opts.build_id) in arc_version:
-    logger.info('updated to "%s", done', arc_version)
-  else:
+  if not arc_version or str(opts.build_id) not in arc_version:
     raise errors.ExecutionFatalError(
         'arc version is expected matching "%s" but actual "%s"' %
         (opts.build_id, arc_version))
 
+  logger.info('updated to "%s", done', arc_version)
+
+
+def main(args: typing.Optional[tuple[str]] = None) -> int:
+  return bisector_cli.switch_main_wrapper(switch_main, args)
+
 
 if __name__ == '__main__':
-  main()
+  sys.exit(main())

@@ -275,7 +275,7 @@ class NoisyBinarySearch:
     if self.state == self.INITED:
       pass
     elif self.state == self.STARTED:
-      if status == 'init':
+      if status == 'value':
         status = self.classify_result_from_values(sample['values'])
       assert self.prob
       for _ in range(sample.get('times', 1)):
@@ -656,7 +656,7 @@ class NoisyBinarySearch:
   def classify_result_from_values(self, values):
     assert values, 'eval script terminated normally but does not output values?'
     if self.state == self.INITED and self.recompute_init_values:
-      return 'init'
+      return 'value'
     assert self.threshold is not None
     assert values
     avg = math_util.average(values)
@@ -993,7 +993,7 @@ class NoisyBinarySearch:
       return None
 
     def is_one_side_enough(info):
-      count = info['init']
+      count = info['value']
       if count > 30:
         return True
       if count < 2:

@@ -1,0 +1,46 @@
+[
+  {
+    "name": "example.Fail",
+    "pkg": "chromiumos/tast/local/bundles/cros/example",
+    "desc": "Always fails",
+    "contacts": [
+      "nya@chromium.org",
+      "tast-owners@google.com"
+    ],
+    "attr": [
+      "name:example.Fail",
+      "bundle:cros",
+      "disabled"
+    ],
+    "data": null,
+    "timeout": 120000000000,
+    "bundle": "cros",
+    "errors": [
+      {
+        "time": "2022-02-17T07:45:08.062471676Z",
+        "reason": "Here's an error",
+        "file": "/build/coral/tmp/portage/chromeos-base/tast-local-tests-cros-0.0.2-r9302/work/tast-local-tests-cros-0.0.2/src/chromiumos/tast/local/bundles/cros/example/fail.go",
+        "line": 23,
+        "stack": "Here's an error\n\tat chromiumos/tast/local/bundles/cros/example.Fail (fail.go:23)\n\tat chromiumos/tast/internal/planner.runTestWithConfig.func3.1 (run.go:824)\n\tat chromiumos/tast/internal/usercode.SafeCall.func2 (usercode.go:112)\n\tat runtime.goexit (asm_amd64.s:1581)"
+      },
+      {
+        "time": "2022-02-17T07:45:08.062610125Z",
+        "reason": "And here's a second",
+        "file": "/build/coral/tmp/portage/chromeos-base/tast-local-tests-cros-0.0.2-r9302/work/tast-local-tests-cros-0.0.2/src/chromiumos/tast/local/bundles/cros/example/fail.go",
+        "line": 24,
+        "stack": "And here's a second\n\tat chromiumos/tast/local/bundles/cros/example.Fail (fail.go:24)\n\tat chromiumos/tast/internal/planner.runTestWithConfig.func3.1 (run.go:824)\n\tat chromiumos/tast/internal/usercode.SafeCall.func2 (usercode.go:112)\n\tat runtime.goexit (asm_amd64.s:1581)"
+      },
+      {
+        "time": "2022-02-17T07:45:08.062657697Z",
+        "reason": "Finally, a fatal error",
+        "file": "/build/coral/tmp/portage/chromeos-base/tast-local-tests-cros-0.0.2-r9302/work/tast-local-tests-cros-0.0.2/src/chromiumos/tast/local/bundles/cros/example/fail.go",
+        "line": 25,
+        "stack": "Finally, a fatal error\n\tat chromiumos/tast/local/bundles/cros/example.Fail (fail.go:25)\n\tat chromiumos/tast/internal/planner.runTestWithConfig.func3.1 (run.go:824)\n\tat chromiumos/tast/internal/usercode.SafeCall.func2 (usercode.go:112)\n\tat runtime.goexit (asm_amd64.s:1581)"
+      }
+    ],
+    "start": "2022-02-17T07:45:07.969060368Z",
+    "end": "2022-02-17T07:45:08.283789249Z",
+    "outDir": "/mnt/host/source/tmp/tast_results_tmp/tests/example.Fail",
+    "skipReason": ""
+  }
+]

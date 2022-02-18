@@ -84,13 +84,13 @@ class BisectorWrapper:
       self.call('init', *(common_init_args + init_args))
 
     self.switch_cmds = [switch_cmd]
-    self.call('config', 'switch', *switch_cmd)
-    self.call('config', 'eval', *eval_cmd)
+    self.call('config', 'switch', '--mode=bisectkit', *switch_cmd)
+    self.call('config', 'eval', '--mode=bisectkit', *eval_cmd)
 
   def _set_switch_commands(self):
     cmdline = ' && '.join(
         subprocess.list2cmdline(cmd) for cmd in self.switch_cmds)
-    self.call('config', 'switch', 'sh', '-c', cmdline)
+    self.call('config', 'switch', '--mode=bisectkit', 'sh', '-c', cmdline)
 
   def append_switch_command(self, cmd):
     self.switch_cmds.append(cmd)

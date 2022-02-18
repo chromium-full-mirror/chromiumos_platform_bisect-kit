@@ -18,7 +18,9 @@ import os
 import shutil
 import sys
 import tempfile
+import typing
 
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
@@ -44,6 +46,10 @@ def create_argument_parser():
   parents = [common.common_argument_parser, common.session_optional_parser]
   parser = argparse.ArgumentParser(description=__doc__, parents=parents)
   cli.patching_argparser_exit(parser)
+  parser.add_argument(
+      '--rich_result',
+      action='store_true',
+      help='Instead of mere exit code, output detailed information in json')
   parser.add_argument(
       '--chromeos_root',
       type=cli.argtype_dir_path,
@@ -135,8 +141,7 @@ def switch(autotest_dir, board, version, test_name, dut):
   shutil.rmtree(tmp_dir)
 
 
-@cli.fatal_error_handler
-def main(args=None):
+def switch_main(args: typing.Optional[tuple[str]]):
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
@@ -159,9 +164,13 @@ def main(args=None):
           logger.warning('%s is not parsable, ignore', control_file)
           continue
         names.append(info.name)
-      util.show_similar_candidates('test_name', opts.test_name, names)
-      sys.exit(cli.EXIT_CODE_FATAL)
+      util.report_similar_candidates('test_name', opts.test_name, names)
+      assert 0  # unreachable
+
+
+def main(args: typing.Optional[tuple[str]] = None) -> int:
+  return bisector_cli.step_main_wrapper(switch_main, args)
 
 
 if __name__ == '__main__':
-  main()
+  sys.exit(main())

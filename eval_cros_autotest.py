@@ -12,18 +12,23 @@ matches. Otherwise your test binary will be overwritten.
 """
 from __future__ import print_function
 import argparse
+import json
 import logging
 import os
 import re
 import subprocess
 import sys
+import typing
 
+from bisect_kit import bisector_cli
 from bisect_kit import catapult_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -43,8 +48,14 @@ EXIT_CODE_MAP = {
 
 def create_argument_parser():
   parents = [common.common_argument_parser, common.session_optional_parser]
-  parser = argparse.ArgumentParser(description=__doc__, parents=parents)
+  # exit_on_error=False: to capture invalid argument values
+  parser = argparse.ArgumentParser(
+      description=__doc__, parents=parents, exit_on_error=False)
   cli.patching_argparser_exit(parser)
+  parser.add_argument(
+      '--rich_result',
+      action='store_true',
+      help='Instead of mere exit code, output detailed information in json')
   parser.add_argument(
       'dut',
       nargs='?',
@@ -114,34 +125,6 @@ def create_argument_parser():
   return parser
 
 
-def parse_test_report_log(result_log, metric):
-  """Parses autotest result log.
-
-  Args:
-    result_log: content of test_report.log
-    metric: what metric to capture if not None
-
-  Returns:
-    passed, values:
-      passed: True if test run successfully
-      values: captured metric values; None if test failed or metric is None
-  """
-  m = re.search(r'Total PASS: (\d+)/(\d+)', result_log)
-  passed = (m and m.group(1) == m.group(2))
-
-  if not metric:
-    return passed, None
-
-  values = []
-  for line in result_log.splitlines():
-    m = re.match(r'^(\S+)\s+(\w+)(?:\{\d+\})?\s+(\d+\.\d+)$', line)
-    if not m:
-      continue
-    if m.group(2) == metric:
-      values.append(float(m.group(3)))
-  return passed, values
-
-
 def get_additional_test_args(test_name):
   """Gets extra arguments to specific test.
 
@@ -205,7 +188,7 @@ def prepare_to_run_test(opts):
         opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo)
 
 
-def run_test(opts):
+def run_test(opts) -> str:
   """Runs an autotest test.
 
   Args:
@@ -247,49 +230,72 @@ def run_test(opts):
         opts.chromeos_root, *cmd, chrome_root=opts.chrome_root)
   except subprocess.CalledProcessError as e:
     if e.output is None:
-      logger.error('cros_sdk failed before test started')
-      return None
+      raise errors.ExternalError('cros_sdk failed before test started')
     output = e.output
 
   m = re.search(r'Finished running tests. Results can be found in (\S+)',
                 output)
   if not m:
-    logger.error('result dir is unknown')
-    return None
+    raise errors.ExternalError('result dir is unknown')
   assert m.group(1) == results_dir
   return results_dir.replace(cros_util.chromeos_root_inside_chroot,
                              opts.chromeos_root)
 
 
-def gather_test_result(opts, result_dir):
-  result_log_path = os.path.join(result_dir, 'test_report.log')
-  with open(result_log_path) as f:
-    result_log = f.read()
+# Be careful that both tauto and tast generate results.json, but their format
+# is totally different.
+def parse_results_json(result_dir,
+                       test_name) -> tuple[bool, typing.Optional[str]]:
+  passed = None
+  reason = None
+  results_path = os.path.join(result_dir, 'results.json')
+  with open(results_path) as f:
+    results = json.load(f)
+  for result in results['tests']:
+    if result['testname'] != test_name:
+      logger.warning('unexpected test ran: %s', result['testname'])
+      continue
+    passed = (result['verdict'] == 'Pass')
+    reason = result['errmsg']
+  if passed is None:
+    raise errors.ExternalError('no test result for "%s"?' % test_name)
+  return passed, reason
 
-  passed, values = parse_test_report_log(result_log, opts.metric)
-  if opts.metric and not values:
-    values = []
+
+def gather_test_result(opts, result_dir) -> core.StepResult:
+  passed, reason = parse_results_json(result_dir, opts.test_name)
+
+  if opts.metric:
     for root, _, files in os.walk(result_dir):
       for filename in files:
         if filename != 'results-chart.json':
           continue
         full_path = os.path.join(root, filename)
         values = catapult_util.get_benchmark_values(full_path, opts.metric)
-        return passed, values
+        return core.StepResult('value', values=values)
+    raise errors.BisectionTemporaryError('no values found; SKIP')
 
-  return passed, values
+  if opts.fail_to_pass:
+    if passed:
+      logger.info('passed')
+      return core.StepResult('new', reason)
+    logger.info('failed')
+    return core.StepResult('old', reason)
+  if passed:
+    logger.info('passed')
+    return core.StepResult('old', reason)
+  logger.info('failed')
+  return core.StepResult('new', reason)
 
 
-@cli.fatal_error_handler
-def main(args=None):
+def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
   common.config_logging(opts)
 
   if not cros_util.is_dut(opts.dut):
-    logger.error('%r is not a valid DUT address', opts.dut)
-    return FATAL
+    raise errors.BrokenDutException('%r is not a valid DUT address' % opts.dut)
   dut_os_version = cros_util.query_dut_short_version(opts.dut)
 
   is_cts = (
@@ -297,12 +303,15 @@ def main(args=None):
       opts.cts_test or opts.cts_timeout)
   if is_cts:
     if opts.test_name or opts.metric or opts.args:
-      parser.error(
+      raise errors.ArgumentError(
+          None,
           'do not specify --test_name, --metric, --args for CTS/GTS tests')
     if not opts.cts_prefix:
-      parser.error('--cts_prefix should be specified for CTS/GTS tests')
+      raise errors.ArgumentError(
+          None, '--cts_prefix should be specified for CTS/GTS tests')
     if not opts.cts_module:
-      parser.error('--cts_module should be specified for CTS/GTS tests')
+      raise errors.ArgumentError(
+          None, '--cts_module should be specified for CTS/GTS tests')
     opts.test_name = '%s.tradefed-run-test' % opts.cts_prefix
     opts.args = [
         'module=%s' % opts.cts_module,
@@ -316,67 +325,45 @@ def main(args=None):
       opts.args.append('timeout=%s' % opts.cts_timeout)
   else:
     if not opts.test_name:
-      parser.error('argument --test_name is required')
+      raise errors.ArgumentError(None, 'argument --test_name is required')
 
   # Verify command line options.
   if opts.metric:
     if opts.fail_to_pass:
-      logger.error('--fail_to_pass is not for benchmark test (--metric)')
-      return FATAL
+      raise errors.ArgumentError(
+          '--fail_to_pass',
+          '--fail_to_pass is not for benchmark test (--metric)')
   if opts.test_name.startswith('telemetry_'):
     if not opts.chrome_root:
-      logger.error('--chrome_root is mandatory for telemetry tests')
-      return FATAL
+      raise errors.ArgumentError(
+          '--chrome_root', '--chrome_root is mandatory for telemetry tests')
   if opts.prebuilt:
     autotest_dir = os.path.join(opts.chromeos_root,
                                 cros_util.prebuilt_autotest_dir)
     if not os.path.exists(autotest_dir):
-      parser.error('--prebuilt: no autotest prebuilt installed (%s); '
-                   'please run switch_autotest_prebuilt.py first' %
-                   autotest_dir)
+      raise errors.ArgumentError(
+          '--prebuilt', 'no autotest prebuilt installed (%s); '
+          'please run switch_autotest_prebuilt.py first' % autotest_dir)
 
   try:
     prepare_to_run_test(opts)
-  except Exception:
-    logger.exception('failed when prepare, assume it is temporary; SKIP')
-    return SKIP
+  except Exception as e:
+    raise errors.BisectionTemporaryError(
+        'failed when prepare, assume it is temporary: %s' % e)
 
   result_dir = run_test(opts)
-  if not result_dir:
-    return FATAL
+  result = gather_test_result(opts, result_dir)
 
-  try:
-    passed, values = gather_test_result(opts, result_dir)
-  except Exception:
-    logger.exception('failed to parse test result')
-    return FATAL
-
-  # Sanity check. The OS version should not change.
+  # The OS version should not change.
   assert dut_os_version == cros_util.query_dut_short_version(opts.dut), (
       'Someone else reflashed the DUT. DUT locking is not respected?')
 
-  if opts.metric:
-    if not values:
-      logger.warning('no values found; SKIP')
-      return SKIP
+  return result
 
-    print('BISECT_RESULT_VALUES=', ' '.join(str(v) for v in values))
-    logger.info('values=%s', values)
-    # The exit code doesn't matter.
-    return OLD
 
-  if opts.fail_to_pass:
-    if passed:
-      logger.info('passed')
-      return NEW
-    logger.info('failed')
-    return OLD
-  if passed:
-    logger.info('passed')
-    return OLD
-  logger.info('failed')
-  return NEW
+def main(args: typing.Optional[tuple[str]] = None) -> int:
+  return bisector_cli.step_main_wrapper(step_main, args)
 
 
 if __name__ == '__main__':
-  sys.exit(EXIT_CODE_MAP[main()])
+  sys.exit(main())

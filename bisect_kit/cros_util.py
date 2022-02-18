@@ -1285,7 +1285,8 @@ def provision_image_with_retry(chromeos_root,
                                repair_callback=None,
                                force_reboot_callback=None):
   # 'cros flash' is not 100% reliable, retry if necessary.
-  for attempt in range(2):
+  retry = 2
+  for attempt in range(retry):
     if attempt > 0:
       logger.info('will retry 60 seconds later')
       time.sleep(60)
@@ -1302,13 +1303,14 @@ def provision_image_with_retry(chromeos_root,
           force_reboot_callback=force_reboot_callback)
       workaround_b183567529(
           host, board, version, force_reboot_callback=force_reboot_callback)
-      return True
+      return
     except errors.ExternalError:
       logger.exception('cros flash failed')
       if repair_callback and not repair_callback(host):
         logger.warning('not repaired, assume it is harmless')
-      continue
-  return False
+      if attempt < retry - 1:
+        continue
+      raise
 
 
 def version_info(board, version):

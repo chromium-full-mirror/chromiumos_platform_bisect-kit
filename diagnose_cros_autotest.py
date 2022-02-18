@@ -92,6 +92,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     # prebuilt version will be specified later.
     common_switch_cmd = [
         './switch_autotest_prebuilt.py',
+        '--rich_result',
         '--chromeos_root',
         self.config['chromeos_root'],
         '--board',
@@ -102,6 +103,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
     common_eval_cmd = [
         './eval_cros_autotest.py',
+        '--rich_result',
         '--chromeos_root', self.config['chromeos_root'],
     ]  # yapf: disable
     if self.config['test_name'] and not self.config['cts_test']:

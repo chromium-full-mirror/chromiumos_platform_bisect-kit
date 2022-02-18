@@ -20,6 +20,19 @@ from bisect_kit import math_util
 logger = logging.getLogger(__name__)
 
 
+class StepResult:
+
+  def __init__(self,
+               status: typing.Literal['old', 'new', 'skip', 'fatal', 'value'],
+               reason: typing.Optional[str] = None,
+               values: typing.Optional[typing.List[float]] = None):
+    self.data: typing.Dict[str, typing.Any] = {'status': status}
+    if values:
+      self.data['values'] = values
+    if reason:
+      self.data['reason'] = reason
+
+
 class RevInfo:
   """Aggregated evaluation result of one revision.
 
@@ -103,7 +116,7 @@ class RevInfo:
                  **kwargs):
     if 'rev' in kwargs:
       assert kwargs['rev'] == self.rev
-    assert status in (None, 'init', 'old', 'new', 'skip', 'fatal')
+    assert status in (None, 'value', 'old', 'new', 'skip', 'fatal')
 
     if times is None:
       times = 1
@@ -119,14 +132,14 @@ class RevInfo:
 
   def reclassify(self, old_avg, threshold, new_avg):
     """Reclassify status by values."""
-    assert self['init'] == len(self.values) and self.values
+    assert self['value'] == len(self.values) and self.values
     assert self['old'] + self['new'] == 0
     for avg in self.averages():
       if old_avg < new_avg:
         status = 'old' if avg < threshold else 'new'
       else:
         status = 'new' if avg < threshold else 'old'
-      self['init'] -= 1
+      self['value'] -= 1
       self[status] += 1
 
 

@@ -38,9 +38,9 @@ class TestRevInfo(unittest.TestCase):
 
   def test_reclassify(self):
     rev_info = core.RevInfo('foo')
-    rev_info.add_sample(status='init', values=[1, 3])
-    rev_info.add_sample(status='init', values=[10, 10])
-    rev_info.add_sample(status='init', values=[1, 100])
+    rev_info.add_sample(status='value', values=[1, 3])
+    rev_info.add_sample(status='value', values=[10, 10])
+    rev_info.add_sample(status='value', values=[1, 100])
     rev_info.add_sample(status='skip')
     rev_info.reclassify(1, 3, 5)
     self.assertEqual(rev_info['old'], 1)
@@ -49,9 +49,9 @@ class TestRevInfo(unittest.TestCase):
 
   def test_reclassify_reverse(self):
     rev_info = core.RevInfo('foo')
-    rev_info.add_sample(status='init', values=[1, 3])
-    rev_info.add_sample(status='init', values=[10, 10])
-    rev_info.add_sample(status='init', values=[1, 100])
+    rev_info.add_sample(status='value', values=[1, 3])
+    rev_info.add_sample(status='value', values=[10, 10])
+    rev_info.add_sample(status='value', values=[1, 100])
     rev_info.reclassify(5, 3, 1)
     self.assertEqual(rev_info['old'], 2)
     self.assertEqual(rev_info['new'], 1)

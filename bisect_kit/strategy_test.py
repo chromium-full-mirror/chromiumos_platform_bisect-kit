@@ -480,23 +480,23 @@ class TestNoisyBinarySearch(unittest.TestCase):
         new_value=20.0,
         recompute_init_values=True)
     self.assertTrue(bsearch.is_value_bisection())
-    self.assertEqual(bsearch.classify_result_from_values([100]), 'init')
-    self.assertEqual(bsearch.classify_result_from_values([0]), 'init')
+    self.assertEqual(bsearch.classify_result_from_values([100]), 'value')
+    self.assertEqual(bsearch.classify_result_from_values([0]), 'value')
     self.assertEqual(bsearch.next_idx(), 99)
     self.assertEqual(bsearch.next_idx(), 99)
 
     # same value, twice is enough
-    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 99)
-    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 0)
 
     # different value, at least 3 times
-    bsearch.add_sample(0, 'init', values=[10.0], eval_time=1000)
+    bsearch.add_sample(0, 'value', values=[10.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 0)
-    bsearch.add_sample(0, 'init', values=[11.0], eval_time=1000)
+    bsearch.add_sample(0, 'value', values=[11.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 0)
-    bsearch.add_sample(0, 'init', values=[12.0], eval_time=1000)
+    bsearch.add_sample(0, 'value', values=[12.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 49)
 
   def test_recompute_init_values_unreproducible(self):
@@ -509,18 +509,18 @@ class TestNoisyBinarySearch(unittest.TestCase):
         recompute_init_values=True)
 
     # same value, twice is enough
-    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 99)
-    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 0)
 
     # different value, at least 3 times
-    bsearch.add_sample(0, 'init', values=[19.0], eval_time=1000)
+    bsearch.add_sample(0, 'value', values=[19.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 0)
-    bsearch.add_sample(0, 'init', values=[18.0], eval_time=1000)
+    bsearch.add_sample(0, 'value', values=[18.0], eval_time=1000)
     self.assertEqual(bsearch.next_idx(), 0)
     with self.assertRaises(errors.WrongAssumption):
-      bsearch.add_sample(0, 'init', values=[21.0], eval_time=1000)
+      bsearch.add_sample(0, 'value', values=[21.0], eval_time=1000)
 
   def test_recompute_init_values_undecidable(self):
     bsearch = strategy.NoisyBinarySearch(
@@ -532,15 +532,15 @@ class TestNoisyBinarySearch(unittest.TestCase):
         recompute_init_values=True)
 
     # same value, twice is enough
-    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
-    bsearch.add_sample(99, 'init', values=[20.0], eval_time=1000)
+    bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
+    bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
 
     # One sample with good trend
-    bsearch.add_sample(0, 'init', values=[10.0], eval_time=100)
+    bsearch.add_sample(0, 'value', values=[10.0], eval_time=100)
     self.assertEqual(bsearch.next_idx(), 0)
     # But others are not, so need more samples
     for _ in range(10):
-      bsearch.add_sample(0, 'init', values=[17.0], eval_time=100)
+      bsearch.add_sample(0, 'value', values=[17.0], eval_time=100)
       self.assertEqual(bsearch.next_idx(), 0)
 
 

@@ -12,7 +12,9 @@ import logging
 import os
 import sys
 import time
+import typing
 
+from bisect_kit import bisector_cli
 from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -45,6 +47,10 @@ def add_build_and_deploy_arguments(parser_group):
 def create_common_argument_parser():
   """Common arguments parser for both Chrome and Chrome OS builds"""
   parser = argparse.ArgumentParser(add_help=False)
+  parser.add_argument(
+      '--rich_result',
+      action='store_true',
+      help='Instead of mere exit code, output detailed information in json')
   parser.add_argument(
       '--dut',
       type=cli.argtype_notempty,
@@ -394,13 +400,13 @@ def switch(opts):
   # If --nodeploy is given, the script will exit as soon as job scheduled and
   # ignore potential build errors.
   if opts.nodeploy:
-    return 0
+    return
 
   wait_build_complete(buildbucket_id)
   image_info = search_build_image(buildbucket_id)
 
   # deploy and flash
-  if cros_util.provision_image_with_retry(
+  cros_util.provision_image_with_retry(
       opts.chromeos_root,
       opts.dut,
       opts.board,
@@ -408,13 +414,10 @@ def switch(opts):
       clobber_stateful=opts.clobber_stateful,
       disable_rootfs_verification=opts.disable_rootfs_verification,
       repair_callback=cros_lab_util.repair,
-      force_reboot_callback=cros_lab_util.reboot_via_servo):
-    return 0
-  return 1
+      force_reboot_callback=cros_lab_util.reboot_via_servo)
 
 
-@cli.fatal_error_handler
-def main(args=None):
+def switch_main(args: typing.Optional[tuple[str]]):
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
@@ -431,7 +434,7 @@ def main(args=None):
     if not cros_util.is_good_dut(opts.dut):
       logger.fatal('%r is not a good DUT', opts.dut)
       if not cros_lab_util.repair(opts.dut):
-        sys.exit(cli.EXIT_CODE_FATAL)
+        raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 
@@ -444,20 +447,19 @@ def main(args=None):
   cros_util.prepare_chroot(opts.chromeos_root)
 
   try:
-    returncode = switch(opts)
-  except Exception:
-    logger.exception('switch failed')
-    returncode = 1
-
-  if not opts.nodeploy:
-    # No matter switching succeeded or not, DUT must be in good state.
-    # switch() already tried repairing if possible, no repair here.
-    if not cros_util.is_good_dut(opts.dut):
-      logger.fatal('%r is not a good DUT', opts.dut)
-      returncode = cli.EXIT_CODE_FATAL
+    switch(opts)
+  finally:
+    if not opts.nodeploy:
+      # No matter switching succeeded or not, DUT must be in good state.
+      # switch() already tried repairing if possible, no repair here.
+      if not cros_util.is_good_dut(opts.dut):
+        raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
   logger.info('done')
-  sys.exit(returncode)
+
+
+def main(args: typing.Optional[tuple[str]] = None) -> int:
+  return bisector_cli.switch_main_wrapper(switch_main, args)
 
 
 if __name__ == '__main__':
-  main()
+  sys.exit(main())

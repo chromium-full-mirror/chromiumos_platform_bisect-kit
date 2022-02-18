@@ -144,10 +144,11 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
 
-    def do_evaluate(_cmd, _domain, rev, _log_file):
+    def do_evaluate(_cmd, _domain, rev, _log_file, capture_values=False):
+      del capture_values  # unused
       if int(rev) < 42:
-        return 'old', []
-      return 'new', []
+        return core.StepResult('old')
+      return core.StepResult('new')
 
     with mock.patch('bisect_kit.bisector_cli.do_evaluate', do_evaluate):
       # two verify
@@ -178,14 +179,15 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
 
-    def do_evaluate(_cmd, _domain, rev, _log_file):
+    def do_evaluate(_cmd, _domain, rev, _log_file, capture_values=False):
+      del capture_values  # unused
       if int(rev) < 42:
         p = 0.1
       else:
         p = 0.9
       if random.random() < p:
-        return 'new', []
-      return 'old', []
+        return core.StepResult('new')
+      return core.StepResult('old')
 
     with mock.patch('bisect_kit.bisector_cli.do_evaluate', do_evaluate):
       bisector.main('run')

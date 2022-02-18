@@ -1,0 +1,1 @@
+{"tests": [{"verdict": "Fail", "testname": "platform_FileSize", "errmsg": "FAIL: /mnt/stateful_partition/tempfile file test failed."}]}

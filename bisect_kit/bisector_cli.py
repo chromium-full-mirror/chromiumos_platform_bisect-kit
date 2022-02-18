@@ -16,6 +16,7 @@ import subprocess
 import sys
 import textwrap
 import time
+import typing
 
 from bisect_kit import cli
 from bisect_kit import common
@@ -29,6 +30,25 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIDENCE = 0.999
 END_OF_LOG_FILE_MARKER = '== end of log file ==\n'
+
+OLD = 'old'
+NEW = 'new'
+SKIP = 'skip'
+FATAL = 'fatal'
+VALUE = 'value'
+
+EXIT_CODE_MAP = {
+    OLD: cli.EXIT_CODE_OLD,
+    NEW: cli.EXIT_CODE_NEW,
+    SKIP: cli.EXIT_CODE_SKIP,
+    FATAL: cli.EXIT_CODE_FATAL,
+    VALUE: cli.EXIT_CODE_VALUE,
+}
+
+step_command_parser = argparse.ArgumentParser(prog='config')
+step_command_parser.add_argument(
+    '--mode', choices=['git', 'bisectkit'], default='git')
+step_command_parser.add_argument('command', nargs=argparse.REMAINDER)
 
 
 def _collect_bisect_result_values(values, line):
@@ -52,42 +72,13 @@ def _is_fatal_returncode(returncode):
   return returncode < 0 or returncode >= 128
 
 
-def _execute_command(args, env=None, stdout_callback=None):
+def output_rich_result(result: core.StepResult):
+  print('rich-result:', json.dumps(result.data))
+
+
+def _execute_git_step_command(args, env=None,
+                              capture_values=False) -> core.StepResult:
   """Helper of do_evaluate() and do_switch().
-
-  Args:
-    args: command line arguments
-    env: environment variables
-    stdout_callback: Callback function for stdout. Called once per line.
-
-  Returns:
-    returncode
-  """
-  stderr_lines = []
-  p = util.Popen(
-      args,
-      env=env,
-      stdout_callback=stdout_callback,
-      stderr_callback=stderr_lines.append)
-  returncode = p.wait()
-  if _is_fatal_returncode(returncode):
-    # Only output error messages of child process if it is fatal error.
-    print(cli.format_returncode(returncode))
-    print(
-        'Last stderr lines of "%s"' % subprocess.list2cmdline(args),
-        file=sys.stderr)
-    print('=' * 40, file=sys.stderr)
-    for line in stderr_lines[-50:]:
-      print(line, end='', file=sys.stderr)
-    print('=' * 40, file=sys.stderr)
-  return returncode
-
-
-def do_evaluate(evaluate_cmd, domain, rev, log_file):
-  """Invokes evaluator command.
-
-  The `evaluate_cmd` can get the target revision from the environment variable
-  named 'BISECT_REV'.
 
   The result is determined according to the exit code of evaluator:
     0: 'old'
@@ -103,10 +94,94 @@ def do_evaluate(evaluate_cmd, domain, rev, log_file):
        BISECT_RESULT_VALUES=<float>[, <float>]*
 
   Args:
+    args: command line arguments
+    env: environment variables
+    capture_values: capture additional value output
+
+  Returns:
+    core.StepResult
+  """
+  values: list[float] = []
+  stderr_lines: list[str] = []
+  p = util.Popen(
+      args,
+      env=env,
+      stdout_callback=lambda line: _collect_bisect_result_values(values, line),
+      stderr_callback=stderr_lines.append)
+  returncode = p.wait()
+  if _is_fatal_returncode(returncode):
+    # Only output error messages of child process if it is fatal error.
+    print(cli.format_returncode(returncode))
+    print(
+        'Last stderr lines of "%s"' % subprocess.list2cmdline(args),
+        file=sys.stderr)
+    print('=' * 40, file=sys.stderr)
+    for line in stderr_lines[-50:]:
+      print(line, end='', file=sys.stderr)
+    print('=' * 40, file=sys.stderr)
+
+  if _is_fatal_returncode(returncode):
+    return core.StepResult('fatal')
+  if returncode == 125:
+    return core.StepResult('skip')
+  if capture_values:
+    return core.StepResult('value', values=values)
+  if returncode == 0:
+    return core.StepResult('old')
+  return core.StepResult('new')
+
+
+def _execute_bisectkit_step_command(args, env=None) -> core.StepResult:
+  """Helper of do_evaluate() and do_switch().
+
+  For commands executed in this mode, the last line of stdout should be dump of
+  json format of core.StepResult (a.k.a. rich result).
+
+  Args:
+    args: command line arguments
+    env: environment variables
+
+  Returns:
+    core.StepResult
+  """
+  stdout_lines: list[str] = []
+  stderr_lines: list[str] = []
+  p = util.Popen(
+      args,
+      env=env,
+      stdout_callback=stdout_lines.append,
+      stderr_callback=stderr_lines.append)
+  returncode = p.wait()
+  if _is_fatal_returncode(returncode):
+    # Only output error messages of child process if it is fatal error.
+    print(cli.format_returncode(returncode))
+    print(
+        'Last stderr lines of "%s"' % subprocess.list2cmdline(args),
+        file=sys.stderr)
+    print('=' * 40, file=sys.stderr)
+    for line in stderr_lines[-50:]:
+      print(line, end='', file=sys.stderr)
+    print('=' * 40, file=sys.stderr)
+
+  if stdout_lines and stdout_lines[-1].startswith('rich-result: '):
+    data = json.loads(stdout_lines[-1][13:])
+    return core.StepResult(**data)
+  return core.StepResult('fatal', 'completely failed to run %s' % args[0])
+
+
+def do_evaluate(evaluate_cmd, domain, rev, log_file,
+                capture_values=False) -> core.StepResult:
+  """Invokes evaluator command.
+
+  The `evaluate_cmd` can get the target revision from the environment variable
+  named 'BISECT_REV'.
+
+  Args:
     evaluate_cmd: evaluator command.
     domain: a bisect_kit.core.Domain instance.
     rev: version to evaluate.
     log_file: hint sub-process where to output detail log
+    capture_values: True if we should capture values generated by the command
 
   Returns:
     (result, values):
@@ -121,24 +196,21 @@ def do_evaluate(evaluate_cmd, domain, rev, log_file):
     logger.info('eval log file = %s', log_file)
     env['LOG_FILE'] = log_file
 
-  values = []
-  returncode = _execute_command(
-      evaluate_cmd,
-      env=env,
-      stdout_callback=lambda line: _collect_bisect_result_values(values, line))
+  exec_opts = step_command_parser.parse_args(evaluate_cmd)
+  if exec_opts.mode == 'git':
+    result = _execute_git_step_command(
+        exec_opts.command, env=env, capture_values=capture_values)
+  else:
+    result = _execute_bisectkit_step_command(exec_opts.command, env=env)
   if log_file and os.path.exists(log_file):
     with open(log_file, 'a') as f:
       f.write(END_OF_LOG_FILE_MARKER)
-  if _is_fatal_returncode(returncode):
-    return 'fatal', []
-  if returncode == 0:
-    return 'old', values
-  if returncode == 125:
-    return 'skip', values
-  return 'new', values
+
+  return result
 
 
-def do_switch(switch_cmd, domain, rev, log_file):
+def do_switch(switch_cmd, domain, rev,
+              log_file) -> typing.Optional[core.StepResult]:
   """Invokes switcher command.
 
   The `switch_cmd` can get the target revision from the environment variable
@@ -159,7 +231,8 @@ def do_switch(switch_cmd, domain, rev, log_file):
     log_file: hint sub-process where to output detail log
 
   Returns:
-    None if switch successfully, otherwise 'skip' or 'fatal'.
+    None if switch successfully, otherwise core.StepResult with 'skip' or
+    'fatal'.
   """
   env = os.environ.copy()
   env['BISECT_REV'] = rev
@@ -169,15 +242,74 @@ def do_switch(switch_cmd, domain, rev, log_file):
     logger.info('switch log file = %s', log_file)
     env['LOG_FILE'] = log_file
 
-  returncode = _execute_command(switch_cmd, env=env)
+  exec_opts = step_command_parser.parse_args(switch_cmd)
+  if exec_opts.mode == 'git':
+    result = _execute_git_step_command(exec_opts.command, env=env)
+  else:
+    result = _execute_bisectkit_step_command(exec_opts.command, env=env)
   if log_file and os.path.exists(log_file):
     with open(log_file, 'a') as f:
       f.write(END_OF_LOG_FILE_MARKER)
-  if _is_fatal_returncode(returncode):
-    return 'fatal'
-  if returncode != 0:
-    return 'skip'
+
+  if result.data['status'] == 'new':
+    logger.debug('for "switch" step, "new" means this candidate failed')
+    result.data['status'] = 'skip'
+
+  if result.data['status'] in ('fatal', 'skip'):
+    return result
+  assert result.data['status'] == 'old'
   return None
+
+
+def step_main_wrapper(step_main: typing.Callable[..., core.StepResult],
+                      args: typing.Optional[tuple[str]]) -> int:
+  """Wrapper function for switch and eval step.
+
+  We treat most unhandled exceptions are fatal and will stop the whole
+  bisection.
+
+  Args:
+    step_main: main function
+    args: command line arguments
+  """
+  try:
+    result = step_main(args)
+  except (OSError, subprocess.SubprocessError,
+          errors.BisectionTemporaryError) as e:
+    # These exceptions are kind of external dependencies. So we classify them
+    # as 'skip' (undecidable now) and let bisection algorithm retry this
+    # candidate later.
+    logging.exception(str(e))
+    result = core.StepResult('skip', str(e))
+  except Exception as e:
+    exception_name = e.__class__.__name__
+    logging.exception('unhandled exception')
+    result = core.StepResult('fatal', '%s: %s' % (exception_name, str(e)))
+
+  # Because it may fail during argument parsing in the main function, we parse
+  # sole '--rich_result' here by ourself.
+  parser = argparse.ArgumentParser(add_help=False)
+  parser.add_argument('--rich_result', action='store_true')
+  opts, _ = parser.parse_known_args(args)
+
+  if opts.rich_result:
+    output_rich_result(result)
+  elif result.data['status'] == 'value':
+    print('BISECT_RESULT_VALUES=',
+          ' '.join(str(v) for v in result.data['values']))
+
+  return EXIT_CODE_MAP[result.data['status']]
+
+
+def switch_main_wrapper(switch_main: typing.Callable[..., None],
+                        args: typing.Optional[tuple[str]]) -> int:
+
+  def func(args):
+    # "switch" step usually has no return values. No exception is good (old).
+    switch_main(args)
+    return core.StepResult('old')
+
+  return step_main_wrapper(func, args)
 
 
 class BisectorCommandLine:
@@ -317,13 +449,16 @@ class BisectorCommandLine:
       switch_log_fullpath = os.path.join(self.session_dir, switch_log)
       logger.debug('switch to rev=%s', rev)
       t0 = time.time()
-      status = do_switch(self.config['switch'], self.domain, rev,
+      result = do_switch(self.config['switch'], self.domain, rev,
                          switch_log_fullpath)
+      status = result.data['status'] if result else None
       t1 = time.time()
       sample['switch_time'] = t1 - t0
       sample['status'] = status
       if os.path.exists(switch_log_fullpath):
         sample['switch_log'] = switch_log
+      if result and 'reason' in result.data:
+        sample['reason'] = result.data['reason']
       if status in ('skip', 'fatal'):
         logger.debug('switch failed => %s', status)
         return 'switch', sample
@@ -332,23 +467,31 @@ class BisectorCommandLine:
     eval_log_fullpath = os.path.join(self.session_dir, eval_log)
     logger.debug('eval rev=%s', rev)
     t0 = time.time()
-    status, values = do_evaluate(self.config['eval'], self.domain, rev,
-                                 eval_log_fullpath)
+    result = do_evaluate(
+        self.config['eval'],
+        self.domain,
+        rev,
+        eval_log_fullpath,
+        capture_values=self.strategy.is_value_bisection())
+    status = result.data['status']
     t1 = time.time()
     sample['eval_time'] = t1 - t0
     sample['status'] = status
     if os.path.exists(eval_log_fullpath):
       sample['eval_log'] = eval_log
+    if result and 'reason' in result.data:
+      sample['reason'] = result.data['reason']
     if status in ('skip', 'fatal'):
       return 'eval', sample
 
     if self.strategy.is_value_bisection():
-      if not values:
+      if status != 'value':
         raise errors.ExecutionFatalError(
             'eval command (%s) terminated normally but did not output values' %
             self.config['eval'])
-      sample['values'] = values
-      sample['status'] = self.strategy.classify_result_from_values(values)
+      sample['values'] = result.data['values']
+      sample['status'] = self.strategy.classify_result_from_values(
+          result.data['values'])
 
     return 'eval', sample
 
@@ -728,8 +871,8 @@ class BisectorCommandLine:
 
     switch_log = self._step_log_path(rev, 'switch')
     logger.info('switch to %s', rev)
-    status = do_switch(self.config['switch'], self.domain, rev, switch_log)
-    if status:
+    result = do_switch(self.config['switch'], self.domain, rev, switch_log)
+    if result:
       print('switch failed')
 
   def _add_revs_status_helper(self, revs, status):
@@ -783,7 +926,8 @@ class BisectorCommandLine:
       return
 
     if opts.key in ['switch', 'eval']:
-      result = cli.check_executable(opts.value[0])
+      exec_opts = step_command_parser.parse_args(opts.value)
+      result = cli.check_executable(exec_opts.command[0])
       if result:
         raise errors.ArgumentError('%s command' % opts.key, result)
 

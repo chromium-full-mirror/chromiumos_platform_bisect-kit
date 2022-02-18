@@ -10,13 +10,16 @@ import argparse
 import logging
 import os
 import sys
+import typing
 
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import errors
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,10 @@ def create_argument_parser():
   parents = [common.common_argument_parser, common.session_optional_parser]
   parser = argparse.ArgumentParser(description=__doc__, parents=parents)
   cli.patching_argparser_exit(parser)
+  parser.add_argument(
+      '--rich_result',
+      action='store_true',
+      help='Instead of mere exit code, output detailed information in json')
   parser.add_argument(
       '--dut',
       type=cli.argtype_notempty,
@@ -72,10 +79,10 @@ def switch(opts):
   # TODO(kcwu): clear cache of cros flash
   image_info = cros_util.search_image(opts.board, opts.version)
   if not image_info:
-    logger.error('no images available for %s %s', opts.board, opts.version)
-    return cli.EXIT_CODE_FATAL
+    raise errors.ExecutionFatalError('no images available for %s %s' %
+                                     (opts.board, opts.version))
 
-  if cros_util.provision_image_with_retry(
+  cros_util.provision_image_with_retry(
       opts.default_chromeos_root,
       opts.dut,
       opts.board,
@@ -84,9 +91,7 @@ def switch(opts):
       clobber_stateful=opts.clobber_stateful,
       disable_rootfs_verification=opts.disable_rootfs_verification,
       repair_callback=cros_lab_util.repair,
-      force_reboot_callback=cros_lab_util.reboot_via_servo):
-    return 0
-  return 1
+      force_reboot_callback=cros_lab_util.reboot_via_servo)
 
 
 def parse_args(args):
@@ -98,34 +103,32 @@ def inner_main(opts):
   if not cros_util.is_good_dut(opts.dut):
     logger.error('%r is not a good DUT', opts.dut)
     if not cros_lab_util.repair(opts.dut):
-      return cli.EXIT_CODE_FATAL
+      raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
   if not opts.board:
     opts.board = cros_util.query_dut_board(opts.dut)
 
   cros_util.prepare_chroot(opts.default_chromeos_root)
 
   try:
-    returncode = switch(opts)
-  except Exception:
-    logger.exception('switch failed')
-    returncode = 1
-
-  # No matter switching succeeded or not, DUT must be in good state.
-  # switch() already tried repairing if possible, no repair here.
-  if not cros_util.is_good_dut(opts.dut):
-    logger.fatal('%r is not a good DUT', opts.dut)
-    returncode = cli.EXIT_CODE_FATAL
+    switch(opts)
+  finally:
+    # No matter switching succeeded or not, DUT must be in good state.
+    # switch() already tried repairing if possible, no repair here.
+    if not cros_util.is_good_dut(opts.dut):
+      raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
   logger.info('done')
-  return returncode
 
 
-@cli.fatal_error_handler
-def main(args=None):
+def switch_main(args: typing.Optional[tuple[str]]):
   common.init()
   opts = parse_args(args)
   common.config_logging(opts)
-  sys.exit(inner_main(opts))
+  inner_main(opts)
+
+
+def main(args: typing.Optional[tuple[str]] = None) -> int:
+  return bisector_cli.switch_main_wrapper(switch_main, args)
 
 
 if __name__ == '__main__':
-  main()
+  sys.exit(main())

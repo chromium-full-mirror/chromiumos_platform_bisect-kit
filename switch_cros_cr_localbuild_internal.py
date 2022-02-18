@@ -20,7 +20,9 @@ import argparse
 import logging
 import os
 import sys
+import typing
 
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
@@ -40,6 +42,10 @@ def create_argument_parser():
   parents = [common.common_argument_parser, common.session_optional_parser]
   parser = argparse.ArgumentParser(parents=parents)
   cli.patching_argparser_exit(parser)
+  parser.add_argument(
+      '--rich_result',
+      action='store_true',
+      help='Instead of mere exit code, output detailed information in json')
   parser.add_argument(
       '--dut',
       type=cli.argtype_notempty,
@@ -138,8 +144,7 @@ def _apply_additional_patch(root_dir, rev):
     util.check_call('git', 'am', patch_file, cwd=path)
 
 
-@cli.fatal_error_handler
-def main(args=None):
+def switch_main(args: typing.Optional[tuple[str]]):
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
@@ -216,13 +221,7 @@ def main(args=None):
         opts.with_tests,
         nodeploy=opts.nodeploy)
   elif opts.deploy_method == 'image':
-    try:
-      returncode = switch_cros_localbuild.build_and_deploy(
-          opts, do_mark_as_stable=False)
-    except Exception:
-      logger.exception('switch failed')
-      returncode = 1
-    sys.exit(returncode)
+    switch_cros_localbuild.build_and_deploy(opts)
 
   # Sanity check. The OS version should not change.
   if opts.dut:
@@ -230,5 +229,9 @@ def main(args=None):
         'Someone else reflashed the DUT. DUT locking is not respected?')
 
 
+def main(args: typing.Optional[tuple[str]] = None) -> int:
+  return bisector_cli.switch_main_wrapper(switch_main, args)
+
+
 if __name__ == '__main__':
-  main()
+  sys.exit(main())

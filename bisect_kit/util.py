@@ -12,6 +12,7 @@ import re
 import subprocess
 import threading
 import time
+import typing
 
 import psutil
 
@@ -432,17 +433,21 @@ def is_direct_relative_version(a, b):
   return True
 
 
-def show_similar_candidates(key, value, candidates):
-  logger.error('incorrect %s: %r; possible candidates:', key, value)
+def report_similar_candidates(key: str, value: str,
+                              candidates: list[str]) -> typing.NoReturn:
+  assert value not in candidates
   if not candidates:
-    logger.error('(no candidates at all)')
-    return
+    raise errors.ExecutionFatalError(
+        'no candidates of %s at all, something wrong?' % key)
   similar_candidates = difflib.get_close_matches(value, candidates)
   if not similar_candidates:
-    logger.error('(no similar candidates)')
-    return
+    raise errors.ExecutionFatalError('no %s candidates similar to %s' %
+                                     (key, value))
+  logger.error('incorrect %s: %r; possible candidates:', key, value)
   for candidate in similar_candidates:
     logger.error('    %s', candidate)
+  raise errors.ExecutionFatalError('incorrect %s: %r; possible candidates: %s' %
+                                   (key, value, similar_candidates))
 
 
 def dict_get(element, *args):

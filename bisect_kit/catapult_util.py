@@ -22,6 +22,7 @@ import os
 import re
 
 from bisect_kit import util
+from bisect_kit import errors
 
 logger = logging.getLogger(__name__)
 
@@ -134,10 +135,11 @@ def match_trace_name(dashboard_name, result_name):
   return dashboard_name == result_name
 
 
-def get_benchmark_values(json_path, metric):
+def get_benchmark_values(json_path: str, metric: str) -> list[float]:
   if not os.path.exists(json_path):
-    logger.warning('benchmark result file not found: %s', json_path)
-    return None
+    raise errors.BisectionTemporaryError(
+        'benchmark result file not found: %s '
+        '(the test failed before result generated?)' % json_path)
 
   with open(json_path) as f:
     content = f.read()
@@ -146,9 +148,9 @@ def get_benchmark_values(json_path, metric):
     if not match_trace_name(metric, subtest_name):
       continue
     if not values:
-      logger.error('found metric %s but values are bad or unsupported', metric)
-      return None
+      raise errors.ExecutionFatalError(
+          'found metric %s but values are bad or unsupported' % metric)
     return values
   logger.error('metric %s not found in %s', metric, json_path)
-  util.show_similar_candidates('metric name', metric, list(traces.keys()))
-  return None
+  util.report_similar_candidates('metric name', metric, list(traces.keys()))
+  assert 0  # unreachable

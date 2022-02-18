@@ -40,6 +40,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     # prebuilt version will be specified later.
     common_switch_cmd = [
         './switch_tast_prebuilt.py',
+        '--rich_result',
         '--chromeos_root',
         self.config['chromeos_root'],
         '--board',
@@ -47,6 +48,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     ]
     common_eval_cmd = [
         './eval_cros_tast.py',
+        '--rich_result',
         '--with_private_bundles',
         '--chromeos_root', self.config['chromeos_root'],
         '--test_name', self.config['test_name'],
