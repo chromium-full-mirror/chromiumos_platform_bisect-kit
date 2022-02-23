@@ -169,7 +169,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
 
 
 def main(args: typing.Optional[tuple[str]] = None) -> int:
-  return bisector_cli.step_main_wrapper(switch_main, args)
+  return bisector_cli.switch_main_wrapper(switch_main, args)
 
 
 if __name__ == '__main__':
