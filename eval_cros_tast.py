@@ -228,9 +228,14 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
   if opts.metric:
     chart_path = os.path.join(result_dir, 'tests', opts.test_name,
                               'results-chart.json')
-    return core.StepResult(
-        'value',
-        values=catapult_util.get_benchmark_values(chart_path, opts.metric))
+    try:
+      values = catapult_util.get_benchmark_values(chart_path, opts.metric)
+    except Exception:
+      if not passed:
+        raise errors.BisectionTemporaryError(
+            'test failed to generate metric values, reason: %s' % reason)
+      raise
+    return core.StepResult('value', values=values)
 
   if opts.fail_to_pass:
     if passed:
