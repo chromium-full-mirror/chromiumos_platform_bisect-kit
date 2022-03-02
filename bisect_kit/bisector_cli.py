@@ -613,7 +613,11 @@ class BisectorCommandLine:
         self.states.add_history('sample', **sample)
         self.states.save()
         if sample['status'] == 'fatal':
-          raise errors.ExecutionFatalError('%s failed' % step)
+          if 'reason' in sample:
+            reason_text = ': %s' % sample['reason']
+          else:
+            reason_text = ''
+          raise errors.ExecutionFatalError('%s failed' % step + reason_text)
         status = term_map.get(sample['status'], sample['status'])
         if 'values' in sample:
           logger.info('rev=%s status => %s: %s', rev, status, sample['values'])

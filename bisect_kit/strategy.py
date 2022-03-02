@@ -271,7 +271,7 @@ class NoisyBinarySearch:
     status = sample['status']
     self.check_verification_range()
     if status == 'skip':
-      self.check_proceed_with_skip(idx)
+      self.check_proceed_with_skip(idx, sample.get('reason', 'something wrong'))
     if self.state == self.INITED:
       pass
     elif self.state == self.STARTED:
@@ -816,13 +816,14 @@ class NoisyBinarySearch:
             term_old=self.term_map.get('old', 'old'),
             term_new=self.term_map.get('new', 'new'))
 
-  def check_proceed_with_skip(self, idx):
+  def check_proceed_with_skip(self, idx, reason):
     """Checks if we should proceed after skips.
 
     We just got one more 'skip' result. Should we tolerate it or stop bisecting?
 
     Args:
       idx: index of the new skip.
+      reason: the reason why a candidate reported 'skip' status
 
     Raises:
       errors.UnableToProceed: skip too many times, probably serious issue and
@@ -837,9 +838,8 @@ class NoisyBinarySearch:
         (self.rev_info[idx]['skip'] >=
          (non_skip_count + 1) * (SKIP_FOREVER + 2))):
       raise errors.UnableToProceed(
-          'something wrong, '
-          'unable to evaluate rev=%r (skip) %d times' %
-          (self.rev_info[idx].rev, self.rev_info[idx]['skip']))
+          'unable to evaluate rev=%r (skip) %d times: %s' %
+          (self.rev_info[idx].rev, self.rev_info[idx]['skip'], reason))
 
   def show_summary(self, more=False):
     """Shows top ranked candidates.
