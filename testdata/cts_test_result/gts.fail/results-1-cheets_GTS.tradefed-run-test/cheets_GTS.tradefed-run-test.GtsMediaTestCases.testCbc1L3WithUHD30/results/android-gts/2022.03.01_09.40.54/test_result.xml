@@ -1,0 +1,177 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no' ?><?xml-stylesheet type="text/xsl" href="compatibility_result.xsl"?>
+<Result start="1646156454564" end="1646158825994" start_display="Tue Mar 01 09:40:54 PST 2022" end_display="Tue Mar 01 10:20:25 PST 2022" command_line_args='gts --include-filter "GtsMediaTestCases com.google.android.media.gts.WidevineH264PlaybackTests#testCbc1L3WithUHD30" --skip-device-info --ignore-business-logic-failure --log-level-display=DEBUG -s coral-test:22' suite_name="GTS" suite_variant="GTS" suite_version="9.0_r2" suite_plan="gts" suite_build_number="7975754" report_version="5.0" devices="coral-test:22" host_name="example.com" os_name="Linux" os_version="5.15.15-1rodete1-amd64" os_arch="amd64" java_vendor="Oracle Corporation" java_version="11.0.4">
+  <Build invocation-id="1" command_line_args='gts --include-filter "GtsMediaTestCases com.google.android.media.gts.WidevineH264PlaybackTests#testCbc1L3WithUHD30" --skip-device-info --ignore-business-logic-failure --log-level-display=DEBUG -s coral-test:22' adb_version="1.0.41 subVersion: 31.0.0-7110759 install path: /tmp/autotest-tradefed-install_gz0md739/5754d8952af1f1a77473d0159bc9d9fc/adb" java_version="11.0.4" java_classpath=":/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/tools/compatibility-host-util.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/tools/compatibility-tradefed.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/tools/gts-tradefed.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/tools/gts-tradefed-tests.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/tools/loganalysis.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/tools/tradefed.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/tools/tradefed-no-fwk.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/tools/tradefed-test-framework.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/AngleIntegrationTestCommon.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/CtsEdiHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsAccountsHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsArtManagerHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsAssistantHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsAssistantMicHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsAssistantWorkProfileHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsBackupHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsBootHealthHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsBootStatsTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsCastHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsContentHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsDebugfsMountTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsDevicePolicyHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsDozeHostSideTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsEdiHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsEntertainmentSpaceHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsFontHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsGameOverlayTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsGmscoreHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsGraphicsHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsHomeHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsIncrementalInstallProxyHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsInstantAppsHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsJniUncompressHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsKidsHomeHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsLargeApkHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsLinkerConfigTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsLocationHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsMemoryHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsNetStatsHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsNetworkStackHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsPackageManagerHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsPermissionControllerHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsPlayFsiHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsPlayStoreHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsRollbackManagerTest.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsSampleHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsScreenshotHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsSearchHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsSecurityHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsSensorHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsSettingsHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsSetupWizardHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsSsaidHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsStagedInstallHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsStatsdHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsTelephonyNumberVerificationHostCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsTestHarnessModeTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsTvHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsUnofficialApisUsageTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsUserspaceRebootHostSideTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsVndkDependencyTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsWebViewHostTestCases.jar:/tmp/autotest-tradefed-install_gz0md739/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/../../android-gts/testcases/GtsWellbeingHostTestCases.jar" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher="293" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.DeviceInfoCollector="0" collector_time_ms="4607" pull_file_time_ms="2306" server_reference="dabaa270-31de-4837-9af3-3971e2e65871" setup_time_ms="153943" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.PropertyCheck="119" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.WifiCheck="135740" tf_fetch_build_start_timestamp="1646156454434" test_crash_failures="4" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.ReportLogCollector="0" device_done_timestamp="1646158825827" target-preparer-setup-latency_com.android.tradefed.targetprep.RunCommandTargetPreparer="206" soft_restart_after_module="4" push_file_time_ms="3904" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.ApkPreconditionCheck="7655" teardown_disk_usage_bytes="0" tf_dynamic_resolver_pair_timestamp="1646156454409:1646156454432" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.BusinessLogicPreparer="9587" tf_invocation_start_timestamp="1646156454328" pull_file_count="4" fetch_build_time_ms="16" tf_setup_start_timestamp="1646156454707" tf_teardown_end_timestamp="1646158825813" device_count="1" tf_fetch_build_end_timestamp="1646156454450" tf_fetch_build_pair_timestamp="1646156454434:1646156454450" tf_module_setup_pair_timestamp="1646156612163:1646156618498,1646157164902:1646157171058,1646157717865:1646157724650,1646158270826:1646158277503" tf_setup_end_timestamp="1646156608650" tf_teardown_pair_timestamp="1646158823920:1646158825813" device_release_state="AVAILABLE" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.SettingsPreparer="62" tf_test_pair_timestamp="1646156608714:1646158823790" uncaught_test_crash_failures="4" tf_setup_pair_timestamp="1646156454703:1646156454706,1646156454707:1646156608650" tf_teardown_start_timestamp="1646158823920" target-preparer-setup-latency_com.android.compatibility.common.tradefed.targetprep.StayAwakePreparer="217" push_file_count="13" tf_module_teardown_pair_timestamp="1646157027085:1646157028733,1646157579794:1646157581241,1646158132903:1646158134446,1646158685663:1646158687175" tf_invocation_end_timestamp="1646158825936" tf_objects_tracking="com.android.tradefed.testtype.AndroidJUnitTest=4,com.android.compatibility.common.tradefed.targetprep.ApkInstrumentationPreparer=2,com.android.compatibility.common.tradefed.targetprep.WifiCheck=1,com.android.tradefed.targetprep.suite.SuiteApkInstaller=4,com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher=5,com.android.tradefed.targetprep.BaseTargetPreparer=20,com.android.compatibility.common.tradefed.targetprep.ApkPreconditionCheck=1,com.android.compatibility.common.tradefed.targetprep.DeviceInfoCollector=1,com.android.compatibility.common.tradefed.testtype.suite.CompatibilityTestSuite=1,com.android.tradefed.testtype.InstrumentationTest=4,com.android.compatibility.common.tradefed.targetprep.PreconditionPreparer=7,com.android.compatibility.common.tradefed.targetprep.PropertyCheck=2,com.android.compatibility.common.tradefed.build.CompatibilityBuildProvider=1,com.android.compatibility.common.tradefed.targetprep.StayAwakePreparer=1,com.android.tradefed.targetprep.RunCommandTargetPreparer=2,com.android.tradefed.testtype.suite.BaseTestSuite=1,com.android.tradefed.testtype.suite.ITestSuite=1,com.android.compatibility.common.tradefed.targetprep.SettingsPreparer=2,com.android.compatibility.common.tradefed.targetprep.BusinessLogicPreparer=1,com.android.tradefed.targetprep.TestAppInstallSetup=4,com.android.compatibility.common.tradefed.targetprep.ReportLogCollector=1" />
+  <Summary pass="0" failed="4" modules_done="4" modules_total="4" />
+  <Module name="GtsMediaTestCases" abi="arm64-v8a" runtime="409798" done="true" pass="0" total_tests="1">
+    <TestCase name="com.google.android.media.gts.WidevineH264PlaybackTests">
+      <Test result="fail" name="testCbc1L3WithUHD30">
+        <Failure message="java.lang.Exception: Failed components: &amp;lt; Network Connection Check: Could not ping google.com because failed to connect to /142.251.42.238 (port 80) from /:: (port 57334): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping proxy.uat.widevine.com because failed to connect to /216.239.32.27 (port 80) from /:: (port 57368): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping storage.googleapis.com because failed to connect to /172.217.163.48 (port 80) from /:: (port 54862): connect failed: ETIMEDOUT (Connection timed out) &amp;gt;&#13;">
+          <StackTrace>java.lang.Exception: Failed components: &amp;lt; Network Connection Check: Could not ping google.com because failed to connect to /142.251.42.238 (port 80) from /:: (port 57334): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping proxy.uat.widevine.com because failed to connect to /216.239.32.27 (port 80) from /:: (port 57368): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping storage.googleapis.com because failed to connect to /172.217.163.48 (port 80) from /:: (port 54862): connect failed: ETIMEDOUT (Connection timed out) &amp;gt;
+	at com.google.android.media.gts.GTSTestBase.run(GTSTestBase.java:158)
+	at com.google.android.media.gts.WidevineH264PlaybackTests.testCbc1L3WithUHD30(WidevineH264PlaybackTests.java:109)
+</StackTrace>
+        </Failure>
+        <Metric key="CPU_Usage_Histogram_0-9_Percent">100.00</Metric>
+        <Metric key="CPU_Usage_Histogram_10-19_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_100-109_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_20-29_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_30-39_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_40-49_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_50-59_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_60-69_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_70-79_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_80-89_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_90-99_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_Total_count">510</Metric>
+        <Metric key="Max_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Max_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Mean_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Mean_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Median_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Median_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Memory_Usage_Histogram_0-9_Percent">100.00</Metric>
+        <Metric key="Memory_Usage_Histogram_10-19_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_100-109_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_20-29_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_30-39_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_40-49_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_50-59_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_60-69_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_70-79_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_80-89_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_90-99_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_Total_count">510</Metric>
+        <Metric key="metrics_widevine_usage-testCbc1L3WithUHD30(com.google.android.media.gts.WidevineH264PlaybackTests)">/storage/emulated/0/Widevine_Metrics/metrics_widevine_usage-testCbc1L3WithUHD30(com.google.android.media.gts.WidevineH264PlaybackTests)</Metric>
+      </Test>
+    </TestCase>
+  </Module>
+  <Module name="GtsMediaTestCases" abi="armeabi-v7a" runtime="409674" done="true" pass="0" total_tests="1">
+    <TestCase name="com.google.android.media.gts.WidevineH264PlaybackTests">
+      <Test result="fail" name="testCbc1L3WithUHD30">
+        <Failure message="java.lang.Exception: Failed components: &amp;lt; Network Connection Check: Could not ping google.com because failed to connect to /172.217.163.46 (port 80) from /:: (port 35480): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping proxy.uat.widevine.com because failed to connect to /216.239.32.27 (port 80) from /:: (port 57622): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping storage.googleapis.com because failed to connect to /172.217.163.48 (port 80) from /:: (port 55106): connect failed: ETIMEDOUT (Connection timed out) &amp;gt;&#13;">
+          <StackTrace>java.lang.Exception: Failed components: &amp;lt; Network Connection Check: Could not ping google.com because failed to connect to /172.217.163.46 (port 80) from /:: (port 35480): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping proxy.uat.widevine.com because failed to connect to /216.239.32.27 (port 80) from /:: (port 57622): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping storage.googleapis.com because failed to connect to /172.217.163.48 (port 80) from /:: (port 55106): connect failed: ETIMEDOUT (Connection timed out) &amp;gt;
+	at com.google.android.media.gts.GTSTestBase.run(GTSTestBase.java:158)
+	at com.google.android.media.gts.WidevineH264PlaybackTests.testCbc1L3WithUHD30(WidevineH264PlaybackTests.java:109)
+</StackTrace>
+        </Failure>
+        <Metric key="CPU_Usage_Histogram_0-9_Percent">100.00</Metric>
+        <Metric key="CPU_Usage_Histogram_10-19_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_100-109_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_20-29_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_30-39_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_40-49_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_50-59_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_60-69_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_70-79_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_80-89_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_90-99_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_Total_count">510</Metric>
+        <Metric key="Max_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Max_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Mean_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Mean_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Median_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Median_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Memory_Usage_Histogram_0-9_Percent">100.00</Metric>
+        <Metric key="Memory_Usage_Histogram_10-19_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_100-109_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_20-29_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_30-39_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_40-49_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_50-59_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_60-69_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_70-79_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_80-89_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_90-99_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_Total_count">510</Metric>
+        <Metric key="metrics_widevine_usage-testCbc1L3WithUHD30(com.google.android.media.gts.WidevineH264PlaybackTests)">/storage/emulated/0/Widevine_Metrics/metrics_widevine_usage-testCbc1L3WithUHD30(com.google.android.media.gts.WidevineH264PlaybackTests)</Metric>
+      </Test>
+    </TestCase>
+  </Module>
+  <Module name="GtsMediaTestCases" abi="x86" runtime="410185" done="true" pass="0" total_tests="1">
+    <TestCase name="com.google.android.media.gts.WidevineH264PlaybackTests">
+      <Test result="fail" name="testCbc1L3WithUHD30">
+        <Failure message="java.lang.Exception: Failed components: &amp;lt; Network Connection Check: Could not ping google.com because failed to connect to /172.217.163.46 (port 80) from /:: (port 35028): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping proxy.uat.widevine.com because failed to connect to /216.239.32.27 (port 80) from /:: (port 57126): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping storage.googleapis.com because failed to connect to /172.217.160.112 (port 80) from /:: (port 60866): connect failed: ETIMEDOUT (Connection timed out) &amp;gt;&#13;">
+          <StackTrace>java.lang.Exception: Failed components: &amp;lt; Network Connection Check: Could not ping google.com because failed to connect to /172.217.163.46 (port 80) from /:: (port 35028): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping proxy.uat.widevine.com because failed to connect to /216.239.32.27 (port 80) from /:: (port 57126): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping storage.googleapis.com because failed to connect to /172.217.160.112 (port 80) from /:: (port 60866): connect failed: ETIMEDOUT (Connection timed out) &amp;gt;
+	at com.google.android.media.gts.GTSTestBase.run(GTSTestBase.java:158)
+	at com.google.android.media.gts.WidevineH264PlaybackTests.testCbc1L3WithUHD30(WidevineH264PlaybackTests.java:109)
+</StackTrace>
+        </Failure>
+        <Metric key="CPU_Usage_Histogram_0-9_Percent">100.00</Metric>
+        <Metric key="CPU_Usage_Histogram_10-19_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_100-109_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_20-29_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_30-39_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_40-49_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_50-59_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_60-69_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_70-79_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_80-89_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_90-99_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_Total_count">510</Metric>
+        <Metric key="Max_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Max_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Mean_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Mean_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Median_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Median_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Memory_Usage_Histogram_0-9_Percent">100.00</Metric>
+        <Metric key="Memory_Usage_Histogram_10-19_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_100-109_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_20-29_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_30-39_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_40-49_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_50-59_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_60-69_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_70-79_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_80-89_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_90-99_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_Total_count">510</Metric>
+        <Metric key="metrics_widevine_usage-testCbc1L3WithUHD30(com.google.android.media.gts.WidevineH264PlaybackTests)">/storage/emulated/0/Widevine_Metrics/metrics_widevine_usage-testCbc1L3WithUHD30(com.google.android.media.gts.WidevineH264PlaybackTests)</Metric>
+      </Test>
+    </TestCase>
+  </Module>
+  <Module name="GtsMediaTestCases" abi="x86_64" runtime="410248" done="true" pass="0" total_tests="1">
+    <TestCase name="com.google.android.media.gts.WidevineH264PlaybackTests">
+      <Test result="fail" name="testCbc1L3WithUHD30">
+        <Failure message="java.lang.Exception: Failed components: &amp;lt; Network Connection Check: Could not ping google.com because failed to connect to /172.217.160.110 (port 80) from /:: (port 37168): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping proxy.uat.widevine.com because failed to connect to /216.239.32.27 (port 80) from /:: (port 56858): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping storage.googleapis.com because failed to connect to /172.217.163.48 (port 80) from /:: (port 54186): connect failed: ETIMEDOUT (Connection timed out) &amp;gt;&#13;">
+          <StackTrace>java.lang.Exception: Failed components: &amp;lt; Network Connection Check: Could not ping google.com because failed to connect to /172.217.160.110 (port 80) from /:: (port 37168): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping proxy.uat.widevine.com because failed to connect to /216.239.32.27 (port 80) from /:: (port 56858): connect failed: ETIMEDOUT (Connection timed out) &amp;gt; &amp;lt; Network Connection Check: Could not ping storage.googleapis.com because failed to connect to /172.217.163.48 (port 80) from /:: (port 54186): connect failed: ETIMEDOUT (Connection timed out) &amp;gt;
+	at com.google.android.media.gts.GTSTestBase.run(GTSTestBase.java:158)
+	at com.google.android.media.gts.WidevineH264PlaybackTests.testCbc1L3WithUHD30(WidevineH264PlaybackTests.java:109)
+</StackTrace>
+        </Failure>
+        <Metric key="CPU_Usage_Histogram_0-9_Percent">100.00</Metric>
+        <Metric key="CPU_Usage_Histogram_10-19_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_100-109_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_20-29_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_30-39_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_40-49_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_50-59_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_60-69_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_70-79_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_80-89_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_90-99_Percent">0.00</Metric>
+        <Metric key="CPU_Usage_Histogram_Total_count">510</Metric>
+        <Metric key="Max_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Max_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Mean_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Mean_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Median_CPU_Usage_Percent">0.00</Metric>
+        <Metric key="Median_Memory_Usage_Percent">0.10</Metric>
+        <Metric key="Memory_Usage_Histogram_0-9_Percent">100.00</Metric>
+        <Metric key="Memory_Usage_Histogram_10-19_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_100-109_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_20-29_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_30-39_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_40-49_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_50-59_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_60-69_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_70-79_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_80-89_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_90-99_Percent">0.00</Metric>
+        <Metric key="Memory_Usage_Histogram_Total_count">510</Metric>
+        <Metric key="metrics_widevine_usage-testCbc1L3WithUHD30(com.google.android.media.gts.WidevineH264PlaybackTests)">/storage/emulated/0/Widevine_Metrics/metrics_widevine_usage-testCbc1L3WithUHD30(com.google.android.media.gts.WidevineH264PlaybackTests)</Metric>
+      </Test>
+    </TestCase>
+  </Module>
+</Result>

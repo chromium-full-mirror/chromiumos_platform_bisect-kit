@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no' ?><?xml-stylesheet type="text/xsl" href="compatibility_result.xsl"?>
+<Result start="1646260378945" end="1646261642682" start_display="Wed Mar 02 14:32:58 PST 2022" end_display="Wed Mar 02 14:54:02 PST 2022" suite_name="CTS" suite_version="9.0_r19" suite_plan="cts" suite_build_number="8068678" report_version="5.0" command_line_args='cts --include-filter "CtsCameraTestCases android.hardware.camera2.cts.StillCaptureTest#testFocalLengths" --skip-device-info --logcat-on-failure --log-level-display=DEBUG --quiet-output=true -s device:22' devices="device:22" host_name="example.com" os_name="Linux" os_version="5.7.17-1rodete5-amd64" os_arch="amd64" java_vendor="Oracle Corporation" java_version="1.8.0_131">
+  <Build build_abis_64="arm64-v8a" build_manufacturer="Google" build_abis_32="armeabi-v7a,armeabi" build_product="strongbad" build_brand="google" build_board="board" build_serial="12345678901234567890" build_version_security_patch="2022-02-05" build_reference_fingerprint="" build_fingerprint="google/strongbad/strongbad_cheets:9/R101-14536.0.0/8223141:user/release-keys" build_version_sdk="28" build_abis="arm64-v8a,armeabi-v7a,armeabi" build_device="strongbad_cheets" build_abi="arm64-v8a" build_model="strongbad" build_id="R101-14536.0.0" build_abi2="" build_version_incremental="8223141" build_version_release="9" build_version_base_os="" build_type="user" build_tags="release-keys" run_history='[{"startTime":1646260378945,"endTime":1646261642682}]' />
+  <RunHistory>
+    <Run start="1646260378945" end="1646261642682" />
+  </RunHistory>
+  <Summary pass="0" failed="0" modules_done="2" modules_total="2" />
+  <Module name="CtsCameraTestCases" abi="arm64-v8a" runtime="30384" done="true" pass="0" />
+  <Module name="CtsCameraTestCases" abi="armeabi-v7a" runtime="30941" done="true" pass="0" />
+</Result>

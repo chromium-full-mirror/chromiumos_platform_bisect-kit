@@ -12,6 +12,7 @@ matches. Otherwise your test binary will be overwritten.
 """
 from __future__ import print_function
 import argparse
+import glob
 import json
 import logging
 import os
@@ -19,6 +20,7 @@ import re
 import subprocess
 import sys
 import typing
+import xml.etree.ElementTree
 
 from bisect_kit import bisector_cli
 from bisect_kit import catapult_util
@@ -244,15 +246,15 @@ def run_test(opts) -> str:
 
 # Be careful that both tauto and tast generate results.json, but their format
 # is totally different.
-def parse_results_json(result_dir,
-                       test_name) -> tuple[bool, typing.Optional[str]]:
+def parse_results_json(result_dir: str, test_name: typing.Optional[str]
+                      ) -> tuple[bool, typing.Optional[str]]:
   passed = None
   reason = None
   results_path = os.path.join(result_dir, 'results.json')
   with open(results_path) as f:
     results = json.load(f)
   for result in results['tests']:
-    if result['testname'] != test_name:
+    if test_name is not None and result['testname'] != test_name:
       logger.warning('unexpected test ran: %s', result['testname'])
       continue
     passed = (result['verdict'] == 'Pass')
@@ -262,8 +264,53 @@ def parse_results_json(result_dir,
   return passed, reason
 
 
+def parse_cts_results(result_dir) -> tuple[bool, typing.Optional[str]]:
+  # The result path looks like
+  #   results-1-cheets_CTS_P.tradefed-run-test/
+  #   cheets_CTS_P.tradefed-run-test.CtsCameraTestCases.testFocalLengths/
+  #   results/android-cts/2022.03.02_00.27.09/test_result.xml
+  result_files = glob.glob(
+      os.path.join(result_dir, 'results*/*/results/*/*/test_result.xml'))
+  if not result_files:
+    logger.error('failed to run cts test, fallback to tauto result')
+    passed, reason = parse_results_json(result_dir, None)
+    assert not passed, 'test_result.xml not found, but test passed?'
+    raise errors.BisectionTemporaryError('failed to run test: %s' % reason)
+
+  result_files.sort(key=os.path.getmtime)
+  logger.info('found result file: %s', result_files)
+  # Use the latest result file because it is the final result of retries.
+  result_file = result_files[-1]
+
+  tree = xml.etree.ElementTree.parse(result_file)
+  root = tree.getroot()
+
+  summary = root.find('Summary')
+  assert summary is not None
+  logger.info('summary: %s', summary.attrib)
+  if summary.get('pass') == summary.get('failed') == '0':
+    raise errors.ExecutionFatalError('no tests found')
+
+  # Returns the reason of the first failure.
+  for test in root.iter('Test'):
+    if test.get('result') == 'pass':
+      continue
+    reason = None
+    failure = test.find('Failure')
+    if failure:
+      reason = failure.get('message')
+    return False, reason
+
+  assert root.findall(
+      './/Test[@result="pass"]'), 'there should be some tests passed'
+  return True, None
+
+
 def gather_test_result(opts, result_dir) -> core.StepResult:
-  passed, reason = parse_results_json(result_dir, opts.test_name)
+  if opts.cts_test:
+    passed, reason = parse_cts_results(result_dir)
+  else:
+    passed, reason = parse_results_json(result_dir, opts.test_name)
 
   if opts.metric:
     for root, _, files in os.walk(result_dir):

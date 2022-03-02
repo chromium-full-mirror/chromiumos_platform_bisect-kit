@@ -1,0 +1,1 @@
+{"tests": [{"verdict": "Fail", "testname": "cheets_GTS.tradefed-run-test", "errmsg": "ERROR: Command </tmp/autotest-tradefed-install_qasqhcth/0917eb19532fdb423c41b93b7014d8d4/android-gts-9-R2-P-7975754/android-gts/tools/gts-tradefed list results> failed, rc=1, Command returned non-zero exit status"}]}

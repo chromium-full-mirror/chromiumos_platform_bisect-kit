@@ -32,6 +32,29 @@ class TestEvalCrosAutotest(unittest.TestCase):
       eval_cros_autotest.parse_results_json(
           testing.get_testdata_path('tauto_test_result/pass'), 'bad_testname')
 
+  def test_parse_cts_results(self):
+    self.assertEqual(
+        eval_cros_autotest.parse_cts_results(
+            testing.get_testdata_path('cts_test_result/cts.pass')),
+        (True, None))
+
+    passed, reason = eval_cros_autotest.parse_cts_results(
+        testing.get_testdata_path('cts_test_result/gts.fail'))
+    self.assertEqual(passed, False)
+    self.assertEqual(reason[:20], 'java.lang.Exception:')
+
+    with self.assertRaisesRegex(errors.BisectionTemporaryError,
+                                r'Failed to login to Chrome'):
+      eval_cros_autotest.parse_cts_results(
+          testing.get_testdata_path('cts_test_result/gts.chrome-fail'))
+
+    with self.assertRaises(errors.ExecutionFatalError):
+      eval_cros_autotest.parse_cts_results(
+          testing.get_testdata_path('cts_test_result/cts.test-not-found'))
+    with self.assertRaises(errors.ExecutionFatalError):
+      eval_cros_autotest.parse_cts_results(
+          testing.get_testdata_path('cts_test_result/gts.test-not-found'))
+
 
 if __name__ == '__main__':
   unittest.main()
