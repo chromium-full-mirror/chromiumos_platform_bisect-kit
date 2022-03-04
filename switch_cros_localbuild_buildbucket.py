@@ -21,6 +21,7 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -322,7 +323,7 @@ def search_build_image(buildbucket_id):
   return image_info
 
 
-def schedule_build(opts):
+def schedule_build(opts) -> int:
   build_tags = {'bisector_chromeos_version': opts.chromeos_rev}
   api = buildbucket_util.BuildbucketApi()
 
@@ -355,7 +356,11 @@ def schedule_build(opts):
   return build_id
 
 
-def wait_build_complete(build_id):
+def wait_build_complete(opts, build_id: int):
+  """
+  Raises:
+    errors.ExternalError
+  """
   api = buildbucket_util.BuildbucketApi()
   last_log_time = 0
   while True:
@@ -370,10 +375,11 @@ def wait_build_complete(build_id):
 
   if not api.is_success(build):
     raise errors.ExternalError(
-        'buildbucket build fail, id=%d, status=%s, summary=%r' %
+        'buildbucket build fail id=%d, status=%s, summary=%r, url=%s' %
         (build_id, buildbucket_util.Status.Name(
-            build.status), build.summary_markdown))
-  return build_id
+            build.status), build.summary_markdown,
+         buildbucket_util.get_luci_link(
+             opts.board, build_id, bucket=opts.bucket)))
 
 
 def build_revlist(opts):
@@ -389,7 +395,7 @@ def build_revlist(opts):
   code_manager.build_revlist(old_rev, new_rev)
 
 
-def switch(opts):
+def switch(opts) -> core.StepResult:
   assert opts.board
 
   # schedule build request and prepare image
@@ -401,9 +407,9 @@ def switch(opts):
   # If --nodeploy is given, the script will exit as soon as job scheduled and
   # ignore potential build errors.
   if opts.nodeploy:
-    return
+    return core.StepResult('skip', reason='--nodeploy is on')
 
-  wait_build_complete(buildbucket_id)
+  wait_build_complete(opts, buildbucket_id)
   image_info = search_build_image(buildbucket_id)
 
   # deploy and flash
@@ -417,8 +423,13 @@ def switch(opts):
       repair_callback=cros_lab_util.repair,
       force_reboot_callback=cros_lab_util.reboot_via_servo)
 
+  return core.StepResult(
+      'old',
+      reason=buildbucket_util.get_luci_link(
+          opts.board, buildbucket_id, bucket=opts.bucket))
 
-def switch_main(args: typing.Optional[tuple[str]]):
+
+def switch_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)
@@ -448,7 +459,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
   cros_util.prepare_chroot(opts.chromeos_root)
 
   try:
-    switch(opts)
+    result = switch(opts)
   finally:
     if not opts.nodeploy:
       # No matter switching succeeded or not, DUT must be in good state.
@@ -456,10 +467,11 @@ def switch_main(args: typing.Optional[tuple[str]]):
       if not cros_util.is_good_dut(opts.dut):
         raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
   logger.info('done')
+  return result
 
 
 def main(args: typing.Optional[tuple[str]] = None) -> int:
-  return bisector_cli.switch_main_wrapper(switch_main, args)
+  return bisector_cli.step_main_wrapper(switch_main, args)
 
 
 if __name__ == '__main__':
