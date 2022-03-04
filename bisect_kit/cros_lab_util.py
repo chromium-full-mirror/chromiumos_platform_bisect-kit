@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 # Magic keyword for automatic DUT allocation.
 LAB_DUT = ':lab:'
 
+SWARMING_CLIENT = os.path.expanduser('~/luci-py/client/swarming.py')
 SWARMING_SERVER = 'https://chromeos-swarming.appspot.com'
 LEASE_DURATION = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
@@ -153,7 +154,7 @@ def swarming_query(method, limit=None, verbose_log=True):
     result dict; the content is defined by each method call.
   """
   service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
-  cmd = ['swarming.py', 'query', '--swarming', SWARMING_SERVER, method]
+  cmd = [SWARMING_CLIENT, 'query', '--swarming', SWARMING_SERVER, method]
   if not common.under_luci_context() and service_account_json:
     cmd += ['--auth-service-account-json', service_account_json]
   if limit:
@@ -170,8 +171,8 @@ def swarming_cancel(task_id):
   """
   service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
   cmd = [
-      'swarming.py', 'cancel', '--swarming', SWARMING_SERVER, '--kill-running',
-      task_id
+      SWARMING_CLIENT, 'cancel', '--swarming', SWARMING_SERVER,
+      '--kill-running', task_id
   ]
   if not common.under_luci_context() and service_account_json:
     cmd += ['--auth-service-account-json', service_account_json]

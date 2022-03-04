@@ -81,12 +81,6 @@ class BuildbucketApi:
   def __init__(self):
     """Find swarming folder and its auth script."""
     self._token = None
-    swarming_py = find_executable('swarming.py')
-    if swarming_py is None:
-      raise errors.InternalError('swarming.py is not found in path, ' +
-                                 'please check if swarming.py is installed, ' +
-                                 ' go/lab-tools for more information.')
-
     self.default_service_account_json = os.environ.get(
         'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
     self.default_service_account_client_id = self._get_client_id(
