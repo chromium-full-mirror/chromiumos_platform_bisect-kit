@@ -4,6 +4,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Evaluate ChromeOS tast tests."""
+from __future__ import annotations
 from __future__ import print_function
 import argparse
 import json
@@ -250,7 +251,7 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
   return core.StepResult('new', reason)
 
 
-def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
+def step_main(args: 'typing.Optional[tuple[str]]') -> core.StepResult:
   common.init()
   parser = create_argument_parser()
   opts = parser.parse_args(args)

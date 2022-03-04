@@ -4,6 +4,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Helper script to manipulate chromeos DUT or query info."""
+from __future__ import annotations
 from __future__ import print_function
 import argparse
 import asyncio
@@ -24,7 +25,7 @@ from bisect_kit import errors
 DEFAULT_DUT_POOL = 'DUT_POOL_QUOTA'
 logger = logging.getLogger(__name__)
 
-models_to_avoid: typing.Dict[str, str] = {
+models_to_avoid: dict[str, str] = {
     # model: reason
 }
 

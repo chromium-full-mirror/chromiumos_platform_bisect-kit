@@ -10,6 +10,7 @@ Later, you can run tests using "eval_cros_tast.py --prebuilt" or
 "$CHROMEOS_ROOT/tmp/tast-prebuilt/run_tast.sh".
 """
 
+from __future__ import annotations
 from __future__ import print_function
 import argparse
 import logging

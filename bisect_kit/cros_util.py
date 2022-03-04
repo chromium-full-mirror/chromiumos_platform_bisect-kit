@@ -173,7 +173,7 @@ class NeedRecreateChrootException(Exception):
 class SnapshotStore:
   default_path = ('gs://chromeos-image-archive/{board}-{bucket}'
                   '/{snapshot_version}-*/{filename}')
-  images: typing.Dict[str, ImageInfo] = {}
+  images: dict[str, ImageInfo] = {}
 
   @classmethod
   def init_with_state(cls, states: core.BisectStates):
@@ -295,7 +295,7 @@ class SnapshotStore:
     return image_info
 
   @classmethod
-  def parse_snapshot_path(cls, path: str) -> typing.Dict[str, str]:
+  def parse_snapshot_path(cls, path: str) -> dict[str, str]:
     """Parse information in snapshot path."""
     m = re.match(
         r"""
@@ -308,7 +308,7 @@ class SnapshotStore:
     return m.groupdict() if m else {}
 
   @classmethod
-  def query_snapshot_info(cls, board, version) -> typing.Dict[str, str]:
+  def query_snapshot_info(cls, board, version) -> dict[str, str]:
     """Query snapshot information by board and version."""
     path = cls.query_snapshot_image(board, version)
     if not path:
@@ -840,10 +840,9 @@ def version_to_full(board, version):
   return make_cros_full_version(milestone, version)
 
 
-def _find_files_from_image_archive(board: str, buckets: typing.List[str],
-                                   filenames: typing.List[str], old: str,
-                                   new: str
-                                  ) -> typing.List[typing.Tuple[str, str]]:
+def _find_files_from_image_archive(board: str, buckets: list[str],
+                                   filenames: list[str], old: str,
+                                   new: str) -> list[tuple[str, str]]:
   assert is_cros_full_version(old) or is_cros_snapshot_version(old)
   assert is_cros_full_version(new) or is_cros_snapshot_version(new)
 
@@ -916,9 +915,9 @@ def is_bad_snapshot_to_ignore(version):
   return False
 
 
-def list_prebuilt_from_image_archive(
-    board: str, old: str, new: str,
-    use_snapshot: bool) -> typing.List[typing.Tuple[str, ImageInfo]]:
+def list_prebuilt_from_image_archive(board: str, old: str, new: str,
+                                     use_snapshot: bool
+                                    ) -> list[tuple[str, ImageInfo]]:
   """Lists ChromeOS prebuilt image available from gs://chromeos-image-archive.
 
   Args:
@@ -954,9 +953,11 @@ def list_prebuilt_from_image_archive(
   return list(result.items())
 
 
-def list_chromeos_prebuilt_versions(
-    board: str, old: str, new: str, use_snapshot: bool = False
-) -> typing.Tuple[typing.List[str], typing.Dict[str, typing.Any]]:
+def list_chromeos_prebuilt_versions(board: str,
+                                    old: str,
+                                    new: str,
+                                    use_snapshot: bool = False
+                                   ) -> tuple[list[str], dict[str, typing.Any]]:
   """Lists ChromeOS version numbers with prebuilt between given range
 
   Args:
@@ -979,7 +980,7 @@ def list_chromeos_prebuilt_versions(
     new = version_to_full(board, new)
 
   versions = []
-  details: typing.Dict[str, typing.Any] = {}
+  details: dict[str, typing.Any] = {}
   for version, image_info in list_prebuilt_from_image_archive(
       board, old, new, use_snapshot=use_snapshot):
     if is_cros_snapshot_version(version) and is_bad_snapshot_to_ignore(version):

@@ -25,8 +25,8 @@ class StepResult:
   def __init__(self,
                status: typing.Literal['old', 'new', 'skip', 'fatal', 'value'],
                reason: typing.Optional[str] = None,
-               values: typing.Optional[typing.List[float]] = None):
-    self.data: typing.Dict[str, typing.Any] = {'status': status}
+               values: typing.Optional[list[float]] = None):
+    self.data: dict[str, typing.Any] = {'status': status}
     if values:
       self.data['values'] = values
     if reason:
@@ -243,7 +243,7 @@ class BisectStates(States):
     return self.data.get('config')
 
   @property
-  def details(self) -> typing.Dict[str, typing.Any]:
+  def details(self) -> dict[str, typing.Any]:
     assert self.inited
     return self.data.get('details', {})
 
@@ -278,7 +278,7 @@ class BisectStates(States):
       self.rev_index[rev] = i
     super().init_done()
 
-  def get_rev_info(self, term_map=None) -> typing.List[RevInfo]:
+  def get_rev_info(self, term_map=None) -> list[RevInfo]:
     """Gets aggregated rev info.
 
     Args:
