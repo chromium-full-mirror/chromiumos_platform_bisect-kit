@@ -1,0 +1,10 @@
+---------------------------------------------------------------------------------------------------
+/mnt/host/source/tmp/autotest_results_tmp/results-1-platform_FileSize                   [  FAILED  ]
+/mnt/host/source/tmp/autotest_results_tmp/results-1-platform_FileSize                     FAIL: /mnt/stateful_partition/tempfile file test failed.
+/mnt/host/source/tmp/autotest_results_tmp/results-1-platform_FileSize/platform_FileSize [  FAILED  ]
+/mnt/host/source/tmp/autotest_results_tmp/results-1-platform_FileSize/platform_FileSize   FAIL: /mnt/stateful_partition/tempfile file test failed.
+---------------------------------------------------------------------------------------------------
+Total PASS: 0/2 (0%)
+
+
+Logging the data into test_report.html file.

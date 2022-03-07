@@ -1,0 +1,26 @@
+---------------------------------------------------------------------------------------------------------------
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80                         [  FAILED  ]
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80                           FAIL: Throughput performance too low for test type(s): [test_type=udp_rx, channel=44, power_save_on=True, measured_Tput=180.47, must_expected_Tput_failed=347.00], [test_type=udp_rx, channel=157, power_save_on=True, measured_Tput=201.95, must_expected_Tput_failed=347.00]
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80 [  FAILED  ]
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   FAIL: Throughput performance too low for test type(s): [test_type=udp_rx, channel=44, power_save_on=True, measured_Tput=180.47, must_expected_Tput_failed=347.00], [test_type=udp_rx, channel=157, power_save_on=True, measured_Tput=201.95, must_expected_Tput_failed=347.00]
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   03/05 13:23:39.875 ERROR| network_WiFi_Perf:0095| Throughput is too low for udp_rx. Expected (must) 347.00 Mbps, got 180.47.
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   03/05 13:32:31.452 ERROR| network_WiFi_Perf:0095| Throughput is too low for udp_rx. Expected (must) 347.00 Mbps, got 201.95.
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch044_modeVHT80_none_PSon_governor-default_signal                                                 -41
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch044_modeVHT80_none_PSon_governor-default_tcp_bidirectional_throughput                           312.19+-27.89
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch044_modeVHT80_none_PSon_governor-default_tcp_rx_throughput                                      448.76+-58.12
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch044_modeVHT80_none_PSon_governor-default_tcp_tx_throughput                                      311.58+-21.55
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch044_modeVHT80_none_PSon_governor-default_udp_bidirectional_throughput                           317.70+-31.57
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch044_modeVHT80_none_PSon_governor-default_udp_rx_throughput                                      180.47+-42.49
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch044_modeVHT80_none_PSon_governor-default_udp_tx_throughput                                      379.30+-1.55
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch157_modeVHT80_none_PSon_governor-default_signal                                                 -39
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch157_modeVHT80_none_PSon_governor-default_tcp_bidirectional_throughput                           322.11+-22.38
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch157_modeVHT80_none_PSon_governor-default_tcp_rx_throughput                                      433.80+-8.06
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch157_modeVHT80_none_PSon_governor-default_tcp_tx_throughput                                      324.37+-24.53
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch157_modeVHT80_none_PSon_governor-default_udp_bidirectional_throughput                           312.87+-24.72
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch157_modeVHT80_none_PSon_governor-default_udp_rx_throughput                                      201.95+-58.59
+/mnt/host/source/tmp/autotest_results_tmp/results-1-network_WiFi_Perf.vht80/network_WiFi_Perf.vht80   ch157_modeVHT80_none_PSon_governor-default_udp_tx_throughput                                      380.57+-4.39
+---------------------------------------------------------------------------------------------------------------
+Total PASS: 0/2 (0%)
+
+
+Logging the data into test_report.html file.

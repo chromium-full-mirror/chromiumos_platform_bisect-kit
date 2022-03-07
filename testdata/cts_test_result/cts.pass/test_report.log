@@ -1,0 +1,9 @@
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+/mnt/host/source/tmp/autotest_results_tmp/results-1-cheets_CTS_P.tradefed-run-test                                                                              [  PASSED  ]
+/mnt/host/source/tmp/autotest_results_tmp/results-1-cheets_CTS_P.tradefed-run-test/cheets_CTS_P.tradefed-run-test.CtsCameraTestCases.testFocalLengths           [  PASSED  ]
+/mnt/host/source/tmp/autotest_results_tmp/results-1-cheets_CTS_P.tradefed-run-test/cheets_CTS_P.tradefed-run-test.CtsCameraTestCases.testFocalLengths/stub_Pass [  PASSED  ]
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Total PASS: 3/3 (100%)
+
+
+Logging the data into test_report.html file.

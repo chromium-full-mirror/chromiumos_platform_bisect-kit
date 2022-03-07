@@ -244,27 +244,46 @@ def run_test(opts) -> str:
                              opts.chromeos_root)
 
 
-# Be careful that both tauto and tast generate results.json, but their format
-# is totally different.
-def parse_results_json(result_dir: str, test_name: typing.Optional[str]
-                      ) -> tuple[bool, typing.Optional[str]]:
-  passed = None
+# Although tauto will generate results.json, its content may be empty and
+# useless (see testdata/tast_test_result/fail.2 for example). So we have to
+# parse the machine-unfriendly test_report.log instead.
+def parse_tauto_results(result_dir: str, test_name: typing.Optional[str]
+                       ) -> tuple[bool, typing.Optional[str]]:
+  result_file = os.path.join(result_dir, 'test_report.log')
+  if not os.path.exists(result_file):
+    raise errors.ExternalError('test_report.log not found')
+
+  failed = None
   reason = None
-  results_path = os.path.join(result_dir, 'results.json')
-  with open(results_path) as f:
-    results = json.load(f)
-  for result in results['tests']:
-    if test_name is not None and result['testname'] != test_name:
-      logger.warning('unexpected test ran: %s', result['testname'])
+  for line in open(result_file):
+    line = line.strip()
+    # Assume no space characters in the result path.
+    m = re.match(r'^(\S+)\s+(.+)', line)
+    if not m:
       continue
-    passed = (result['verdict'] == 'Pass')
-    reason = result['errmsg']
-  if passed is None:
-    raise errors.ExternalError('no test result for "%s"?' % test_name)
-  return passed, reason
+
+    # Match test name.
+    path, content = m.groups()
+    m = re.search(r'/(?:results-\d+-)?([^/]+)$', path)
+    if not m:
+      continue
+    logger.debug('found test name: %s', m.group(1))
+    if m.group(1) != test_name:
+      continue
+
+    if re.match(r'\[  (FAILED|PASSED)  \]', content):
+      if 'PASSED' in content:
+        return True, None
+      failed = True
+    if re.match(r'ABORT|ERROR|FAIL|WARN|TEST_NA', content):
+      reason = content
+
+  assert failed, 'test name not found in test_report.log'
+  return False, reason
 
 
-def parse_cts_results(result_dir) -> tuple[bool, typing.Optional[str]]:
+def parse_cts_results(result_dir,
+                      test_name) -> tuple[bool, typing.Optional[str]]:
   # The result path looks like
   #   results-1-cheets_CTS_P.tradefed-run-test/
   #   cheets_CTS_P.tradefed-run-test.CtsCameraTestCases.testFocalLengths/
@@ -273,7 +292,7 @@ def parse_cts_results(result_dir) -> tuple[bool, typing.Optional[str]]:
       os.path.join(result_dir, 'results*/*/results/*/*/test_result.xml'))
   if not result_files:
     logger.error('failed to run cts test, fallback to tauto result')
-    passed, reason = parse_results_json(result_dir, None)
+    passed, reason = parse_tauto_results(result_dir, test_name)
     assert not passed, 'test_result.xml not found, but test passed?'
     raise errors.BisectionTemporaryError('failed to run test: %s' % reason)
 
@@ -308,9 +327,9 @@ def parse_cts_results(result_dir) -> tuple[bool, typing.Optional[str]]:
 
 def gather_test_result(opts, result_dir) -> core.StepResult:
   if opts.cts_test:
-    passed, reason = parse_cts_results(result_dir)
+    passed, reason = parse_cts_results(result_dir, opts.test_name)
   else:
-    passed, reason = parse_results_json(result_dir, opts.test_name)
+    passed, reason = parse_tauto_results(result_dir, opts.test_name)
 
   if opts.metric:
     for root, _, files in os.walk(result_dir):
