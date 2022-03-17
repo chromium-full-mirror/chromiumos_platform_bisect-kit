@@ -610,7 +610,8 @@ def wait_reboot_done(host, boot_id):
       # During boot, DUT does not response and thus ssh may hang a while. So
       # set a connect timeout. 3 seconds are enough and 2 are not. It's okay to
       # set tight limit because it's inside retry loop.
-      assert boot_id != query_dut_boot_id(host, connect_timeout=3)
+      assert boot_id != query_dut_boot_id(
+          host, connect_timeout=3), 'rebooted but boot id intact?'
       return
     except errors.SshConnectionError:
       logger.debug('reboot not ready? sleep wait 1 sec')
