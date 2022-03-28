@@ -76,16 +76,22 @@ class DefaultProjectPathFactory:
     return os.path.join(self.work_base, self.session, 'chrome')
 
 
+def make_subvolume(path):
+  if os.path.exists(path):
+    return
+  dirname, basename = os.path.split(path)
+  if not os.path.exists(dirname):
+    os.makedirs(dirname)
+  util.check_call('btrfs', 'subvolume', 'create', basename, cwd=dirname)
+
+
 def subvolume_or_makedirs(opts, path):
   if os.path.exists(path):
     return
 
   path = os.path.abspath(path)
   if opts.btrfs:
-    dirname, basename = os.path.split(path)
-    if not os.path.exists(dirname):
-      os.makedirs(dirname)
-    util.check_call('btrfs', 'subvolume', 'create', basename, cwd=dirname)
+    make_subvolume(path)
   else:
     os.makedirs(path)
 
@@ -156,6 +162,28 @@ def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
   return removed
 
 
+def mount_user_config(chromeos_tree: str):
+  """Mount gsutil cred in ~/.config folder in chromeos local mount setting.
+
+  This is necessary to run gsutil commands under chroot.
+  """
+  user_config_dir = os.path.expanduser('~/.config')
+  if not os.path.isdir(user_config_dir):
+    return
+
+  mount_config = []
+  mount_config_file = os.path.join(chromeos_tree, 'src/scripts/.local_mounts')
+  if os.path.exists(mount_config_file):
+    with open(mount_config_file, 'r') as f:
+      mount_config = [line.strip() for line in f.readlines()]
+
+  if user_config_dir not in mount_config:
+    logger.info('add %s in local_mounts' % user_config_dir)
+    mount_config.append(user_config_dir)
+    with open(mount_config_file, 'w') as f:
+      f.writelines(mount_config)
+
+
 def setup_chromeos_repos(opts, path_factory):
   chromeos_mirror = path_factory.get_chromeos_mirror()
   chromeos_tree = path_factory.get_chromeos_tree()
@@ -203,6 +231,7 @@ def setup_chromeos_repos(opts, path_factory):
 
   logger.info('repo sync for chromeos tree')
   repo_util.sync(chromeos_tree)
+  mount_user_config(chromeos_tree)
 
 
 def read_last_sync_time(repo_dir):
@@ -455,7 +484,21 @@ def do_sync(opts):
     sync_all = True
 
   if sync_all or opts.chromeos:
-    sync_chromeos_code(opts, path_factory)
+    try:
+      sync_chromeos_code(opts, path_factory)
+    except subprocess.CalledProcessError:
+      # b/222638221: repo may be broken due to infra issues
+      # re-create the whole repo and sync again
+      logger.info('chromeos sync failed, re-init chromeos repo')
+      chromeos_tree = path_factory.get_chromeos_tree()
+      is_btrfs = is_btrfs_subvolume(chromeos_tree)
+
+      delete_tree(chromeos_tree)
+      if is_btrfs:
+        make_subvolume(chromeos_tree)
+      else:
+        os.makedirs(chromeos_tree)
+      setup_chromeos_repos(opts, path_factory)
   if sync_all or opts.chrome:
     sync_chrome_code(opts, path_factory)
 
