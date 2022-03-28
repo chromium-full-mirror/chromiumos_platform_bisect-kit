@@ -96,69 +96,33 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         diagnoser = diagnoser_cros.CrosDiagnoser(self.states, path_factory,
                                                  self.config, dut)
 
-        eval_cmd = common_eval_cmd + ['--prebuilt']
-        extra_switch_cmd = common_switch_cmd
-        diagnoser.narrow_down_chromeos_prebuilt(
-            self.config['old'],
-            self.config['new'],
-            eval_cmd,
-            extra_switch_cmd=extra_switch_cmd)
-
-        diagnoser.switch_chromeos_to_old(force=self.config['always_reflash'])
-        util.check_call(*(common_switch_cmd +
-                          [diagnoser.cros_old, '--dut', dut]))
-        dut_os_version = cros_util.query_dut_short_version(dut)
-
-        try:
-          if diagnoser.narrow_down_android(common_eval_cmd):
-            return
-        except errors.DiagnoseContradiction:
-          raise
-        except Exception:
-          diagnoser.make_decision(
-              'Exception in Android bisector before verification; '
-              'assume the culprit is not inside Android and continue')
-        # Assume it's ok to leave random version of android prebuilt on DUT.
-
-        # Sanity check. The OS version should not change after android bisect.
-        assert dut_os_version == cros_util.query_dut_short_version(dut), (
-            'Someone else reflashed the DUT. DUT locking is not respected?')
-
-        try:
-          buildbucket_build = (
-              cros_util.is_buildbucket_buildable(self.config['old']) and
-              self.config['enable_buildbucket_chrome'])
-          if self.config['chrome_deploy_image']:
-            eval_cmd = common_eval_cmd + ['--tast_build']
-          else:
-            eval_cmd = common_eval_cmd + ['--prebuilt']
-          if diagnoser.narrow_down_chrome(
-              eval_cmd, buildbucket_build=buildbucket_build):
-            return
-        except errors.DiagnoseContradiction:
-          raise
-        except Exception:
-          diagnoser.make_decision(
-              'Exception in Chrome bisector before verification; '
-              'assume the culprit is not inside Chrome and continue')
-
-        if not self.config['chrome_deploy_image'] and not buildbucket_build:
-          # Sanity check. The OS version should not change after chrome bisect.
-          assert dut_os_version == cros_util.query_dut_short_version(dut), (
-              'Someone else reflashed the DUT. DUT locking is not respected?')
-
-        buildbucket_build = (
-            cros_util.is_buildbucket_buildable(self.config['old']) and
-            not self.config['disable_buildbucket_chromeos'])
-
-        if not buildbucket_build:
-          eval_cmd = common_eval_cmd + ['--tast_build']
-          extra_switch_cmd = None
+        cros_prebuilt_extra_switch_cmd = common_switch_cmd
+        cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
+        android_prebuilt_eval_cmd = common_eval_cmd
+        if self.config['chrome_deploy_image']:
+          chrome_localbuild_eval_cmd = common_eval_cmd + ['--tast_build']
         else:
-          eval_cmd = common_eval_cmd + ['--prebuilt']
-          extra_switch_cmd = common_switch_cmd
-        diagnoser.narrow_down_chromeos_localbuild(
-            eval_cmd, buildbucket_build, extra_switch_cmd=extra_switch_cmd)
+          chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
+
+        cros_buildbucket_build = (
+            cros_util.is_buildbucket_buildable(self.config['cros_prebuilt_old'])
+            and not self.config['disable_buildbucket_chromeos'])
+        if not cros_buildbucket_build:
+          cros_localbuild_eval_cmd = common_eval_cmd + ['--tast_build']
+          cros_localbuild_extra_switch_cmd = None
+        else:
+          cros_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
+          cros_localbuild_extra_switch_cmd = common_switch_cmd
+
+        diagnoser.diagnose(
+            common_switch_cmd=common_switch_cmd,
+            cros_prebuilt_extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
+            cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
+            android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
+            chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
+            cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,
+            cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd)
+
         logger.info('%s done', __file__)
     except Exception as e:
       logger.exception('got exception; stop')

@@ -3,6 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Diagnose ChromeOS regressions on top of subcomponent bisectors."""
+from __future__ import annotations
 from __future__ import print_function
 import argparse
 import datetime
@@ -17,6 +18,7 @@ from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import core
+from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -102,6 +104,8 @@ class CrosDiagnoser:
   def _verified_chromeos_prebuilt(self):
     if self.config['bypass_chromeos_prebuilt']:
       return 'assume'
+    if self.config['bisect_chrome']:
+      return 'assume'
     return 'verified'
 
   def make_decision(self, text):
@@ -110,6 +114,83 @@ class CrosDiagnoser:
     else:
       logger.info('decision: %s', text)
     self.states.add_history('decision', text=text)
+
+  def diagnose(self,
+               autotest: bool = False,
+               common_switch_cmd: list[str] = None,
+               cros_prebuilt_extra_switch_cmd: list[str] = None,
+               cros_prebuilt_eval_cmd: list[str] = None,
+               android_prebuilt_eval_cmd: list[str] = None,
+               chrome_localbuild_eval_cmd: list[str] = None,
+               chrome_localbuild_with_tests: bool = True,
+               cros_localbuild_eval_cmd: list[str] = None,
+               cros_localbuild_extra_switch_cmd: list[str] = None):
+    # Step 1: Narrows down Chrome OS prebuilt.
+    self.narrow_down_chromeos_prebuilt(
+        self.config['cros_prebuilt_old'],
+        self.config['cros_prebuilt_new'],
+        cros_prebuilt_eval_cmd,
+        extra_switch_cmd=cros_prebuilt_extra_switch_cmd)
+
+    # Switches CrOS repository and DUT to narrowed down old version.
+    self.switch_chromeos_to_old(force=self.config['always_reflash'])
+    util.check_call(*(common_switch_cmd + [self.cros_old, '--dut', self.dut]))
+    dut_os_version = cros_util.query_dut_short_version(self.dut)
+
+    # Step 2: Narrows down Android prebuilt. If the error can be reproduced,
+    # returns the result and skips other steps.
+    try:
+      if self.narrow_down_android(android_prebuilt_eval_cmd):
+        return
+    except errors.DiagnoseContradiction:
+      raise
+    except Exception:
+      self.make_decision(
+          'Exception in Android bisector before verification; '
+          'assume the culprit is not inside Android and continue')
+    # Assume it's ok to leave random version of android prebuilt on DUT.
+    # Sanity check. The OS version should not change after android bisect.
+    assert dut_os_version == cros_util.query_dut_short_version(self.dut), (
+        'Someone else reflashed the DUT. DUT locking is not respected?')
+
+    # Step 3: Narrows down Chrome local build. If the error can be reproduced,
+    # returns the result and skips other steps.
+    buildbucket_buildable = cros_util.is_buildbucket_buildable(
+        self.config['cros_prebuilt_old'])
+    if autotest and chrome_localbuild_with_tests:
+      # Now, the version of autotest on the DUT is unknown and may be even
+      # not installed. Invoke the test once here, so
+      #   - make sure autotest-deps is installed, with expected version
+      #   - autotest-deps is installed first, so our chrome test binaries
+      #     won't be reset to default version during bisection.
+      # It's acceptable to spend extra time to run test once because
+      #   - only few tests do so
+      #   - tests are migrating away from autotest
+      util.call(*chrome_localbuild_eval_cmd)
+    try:
+      if self.narrow_down_chrome(
+          chrome_localbuild_eval_cmd,
+          buildbucket_build=buildbucket_buildable and
+          self.config['enable_buildbucket_chrome'],
+          with_tests=chrome_localbuild_with_tests):
+        return
+    except errors.DiagnoseContradiction:
+      raise
+    except Exception:
+      self.make_decision('Exception in Chrome bisector before verification; '
+                         'assume the culprit is not inside Chrome and continue')
+    # If chrome is not deployed with cros image, do the sanity check to ensure OS version.
+    if not self.config['chrome_deploy_image'] and not self.config[
+        'enable_buildbucket_chrome']:
+      assert dut_os_version == cros_util.query_dut_short_version(self.dut), (
+          'Someone else reflashed the DUT. DUT locking is not respected?')
+
+    # Step 4: Narrowdown chromeos localbuild.
+    self.narrow_down_chromeos_localbuild(
+        cros_localbuild_eval_cmd,
+        buildbucket_buildable and
+        not self.config['disable_buildbucket_chromeos'],
+        extra_switch_cmd=cros_localbuild_extra_switch_cmd)
 
   def narrow_down_chromeos_prebuilt(self,
                                     old,
@@ -124,7 +205,12 @@ class CrosDiagnoser:
       eval_cmd: command to reproduce the regression
       extra_switch_cmd: additional command to run when switch chromeos version
     """
-    if self.config['bypass_chromeos_prebuilt']:
+    if self.config['bisect_chrome']:
+      self.make_decision(
+          'The Chrome OS prebuilt bisection is bypassed since --bisect_chrome is on'
+      )
+      self.cros_old = self.cros_new = self.config['base_cros_version']
+    elif self.config['bypass_chromeos_prebuilt']:
       self.make_decision(
           'The bisection with Chrome OS prebuilt image is bypassed; '
           'assume that old Chrome OS has old behavior and '
@@ -173,8 +259,16 @@ class CrosDiagnoser:
         'ChromeOSVersionDomain', self.config['session'])
     if prebuilt_states.load_states():
       cros_util.SnapshotStore.init_with_state(prebuilt_states)
-    self.old_info = cros_util.version_info(self.config['board'], self.cros_old)
-    self.new_info = cros_util.version_info(self.config['board'], self.cros_new)
+
+    # If old and new chrome version not specified, fetches info from metadata.
+    if not self.config['bisect_chrome']:
+      self.old_info = cros_util.version_info(self.config['board'],
+                                             self.cros_old)
+      self.new_info = cros_util.version_info(self.config['board'],
+                                             self.cros_new)
+    else:
+      self.old_info = {'cr_version': self.config['chrome_localbuild_old']}
+      self.new_info = {'cr_version': self.config['chrome_localbuild_new']}
 
     logger.info('old: cros %s, chrome %s, android %s',
                 self.old_info.get('cros_full_version'),
@@ -223,6 +317,12 @@ class CrosDiagnoser:
       True if android bisect is necessary (ex. version not equal) and possible
       (ex. same branch).
     """
+    if self.config['bisect_chrome']:
+      self.make_decision(
+          'The Android prebuilt bisection is bypassed since --bisect_chrome is on'
+      )
+      return False
+
     if (old_info.get('android_build_id') is None or
         new_info.get('android_build_id') is None):
       self.make_decision(
@@ -498,6 +598,10 @@ class CrosDiagnoser:
       buildbucket_build: to build ChromeOS image on buildbucket
       extra_switch_cmd: additional command to run when switch ChromeOS version
     """
+    if self.config['bisect_chrome']:
+      self.make_decision(
+          'Bypass Chrome OS local build since --bisect_chrome is on')
+      return
     if self.config['bypass_chromeos_build']:
       self.make_decision('The bisection with Chrome OS local build is bypassed')
       return
@@ -637,6 +741,32 @@ class DiagnoseCommandLineBase:
   def config(self):
     return self.states.config
 
+  def check_cros_image_exists(self, argument_key: str, board: str,
+                              cros_version: str) -> str:
+    """Raises error if an image could not be found.
+
+    Args:
+      board: ChromeOS board name.
+      cros_version: ChromeOS version.
+      argument_key: The argument key name, will be displayed in error message
+        if an image couldn't be found.
+
+    Returns:
+      ChromeOS full version.
+    """
+    cros_util.argtype_cros_version(cros_version)
+    if cros_util.is_cros_short_version(cros_version):
+      cros_version = cros_util.version_to_full(cros_version)
+    if not cros_util.has_test_image(board, cros_version):
+      self.argument_parser.error('%s: %s has no image for %s' %
+                                 (argument_key, board, cros_version))
+    return cros_version
+
+  def check_chrome_version(self, argument_key: str, chrome_version: str):
+    if not cr_util.is_chrome_version(chrome_version):
+      self.argument_parser.error('%s: %s is not a valid Chrome version' %
+                                 (argument_key, chrome_version))
+
   def check_options(self, opts, path_factory):
     if not opts.chromeos_mirror:
       opts.chromeos_mirror = path_factory.get_chromeos_mirror()
@@ -651,7 +781,11 @@ class DiagnoseCommandLineBase:
       opts.chrome_root = path_factory.get_chrome_tree()
       logger.info('chrome_root = %s', opts.chrome_root)
 
-    if not cros_util.is_ancestor_version(opts.old, opts.new):
+    if opts.bisect_chrome:
+      if not cr_util.is_version_lesseq(opts.old, opts.new):
+        self.argument_parser.error('%s is not ancestor of %s' %
+                                   (opts.old, opts.new))
+    elif not cros_util.is_ancestor_version(opts.old, opts.new):
       self.argument_parser.error('%s is not ancestor of %s' %
                                  (opts.old, opts.new))
 
@@ -675,17 +809,14 @@ class DiagnoseCommandLineBase:
       util.report_similar_candidates('board name', opts.board, names)
       assert 0  # unreachable
 
-    if cros_util.is_cros_short_version(opts.old):
-      opts.old = cros_util.version_to_full(opts.board, opts.old)
-    if cros_util.is_cros_short_version(opts.new):
-      opts.new = cros_util.version_to_full(opts.board, opts.new)
-
-    if not cros_util.has_test_image(opts.board, opts.old):
-      self.argument_parser.error('--old: %s has no image for %s' %
-                                 (opts.board, opts.old))
-    if not cros_util.has_test_image(opts.board, opts.new):
-      self.argument_parser.error('--new: %s has no image for %s' %
-                                 (opts.board, opts.new))
+    if opts.bisect_chrome:
+      opts.base_cros_version = self.check_cros_image_exists(
+          '--base_cros_version', opts.board, opts.base_cros_version)
+      self.check_chrome_version('--old', opts.old)
+      self.check_chrome_version('--new', opts.new)
+    else:
+      opts.old = self.check_cros_image_exists('--old', opts.board, opts.old)
+      opts.new = self.check_cros_image_exists('--new', opts.board, opts.new)
 
     if opts.metric:
       if opts.old_value is None:
@@ -739,6 +870,14 @@ class DiagnoseCommandLineBase:
       if not cros_lab_util.repair(opts.dut):
         raise ValueError('DUT is in bad state')
 
+    # Determines CrOS, Chrome old and new versions from argument.
+    if opts.bisect_chrome:
+      cros_prebuilt_old, cros_prebuilt_new = opts.base_cros_version, opts.base_cros_version
+      chrome_localbuild_old, chrome_localbuild_new = opts.old, opts.new
+    else:
+      cros_prebuilt_old, cros_prebuilt_new = opts.old, opts.new
+      chrome_localbuild_old, chrome_localbuild_new = None, None
+
     config = dict(
         session=opts.session,
         mirror_base=opts.mirror_base,
@@ -754,8 +893,14 @@ class DiagnoseCommandLineBase:
         model=opts.model,
         sku=opts.sku,
         board=opts.board,
-        old=opts.old,
+        old=opts.old,  # TODO(zjchang): Remove ambiguous term old and new
         new=opts.new,
+        bisect_chrome=opts.bisect_chrome,
+        base_cros_version=opts.base_cros_version,
+        cros_prebuilt_old=cros_prebuilt_old,
+        cros_prebuilt_new=cros_prebuilt_new,
+        chrome_localbuild_old=chrome_localbuild_old,
+        chrome_localbuild_new=chrome_localbuild_new,
         term_old=opts.term_old,
         term_new=opts.term_new,
         test_name=opts.test_name,
@@ -898,14 +1043,14 @@ class DiagnoseCommandLineBase:
         help='ChromeOS board name; auto detected if DUT is not auto allocated')
     group.add_argument(
         '--old',
-        type=cros_util.argtype_cros_version,
+        type=str,
         required=True,
-        help='ChromeOS version with old behavior')
+        help='ChromeOS or Chrome version with old behavior')
     group.add_argument(
         '--new',
-        type=cros_util.argtype_cros_version,
+        type=str,
         required=True,
-        help='ChromeOS version with new behavior')
+        help='ChromeOS or Chrome version with new behavior')
     group.add_argument('--term_old', help='Alternative term for "old" state')
     group.add_argument('--term_new', help='Alternative term for "new" state')
 
@@ -974,6 +1119,12 @@ class DiagnoseCommandLineBase:
         dest='disable_rootfs_verification',
         action='store_false',
         help="Don't disable rootfs verification after update is completed")
+    group.add_argument(
+        '--bisect_chrome', action='store_true', help='Bisect a chrome version')
+    group.add_argument(
+        '--base_cros_version',
+        type=cros_util.argtype_cros_version,
+        help='ChromeOS base version for running chrome bisection')
     group.add_argument(
         '--chrome_deploy_image',
         action='store_true',
