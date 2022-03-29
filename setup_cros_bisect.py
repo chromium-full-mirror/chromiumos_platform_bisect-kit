@@ -85,12 +85,12 @@ def make_subvolume(path):
   util.check_call('btrfs', 'subvolume', 'create', basename, cwd=dirname)
 
 
-def subvolume_or_makedirs(opts, path):
+def subvolume_or_makedirs(use_btrfs: bool, path: str):
   if os.path.exists(path):
     return
 
   path = os.path.abspath(path)
-  if opts.btrfs:
+  if use_btrfs:
     make_subvolume(path)
   else:
     os.makedirs(path)
@@ -162,8 +162,8 @@ def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
   return removed
 
 
-def mount_user_config(chromeos_tree: str):
-  """Mount gsutil cred in ~/.config folder in chromeos local mount setting.
+def add_local_mount(chromeos_tree: str):
+  """Add gsutil cred in ~/.config folder in chromeos local mount setting.
 
   This is necessary to run gsutil commands under chroot.
   """
@@ -178,17 +178,17 @@ def mount_user_config(chromeos_tree: str):
       mount_config = [line.strip() for line in f.readlines()]
 
   if user_config_dir not in mount_config:
-    logger.info('add %s in local_mounts' % user_config_dir)
+    logger.info('add %s in local_mounts', user_config_dir)
     mount_config.append(user_config_dir)
     with open(mount_config_file, 'w') as f:
-      f.writelines(mount_config)
+      print('\n'.join(mount_config), file=f)
 
 
-def setup_chromeos_repos(opts, path_factory):
+def setup_chromeos_repos(path_factory, use_btrfs: bool):
   chromeos_mirror = path_factory.get_chromeos_mirror()
   chromeos_tree = path_factory.get_chromeos_tree()
-  subvolume_or_makedirs(opts, chromeos_mirror)
-  subvolume_or_makedirs(opts, chromeos_tree)
+  subvolume_or_makedirs(use_btrfs, chromeos_mirror)
+  subvolume_or_makedirs(use_btrfs, chromeos_tree)
 
   manifest_url = (
       'https://chrome-internal.googlesource.com/chromeos/manifest-internal')
@@ -231,7 +231,7 @@ def setup_chromeos_repos(opts, path_factory):
 
   logger.info('repo sync for chromeos tree')
   repo_util.sync(chromeos_tree)
-  mount_user_config(chromeos_tree)
+  add_local_mount(chromeos_tree)
 
 
 def read_last_sync_time(repo_dir):
@@ -352,11 +352,11 @@ def sync_chromeos_code(opts, path_factory):
   repo_util.sync(chromeos_tree)
 
 
-def setup_chrome_repos(opts, path_factory):
+def setup_chrome_repos(path_factory, use_btrfs: bool):
   chrome_cache = path_factory.get_chrome_cache()
-  subvolume_or_makedirs(opts, chrome_cache)
+  subvolume_or_makedirs(use_btrfs, chrome_cache)
   chrome_tree = path_factory.get_chrome_tree()
-  subvolume_or_makedirs(opts, chrome_tree)
+  subvolume_or_makedirs(use_btrfs, chrome_tree)
 
   spec = """
 solutions = [
@@ -386,16 +386,16 @@ cache_dir = %r
     additional_chrome_mirror_sync(chrome_cache)
 
 
-def sync_chrome_code(opts, path_factory):
+def sync_chrome_code(path_factory, use_btrfs: bool):
   # The sync step is identical to the initial gclient config step.
-  setup_chrome_repos(opts, path_factory)
+  setup_chrome_repos(path_factory, use_btrfs)
 
 
-def setup_android_repos(opts, path_factory, branch):
+def setup_android_repos(path_factory, branch, use_btrfs: bool):
   android_mirror = path_factory.get_android_mirror(branch)
   android_tree = path_factory.get_android_tree(branch)
-  subvolume_or_makedirs(opts, android_mirror)
-  subvolume_or_makedirs(opts, android_tree)
+  subvolume_or_makedirs(use_btrfs, android_mirror)
+  subvolume_or_makedirs(use_btrfs, android_tree)
 
   manifest_url = ('persistent-https://googleplex-android.git.corp.google.com'
                   '/platform/manifest')
@@ -459,11 +459,11 @@ def cmd_init(opts):
                                            CHECKOUT_TEMPLATE_NAME)
 
   if opts.chromeos:
-    setup_chromeos_repos(opts, path_factory)
+    setup_chromeos_repos(path_factory, opts.btrfs)
   if opts.chrome:
-    setup_chrome_repos(opts, path_factory)
+    setup_chrome_repos(path_factory, opts.btrfs)
   for branch in opts.android:
-    setup_android_repos(opts, path_factory, branch)
+    setup_android_repos(path_factory, branch, opts.btrfs)
 
 
 def enumerate_android_branches_available(base):
@@ -489,18 +489,15 @@ def do_sync(opts):
     except subprocess.CalledProcessError:
       # b/222638221: repo may be broken due to infra issues
       # re-create the whole repo and sync again
-      logger.info('chromeos sync failed, re-init chromeos repo')
+      logger.warning('chromeos sync failed, re-init chromeos repo '
+                     '(this takes hours; be patient)')
       chromeos_tree = path_factory.get_chromeos_tree()
-      is_btrfs = is_btrfs_subvolume(chromeos_tree)
-
+      use_btrfs = is_btrfs_subvolume(chromeos_tree)
       delete_tree(chromeos_tree)
-      if is_btrfs:
-        make_subvolume(chromeos_tree)
-      else:
-        os.makedirs(chromeos_tree)
-      setup_chromeos_repos(opts, path_factory)
+      setup_chromeos_repos(path_factory, use_btrfs)
   if sync_all or opts.chrome:
-    sync_chrome_code(opts, path_factory)
+    use_btrfs = is_btrfs_subvolume(path_factory.get_chrome_tree())
+    sync_chrome_code(path_factory, use_btrfs)
 
   if sync_all:
     android_branches = enumerate_android_branches_available(opts.mirror_base)
