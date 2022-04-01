@@ -39,6 +39,7 @@ from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import cr_util
 from bisect_kit import errors
+from bisect_kit import gclient_util
 from bisect_kit import git_util
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,11 @@ class ChromeSrcMasterDomain(core.BisectDomain):
       assert cros_util.is_dut(opts.dut)
       if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)
+
+    # b/227415522: Sync Chrome source tree to old and new to fetch unreachable
+    # commits.
+    gclient_util.sync(opts.chrome_root, revision=opts.new)
+    gclient_util.sync(opts.chrome_root, revision=opts.old)
 
     old = guess_git_rev(opts, opts.old)
     new = guess_git_rev(opts, opts.new)

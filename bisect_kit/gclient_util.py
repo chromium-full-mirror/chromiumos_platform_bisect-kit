@@ -85,13 +85,18 @@ def config(gclient_dir,
       f.write('target_os = ["%s"]\n' % target_os)
 
 
-def sync(gclient_dir, with_branch_heads=False, with_tags=False, jobs=8):
+def sync(gclient_dir: str,
+         with_branch_heads: bool = False,
+         with_tags: bool = False,
+         revision: str = None,
+         jobs: int = 8):
   """Simply wrapper of `gclient sync`.
 
   Args:
     gclient_dir: root directory of gclient project
     with_branch_heads: whether to clone git `branch_heads` refspecs
     with_tags: whether to clone git tags
+    revision: the revision name, e.g. src@100.0.4857.0 or 100.0.4857.0
     jobs: how many workers running in parallel
   """
   # Work around gclient issue crbug/943430
@@ -115,6 +120,8 @@ def sync(gclient_dir, with_branch_heads=False, with_tags=False, jobs=8):
     cmd.append('--with_branch_heads')
   if with_tags:
     cmd.append('--with_tags')
+  if revision:
+    cmd += ['--revision', revision]
 
   try:
     old_projects = load_gclient_entries(gclient_dir)

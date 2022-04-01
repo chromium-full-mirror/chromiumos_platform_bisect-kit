@@ -137,6 +137,11 @@ class ChromeSrcDomain(core.BisectDomain):
           'still have expected old behavior as %s', lowest_common_ancestor, old)
       config['old'] = old = lowest_common_ancestor
 
+    # b/227415522: Sync Chrome source tree to old and new to fetch unreachable
+    # commits.
+    gclient_util.sync(opts.chrome_root, revision=opts.new)
+    gclient_util.sync(opts.chrome_root, revision=opts.old)
+
     code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
     revlist, details = code_manager.build_revlist(old, new)
     for detail in details.values():
