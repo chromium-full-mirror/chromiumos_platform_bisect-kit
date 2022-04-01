@@ -782,7 +782,9 @@ class DiagnoseCommandLineBase:
       logger.info('chrome_root = %s', opts.chrome_root)
 
     if opts.bisect_chrome:
-      if not cr_util.is_version_lesseq(opts.old, opts.new):
+      if not cr_util.is_version_lesseq(
+          opts.old, opts.new) or not cr_util.is_direct_relative_version(
+              opts.old, opts.new):
         self.argument_parser.error('%s is not ancestor of %s' %
                                    (opts.old, opts.new))
     elif not cros_util.is_ancestor_version(opts.old, opts.new):

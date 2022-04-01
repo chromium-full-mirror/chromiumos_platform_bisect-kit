@@ -86,7 +86,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     #  - dependency labels for DUT allocation
     common_switch_cmd, _common_eval_cmd = self._build_cmds()
     util.check_call(*(common_switch_cmd +
-                      [self.config['old'], '--dut', opts.dut]))
+                      [self.config['cros_prebuilt_old'], '--dut', opts.dut]))
 
   def _build_cmds(self):
     # prebuilt version will be specified later.
