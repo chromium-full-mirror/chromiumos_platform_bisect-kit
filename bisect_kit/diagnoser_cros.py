@@ -756,7 +756,7 @@ class DiagnoseCommandLineBase:
     """
     cros_util.argtype_cros_version(cros_version)
     if cros_util.is_cros_short_version(cros_version):
-      cros_version = cros_util.version_to_full(cros_version)
+      cros_version = cros_util.version_to_full(board, cros_version)
     if not cros_util.has_test_image(board, cros_version):
       self.argument_parser.error('%s: %s has no image for %s' %
                                  (argument_key, board, cros_version))
