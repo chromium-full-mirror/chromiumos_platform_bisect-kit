@@ -677,6 +677,9 @@ class BisectorCommandLine:
         'rev_info': [],
     }
 
+    summary.update({
+        'reproduced': self.strategy.check_reproduced(),
+    })
     for info in self.strategy.rev_info:
       info_dict = info.to_dict()
       detail = self.states.details.get(info.rev, {})

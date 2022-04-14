@@ -716,9 +716,9 @@ class NoisyBinarySearch:
   def get_range(self, confidence=None):
     """Gets narrowed-down bisection range so far.
 
-    Using a heuristic algorithm to find a range (left, right) that,
-    sum(prob[left:right]) > confidence. Some optimizations are applied so the
-    range may not be the narrowest.
+    Using a heuristic algorithm to find a semi-open range (left, right] that,
+    sum(prob[left+1:right+1]) >= confidence. Some optimizations are applied so
+    the range may not be the narrowest.
 
     If `confidence` value is bigger, the returned range is bigger.
 
@@ -815,6 +815,27 @@ class NoisyBinarySearch:
             self.rev_info[self.new_idx]['old'],
             term_old=self.term_map.get('old', 'old'),
             term_new=self.term_map.get('new', 'new'))
+
+  def check_reproduced(self):
+    """Checks if the bisection is reproduced.
+
+    Returns true if:
+      1. Both old and new versions are tested, has 'old' or 'new' results.
+      2. It's not unreproduced, passes check_verification_range().
+
+    Returns:
+      True if the regression is reproduced.
+    """
+    old_count = self.rev_info[self.old_idx]['old']
+    new_count = self.rev_info[self.new_idx]['new']
+    if old_count == 0 or new_count == 0:
+      return False
+    try:
+      self.check_verification_range()
+    except (errors.VerifyOldBehaviorFailed, errors.VerifyNewBehaviorFailed,
+            errors.WrongAssumption):
+      return False
+    return True
 
   def check_proceed_with_skip(self, idx, reason):
     """Checks if we should proceed after skips.
