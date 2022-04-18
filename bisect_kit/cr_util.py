@@ -46,6 +46,7 @@ CHROME_TEST_BINARIES = [
     'jpeg_decode_accelerator_unittest',
     'jpeg_encode_accelerator_unittest',
     'ozone_gl_unittests',
+    'ozone_integration_tests',
     'sandbox_linux_unittests',
     'v4l2_stateless_decoder',
     'vaapi_unittest',
