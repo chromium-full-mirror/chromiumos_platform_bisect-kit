@@ -12,6 +12,7 @@ Terminology to refer a DUT in bisect-kit:
       "dut_name" is almost used only in this module. It needs conversion to
       "dut" for rest of bisect-kit code (dut_name_to_address).
 """
+from __future__ import annotations
 from __future__ import print_function
 import asyncio
 import calendar
@@ -312,22 +313,18 @@ def is_dut_leased_by_me(status):
 
 
 def extract_lease_info(text):
-  """Parse inflight lease info from output of 'skylab lease-dut'"""
+  """Parse inflight lease info from output of crosfleet dut lease.
+
+  You colud find the detailed format from:
+    https://chromium.googlesource.com/infra/infra/+/e560ebb6baf0/go/src/infra/
+    cmd/crosfleet/internal/dut/lease.go#112
+  """
   info = {}
-
-  # The lease job was a swarming task. Keep it for backward-compatible.
-  m = re.search(r'Created lease task.*(http\S+task\?id=(\w+))', text)
-  if m:
-    info['link'] = m.group(1)
-    info['swarming_task_id'] = m.group(2)
-
-  # Now it is wrapped as a buildbucket build.
-  m = re.search(
-      r'Created lease .*(http\S+/builders/test_runner/dut_leaser/b(\d+))', text)
+  # The job is wrapped as a buildbucket build.
+  m = re.search(r'.*(http\S+/builders/test_runner/dut_leaser/b(\d+))', text)
   if m:
     info['link'] = m.group(1)
     info['buildbucket_build_id'] = m.group(2)
-
   return info
 
 
@@ -346,8 +343,8 @@ def cancel_pending_lease(pending_lease):
   assert task_id or build_id, 'lease is pending but nothing to cancel'
 
 
-async def create_async_skylab_proc(cmd, *args, **kwargs):
-  cmd_args = ['skylab', cmd]
+async def create_async_crosfleet_proc(cmd: str, *args, **kwargs):
+  cmd_args = ['crosfleet'] + cmd.split(' ')
   service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
   if service_account_json:
     cmd_args += ['-service-account-json', service_account_json]
@@ -362,16 +359,17 @@ async def create_async_skylab_proc(cmd, *args, **kwargs):
 async def async_lease(dut_name, reason, duration=None):
   if not duration:
     duration = LEASE_DURATION
-  cmd = [
-      'lease-dut',
+  args = [
       '-minutes',
       '%d' % (duration // 60),
       '-reason',
       reason,
-      dut_name,
+      '-host',
+      dut_name_to_address(dut_name),
   ]
-  proc = await create_async_skylab_proc(
-      *cmd,
+  proc = await create_async_crosfleet_proc(
+      'dut lease',
+      *args,
       # combine two streams, so the code becomes simpler
       stderr=subprocess.STDOUT)
 
@@ -385,19 +383,19 @@ async def async_lease(dut_name, reason, duration=None):
       logger.debug('lease(%s): %s', dut_name, line)
       if not pending_lease:
         pending_lease = extract_lease_info(line)
-      if 'EXPIRED' in line:
+      if 'INFRA_FAILURE' in line:
         pending_lease = None
         return None
 
     await proc.wait()
     if proc.returncode != 0:
-      logger.warning('lease(%s): skylab command failed: %s', dut_name,
+      logger.warning('lease(%s): crosfleet command failed: %s', dut_name,
                      proc.returncode)
-      raise errors.ExternalError('skylab command failed unexpectedly: %s' %
+      raise errors.ExternalError('crosfleet command failed unexpectedly: %s' %
                                  proc.returncode)
     if not pending_lease:
       raise errors.InternalError(
-          'not found lease info; skylab output format changed?')
+          'not found lease info; crosfleet output format changed?')
 
     if not cros_util.is_good_dut(dut_name_to_address(dut_name)):
       logger.warning(
@@ -463,8 +461,8 @@ def make_lease_reason(session):
   return 'bisector: %s' % session[:18]
 
 
-def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
-  """Lease DUT from skylab.
+def crosfleet_lease_dut(dut_name, reason, duration=None, timeout=None):
+  """Lease DUT from crosfleet.
 
   Args:
     dut_name: DUT name
@@ -475,25 +473,27 @@ def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
   Returns:
     dict of lease status if successful, otherwise None
   """
-  logger.debug('skylab_lease_dut %s', dut_name)
+  logger.debug('crosfleet_lease_dut %s', dut_name)
   if not duration:
     duration = LEASE_DURATION
   stdout_lines = []
   stderr_lines = []
   orphan_task = True
   try:
-    skylab_cmd(
-        'lease-dut',
+    crosfleet_cmd(
+        'dut lease',
         '-minutes',
         '%d' % (duration // 60),
         '-reason',
         reason,
-        dut_name,
+        '-host',
+        dut_name_to_address(dut_name),
+        '-json',
         stdout_callback=stdout_lines.append,
         stderr_callback=stderr_lines.append,
         timeout=timeout)
 
-    pending_lease = extract_lease_info(''.join(stdout_lines))
+    pending_lease = extract_lease_info(''.join(stderr_lines))
     # wait the state propagated
     for _ in range(10):
       time.sleep(5)
@@ -507,15 +507,15 @@ def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
     orphan_task = False
   except subprocess.CalledProcessError:
     stderr = ''.join(stderr_lines)
-    if 'EXPIRED' in stderr:
+    if 'INFRA_FAILURE' in stderr:
       logger.warning('unable to lease DUT within time limit')
       orphan_task = False
       return None
-    logger.exception('skylab lease-dut failed')
+    logger.exception('crosfleet dut lease failed')
     raise
   finally:
     if orphan_task:
-      pending_lease = extract_lease_info(''.join(stdout_lines))
+      pending_lease = extract_lease_info(''.join(stderr_lines))
       if pending_lease:
         cancel_pending_lease(pending_lease)
 
@@ -523,7 +523,7 @@ def skylab_lease_dut(dut_name, reason, duration=None, timeout=None):
   return status
 
 
-def skylab_release_dut(dut_name):
+def crosfleet_release_dut(dut_name):
   """Release DUT which was leased by me.
 
   Args:
@@ -533,7 +533,7 @@ def skylab_release_dut(dut_name):
     raise errors.DutLeaseException('%s is not leased, or not leased by me' %
                                    dut_name)
 
-  skylab_cmd('release-duts', dut_name)
+  crosfleet_cmd('dut abandon', dut_name)
 
   # wait the state propagated
   for _ in range(10):
@@ -670,7 +670,7 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
         continue
 
       logger.info("Previous lease is near expiration, let's lease again")
-      this_lease = skylab_lease_dut(dut_name, reason)
+      this_lease = crosfleet_lease_dut(dut_name, reason)
       if not this_lease:
         raise errors.DutLeaseException(
             'Lease is expired and unable to extend the lease')
@@ -684,14 +684,14 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
           if i > 1:
             logger.error('detected race condition')
             logger.error('cancel our recent lease task')
-            skylab_release_dut(dut_name)
+            crosfleet_release_dut(dut_name)
             raise errors.DutLeaseException(
                 'there are other tasks between our two leases; race condition?')
           break
       else:
         logger.error('not found previous lease task in task list')
         logger.error('cancel our recent lease task')
-        skylab_release_dut(dut_name)
+        crosfleet_release_dut(dut_name)
         raise errors.DutLeaseException(
             'not found previous lease task in task list')
   except (errors.DutLeaseException, errors.ExternalError,
@@ -775,7 +775,7 @@ def dut_manager(dut, reason, allocator):
         yield dut_name_to_address(host)
     finally:
       logger.info('auto release DUT %s', host)
-      skylab_release_dut(host)
+      crosfleet_release_dut(host)
   else:
     with dut_lease_manager(dut, reason):
       yield dut

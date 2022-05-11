@@ -70,7 +70,7 @@ def cmd_lease_dut(opts):
   reason = opts.reason or cros_lab_util.make_lease_reason(opts.session)
   host = cros_lab_util.dut_host_name(opts.dut)
   logger.info('trying to lease %s', host)
-  if cros_lab_util.skylab_lease_dut(host, reason, opts.duration):
+  if cros_lab_util.crosfleet_lease_dut(host, reason, opts.duration):
     logger.info('leased %s', host)
   else:
     raise Exception('unable to lease %s' % host)
@@ -78,7 +78,7 @@ def cmd_lease_dut(opts):
 
 def cmd_release_dut(opts):
   host = cros_lab_util.dut_host_name(opts.dut)
-  cros_lab_util.skylab_release_dut(host)
+  cros_lab_util.crosfleet_release_dut(host)
   logger.info('%s released', host)
 
 
