@@ -1360,7 +1360,7 @@ def version_info(board, version):
     if metadata:
       o = json.loads(metadata)
       v = o['version']
-      board_metadata = o['board-metadata'][board]
+      board_metadata = o['board-metadata'].get(board, {})
       info.update({
           VERSION_KEY_CROS_SHORT_VERSION: v['platform'],
           VERSION_KEY_CROS_FULL_VERSION: v['full'],
