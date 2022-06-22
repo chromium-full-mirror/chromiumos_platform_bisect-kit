@@ -182,6 +182,8 @@ def prepare_to_run_test(opts):
       'o-r,g-r',
       'src/scripts/mod_for_test_scripts/ssh_keys/testing_rsa',
       cwd=opts.chromeos_root)
+  cros_util.copy_into_chroot(opts.chromeos_root, '~/.ssh/config',
+                             '~/.ssh/config')
 
   if opts.reinstall:
     util.ssh_cmd(opts.dut, 'rm', '-rf', '/usr/local/autotest')
