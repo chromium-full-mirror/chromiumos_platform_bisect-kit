@@ -1,5 +1,7 @@
 google-api-python-client
 googleapis_common_protos
-protobuf
+# b/187806838 chrome cannot find system google.protobuf, but user local's works.
+# b/236854886 lock version to avoid python complaining pb_2 too old.
+protobuf==3.20.1
 psutil
 setuptools
