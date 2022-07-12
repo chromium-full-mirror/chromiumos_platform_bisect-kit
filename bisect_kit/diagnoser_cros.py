@@ -14,6 +14,7 @@ import random
 import sys
 import time
 
+from bisect_kit import android_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
@@ -105,6 +106,8 @@ class CrosDiagnoser:
     if self.config['bypass_chromeos_prebuilt']:
       return 'assume'
     if self.config['bisect_chrome']:
+      return 'assume'
+    if self.config['bisect_android']:
       return 'assume'
     return 'verified'
 
@@ -210,6 +213,11 @@ class CrosDiagnoser:
           'The Chrome OS prebuilt bisection is bypassed since --bisect_chrome is on'
       )
       self.cros_old = self.cros_new = self.config['base_cros_version']
+    elif self.config['bisect_android']:
+      self.make_decision(
+          'The Chrome OS prebuilt bisection is bypassed since --bisect_android is on'
+      )
+      self.cros_old = self.cros_new = self.config['base_cros_version']
     elif self.config['bypass_chromeos_prebuilt']:
       self.make_decision(
           'The bisection with Chrome OS prebuilt image is bypassed; '
@@ -261,14 +269,19 @@ class CrosDiagnoser:
       cros_util.SnapshotStore.init_with_state(prebuilt_states)
 
     # If old and new chrome version not specified, fetches info from metadata.
-    if not self.config['bisect_chrome']:
+    if self.config['bisect_chrome']:
+      self.old_info = {'cr_version': self.config['chrome_localbuild_old']}
+      self.new_info = {'cr_version': self.config['chrome_localbuild_new']}
+    elif self.config['bisect_android']:
+      base_cros_info = cros_util.version_info(self.config['board'],
+                                             self.config['base_cros_version'])
+      self.old_info = {'android_build_id': self.config['android_prebuilt_old'], 'android_branch': base_cros_info['android_branch']}
+      self.new_info = {'android_build_id': self.config['android_prebuilt_new'], 'android_branch': base_cros_info['android_branch']}
+    else:
       self.old_info = cros_util.version_info(self.config['board'],
                                              self.cros_old)
       self.new_info = cros_util.version_info(self.config['board'],
                                              self.cros_new)
-    else:
-      self.old_info = {'cr_version': self.config['chrome_localbuild_old']}
-      self.new_info = {'cr_version': self.config['chrome_localbuild_new']}
 
     logger.info('old: cros %s, chrome %s, android %s',
                 self.old_info.get('cros_full_version'),
@@ -505,6 +518,12 @@ class CrosDiagnoser:
       True: culprit is inside Chrome
       False: culprit is not inside Chrome or unable to bisect
     """
+
+    if self.config['bisect_android']:
+      self.make_decision(
+          'The bisection with Chrome local build is bypassed since --bisect_android is on')
+      return False
+
     if self.old_info['cr_version'] == self.new_info['cr_version']:
       self.make_decision(
           'The Chrome version is identical, no need to bisect Chrome')
@@ -601,6 +620,10 @@ class CrosDiagnoser:
     if self.config['bisect_chrome']:
       self.make_decision(
           'Bypass Chrome OS local build since --bisect_chrome is on')
+      return
+    elif self.config['bisect_android']:
+      self.make_decision(
+          'Bypass Chrome OS local build since --bisect_android is on')
       return
     if self.config['bypass_chromeos_build']:
       self.make_decision('The bisection with Chrome OS local build is bypassed')
@@ -767,6 +790,11 @@ class DiagnoseCommandLineBase:
       self.argument_parser.error('%s: %s is not a valid Chrome version' %
                                  (argument_key, chrome_version))
 
+  def check_android_version(self, argument_key: str, android_version: str):
+    if not android_util.is_android_build_id(android_version):
+      self.argument_parser.error('%s: %s is not a valid Android version' %
+                                 (argument_key, android_version))
+
   def check_options(self, opts, path_factory):
     if not opts.chromeos_mirror:
       opts.chromeos_mirror = path_factory.get_chromeos_mirror()
@@ -785,6 +813,10 @@ class DiagnoseCommandLineBase:
       if not cr_util.is_version_lesseq(
           opts.old, opts.new) or not cr_util.is_direct_relative_version(
               opts.old, opts.new):
+        self.argument_parser.error('%s is not ancestor of %s' %
+                                   (opts.old, opts.new))
+    elif opts.bisect_android:
+      if int(opts.old) >= int(opts.new):
         self.argument_parser.error('%s is not ancestor of %s' %
                                    (opts.old, opts.new))
     elif not cros_util.is_ancestor_version(opts.old, opts.new):
@@ -811,11 +843,19 @@ class DiagnoseCommandLineBase:
       util.report_similar_candidates('board name', opts.board, names)
       assert 0  # unreachable
 
-    if opts.bisect_chrome:
+    if opts.bisect_chrome and opts.bisect_android:
+      self.argument_parser.error(
+            '--bisect_chrome and --bisect_android are not allowed together')
+    elif opts.bisect_chrome:
       opts.base_cros_version = self.check_cros_image_exists(
           '--base_cros_version', opts.board, opts.base_cros_version)
       self.check_chrome_version('--old', opts.old)
       self.check_chrome_version('--new', opts.new)
+    elif opts.bisect_android:
+      opts.base_cros_version = self.check_cros_image_exists(
+          '--base_cros_version', opts.board, opts.base_cros_version)
+      self.check_android_version('--old', opts.old)
+      self.check_android_version('--new', opts.new)
     else:
       opts.old = self.check_cros_image_exists('--old', opts.board, opts.old)
       opts.new = self.check_cros_image_exists('--new', opts.board, opts.new)
@@ -876,9 +916,15 @@ class DiagnoseCommandLineBase:
     if opts.bisect_chrome:
       cros_prebuilt_old, cros_prebuilt_new = opts.base_cros_version, opts.base_cros_version
       chrome_localbuild_old, chrome_localbuild_new = opts.old, opts.new
+      android_prebuilt_old, android_prebuilt_new = None, None
+    elif opts.bisect_android:
+      cros_prebuilt_old, cros_prebuilt_new = opts.base_cros_version, opts.base_cros_version
+      chrome_localbuild_old, chrome_localbuild_new = None, None
+      android_prebuilt_old, android_prebuilt_new = opts.old, opts.new
     else:
       cros_prebuilt_old, cros_prebuilt_new = opts.old, opts.new
       chrome_localbuild_old, chrome_localbuild_new = None, None
+      android_prebuilt_old, android_prebuilt_new = None, None
 
     config = dict(
         session=opts.session,
@@ -898,11 +944,14 @@ class DiagnoseCommandLineBase:
         old=opts.old,  # TODO(zjchang): Remove ambiguous term old and new
         new=opts.new,
         bisect_chrome=opts.bisect_chrome,
+        bisect_android=opts.bisect_android,
         base_cros_version=opts.base_cros_version,
         cros_prebuilt_old=cros_prebuilt_old,
         cros_prebuilt_new=cros_prebuilt_new,
         chrome_localbuild_old=chrome_localbuild_old,
         chrome_localbuild_new=chrome_localbuild_new,
+        android_prebuilt_old=android_prebuilt_old,
+        android_prebuilt_new=android_prebuilt_new,
         term_old=opts.term_old,
         term_new=opts.term_new,
         test_name=opts.test_name,
@@ -1047,12 +1096,12 @@ class DiagnoseCommandLineBase:
         '--old',
         type=str,
         required=True,
-        help='ChromeOS or Chrome version with old behavior')
+        help='ChromeOS, Chrome or Android version with old behavior')
     group.add_argument(
         '--new',
         type=str,
         required=True,
-        help='ChromeOS or Chrome version with new behavior')
+        help='ChromeOS, Chrome or Android version with new behavior')
     group.add_argument('--term_old', help='Alternative term for "old" state')
     group.add_argument('--term_new', help='Alternative term for "new" state')
 
@@ -1123,6 +1172,8 @@ class DiagnoseCommandLineBase:
         help="Don't disable rootfs verification after update is completed")
     group.add_argument(
         '--bisect_chrome', action='store_true', help='Bisect a chrome version')
+    group.add_argument(
+        '--bisect_android', action='store_true', help='Bisect an android version')
     group.add_argument(
         '--base_cros_version',
         type=cros_util.argtype_cros_version,
