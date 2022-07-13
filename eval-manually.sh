@@ -26,4 +26,5 @@ If you want to abort bisection, press [Esc] key.
 
 # show dialog on tty, because bisector will capture and hide stdout and stderr.
 export DIALOG_TTY=1
-dialog --ok-label old --extra-button --extra-label new --cancel-label skip   --yesno "$TEXT" 20 60
+dialog --yes-label old --extra-button --extra-label new --no-label skip  \
+    --yesno "$TEXT" 20 60
