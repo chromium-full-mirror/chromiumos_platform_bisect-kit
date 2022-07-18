@@ -15,6 +15,7 @@ from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import errors
+from bisect_kit import strategy
 from bisect_kit import testing
 
 
@@ -79,13 +80,15 @@ class TestBisectorCli(unittest.TestCase):
           values, 'BISECT_RESULT_VALUES=hello\n')
 
 
-@mock.patch('bisect_kit.common.config_logging', mock.Mock())
 class TestBisectorCommandLine(unittest.TestCase):
   """Test bisector_cli.BisectorCommandLine class."""
 
   def setUp(self):
     self.session_base_patcher = testing.SessionBasePatcher()
     self.session_base_patcher.patch()
+    self.random_list = testing.RandomNum()
+    self.old_rate = None
+    self.new_rate = None
 
   def tearDown(self):
     self.session_base_patcher.reset()
@@ -114,6 +117,30 @@ class TestBisectorCommandLine(unittest.TestCase):
     self.assertEqual(result.get('inited'), True)
     self.assertEqual(result.get('verified'), False)
 
+  def test_run_true_with_endpoint_verification(self):
+    bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+    bisector.main('init', '--num=10', '--old=0', '--new=9',
+                  '--endpoint_verification')
+    bisector.main('config', 'switch', 'true')
+    bisector.main('config', 'eval', 'true')
+    with self.assertRaises(errors.VerificationFailed):
+      bisector.main('run')
+    result = bisector.current_status()
+    self.assertEqual(result.get('inited'), True)
+    self.assertEqual(result.get('verified'), False)
+
+  def test_run_false_with_endpoint_verification(self):
+    bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+    bisector.main('init', '--num=10', '--old=0', '--new=9',
+                  '--endpoint_verification')
+    bisector.main('config', 'switch', 'true')
+    bisector.main('config', 'eval', 'false')
+    with self.assertRaises(errors.VerificationFailed):
+      bisector.main('run')
+    result = bisector.current_status()
+    self.assertEqual(result.get('inited'), True)
+    self.assertEqual(result.get('verified'), False)
+
   def test_simple(self):
     bisector = bisector_cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=20', '--old=3', '--new=15')
@@ -138,36 +165,78 @@ class TestBisectorCommandLine(unittest.TestCase):
     self.assertEqual(result.get('inited'), True)
     self.assertEqual(result.get('verified'), False)
 
+  def do_evaluate(self, _cmd, _domain, rev, _log_file, capture_values=False):
+    del capture_values  # unused
+    if int(rev) < 42:
+      return core.StepResult('old')
+    return core.StepResult('new')
+
+  def do_noisy_evaluate(self,
+                        _cmd,
+                        _domain,
+                        rev,
+                        _log_file,
+                        capture_values=False):
+    del capture_values
+    ans = self.random_list.get_random_num()
+
+    if int(rev) < 42:
+      p = self.old_rate
+    else:
+      p = self.new_rate
+
+    if ans < p:
+      return core.StepResult('new')
+    return core.StepResult('old')
+
   def test_run_classic(self):
     bisector = bisector_cli.BisectorCommandLine(DummyDomain)
     bisector.main('init', '--num=200', '--old=0', '--new=99')
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
 
-    def do_evaluate(_cmd, _domain, rev, _log_file, capture_values=False):
-      del capture_values  # unused
-      if int(rev) < 42:
-        return core.StepResult('old')
-      return core.StepResult('new')
-
-    with mock.patch('bisect_kit.bisector_cli.do_evaluate', do_evaluate):
+    with mock.patch('bisect_kit.bisector_cli.do_evaluate', self.do_evaluate):
       # two verify
       with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
         bisector.main('next')
         self.assertEqual(mock_stdout.getvalue(), '99\n')
+
       bisector.main('run', '-1')
       with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
         bisector.main('next')
         self.assertEqual(mock_stdout.getvalue(), '0\n')
+
       bisector.main('run', '-1')
       self.assertEqual(bisector.strategy.get_range(), (0, 99))
-
       bisector.main('run', '-1')
       self.assertIn(bisector.strategy.get_range(), {(0, 49), (0, 50)})
 
       bisector.main('run')
       self.assertEqual(bisector.strategy.get_best_guess(), 42)
+    with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+      bisector.main('next')
+      self.assertEqual(mock_stdout.getvalue(), 'done\n')
 
+  def test_run_classic_with_endpoint_verification(self):
+    bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+    bisector.main('init', '--num=200', '--old=0', '--new=99',
+                  '--endpoint_verification')
+    bisector.main('config', 'switch', 'true')
+    bisector.main('config', 'eval', 'false')
+
+    with mock.patch('bisect_kit.bisector_cli.do_evaluate', self.do_evaluate):
+      with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+        bisector.main('next')
+        self.assertEqual(mock_stdout.getvalue(), '99\n')
+
+      bisector.main('run', '-1')
+      with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+        bisector.main('next')
+        self.assertEqual(mock_stdout.getvalue(), '99\n')
+      self.assertEqual(bisector.strategy.get_range(), (0, 99))
+
+      bisector.main('run')
+      self.assertEqual(bisector.strategy.get_best_guess(), 42)
     with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
       bisector.main('next')
       self.assertEqual(mock_stdout.getvalue(), 'done\n')
@@ -179,23 +248,36 @@ class TestBisectorCommandLine(unittest.TestCase):
     bisector.main('config', 'switch', 'true')
     bisector.main('config', 'eval', 'false')
 
-    def do_evaluate(_cmd, _domain, rev, _log_file, capture_values=False):
-      del capture_values  # unused
-      if int(rev) < 42:
-        p = 0.1
-      else:
-        p = 0.9
-      if random.random() < p:
-        return core.StepResult('new')
-      return core.StepResult('old')
+    self.old_rate = 0.1
+    self.new_rate = 0.9
 
-    with mock.patch('bisect_kit.bisector_cli.do_evaluate', do_evaluate):
+    with mock.patch('bisect_kit.bisector_cli.do_evaluate',
+                    self.do_noisy_evaluate):
       bisector.main('run')
       self.assertEqual(bisector.strategy.get_best_guess(), 42)
 
     with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
       bisector.main('next')
       # There might be small math error near the boundary of confidence.
+      self.assertIn(mock_stdout.getvalue(), ['done\n', '41\n', '42\n'])
+
+  def test_run_noisy_with_endpoint_verification(self):
+    bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+    bisector.main('init', '--num=100', '--old=0', '--new=99',
+                  '--noisy=old=1/10,new=9/10', '--endpoint_verification')
+    bisector.main('config', 'switch', 'true')
+    bisector.main('config', 'eval', 'false')
+
+    self.old_rate = 0.1
+    self.new_rate = 0.9
+
+    with mock.patch('bisect_kit.bisector_cli.do_evaluate',
+                    self.do_noisy_evaluate):
+      bisector.main('run')
+      self.assertEqual(bisector.strategy.get_best_guess(), 42)
+
+    with mock.patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+      bisector.main('next')
       self.assertIn(mock_stdout.getvalue(), ['done\n', '41\n', '42\n'])
 
   def test_cmd_old_and_new(self):
@@ -219,6 +301,71 @@ class TestBisectorCommandLine(unittest.TestCase):
     with self.assertRaises(errors.UnableToProceed):
       bisector.main('skip', '30*10')
     self.assertEqual(bisector.strategy.get_range(), (20, 30))
+
+  def test_run_very_noisy(self):
+    bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+    bisector.main('init', '--num=100', '--old=0', '--new=99',
+                  '--noisy=old=3/10,new=7/10', '--endpoint_verification')
+    bisector.main('config', 'switch', 'true')
+    bisector.main('config', 'eval', 'false')
+
+    self.old_rate = 0.3
+    self.new_rate = 0.7
+
+    with mock.patch('bisect_kit.bisector_cli.do_evaluate',
+                    self.do_noisy_evaluate):
+      bisector.main('run')
+      self.assertEqual(bisector.strategy.get_best_guess(), 42)
+
+  def test_run_noisy_many_times(self):
+    """
+    Test noisy cases with different ratio
+    """
+    bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+    total_correct_count = 0
+    total_wrong_count = 0
+
+    cases = [
+        dict(rate=(0.1, 0.9), times=100, expect_correct_rate=0.99),
+        dict(rate=(0.2, 0.8), times=50, expect_correct_rate=0.99),
+        dict(rate=(0.3, 0.7), times=50, expect_correct_rate=0.8),
+    ]
+    correct_rate_list = []
+
+    with mock.patch('bisect_kit.bisector_cli.do_evaluate',
+                    self.do_noisy_evaluate):
+      for case in cases:
+        self.old_rate, self.new_rate = case['rate']
+        correct_count = 0
+        wrong_count = 0
+        noisy_flag = '--noisy=old=%d/10,new=%d/10' % (self.old_rate * 10,
+                                                      self.new_rate * 10)
+
+        for _ in range(case['times']):
+          try:
+            bisector.main('init', '--num=100', '--old=0', '--new=99',
+                          noisy_flag, '--endpoint_verification')
+            bisector.main('config', 'switch', 'true')
+            bisector.main('config', 'eval', 'false')
+            bisector.main('run')
+
+            self.assertEqual(bisector.strategy.get_best_guess(), 42)
+            correct_count += 1
+
+          except errors.VerifyInitialRangeFailed:
+            wrong_count += 1
+
+        correct_rate = correct_count / (correct_count + wrong_count)
+        self.assertGreaterEqual(correct_rate, case['expect_correct_rate'])
+
+        correct_rate_list.append(correct_rate)
+        total_correct_count += correct_count
+        total_wrong_count += wrong_count
+
+    total_correct_rate = total_correct_count / (
+        total_correct_count + total_wrong_count)
+    print('Correct rate of different test ratio: %s' % correct_rate_list)
+    self.assertGreaterEqual(total_correct_rate, 0.95)
 
   def test_cmd_switch(self):
     """Test cmd_switch"""

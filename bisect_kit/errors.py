@@ -67,12 +67,15 @@ class DiagnoseContradiction(Exception):
 class VerificationFailed(Exception):
   """Bisection range is verified false."""
 
+
+class VerifyBehaviorFailed(VerificationFailed):
+  """Either old version or new version behaves incorrectly."""
+
   def __init__(self, rev, expect, actual, bad_times=1):
     self.rev = rev
     self.expect = expect
     self.actual = actual
     self.bad_times = bad_times
-
     msg = 'rev=%s expect "%s" but got "%s"' % (self.rev, self.expect,
                                                self.actual)
     if self.bad_times > 1:
@@ -80,18 +83,27 @@ class VerificationFailed(Exception):
     super().__init__(msg)
 
 
-class VerifyOldBehaviorFailed(VerificationFailed):
+class VerifyOldBehaviorFailed(VerifyBehaviorFailed):
   """Old version does not behave as old."""
 
   def __init__(self, rev, bad_times=1, term_old='OLD', term_new='NEW'):
     super().__init__(rev, term_old, term_new, bad_times)
 
 
-class VerifyNewBehaviorFailed(VerificationFailed):
+class VerifyNewBehaviorFailed(VerifyBehaviorFailed):
   """New version does not behave as new."""
 
   def __init__(self, rev, bad_times=1, term_old='OLD', term_new='NEW'):
     super().__init__(rev, term_new, term_old, bad_times)
+
+
+class VerifyInitialRangeFailed(VerificationFailed):
+  """Fail to pass the statistical tests."""
+
+  def __init__(self, rounds):
+    self.rounds = rounds
+    msg = 'Fail to pass the Boschloo Exact Test in round %d' % self.rounds
+    super().__init__(msg)
 
 
 class UnableToProceed(Exception):

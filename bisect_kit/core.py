@@ -298,6 +298,14 @@ class BisectStates(States):
       rev_info[idx].add_sample(**entry)
     return rev_info
 
+  def get_init_range_verified(self) -> bool:
+    assert self.inited
+    for entry in self.data['history']:
+      if entry.get('event') != 'verified':
+        continue
+      return entry['verified_status']
+    return False
+
   def idx2rev(self, idx):
     assert self.inited
     return self.data['revlist'][idx]

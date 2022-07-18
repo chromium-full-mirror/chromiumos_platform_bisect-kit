@@ -400,8 +400,8 @@ class BisectorCommandLine:
           term_new=opts.term_new,
           old_value=opts.old_value,
           new_value=opts.new_value,
-          recompute_init_values=opts.recompute_init_values)
-
+          recompute_init_values=opts.recompute_init_values,
+          endpoint_verification=opts.endpoint_verification)
       details = candidates.get('details', {})
       self.states.init_states(config, revlist, details)
     except Exception as e:
@@ -475,6 +475,11 @@ class BisectorCommandLine:
         eval_log_fullpath,
         capture_values=self.strategy.is_value_bisection())
     status = result.data['status']
+
+    if (self.strategy.endpoint_verification and
+        not self.strategy.is_value_bisection()):
+      self.strategy.renew_initial_count(status, self.states.rev2idx(rev))
+
     t1 = time.time()
     sample['eval_time'] = t1 - t0
     sample['status'] = status
@@ -581,6 +586,8 @@ class BisectorCommandLine:
     See run command's help message for more detail.
 
     Raises:
+      errors.VerifyInitialRangeFailed: The initial bisection range doesn't
+          pass the statistical test.
       errors.VerificationFailed: The bisection range is verified false. We
           expect 'old' at the first rev and 'new' at last rev.
       errors.UnableToProceed: Too many errors to narrow down further the
@@ -662,6 +669,8 @@ class BisectorCommandLine:
             'range',
             old=self.states.idx2rev(old_idx),
             new=self.states.idx2rev(new_idx))
+        init_range_verified = self.strategy.init_range_verified
+        self.states.add_history('verified', verified_status=init_range_verified)
         self.states.save()
 
   def cmd_view(self, opts):
@@ -780,6 +789,7 @@ class BisectorCommandLine:
         'new': self.config['term_new'],
     }
     rev_info = self.states.get_rev_info(term_map)
+    init_range_verified = self.states.get_init_range_verified()
     assert rev_info
     return strategy.NoisyBinarySearch(
         rev_info,
@@ -790,7 +800,9 @@ class BisectorCommandLine:
         term_map=term_map,
         recompute_init_values=self.config['recompute_init_values'],
         confidence=self.config['confidence'],
-        observation=self.config['noisy'])
+        observation=self.config['noisy'],
+        endpoint_verification=self.config['endpoint_verification'],
+        init_range_verified=init_range_verified)
 
   def current_status(self, session=None):
     """Gets current bisect status.
@@ -1051,6 +1063,10 @@ class BisectorCommandLine:
         type=float,
         default=DEFAULT_CONFIDENCE,
         help='Confidence level (default: %(default)r)')
+    parser_init.add_argument(
+        '--endpoint_verification',
+        action='store_true',
+        help='Enable statistical method to verify endpoints')
     parser_init.set_defaults(func=self.cmd_init)
     self.domain_cls.add_init_arguments(parser_init)
 

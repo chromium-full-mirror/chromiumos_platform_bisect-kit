@@ -4,4 +4,5 @@ googleapis_common_protos
 # b/236854886 lock version to avoid python complaining pb_2 too old.
 protobuf==3.20.1
 psutil
+scipy
 setuptools

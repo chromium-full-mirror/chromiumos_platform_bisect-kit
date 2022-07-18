@@ -10,6 +10,8 @@ import math
 import re
 import sys
 
+from scipy.stats import boschloo_exact
+
 from bisect_kit import errors
 from bisect_kit import math_util
 
@@ -21,6 +23,9 @@ SKIP_FOREVER = 3
 
 # Constant that denotes version is known not noisy.
 NOT_NOISY = (None, None)
+
+# Constant that denotes whether the statistical method is used in initial range
+ENABLE_AUTO_ENDPOINT_VERIFICATION = False
 
 
 def trend_score(prev_from, prev_to, now_from, now_to):
@@ -94,6 +99,63 @@ class NoisyBinarySearch:
   INITED = 'inited'
   STARTED = 'started'
 
+  # During the initial range verification phase, there are four init-states:
+  #   INIT_DO_ONE:
+  #     Run several times at both ends, and the init-state will
+  #     change to INIT_CHECK_ONE.
+  #     The time is determined by rounds, up to three rounds.
+  #   INIT_CHECK_ONE:
+  #     Use statistical method to check for regression.
+  #     According to the statistical test result, the init-state may
+  #     change to INIT_DO_ONE or INIT_DO_TWO.
+  #   INIT_DO_TWO:
+  #     Do the final round of test. Run 10 times at both ends.
+  #   INIT_CHECK_TWO:
+  #     Do the final round of statistical test to check.
+  #     According to the statistical test result, determine whether
+  #     there is a regression.
+  # INIT_STATUS_MAP describes transition of the init-states and the alpha value
+  # for statistical tests.
+  INIT_DO_ONE = 'init_do_one'
+  INIT_CHECK_ONE = 'init_check_one'
+  INIT_DO_TWO = 'init_do_two'
+  INIT_CHECK_TWO = 'init_check_two'
+
+  INIT_STATUS_MAP = {
+      INIT_DO_ONE: {
+          'next_state': INIT_CHECK_ONE,
+          'action': 'counting',
+      },
+      INIT_CHECK_ONE: {
+          'next_state': INIT_DO_TWO,
+          'last_state': INIT_DO_ONE,
+          'alpha': 0.01,
+          'action': 'checking',
+      },
+      INIT_DO_TWO: {
+          'next_state': INIT_CHECK_TWO,
+          'action': 'counting',
+      },
+      INIT_CHECK_TWO: {
+          'next_state': None,
+          'alpha': 0.05,
+          'action': 'checking',
+      },
+  }
+
+  # INIT_ROUNDS:
+  #   INIT_ROUNDS[i] represents the cumulative number of times it has run on both
+  #   ends in the i-th round.
+  # INIT_P_BOUND:
+  #   For the first three rounds(e.g. round i), if the p-value calculated by the
+  #   statistical method is greater than or equal to INIT_P_BOUND[i], the
+  #   regression doesn't exist.
+  #   For the last round, if the p-value calculated by the statistical method is
+  #   greater than or equal to alpha, the regression doesn't exist.
+  # INIT_P_BOUND is used to eliminate tests which apparently don't have regression.
+  INIT_ROUND = [5, 10, 15, 25]
+  INIT_P_BOUND = [0.65, 0.55, 0.5]
+
   def __init__(self,
                rev_info,
                old_idx=0,
@@ -105,7 +167,9 @@ class NoisyBinarySearch:
                oracle=None,
                observation=None,
                confidence=0.999,
-               verify_confidence=0.999):
+               verify_confidence=0.999,
+               endpoint_verification=None,
+               init_range_verified=False):
     """Initializes NoisyBinarySearch.
 
     The probability model could be specified in three ways:
@@ -152,6 +216,9 @@ class NoisyBinarySearch:
       observation: Observed test results.
       confidence: Required confidence for bisection result.
       verify_confidence: Bisect range verification confidence.
+      endpoint_verification: Flag indicating whether the statistical verification
+        method is enabled.
+      init_range_verified: Record of whether the initial range has been verified.
     """
     assert oracle is None or observation is None
     self._state = self.INITED
@@ -205,11 +272,43 @@ class NoisyBinarySearch:
         self.new_avg = new_value
         self.threshold = (old_value + new_value) / 2
 
+    if endpoint_verification is None:
+      self.endpoint_verification = ENABLE_AUTO_ENDPOINT_VERIFICATION
+    else:
+      self.endpoint_verification = endpoint_verification
+
+    # init_verify_state includes: INIT_DO_ONE, INIT_CHECK_ONE,
+    #                             INIT_DO_TWO, INIT_CHECK_TWO
+    # init_range_verified denotes whether the initial range has been verified
+    # with statistical method.
+    # count records the results in both ends.
+    self.init_rounds = 0
+    self._init_verify_state = self.INIT_DO_ONE
+    assert init_range_verified is not None
+    self.init_range_verified = init_range_verified
+    self.count_revold_old = 0
+    self.count_revold_new = 0
+    self.count_revnew_old = 0
+    self.count_revnew_new = 0
+
   def is_noisy(self):
     """Is noisy case?"""
     if self.oracle and self.oracle != (0, 1):
       return True
     return self.prior_observation is not None
+
+  @property
+  def init_verify_state(self):
+    current_state = self._init_verify_state
+    if self.INIT_STATUS_MAP[current_state]['action'] == 'checking':
+      return self._init_verify_state
+
+    current_round = self.INIT_ROUND[self.init_rounds]
+    if (self.count_revnew_old + self.count_revnew_new >= current_round and
+        self.count_revold_old + self.count_revold_new >= current_round):
+      self._init_verify_state = self.INIT_STATUS_MAP[current_state][
+          'next_state']
+    return self._init_verify_state
 
   @property
   def state(self):
@@ -780,8 +879,11 @@ class NoisyBinarySearch:
 
   def is_range_verified(self):
     """Is bisection range already been verified?"""
-    return (self.rev_info[self.old_idx]['old'] > 0 and
-            self.rev_info[self.new_idx]['new'] > 0)
+    if self.endpoint_verification and not self.is_value_bisection():
+      return self.init_range_verified
+    else:
+      return self.rev_info[self.old_idx]['old'] > 0 and self.rev_info[
+          self.new_idx]['new'] > 0
 
   def check_verification_range(self):
     """Checks if bisection range is reasonable.
@@ -794,6 +896,10 @@ class NoisyBinarySearch:
           events occur too many times.
     """
     if self.state == self.INITED and self.recompute_init_values:
+      return
+
+    if (self.state == self.INITED and self.endpoint_verification and
+        not self.is_value_bisection()):
       return
 
     if self.rev_info[self.old_idx]['old'] == 0:
@@ -826,10 +932,15 @@ class NoisyBinarySearch:
     Returns:
       True if the regression is reproduced.
     """
-    old_count = self.rev_info[self.old_idx]['old']
-    new_count = self.rev_info[self.new_idx]['new']
-    if old_count == 0 or new_count == 0:
-      return False
+    if self.endpoint_verification and not self.is_value_bisection():
+      if not self.init_range_verified:
+        return False
+    else:
+      old_count = self.rev_info[self.old_idx]['old']
+      new_count = self.rev_info[self.new_idx]['new']
+      if old_count == 0 or new_count == 0:
+        return False
+
     try:
       self.check_verification_range()
     except (errors.VerifyOldBehaviorFailed, errors.VerifyNewBehaviorFailed,
@@ -988,6 +1099,67 @@ class NoisyBinarySearch:
 
     return best_i
 
+  def statistics_test(self, round_idx):
+    """Helper function for verify_for_init_state
+
+    Returns:
+      p value calculated with Boschloo's Exact Test.
+      See https://en.wikipedia.org/wiki/Boschloo%27s_test for reference.
+    """
+    assert self.count_revnew_old + self.count_revnew_new >= self.INIT_ROUND[
+        round_idx]
+    assert self.count_revold_old + self.count_revold_new >= self.INIT_ROUND[
+        round_idx]
+
+    test_table = [[self.count_revold_old, self.count_revnew_old],
+                  [self.count_revold_new, self.count_revnew_new]]
+    res = boschloo_exact(test_table, alternative='greater')
+    return res.pvalue
+
+  def _verify_for_init_state(self):
+    """Returns index to probe for initial samples with statistical method"""
+    current_state = self.init_verify_state
+
+    # DO_ONE & DO_TWO
+    if self.INIT_STATUS_MAP[current_state]['action'] == 'counting':
+      if self.count_revnew_old + self.count_revnew_new < self.INIT_ROUND[
+          self.init_rounds]:
+        return self.new_idx
+
+      if self.count_revold_old + self.count_revold_new < self.INIT_ROUND[
+          self.init_rounds]:
+        return self.old_idx
+      raise AssertionError('Should not get the initial state: %s' %
+                           current_state)
+
+    # CHECK_ONE & CHECK_TWO
+    if self.INIT_STATUS_MAP[current_state]['action'] == 'checking':
+      pvalue = self.statistics_test(self.init_rounds)
+      alpha = self.INIT_STATUS_MAP[current_state]['alpha']
+
+      if pvalue < alpha:
+        self.init_range_verified = True
+        return None
+
+      elif (self.INIT_STATUS_MAP[current_state]['next_state'] is not None and
+            pvalue < self.INIT_P_BOUND[self.init_rounds]):
+        self.init_rounds += 1
+        if self.init_rounds == len(self.INIT_P_BOUND):
+          self._init_verify_state = self.INIT_STATUS_MAP[current_state][
+              'next_state']
+        else:
+          self._init_verify_state = self.INIT_STATUS_MAP[current_state][
+              'last_state']
+        return self.new_idx
+
+      else:
+        raise errors.VerifyInitialRangeFailed(self.init_rounds)
+
+    # get the wrong init_verify_state
+    raise AssertionError(
+        'current state should be one of init_verify_state\'s states, but got %s'
+        % current_state)
+
   def _next_idx_for_initial(self):
     """Returns index to probe for initial samples
 
@@ -1003,15 +1175,23 @@ class NoisyBinarySearch:
     """
     assert self._state == self.INITED
     if not self.recompute_init_values:
-      # Try 'new' before 'old' in order to know whether the issue is
-      # reproducible earlier
-      if self.rev_info[self.new_idx]['new'] == 0:
-        return self.new_idx
+      # If the initial range has already been verified with statistical method,
+      # the state will change to STARTED after resuming the test.
+      if self.init_range_verified:
+        return None
 
-      if self.rev_info[self.old_idx]['old'] == 0:
-        return self.old_idx
+      # Test the initial range of functional tests with statistical method, and get the next index.
+      if self.endpoint_verification and not self.is_value_bisection():
+        idx = self._verify_for_init_state()
+        return idx
 
-      return None
+      # Test the initial range without statistical method, and get the next index.
+      else:
+        if self.rev_info[self.new_idx]['new'] == 0:
+          return self.new_idx
+        if self.rev_info[self.old_idx]['old'] == 0:
+          return self.old_idx
+        return None
 
     def is_one_side_enough(info):
       count = info['value']
@@ -1092,3 +1272,16 @@ class NoisyBinarySearch:
     assert self.prob
     return self._next_idx_by_utility(self.old_p, self.new_p, self.prob,
                                      cost_table)
+
+  def renew_initial_count(self, status, idx):
+    if idx == self.old_idx:
+      if status == 'old':
+        self.count_revold_old += 1
+      if status == 'new':
+        self.count_revold_new += 1
+
+    if idx == self.new_idx:
+      if status == 'old':
+        self.count_revnew_old += 1
+      if status == 'new':
+        self.count_revnew_new += 1
