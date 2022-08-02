@@ -59,6 +59,11 @@ gs_archive_base = 'gs://chromeos-image-archive/'
 gs_archive_path = 'gs://chromeos-image-archive/{board}-{bucket}/{version}'
 release_bucket = 'release'
 
+# only fetches manifest from gs when milestone >= 92
+gs_manifest_cutoff_milestone = 92
+gs_manifest_base = 'gs://chromeos-manifest-versions/'
+gs_manifest_path = 'gs://chromeos-manifest-versions/buildspecs/{milestone}/{short_version}.xml'
+
 # Assume gsutil is in PATH.
 gsutil_bin = 'gsutil'
 
@@ -676,12 +681,15 @@ def gsutil_ls(*args, **kwargs):
   return gsutil('ls', *args, **kwargs).splitlines()
 
 
-def gsutil_stat_creation_time(*args, **kwargs):
-  """Returns the creation time of a file or multiple files.
+def gsutil_stat_max_creation_time(*files, **kwargs):
+  """Returns the max creation time of a set of files.
+
+  For each file, the function will lookup the `create_time_seconds` key is
+  set in metadata.
 
   Args:
-    args: arguments passed to 'gsutil stat'.
-    kwargs: extra parameters for gsutil.
+    files: a list of filenames passed to gsutil
+    kwargs: extra parameters for gsutil
 
   Returns:
     A integer indicates the creation timestamp.
@@ -690,25 +698,102 @@ def gsutil_stat_creation_time(*args, **kwargs):
     subprocess.CalledProcessError: gsutil failed, usually means path not found
     errors.ExternalError: creation time is not found
   """
-  result = -1
-  # Currently we believe stat always returns a UTC time, and strptime also
-  # parses a UTC time by default.
-  time_format = '%a, %d %b %Y %H:%M:%S GMT'
+  timestamps = [
+      x['create_time_seconds']
+      if 'create_time_seconds' in x else x.get('Creation time')
+      for x in gsutil_stat(*files, **kwargs).values()
+  ]
+  if None in timestamps:
+    raise errors.ExternalError(
+        "didn't find creation time or create_time_seconds")
+  return max(timestamps)
 
-  for line in gsutil('stat', *args, **kwargs).splitlines():
+
+def gsutil_stat(*files, **kwargs) -> dict[str, dict[str], any]:
+  """Returns a key-value dict for each file in gsutil stat.
+
+  Note that it only supports a small set of field names.
+
+  Args:
+    files: a list of filename passed to gsutil
+    kwargs: extra parameters for gsutil
+
+  Returns:
+    A dict, result[filename][key] = value
+
+  Raises:
+    subprocess.CalledProcessError: gsutil failed, usually means path not found
+  """
+
+  time_format = '%a, %d %b %Y %H:%M:%S GMT'
+  supported_fields = [
+      'Creation time',
+      'Update time',
+      'Storage class',
+      'Content-Length',
+      'Content-Type',
+      'create_time_seconds',  # metadata
+      'Hash (crc32c)',
+      'Hash (md5)',
+      'ETag',
+      'Generation',
+      'Metageneration',
+  ]
+  datetime_fields = [
+      'Creation time',
+      'Update time',
+  ]
+  int_fields = [
+      'Content-Length',
+      'create_time_seconds',
+      'Generation',
+  ]
+
+  result = {}
+  current_file = None
+
+  for line in gsutil('stat', *files, **kwargs).splitlines():
     if ':' not in line:
       continue
     key, value = line.split(':', 1)
     key, value = key.strip(), value.strip()
-    if key != 'Creation time':
-      continue
-    dt = datetime.datetime.strptime(value, time_format)
-    unixtime = int(calendar.timegm(dt.utctimetuple()))
-    result = max(result, unixtime)
 
-  if result == -1:
-    raise errors.ExternalError("didn't find creation time")
+    # fine a new file
+    # gs://file_name: will be splitted to key=gs value=//file_name: here
+    if key == 'gs':
+      file_name = 'gs:%s' % value.rstrip(':')
+      if file_name in files:
+        current_file = file_name
+        result[current_file] = {}
+      continue
+
+    # current file not found
+    if not current_file:
+      continue
+
+    # find a key we want
+    if key in supported_fields:
+      if key in int_fields:
+        value = int(value)
+      if key in datetime_fields:
+        dt = datetime.datetime.strptime(value, time_format)
+        value = int(calendar.timegm(dt.utctimetuple()))
+      result[current_file][key] = value
   return result
+
+
+def should_fetch_release_manifest_from_gs(version: str) -> bool:
+  """Returns whether the manifest of given version is avaliable on google storage.
+
+  Args:
+    version: CrOS full or snapshot version
+
+  Returns:
+    bool, True if manifest is avaliable on google storage.
+  """
+  assert is_cros_snapshot_version(version) or is_cros_full_version(version)
+  milestone, _short_version = version_split(version)
+  return int(milestone) >= gs_manifest_cutoff_milestone
 
 
 def query_milestone_by_version(board, short_version) -> typing.Optional[str]:
@@ -2085,9 +2170,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
     old_path = SnapshotStore.query_snapshot_image(self.config['board'], old)
     new_path = SnapshotStore.query_snapshot_image(self.config['board'], new)
     if old_path:
-      old_timestamp = gsutil_stat_creation_time(old_path) - 86400
+      old_timestamp = gsutil_stat_max_creation_time(old_path) - 86400
     if new_path:
-      new_timestamp = gsutil_stat_creation_time(new_path) + 86400
+      new_timestamp = gsutil_stat_max_creation_time(new_path) + 86400
       # 1558657989 is snapshot_id 5982's commit time, this ensures every time
       # we can find snapshot 5982
       # snapshot_id <= 5982 has different commit message format, so we need
@@ -2154,14 +2239,20 @@ class ChromeOSSpecManager(codechange.SpecManager):
     assert is_cros_full_version(rev)
     milestone, short_version = version_split(rev)
     path = os.path.join('buildspecs', milestone, short_version + '.xml')
-    try:
-      timestamp = git_util.get_commit_time(self.historical_manifest_git_dir,
-                                           self.historical_manifest_branch_name,
-                                           path)
-    except ValueError as e:
-      raise errors.InternalError(
-          '%s does not have %s' %
-          (self.historical_manifest_git_dir, path)) from e
+
+    if should_fetch_release_manifest_from_gs(rev):
+      timestamp = self.query_gs_release_manifest_timestamp(path)
+    else:
+      # b/224575508: timestamp for older versions on gsbucket may be incorrect,
+      # use timestamp from git repository instead
+      try:
+        timestamp = git_util.get_commit_time(
+            self.historical_manifest_git_dir,
+            self.historical_manifest_branch_name, path)
+      except ValueError as e:
+        raise errors.InternalError(
+            '%s does not have %s' %
+            (self.historical_manifest_git_dir, path)) from e
     return timestamp
 
   def detect_float_spec_branch_level(self, spec):
@@ -2336,6 +2427,41 @@ class ChromeOSSpecManager(codechange.SpecManager):
         logger.warning('snapshot id %s is not found, ignore', snapshot_id)
     return result
 
+  def list_release_milestones(self) -> list[str]:
+    path = '%s%s' % (gs_manifest_base, 'buildspecs')
+    return [x.removeprefix(path).strip('/') for x in gsutil_ls(path)]
+
+  def list_release_manifests(self, milestone: str) -> list[str]:
+    if int(milestone) < gs_manifest_cutoff_milestone:
+      return git_util.list_dir_from_revision(
+          self.historical_manifest_git_dir,
+          self.historical_manifest_branch_name,
+          os.path.join('buildspecs', milestone))
+
+    path = '%s%s/%s' % (gs_manifest_base, 'buildspecs', milestone)
+    return [x.removeprefix(path).lstrip('/') for x in gsutil_ls(path)]
+
+  def get_gs_release_manifest(self, path: str) -> typing.Optional[str]:
+    """Query the manifest content of a release version on gs."""
+    return gsutil('cat', '%s%s' % (gs_manifest_base, path))
+
+  def query_gs_release_manifest_timestamp(self,
+                                          path: str) -> typing.Optional[str]:
+    """Query the timestamp of a release version on gs."""
+    return gsutil_stat_max_creation_time('%s%s' % (gs_manifest_base, path))
+
+  def query_release_manifest_timestamp(self, full_version: str) -> int:
+    assert is_cros_full_version(full_version)
+
+    if should_fetch_release_manifest_from_gs(full_version):
+      milestone, short_version = version_split(full_version)
+      path = gs_manifest_path.format(
+          milestone=milestone, short_version=short_version)
+      return gsutil_stat_max_creation_time(path)
+    return git_util.get_commit_time(self.historical_manifest_git_dir,
+                                    self.historical_manifest_branch_name,
+                                    '%s.xml' % full_version)
+
   def collect_release_specs(self, old, new):
     assert is_cros_full_version(old)
     assert is_cros_full_version(new)
@@ -2343,18 +2469,13 @@ class ChromeOSSpecManager(codechange.SpecManager):
     new_milestone, new_short_version = version_split(new)
 
     result = []
-    for milestone in git_util.list_dir_from_revision(
-        self.historical_manifest_git_dir, self.historical_manifest_branch_name,
-        'buildspecs'):
+    for milestone in self.list_release_milestones():
       if not milestone.isdigit():
         continue
       if not int(old_milestone) <= int(milestone) <= int(new_milestone):
         continue
 
-      files = git_util.list_dir_from_revision(
-          self.historical_manifest_git_dir,
-          self.historical_manifest_branch_name,
-          os.path.join('buildspecs', milestone))
+      files = self.list_release_manifests(milestone)
 
       for fn in files:
         path = os.path.join('buildspecs', milestone, fn)
@@ -2365,9 +2486,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             util.is_version_lesseq(short_version, new_short_version) and
             util.is_direct_relative_version(short_version, new_short_version)):
           rev = make_cros_full_version(milestone, short_version)
-          timestamp = git_util.get_commit_time(
-              self.historical_manifest_git_dir,
-              self.historical_manifest_branch_name, path)
+          timestamp = self.query_release_manifest_timestamp(rev)
           result.append(
               codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path))
 
@@ -2385,9 +2504,12 @@ class ChromeOSSpecManager(codechange.SpecManager):
     if is_cros_full_version(rev):
       milestone, short_version = version_split(rev)
       path = os.path.join('buildspecs', milestone, '%s.xml' % short_version)
-      manifest = git_util.get_file_from_revision(
-          self.historical_manifest_git_dir,
-          self.historical_manifest_branch_name, path)
+      if should_fetch_release_manifest_from_gs(rev):
+        manifest = self.get_gs_release_manifest(path)
+      else:
+        manifest = git_util.get_file_from_revision(
+            self.historical_manifest_git_dir,
+            self.historical_manifest_branch_name, path)
     else:
       revisions = self.lookup_snapshot_manifest_revisions(rev, rev)
       commit_id = revisions[0][1]

@@ -260,6 +260,83 @@ class TestCrosUtil(unittest.TestCase):
         result.append(gs_path)
     return result
 
+  def _gsutil_stat(*args, **_kwargs):
+    stat_14469_8 = [
+        'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml:',
+        '    Creation time:          Fri, 08 Apr 2022 17:31:36 GMT',
+        '    Update time:            Fri, 08 Apr 2022 17:32:14 GMT',
+        '    Storage class:          STANDARD',
+        '    Content-Length:         244194',
+        '    Content-Type:           text/xml; charset=utf-8',
+        '    Metadata:',
+        '        create_time_seconds:1643599521',
+        '    Hash (crc32c):          crc32_meow',
+        '    Hash (md5):             md5_woof==',
+        '    ETag:                   tagtag=',
+        '    Generation:             1649439096753030',
+        '    Metageneration:         2',
+    ]
+    stat_14469_7 = [
+        'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml:',
+        '    Creation time:          Fri, 08 Apr 2022 17:29:04 GMT',  # 1649438944
+        '    Update time:            Fri, 08 Apr 2022 17:29:41 GMT',
+        '    Storage class:          STANDARD',
+        '    Content-Length:         244194',
+        '    Content-Type:           text/xml; charset=utf-8',
+        '    Hash (crc32c):          crc32_meow',
+        '    Hash (md5):             md5_woof==',
+        '    ETag:                   tagtag=',
+        '    Generation:             1649438944196998',
+        '    Metageneration:         2',
+    ]
+    files = {
+        'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml':
+            stat_14469_8,
+        'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml':
+            stat_14469_7,
+    }
+
+    result = ''
+    for arg in args:
+      if arg in files:
+        result += '\n'.join(files[arg]) + '\n'
+    return result
+
+  @mock.patch('bisect_kit.cros_util.gsutil', _gsutil_stat)
+  def test_gsutil_stat(self):
+    self.assertDictEqual(cros_util.gsutil_stat('nothing'), {})
+    self.assertDictEqual(
+        cros_util.gsutil_stat(
+            'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml'),
+        {
+            'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml': {
+                'Creation time': 1649439096,
+                'Update time': 1649439134,
+                'Storage class': 'STANDARD',
+                'Content-Length': 244194,
+                'Content-Type': 'text/xml; charset=utf-8',
+                'create_time_seconds': 1643599521,
+                'Hash (crc32c)': 'crc32_meow',
+                'Hash (md5)': 'md5_woof==',
+                'ETag': 'tagtag=',
+                'Generation': 1649439096753030,
+                'Metageneration': '2',
+            },
+        },
+    )
+
+  @mock.patch('bisect_kit.cros_util.gsutil', _gsutil_stat)
+  def test_gsutil_stat_max_creation_time(self):
+    time7 = 1649438944
+    time8 = 1643599521
+    file7 = 'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml'
+    file8 = 'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml'
+    self.assertEqual(cros_util.gsutil_stat_max_creation_time(file7), time7)
+    self.assertEqual(cros_util.gsutil_stat_max_creation_time(file8), time8)
+    self.assertEqual(
+        cros_util.gsutil_stat_max_creation_time(file7, file8),
+        max(time7, time8))
+
   def _query_milestone_by_version(_1, _2):
     return '63'
 
