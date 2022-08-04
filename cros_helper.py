@@ -326,7 +326,7 @@ def do_allocate_dut(opts):
           dimensions,
           variants,
           num=opts.parallel,
-          is_busy=True,
+          is_busy=None,
           filter_func=filter_func)
     if not bots:
       raise errors.NoDutAvailable(
