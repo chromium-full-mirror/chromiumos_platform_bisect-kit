@@ -1693,19 +1693,23 @@ def prepare_chroot(chromeos_root):
   # Copy local ssh configs into chromeos root.
   for name in ['config', 'chromeos_ssh_proxy']:
     path = os.path.expanduser(os.path.join('~/.ssh', name))
-    shutil.copy(
-        path,
-        os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER'],
-                     '.ssh'))
+    to_folder = os.path.join(chromeos_root, 'chroot', 'home',
+                             os.environ['USER'], '.ssh')
+    to_file = os.path.join(to_folder, name)
+    if os.path.isfile(to_file):
+      os.remove(to_file)
+    shutil.copy(path, to_folder)
 
   # Copy ssh keys into chromeos root.
   for name in ['testing_rsa', 'testing_rsa.pub']:
     path = os.path.join(chromeos_root, 'src', 'scripts', 'mod_for_test_scripts',
                         'ssh_keys', name)
-    shutil.copy(
-        path,
-        os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER'],
-                     '.ssh'))
+    to_folder = os.path.join(chromeos_root, 'chroot', 'home',
+                             os.environ['USER'], '.ssh')
+    to_file = os.path.join(to_folder, name)
+    if os.path.isfile(to_file):
+      os.remove(to_file)
+    shutil.copy(path, to_folder)
 
   # Remove the write permission for private keys.
   for name in ['testing_rsa', 'chromeos_ssh_proxy']:
