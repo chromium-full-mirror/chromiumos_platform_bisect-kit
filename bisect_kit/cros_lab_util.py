@@ -210,12 +210,18 @@ def swarming_bots_dimensions():
       method, verbose_log=False).get('bots_dimensions', [])
   return _simplify_bot_dimensions(bots_dimensions)
 
-
-def swarming_bots_list(dimensions, is_busy=None, limit=None, verbose_log=True):
+def swarming_bots_list(dimensions,
+                       is_dead=False,
+                       quarantined=False,
+                       is_busy=None,
+                       limit=None,
+                       verbose_log=True):
   """Lists swarming bots.
 
   Args:
     dimensions: dimensions constraints (list)
+    is_dead: filter by "is_dead" state; None means don't care
+    quarantined: filter by "quarantined" state; None means don't care
     is_busy: filter by "is_busy" state; None means don't care
     limit: limit number of bots
     verbose_log: log more if True
@@ -224,8 +230,11 @@ def swarming_bots_list(dimensions, is_busy=None, limit=None, verbose_log=True):
     list of bots dict
   """
   method = 'bots/list'
-  query = [('is_dead', 'FALSE'), ('quarantined', 'FALSE')]
-  query += [('dimensions', d) for d in dimensions]
+  query = [('dimensions', d) for d in dimensions]
+  if is_dead is not None:
+    query.append(('is_dead', 'TRUE' if is_dead else 'FALSE'))
+  if quarantined is not None:
+    query.append(('quarantined', 'TRUE' if quarantined else 'FALSE'))
   if is_busy is not None:
     query.append(('is_busy', 'TRUE' if is_busy else 'FALSE'))
 

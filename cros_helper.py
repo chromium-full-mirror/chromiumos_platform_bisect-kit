@@ -103,6 +103,8 @@ def verify_dimensions_by_lab(dimensions, tolerate_unknown=False):
 def select_available_bots_randomly(dimensions,
                                    variants,
                                    num=1,
+                                   is_dead=False,
+                                   quarantined=False,
                                    is_busy=None,
                                    filter_func=None):
   bots = []
@@ -110,7 +112,11 @@ def select_available_bots_randomly(dimensions,
     # There might be thousand bots available, set 'limit' to reduce swarming
     # API cost. This is not uniform random, but should be good enough.
     bots += cros_lab_util.swarming_bots_list(
-        dimensions + [variant], is_busy=is_busy, limit=10)
+        dimensions + [variant],
+        is_dead=is_dead,
+        quarantined=quarantined,
+        is_busy=is_busy,
+        limit=10)
 
   if filter_func:
     bots = list(filter(filter_func, bots))
@@ -312,9 +318,11 @@ def do_allocate_dut(opts):
           (variants, opts.pool))
     variants = filtered
 
+  fail_count = 0
   while True:
     filter_func = lambda bot: is_acceptable_bot(boards_with_prebuilt, bot)
     # Query every time because each iteration takes a few minutes
+    # Query bots that satisfy is_busy=False
     bots = select_available_bots_randomly(
         dimensions,
         variants,
@@ -322,6 +330,7 @@ def do_allocate_dut(opts):
         is_busy=False,
         filter_func=filter_func)
     if not bots:
+      # If there is no idle bots, remove the is_busy filter and query again
       bots = select_available_bots_randomly(
           dimensions,
           variants,
@@ -329,8 +338,20 @@ def do_allocate_dut(opts):
           is_busy=None,
           filter_func=filter_func)
     if not bots:
-      raise errors.NoDutAvailable(
-          'no bots satisfy constraints; all are in maintenance state?')
+      fail_count += 1
+      # log all the DUTs for debugging
+      select_available_bots_randomly(
+          dimensions,
+          variants,
+          num=opts.parallel,
+          is_dead=None,
+          quarantined=None,
+          is_busy=None,
+          filter_func=filter_func)
+      if fail_count >= 5:
+        raise errors.NoDutAvailable(
+            'no bots satisfy constraints; all are in maintenance state?')
+      continue
 
     remaining_time = opts.time_limit - (time.time() - t0)
     if remaining_time <= 0:
