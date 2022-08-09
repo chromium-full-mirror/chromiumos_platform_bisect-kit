@@ -1690,6 +1690,14 @@ def prepare_chroot(chromeos_root):
       os.path.join(common.BISECT_KIT_ROOT, 'cros_template_files', 'at_home'),
       os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER']))
 
+  # Copy local ssh configs into chromeos root.
+  for name in ['config', 'chromeos_ssh_proxy']:
+    path = os.path.expanduser(os.path.join('~/.ssh', name))
+    shutil.copy(
+        path,
+        os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER'],
+                     '.ssh'))
+
   # Copy ssh keys into chromeos root.
   for name in ['testing_rsa', 'testing_rsa.pub']:
     path = os.path.join(chromeos_root, 'src', 'scripts', 'mod_for_test_scripts',
@@ -1698,6 +1706,13 @@ def prepare_chroot(chromeos_root):
         path,
         os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER'],
                      '.ssh'))
+
+  # Remove the write permission for private keys.
+  for name in ['testing_rsa', 'chromeos_ssh_proxy']:
+    util.check_call(
+        'chmod', 'o-r,g-r',
+        os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER'],
+                     '.ssh', name))
 
 
 def check_if_need_recreate_chroot(stdout, stderr):

@@ -14,7 +14,6 @@ from __future__ import annotations
 from __future__ import print_function
 import argparse
 import glob
-import json
 import logging
 import os
 import re
@@ -173,17 +172,6 @@ def prepare_to_run_test(opts):
       # chromeos (b/136136270), so ignore the failure.
       logger.debug('Sox is only required by some audio tests. '
                    'Assume the failure of installing sox is harmless')
-
-  # test_that may use this ssh key and ssh complains its permission is too open.
-  # chmod every time just before run test_that because the permission may change
-  # after some git operations.
-  util.check_call(
-      'chmod',
-      'o-r,g-r',
-      'src/scripts/mod_for_test_scripts/ssh_keys/testing_rsa',
-      cwd=opts.chromeos_root)
-  cros_util.copy_into_chroot(opts.chromeos_root, '~/.ssh/config',
-                             '~/.ssh/config')
 
   if opts.reinstall:
     util.ssh_cmd(opts.dut, 'rm', '-rf', '/usr/local/autotest')
