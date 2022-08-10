@@ -39,6 +39,14 @@ logger = logging.getLogger(__name__)
 # Magic keyword for automatic DUT allocation.
 LAB_DUT = ':lab:'
 
+# Regexes for the supported hostnames without .cros suffix.
+# TODO(b/242070463): remove the name_to_address logic if possible.
+LAB_DUT_EXCEPTIONS = [
+    r'chromeos8-.+-host.+',
+    r'chromeos8-.+-labstation.+',
+    r'cre.+',
+]
+
 SWARMING_CLIENT = os.path.expanduser('~/luci-py/client/swarming.py')
 SWARMING_SERVER = 'https://chromeos-swarming.appspot.com'
 LEASE_DURATION = 1439 * 60
@@ -59,6 +67,9 @@ def normalize_sku_name(sku):
 
 
 def is_lab_dut(dut):
+  for r in LAB_DUT_EXCEPTIONS:
+    if re.match(r, dut):
+      return True
   return dut.endswith('.cros')
 
 
@@ -68,6 +79,10 @@ def dut_host_name(dut):
   Args:
     dut: DUT address; assume the address is returned from this module
   """
+  for r in LAB_DUT_EXCEPTIONS:
+    if re.match(r, dut):
+      return dut
+
   assert dut.endswith('.cros')
   return dut[:-5]
 
@@ -79,6 +94,9 @@ def dut_name_to_address(dut_name):
     dut_name: DUT name, which is the host name in the lab
   """
   assert '.' not in dut_name
+  for r in LAB_DUT_EXCEPTIONS:
+    if re.match(r, dut_name):
+      return dut_name
   return dut_name + '.cros'
 
 
@@ -209,6 +227,7 @@ def swarming_bots_dimensions():
   bots_dimensions = swarming_query(
       method, verbose_log=False).get('bots_dimensions', [])
   return _simplify_bot_dimensions(bots_dimensions)
+
 
 def swarming_bots_list(dimensions,
                        is_dead=False,
