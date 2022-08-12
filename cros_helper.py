@@ -13,7 +13,6 @@ import logging
 import os
 import random
 import time
-import typing
 
 from bisect_kit import cli
 from bisect_kit import common
@@ -341,7 +340,7 @@ def do_allocate_dut(opts):
       fail_count += 1
       # log all the DUTs for debugging
       select_available_bots_randomly(
-          dimensions,
+          [x for x in dimensions if x != 'dut_state:ready'],
           variants,
           num=opts.parallel,
           is_dead=None,
@@ -351,6 +350,8 @@ def do_allocate_dut(opts):
       if fail_count >= 5:
         raise errors.NoDutAvailable(
             'no bots satisfy constraints; all are in maintenance state?')
+      # sleep 2^fail_count minutes before next try
+      time.sleep(60 * (2**fail_count))
       continue
 
     remaining_time = opts.time_limit - (time.time() - t0)
