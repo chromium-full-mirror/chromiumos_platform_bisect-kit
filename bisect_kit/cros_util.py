@@ -1164,10 +1164,14 @@ def quick_provision(chromeos_root, host, image_info):
   if not build:
     return False
 
-  if ipaddress.ip_address(socket.gethostbyname(host)).is_private:
-    # Unless you host a mirror by yourself, it will try all possible servers
-    # and waste lots of time before give up.
-    logger.debug('%s is in private network, skip quick_provision', host)
+  try:
+    if ipaddress.ip_address(socket.gethostbyname(host)).is_private:
+      # Unless you host a mirror by yourself, it will try all possible servers
+      # and waste lots of time before give up.
+      logger.debug('%s is in private network, skip quick_provision', host)
+      return False
+  except socket.gaierror as e:
+    logger.warning('got %s, assume it is private address', str(e))
     return False
 
   autotest_path = os.path.join(chromeos_root_inside_chroot,
