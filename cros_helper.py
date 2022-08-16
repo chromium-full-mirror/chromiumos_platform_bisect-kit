@@ -331,7 +331,7 @@ def do_allocate_dut(opts):
     if not bots:
       # If there is no idle bots, remove the is_busy filter and query again
       bots = select_available_bots_randomly(
-          dimensions,
+          [x for x in dimensions if x != 'dut_state:ready'],
           variants,
           num=opts.parallel,
           is_busy=None,
