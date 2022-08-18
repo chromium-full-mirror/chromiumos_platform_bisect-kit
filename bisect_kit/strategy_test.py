@@ -13,6 +13,7 @@ from bisect_kit import core
 from bisect_kit import errors
 from bisect_kit import math_util
 from bisect_kit import strategy
+from bisect_kit import testing
 
 
 class TestStrategy(unittest.TestCase):
@@ -39,6 +40,7 @@ class TestNoisyBinarySearch(unittest.TestCase):
     for i in range(100):
       self.rev_info.append(core.RevInfo(str(i)))
     self.init_prob = [1.0] * len(self.rev_info)
+    self.random_list = testing.RandomNum()
 
   def test_parse_observation(self):
     Strategy = strategy.NoisyBinarySearch
@@ -312,18 +314,7 @@ class TestNoisyBinarySearch(unittest.TestCase):
         result = 'new'
       else:
         result = 'old'
-
-      if idx == bsearch.old_idx:
-        if result == "old":
-          bsearch.count_revold_old += 1
-        if result == "new":
-          bsearch.count_revold_new += 1
-
-      if idx == bsearch.new_idx:
-        if result == "old":
-          bsearch.count_revnew_old += 1
-        if result == "new":
-          bsearch.count_revnew_new += 1
+      bsearch.renew_initial_count(result, idx)
 
       if idx != prev_idx:
         switch_count += 1
@@ -366,6 +357,53 @@ class TestNoisyBinarySearch(unittest.TestCase):
       eval_counts.append(eval_count)
       results.append(result)
     return switch_counts, eval_counts, results
+
+  def perform_search_for_noise_rate(self,
+                                    size,
+                                    ans,
+                                    old_p,
+                                    new_p,
+                                    observation,
+                                    confidence,
+                                    endpoint_verification,
+                                    cost_func=None):
+    """Performs full noisy binary search.
+
+    Args:
+      size: Number of candidates.
+      ans: Position of answer.
+      old_p: False-positive probability for old candidates.
+      new_p: True-positive probability for new candidates.
+      observation: Test results observed by users.
+      confidence: Required confidence.
+      cost_func: cost function.
+
+    Returns:
+      prior_observation: prior_observation after the initial verification stage.
+    """
+    if cost_func is None:
+      cost_func = lambda *a: None
+    rev_info = [core.RevInfo(str(i)) for i in range(size)]
+    bsearch = strategy.NoisyBinarySearch(
+        rev_info,
+        confidence=confidence,
+        observation=observation,
+        verify_confidence=1.0,
+        endpoint_verification=endpoint_verification,
+        init_range_verified=False)
+    prev_idx = None
+    while bsearch.state == bsearch.INITED:
+      cost_table = cost_func(prev_idx)
+      idx = bsearch.next_idx(cost_table)
+      if self.random_list.get_random_num() < (old_p if idx < ans else new_p):
+        result = 'new'
+      else:
+        result = 'old'
+      bsearch.renew_initial_count(result, idx)
+
+      bsearch.add_sample(idx, result)
+      prev_idx = idx
+    return bsearch.observation
 
   def test_classic_search(self):
     # Settings for non-noisy case.
@@ -635,6 +673,32 @@ class TestNoisyBinarySearch(unittest.TestCase):
     for _ in range(10):
       bsearch.add_sample(0, 'value', values=[17.0], eval_time=100)
       self.assertEqual(bsearch.next_idx(), 0)
+
+  def test_pass_noise_rate(self):
+    """Tests whether noise rate was passed to the noisy binary search."""
+    # With endpoint_verification, prior_observation will be appointed by the results of statistical tests.
+    observation = self.perform_search_for_noise_rate(
+        1000,
+        42,
+        0.3,
+        0.7,
+        'old=1/10,new=9/10',
+        0.999,
+        endpoint_verification=True)
+    self.assertEqual(observation[0], (7, 25))
+    self.assertEqual(observation[1], (20, 25))
+
+    # Without endpoint_verification, prior_observation will be appointed by users.
+    observation = self.perform_search_for_noise_rate(
+        1000,
+        42,
+        0.3,
+        0.7,
+        'old=1/10,new=9/10',
+        0.999,
+        endpoint_verification=False)
+    self.assertEqual(observation[0], (1, 11))
+    self.assertEqual(observation[1], (10, 11))
 
 
 if __name__ == '__main__':

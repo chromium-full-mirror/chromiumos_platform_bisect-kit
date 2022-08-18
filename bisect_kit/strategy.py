@@ -291,6 +291,10 @@ class NoisyBinarySearch:
     self.count_revnew_old = 0
     self.count_revnew_new = 0
 
+    # passed_noise_rate denotes whether the noise rate calculated during the
+    # initial range verification stage has been passed to noisy binary search.
+    self.passed_noise_rate = False
+
   def is_noisy(self):
     """Is noisy case?"""
     if self.oracle and self.oracle != (0, 1):
@@ -486,8 +490,13 @@ class NoisyBinarySearch:
     repeat until it is stable.
     """
     assert self.prior_observation
-
-    (left_new, left_trial), (right_new, right_trial) = self.prior_observation
+    # TODO: endpoint verification for perf metrics has not been implemented yet.
+    # When endpoint_verification is enabled, 'observation' will be calculated
+    # based on the results of statistical methods, not user input.
+    if self.endpoint_verification and not self.is_value_bisection():
+      (left_new, left_trial), (right_new, right_trial) = ((0, 0), (0, 0))
+    else:
+      (left_new, left_trial), (right_new, right_trial) = self.prior_observation
 
     seen = set()
     while True:
@@ -507,6 +516,19 @@ class NoisyBinarySearch:
       self.observation = (left_new, left_trial), (right_new, right_trial)
       self.old_p, self.new_p = self._observation_to_prob(
           left_new, left_trial, right_new, right_trial)
+
+      if (not self.passed_noise_rate and self.endpoint_verification and
+          not self.is_value_bisection()):
+        logger.info(
+            'Failure rate is recalculated: old=%d/%d (%f%%), new=%d/%d (%f%%)',
+            self.observation[0][0],
+            self.observation[0][1],
+            self.old_p,
+            self.observation[1][0],
+            self.observation[1][1],
+            self.new_p,
+        )
+        self.passed_noise_rate = True
 
       if (self.old_p, self.new_p) in seen:
         break
