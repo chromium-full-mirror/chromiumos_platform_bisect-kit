@@ -40,6 +40,9 @@ class TestCrUtil(unittest.TestCase):
   def test_extract_branch_from_version(self):
     self.assertEqual(cr_util.extract_branch_from_version('59.0.3064.0'), '3064')
 
+  def test_extract_milestone_from_version(self):
+    self.assertEqual(cr_util.extract_milestone_from_version('59.0.3064.0'), '59')
+
   def test_query_commit_position(self):
     chrome_src = 'dummy'
     git_rev = '0000111122223333'

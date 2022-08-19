@@ -110,6 +110,16 @@ def extract_branch_from_version(rev):
   """
   return rev.split('.')[2]
 
+def extract_milestone_from_version(rev: str) -> str:
+  """Extracts milestone from version string
+
+  Args:
+    rev: chrome version string
+
+  Returns:
+    milestone (str). For example, return '59' for '59.0.3064.0'.
+  """
+  return rev.split('.')[0]
 
 def argtype_chrome_version(s):
   if not is_chrome_version(s):

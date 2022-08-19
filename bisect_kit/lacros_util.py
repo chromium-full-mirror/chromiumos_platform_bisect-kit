@@ -1,0 +1,287 @@
+# -*- coding: utf-8 -*-
+# Copyright 2022 The ChromiumOS Authors.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import logging
+import multiprocessing
+import os
+import shutil
+import subprocess
+import tempfile
+
+from bisect_kit import cr_util
+from bisect_kit import cros_util
+from bisect_kit import errors
+from bisect_kit import util
+
+logger = logging.getLogger(__name__)
+
+LACROS_ZIP_PATH = 'gs://chrome-unsigned/desktop-5c0tCh/{version}/{lacros_folder_name}/lacros.zip'
+LACROS_FILENAME = 'lacros.zip'
+BOARD_ARCHITECTURES = {
+    'x64': {
+        'name': 'x86_64',
+        'lacros_dir': 'lacros64',
+    },
+    'arm': {
+        'name': 'aarch64',
+        'lacros_dir': 'lacros-arm32',
+    }
+}
+DEFAULT_CHROMEOS_ROOT = os.path.expanduser('~/chromiumos')
+DEPLOY_CHROME_PATH = 'chromite/bin/deploy_chrome'
+
+
+def get_lacros_gs_path_list(
+    old_milestone: int = 88,
+    new_milestone: int = 150,
+    lacros_folder_name: str = BOARD_ARCHITECTURES['x64']['lacros_dir']
+) -> list[str]:
+  """Get all the lacros gs paths from bucket between 2 milestones.
+
+  For every milestone the gsutill is called in a seperate worker process.
+  Without mutli process the query takes around 8 minutes for 88 to 106 milestones.
+  With multi process it takes less than 20 seconds.
+  Example query for one worker process:
+  `gsutil ls gs://chrome-unsigned/desktop-5c0tCh/100.**/lacros64/lacros.zip`
+  Usually if lacros64 is available, lacros-arm32 is also available.
+
+  Args:
+    old_milestone: Old milestone of chrome version.
+    new_milestone: New milestone of chrome version.
+    lacros_folder_name: either 'lacros-64' or 'lacros-arm32' depending on DUT architecture
+
+  Returns:
+    A list of gs path
+  """
+  version_prefixes = []
+  for milestone in range(old_milestone, new_milestone + 1):
+    version_prefixes.append('%d.**' % milestone)
+
+  with multiprocessing.Pool() as pool:
+    async_results = []
+    for version_prefix in version_prefixes:
+      lacros_zip_path = LACROS_ZIP_PATH.format(
+          version=version_prefix, lacros_folder_name=lacros_folder_name)
+      async_results.append(
+          pool.apply_async(cros_util.gsutil_ls, [lacros_zip_path],
+                           {'ignore_errors': True}))
+
+    result = []
+    for async_result in async_results:
+      for lacros_zip_path in async_result.get():
+        result.append(lacros_zip_path)
+    return result
+
+
+def get_lacros_prebuilt_versions_between(old_version: str, new_version: str,
+                                         lacros_folder_name: str) -> list[str]:
+  """Returns a list of lacros prebuilt versions between old and new version (included).
+
+  Args:
+    old_version: Old lacros version
+    new_version: New lacros version
+    lacros_folder_name: either 'lacros-64' or 'lacros-arm32' depending on DUT architecture
+
+  Returns:
+    A list of lacros versions. (list[str]).
+  """
+
+  assert lacros_folder_name in [
+      x['lacros_dir'] for x in BOARD_ARCHITECTURES.values()
+  ]
+  lacros_versions = []
+  old_milestone = int(cr_util.extract_milestone_from_version(old_version))
+  new_milestone = int(cr_util.extract_milestone_from_version(new_version))
+
+  lacros_gs_path_list = get_lacros_gs_path_list(old_milestone, new_milestone,
+                                                lacros_folder_name)
+
+  for gs_path in lacros_gs_path_list:
+    seperated_gs_path = gs_path.split('/')
+    if len(seperated_gs_path) < 3:
+      continue
+    lacros_version = seperated_gs_path[-3]
+    assert cr_util.is_chrome_version(lacros_version)
+    if lacros_versions != new_version and not cr_util.is_direct_relative_version(
+        lacros_version, new_version):
+      continue
+    if not (cr_util.is_version_lesseq(old_version, lacros_version) and
+            cr_util.is_version_lesseq(lacros_version, new_version)):
+      continue
+    lacros_versions.append(lacros_version)
+  lacros_versions.sort(key=util.version_key_func)
+  return lacros_versions
+
+
+def is_prebuilt_path_available(lacros_bucket_url: str) -> bool:
+  """Check if a lacros prebuilt image is available
+
+  Args:
+    lacros_bucket_url: lacros prebuilt image bucket url
+
+  Retunrs:
+    True if the lacros version is available to fetch.
+    False if not available to fetch.
+  """
+  gsutil_ls_result = cros_util.gsutil_ls(lacros_bucket_url, ignore_errors=True)
+  return len(gsutil_ls_result) == 1 and gsutil_ls_result[0] == lacros_bucket_url
+
+
+def is_prebuilt_version_available(lacros_version: str, dut_ip: str) -> bool:
+  """Check if a lacros version is available to fetch for a specific dut
+
+  Args:
+    lacros_version: lacros prebuilt version to fetch
+    dut_ip: IP of the DUT
+
+  Retunrs:
+    True if the lacros version is available to fetch.
+    False if not available to fetch.
+  """
+  lacros_folder_name = get_lacross_folder_name(dut_ip)
+  lacros_bucket_url = LACROS_ZIP_PATH.format(
+      version=lacros_version, lacros_folder_name=lacros_folder_name)
+  return is_prebuilt_path_available(lacros_bucket_url)
+
+
+def get_dut_cpu_architecture(dut_ip: str) -> str:
+  """We can ssh into the dut and run 'uname -m' to get the architecture of the dut.
+
+  Args:
+    dut_ip: IP of a DUT
+
+  Returns:
+    The Cpu architecture ['x86_64','aarch64']
+  """
+  try:
+    # TODO(njrafi): Update if any dut architecture is wrong for this command
+    dut_architecture = util.ssh_cmd(dut_ip, "uname", "-m")
+    # There is a extra newline in the output
+    dut_architecture = dut_architecture.splitlines()[0]
+    logger.info("DUT CPU architecture: %s", dut_architecture)
+    return dut_architecture
+  except subprocess.CalledProcessError:
+    logger.error("Get DUT architecture failed")
+    raise
+
+
+def get_lacross_folder_name(dut_ip: str) -> str:
+  """To get a lacros prebuilt we need to determine the folder name in the GS bucket.
+
+  Currently there are 2 folder names: 'lacros-64' and 'lacros-arm32' depending on architecture.
+
+  Args:
+    dut_ip: IP of a DUT
+
+  Returns:
+    the appropriate folder name
+  """
+
+  dut_architecture = get_dut_cpu_architecture(dut_ip)
+
+  for architecture_info in BOARD_ARCHITECTURES.values():
+    if dut_architecture == architecture_info['name']:
+      return architecture_info['lacros_dir']
+
+  raise errors.InternalError('Unknown board architecture %s' % dut_architecture)
+
+
+def fetch_lacros_prebuilt(lacros_version: str, dut_ip: str) -> str:
+  """Fetch and unzip a specific lacros version.
+
+  Args:
+    lacros_version: lacros prebuilt version to fetch
+    dut_ip: IP of the DUT
+
+  Returns:
+    A temp directory where the lacros prebuilt file is unzipped
+  """
+
+  try:
+    lacros_folder_name = get_lacross_folder_name(dut_ip)
+    lacros_bucket_url = LACROS_ZIP_PATH.format(
+        version=lacros_version, lacros_folder_name=lacros_folder_name)
+    assert is_prebuilt_path_available(lacros_bucket_url)
+
+    # Creates a temp directory with a prefix bisect_tmp
+    temp_dir = tempfile.mkdtemp(prefix='bisect_tmp')
+    logger.debug("Temp directory for lacros prebuilt: %s", temp_dir)
+
+    # Downloading lacros.zip to the temp directory
+
+    cros_util.gsutil("cp", lacros_bucket_url, temp_dir)
+
+    # unzip lacros.zip
+    logger.debug('fetch and unpack lacros.zip to %s', temp_dir)
+    lacros_zip_path = os.path.join(temp_dir, LACROS_FILENAME)
+    util.check_call('unzip', lacros_zip_path, cwd=temp_dir)
+
+    return temp_dir
+  except:
+    logger.error("Fetch lacros prebuilt failed")
+    raise
+
+
+def deploy_lacros_to_dut(lacros_build_dir: str, dut_ip: str,
+                         chromeos_root: str) -> int:
+  """Deploy a lacros build to a DUT
+
+  Args:
+    lacros_build_dir: Lacros build directory
+    dut_ip: IP of the DUT
+    chromeos_root: ChromeOS source root directory
+
+  Returns:
+    0 for successful deployment. Raises exception for failures.
+  """
+  try:
+    deploy_chrome_script_path = os.path.join(chromeos_root, DEPLOY_CHROME_PATH)
+
+    assert os.path.exists(deploy_chrome_script_path)
+
+    lacros_deploy_command = [
+        deploy_chrome_script_path,
+        '--build-dir=%s' % lacros_build_dir,
+        '--device=%s' % dut_ip, '--nostrip', '--lacros', '--reset-lacros',
+        '--force'
+    ]
+    logger.debug('Lacros deploy command:')
+    logger.debug(' '.join(lacros_deploy_command))
+    util.check_output(*lacros_deploy_command)
+    return 0
+
+  except:
+    logger.error('Lacros deploy failed')
+    raise
+
+
+def fetch_and_deploy_lacros_prebuilt_to_dut(lacros_version: str,
+                                            dut_ip: str,
+                                            chromeos_root=DEFAULT_CHROMEOS_ROOT
+                                           ) -> int:
+  """Fetch and deploy a specific lacros prebuilt version to a DUT.
+
+  Args:
+    lacros_version: lacros prebuilt version to fetch
+    dut_ip: IP of the DUT
+    chromeos_root: ChromeOS source root directory
+
+  Returns:
+    0 for successful deployment. Raises exception for failures.
+  """
+  assert cr_util.is_chrome_version(lacros_version)
+  try:
+    lacros_prebuilt_directory = fetch_lacros_prebuilt(lacros_version, dut_ip)
+
+    deploy_lacros_to_dut(lacros_prebuilt_directory, dut_ip, chromeos_root)
+
+    return 0
+  except:
+    logger.error('Lacros prebuilt deploy failed')
+    raise
+  finally:
+    logger.debug('clean up lacros prebuilt directory %s',
+                 lacros_prebuilt_directory)
+    shutil.rmtree(lacros_prebuilt_directory, True)
