@@ -5,7 +5,6 @@
 """Buildbucket api utility.
 """
 
-from distutils.spawn import find_executable
 import http.client
 import json
 import logging
@@ -85,7 +84,7 @@ class BuildbucketApi:
         'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
     self.default_service_account_client_id = self._get_client_id(
         self.default_service_account_json)
-    if not find_executable('luci-auth'):
+    if shutil.which('luci-auth') is None:
       raise errors.InternalError('luci-auth not found')
 
   def _get_client_id(self, json_file):

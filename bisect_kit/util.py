@@ -91,12 +91,12 @@ class Popen:
 
     self.stdout_thread = threading.Thread(
         target=self._reader_thread, args=('stdout', self.p.stdout))
-    self.stdout_thread.setDaemon(True)
+    self.stdout_thread.daemon = True
     self.stdout_thread.start()
 
     self.stderr_thread = threading.Thread(
         target=self._reader_thread, args=('stderr', self.p.stderr))
-    self.stderr_thread.setDaemon(True)
+    self.stderr_thread.daemon = True
     self.stderr_thread.start()
 
   @property
