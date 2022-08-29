@@ -112,6 +112,13 @@ def prepare_to_run_test(opts):
         opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo)
 
 
+def to_forwarded_host(host: str) -> tuple[str, str]:
+  # Returns (dut address in chroot, dut address needs to be forwarded)
+  if cros_lab_util.is_dut_needs_forwarded(host):
+    return cros_util.FORWARDED_DUT_HOST, host
+  return host, ''
+
+
 def tast_cmd(opts, cmd, *args):
   flags = []
   if opts.prebuilt:
@@ -139,11 +146,13 @@ def tast_cmd(opts, cmd, *args):
 
 
 def get_tast_bundle_info(opts, pattern=None):
+  dut, forward_host = to_forwarded_host(opts.dut)
+
   bundles = ['cros']
   if opts.with_private_bundles:
     bundles.append('crosint')
 
-  args = [opts.dut]
+  args = [dut]
   if pattern:
     args.append(pattern)
 
@@ -151,7 +160,8 @@ def get_tast_bundle_info(opts, pattern=None):
   for bundle in bundles:
     cmd = tast_cmd(opts, 'list', '-json', '-buildbundle=' + bundle, *args)
     try:
-      json_text = cros_util.cros_sdk(opts.chromeos_root, *cmd, log_stdout=False)
+      json_text = cros_util.cros_sdk(
+          opts.chromeos_root, *cmd, log_stdout=False, forward_host=forward_host)
     except subprocess.CalledProcessError as e:
       raise errors.ExternalError(
           'failed to get tast bundle info, assume it is temporary: %s' % e)
@@ -185,8 +195,10 @@ def run_test(opts, bundle):
   flags = ['-resultsdir', results_dir]
   if opts.tast_build:
     flags.append('-buildbundle=' + bundle)
-  cmd = tast_cmd(opts, 'run', *flags, opts.dut, opts.test_name)
-  cros_util.cros_sdk(opts.chromeos_root, *cmd)
+
+  dut, forward_host = to_forwarded_host(opts.dut)
+  cmd = tast_cmd(opts, 'run', *flags, dut, opts.test_name)
+  cros_util.cros_sdk(opts.chromeos_root, *cmd, forward_host=forward_host)
 
   return results_dir_output_chroot
 

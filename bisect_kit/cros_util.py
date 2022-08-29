@@ -121,6 +121,8 @@ VERSION_KEY_CR_VERSION = 'cr_version'
 VERSION_KEY_ANDROID_BUILD_ID = 'android_build_id'
 VERSION_KEY_ANDROID_BRANCH = 'android_branch'
 CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
+FORWARDED_DUT_HOST = 'localhost'
+FORWARDED_DUT_PORT = 2222
 
 autotest_shadow_config = """
 # This file is created by src/platform/bisect-kit/bisect_kit/cros_util.py
@@ -1547,7 +1549,8 @@ def cros_sdk(chromeos_root,
              log_stdout=True,
              stdin=None,
              stderr_callback=None,
-             goma_dir=None):
+             goma_dir=None,
+             forward_host=''):
   """Run commands inside chromeos chroot.
 
   Args:
@@ -1559,6 +1562,8 @@ def cros_sdk(chromeos_root,
     stdin: standard input file handle for the command
     stderr_callback: Callback function for stderr. Called once per line.
     goma_dir: Goma installed directory to mount into the chroot
+    forward_host: forward the host to localhost:2222, leave empty if no need to
+      forward.
   """
   envs = []
   if env:
@@ -1590,12 +1595,21 @@ def cros_sdk(chromeos_root,
     raise
 
   cmd = prefix + list(args)
-  return util.check_output(
-      *cmd,
-      cwd=chromeos_root,
-      log_stdout=log_stdout,
-      stdin=stdin,
-      stderr_callback=stderr_callback)
+  if forward_host:
+    with util.forward_ssh(forward_host, FORWARDED_DUT_PORT):
+      return util.check_output(
+          *cmd,
+          cwd=chromeos_root,
+          log_stdout=log_stdout,
+          stdin=stdin,
+          stderr_callback=stderr_callback)
+  else:
+    return util.check_output(
+        *cmd,
+        cwd=chromeos_root,
+        log_stdout=log_stdout,
+        stdin=stdin,
+        stderr_callback=stderr_callback)
 
 
 def create_chroot(chromeos_root):

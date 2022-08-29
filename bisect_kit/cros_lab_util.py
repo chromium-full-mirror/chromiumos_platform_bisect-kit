@@ -66,10 +66,24 @@ def normalize_sku_name(sku):
   return re.sub(r'\d+GB$', lambda m: m.group().upper(), sku, flags=re.I)
 
 
-def is_lab_dut(dut):
+def is_dut_needs_forwarded(dut: str) -> bool:
+  """Returns if the DUT needs to be forwarded in the chroot.
+
+  Args:
+    dut: dut host.
+
+  Returns:
+    True if the dut needs to be forwarded.
+  """
   for r in LAB_DUT_EXCEPTIONS:
     if re.match(r, dut):
       return True
+  return False
+
+
+def is_lab_dut(dut):
+  if is_dut_needs_forwarded(dut):
+    return True
   return dut.endswith('.cros')
 
 
@@ -79,10 +93,8 @@ def dut_host_name(dut):
   Args:
     dut: DUT address; assume the address is returned from this module
   """
-  for r in LAB_DUT_EXCEPTIONS:
-    if re.match(r, dut):
-      return dut
-
+  if is_dut_needs_forwarded(dut):
+    return dut
   assert dut.endswith('.cros')
   return dut[:-5]
 
@@ -94,9 +106,8 @@ def dut_name_to_address(dut_name):
     dut_name: DUT name, which is the host name in the lab
   """
   assert '.' not in dut_name
-  for r in LAB_DUT_EXCEPTIONS:
-    if re.match(r, dut_name):
-      return dut_name
+  if is_dut_needs_forwarded(dut_name):
+    return dut_name
   return dut_name + '.cros'
 
 

@@ -6,10 +6,13 @@
 
 from __future__ import annotations
 from __future__ import print_function
+import contextlib
 import difflib
 import logging
+import os
 import queue
 import re
+import socket
 import subprocess
 import threading
 import time
@@ -466,3 +469,57 @@ def dict_get(element, *args):
       break
     element = element.get(arg)
   return element
+
+
+def wait_until(func: typing.Callable, timeout: float, period: float, *args,
+               **kwargs):
+  """Block until func(args, kwargs) becomes true or raise error.
+
+  Args:
+    func (typing.Callable): A callable function.
+    timeout (float): Timeout seconds.
+    period (float): Function call period, in seconds.
+  """
+  until = time.time() + timeout
+  while time.time() < until:
+    if func(*args, **kwargs):
+      return
+    time.sleep(period)
+  raise TimeoutExpired('wait_until failed')
+
+
+def is_port_in_use(port: int) -> bool:
+  """Check if some process is listening to localhost:port.
+
+  Args:
+    port: port number.
+
+  Returns:
+    True if some program is listening to the port.
+  """
+  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    return s.connect_ex(('localhost', port)) == 0
+
+
+@contextlib.contextmanager
+def forward_ssh(from_host: str, to_port: int):
+  """Foward from_host:22 to localhost:to_port.
+
+  Args:
+    from_host (str): DUT host.
+    to_port (int): port number.
+  """
+  assert not is_port_in_use(to_port)
+  try:
+    p = Popen([
+        'go', 'run',
+        os.path.expanduser(
+            '~/chromiumos/src/platform/dev/contrib/sshwatcher/sshwatcher.go'),
+        from_host,
+        str(to_port)
+    ])
+    wait_until(is_port_in_use, 60, 1, to_port)
+    yield
+  finally:
+    p.terminate()
+    assert not is_port_in_use(to_port)

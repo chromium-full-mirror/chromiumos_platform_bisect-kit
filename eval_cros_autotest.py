@@ -190,6 +190,11 @@ def run_test(opts) -> str:
   Returns:
     path of test result (outside chroot)
   """
+  if is_cts(opts) and cros_lab_util.is_dut_needs_forwarded(opts.dut):
+    dut, forward_host = '%s:%d' % (cros_util.FORWARDED_DUT_HOST,
+                                   cros_util.FORWARDED_DUT_PORT), opts.dut
+  else:
+    dut, forward_host = opts.dut, ''
   prebuilt_autotest_dir = os.path.join(cros_util.chromeos_root_inside_chroot,
                                        cros_util.prebuilt_autotest_dir)
   # Set results dir inside source tree, so it's easier to access them outside
@@ -202,7 +207,7 @@ def run_test(opts) -> str:
   else:
     test_that_bin = '/usr/bin/test_that'
   cmd = [
-      test_that_bin, opts.dut, opts.test_name, '--debug', '--results_dir',
+      test_that_bin, dut, opts.test_name, '--debug', '--results_dir',
       results_dir
   ]
   if opts.prebuilt:
@@ -220,7 +225,10 @@ def run_test(opts) -> str:
 
   try:
     output = cros_util.cros_sdk(
-        opts.chromeos_root, *cmd, chrome_root=opts.chrome_root)
+        opts.chromeos_root,
+        *cmd,
+        chrome_root=opts.chrome_root,
+        forward_host=forward_host)
   except subprocess.CalledProcessError as e:
     if e.output is None:
       raise errors.ExternalError('cros_sdk failed before test started')
@@ -355,6 +363,11 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
   return core.StepResult('new', reason)
 
 
+def is_cts(opts) -> bool:
+  return (opts.cts_revision or opts.cts_abi or opts.cts_prefix or
+          opts.cts_module or opts.cts_test or opts.cts_timeout)
+
+
 def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
   common.init()
   parser = create_argument_parser()
@@ -365,10 +378,7 @@ def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
     raise errors.BrokenDutException('%r is not a valid DUT address' % opts.dut)
   dut_os_version = cros_util.query_dut_short_version(opts.dut)
 
-  is_cts = (
-      opts.cts_revision or opts.cts_abi or opts.cts_prefix or opts.cts_module or
-      opts.cts_test or opts.cts_timeout)
-  if is_cts:
+  if is_cts(opts):
     if opts.test_name or opts.metric or opts.args:
       raise errors.ArgumentError(
           None,
