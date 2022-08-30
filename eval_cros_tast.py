@@ -292,6 +292,7 @@ def step_main(args: 'typing.Optional[tuple[str]]') -> core.StepResult:
   # Remove the "tast." prefix prepended by autotest.
   opts.test_name = re.sub(r'^tast\.', '', opts.test_name)
 
+  cros_util.prepare_chroot(opts.chromeos_root)
   tast_bundle_info = get_tast_bundle_info(opts, opts.test_name)
   if not tast_bundle_info:
     tast_bundle_info = get_tast_bundle_info(opts)

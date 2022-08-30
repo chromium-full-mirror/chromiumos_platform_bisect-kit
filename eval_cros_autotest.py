@@ -162,6 +162,7 @@ def prepare_to_run_test(opts):
   else:
     autotest_dir = os.path.join(opts.chromeos_root,
                                 cros_util.in_tree_autotest_dir)
+  cros_util.prepare_chroot(opts.chromeos_root)
   cros_util.override_autotest_config(autotest_dir)
   sox_path = os.path.join(opts.chromeos_root, 'chroot/usr/bin/sox')
   if not os.path.exists(sox_path):
