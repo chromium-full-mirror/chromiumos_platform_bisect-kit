@@ -534,6 +534,8 @@ def cmd_new(opts):
 
   chromeos_template = template_factory.get_chromeos_tree()
   if (prepare_all and os.path.exists(chromeos_template)) or opts.chromeos:
+    # Add mount config again if it's missing.
+    add_local_mount(chromeos_template)
     logger.info('prepare tree for chromeos, %s',
                 path_factory.get_chromeos_tree())
     snapshot_or_copytree(chromeos_template, path_factory.get_chromeos_tree())
