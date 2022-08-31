@@ -257,7 +257,8 @@ class CrosDiagnoser:
           term_old=self.config['term_old'],
           term_new=self.config['term_new'],
           recompute_init_values=self.config['recompute_init_values'],
-          noisy=self.noisy)
+          noisy=self.noisy,
+          endpoint_verification=self.config['endpoint_verification'])
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
 
@@ -274,9 +275,15 @@ class CrosDiagnoser:
       self.new_info = {'cr_version': self.config['chrome_localbuild_new']}
     elif self.config['bisect_android']:
       base_cros_info = cros_util.version_info(self.config['board'],
-                                             self.config['base_cros_version'])
-      self.old_info = {'android_build_id': self.config['android_prebuilt_old'], 'android_branch': base_cros_info['android_branch']}
-      self.new_info = {'android_build_id': self.config['android_prebuilt_new'], 'android_branch': base_cros_info['android_branch']}
+                                              self.config['base_cros_version'])
+      self.old_info = {
+          'android_build_id': self.config['android_prebuilt_old'],
+          'android_branch': base_cros_info['android_branch']
+      }
+      self.new_info = {
+          'android_build_id': self.config['android_prebuilt_new'],
+          'android_branch': base_cros_info['android_branch']
+      }
     else:
       self.old_info = cros_util.version_info(self.config['board'],
                                              self.cros_old)
@@ -407,7 +414,8 @@ class CrosDiagnoser:
             term_old=self.config['term_old'],
             term_new=self.config['term_new'],
             recompute_init_values=self.config['recompute_init_values'],
-            noisy=self.noisy)
+            noisy=self.noisy,
+            endpoint_verification=self.config['endpoint_verification'])
         if extra_switch_cmd:
           bisector.append_switch_command(extra_switch_cmd)
 
@@ -475,7 +483,8 @@ class CrosDiagnoser:
           term_old=self.config['term_old'],
           term_new=self.config['term_new'],
           recompute_init_values=self.config['recompute_init_values'],
-          noisy=self.noisy)
+          noisy=self.noisy,
+          endpoint_verification=self.config['endpoint_verification'])
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
 
@@ -521,7 +530,8 @@ class CrosDiagnoser:
 
     if self.config['bisect_android']:
       self.make_decision(
-          'The bisection with Chrome local build is bypassed since --bisect_android is on')
+          'The bisection with Chrome local build is bypassed since --bisect_android is on'
+      )
       return False
 
     if self.old_info['cr_version'] == self.new_info['cr_version']:
@@ -588,7 +598,8 @@ class CrosDiagnoser:
           term_old=self.config['term_old'],
           term_new=self.config['term_new'],
           recompute_init_values=self.config['recompute_init_values'],
-          noisy=self.noisy)
+          noisy=self.noisy,
+          endpoint_verification=self.config['endpoint_verification'])
       if extra_switch_cmd:
         bisector.append_switch_command(extra_switch_cmd)
 
@@ -662,7 +673,8 @@ class CrosDiagnoser:
         term_old=self.config['term_old'],
         term_new=self.config['term_new'],
         recompute_init_values=self.config['recompute_init_values'],
-        noisy=self.noisy)
+        noisy=self.noisy,
+        endpoint_verification=self.config['endpoint_verification'])
     if extra_switch_cmd:
       bisector.append_switch_command(extra_switch_cmd)
 
@@ -845,7 +857,7 @@ class DiagnoseCommandLineBase:
 
     if opts.bisect_chrome and opts.bisect_android:
       self.argument_parser.error(
-            '--bisect_chrome and --bisect_android are not allowed together')
+          '--bisect_chrome and --bisect_android are not allowed together')
     elif opts.bisect_chrome:
       opts.base_cros_version = self.check_cros_image_exists(
           '--base_cros_version', opts.board, opts.base_cros_version)
@@ -974,6 +986,7 @@ class DiagnoseCommandLineBase:
         disable_buildbucket_chromeos=opts.disable_buildbucket_chromeos,
         enable_buildbucket_chrome=opts.enable_buildbucket_chrome,
         extra_test_variables=opts.extra_test_variables,
+        endpoint_verification=opts.endpoint_verification,
     )
 
     self.states.init(config)
@@ -1173,7 +1186,9 @@ class DiagnoseCommandLineBase:
     group.add_argument(
         '--bisect_chrome', action='store_true', help='Bisect a chrome version')
     group.add_argument(
-        '--bisect_android', action='store_true', help='Bisect an android version')
+        '--bisect_android',
+        action='store_true',
+        help='Bisect an android version')
     group.add_argument(
         '--base_cros_version',
         type=cros_util.argtype_cros_version,
@@ -1199,6 +1214,10 @@ class DiagnoseCommandLineBase:
         help='Extra variables passed to `test_that --args` or `tast -var`',
         action='append',
         default=[])
+    group.add_argument(
+        '--endpoint_verification',
+        action='store_true',
+        help='Enable statistical method to verify endpoints')
     parser_init.set_defaults(func=self.cmd_init)
 
     parser_run = subparsers.add_parser(

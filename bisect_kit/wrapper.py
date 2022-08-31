@@ -62,7 +62,8 @@ class BisectorWrapper:
                         term_old=None,
                         term_new=None,
                         recompute_init_values=False,
-                        noisy=None):
+                        noisy=None,
+                        endpoint_verification=False):
     status = self.current_status()
     if not status['inited']:
       common_init_args = ['--old', old, '--new', new]
@@ -78,6 +79,8 @@ class BisectorWrapper:
         common_init_args += ['--new_value', str(new_value)]
       if recompute_init_values:
         common_init_args.append('--recompute_init_values')
+      if endpoint_verification:
+        common_init_args.append('--endpoint_verification')
       # Note that, if 'init' failed, no session file for this bisector is
       # created. In other words, the error event is only recorded in
       # diagnoser's log.
