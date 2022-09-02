@@ -30,12 +30,7 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 AUTOTEST_SERVER_TARBALL = 'autotest_server_package.tar.bz2'
-GS_BUILD_PATH = 'gs://chromeos-image-archive/{board}-release/{full_version}'
-GS_AUTOTEST_SERVER_PATH = GS_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL
-
 GS_BUILDBUCKET_BUILD_PATH = 'gs://chromeos-image-archive/{path}'
-GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH = (
-    GS_BUILDBUCKET_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL)
 
 
 def create_argument_parser():
@@ -78,14 +73,12 @@ def switch(opts, board, version, dut):
   logger.info('Unpack autotest packages for %s %s', board, version)
   if cros_util.is_cros_short_version(version) or cros_util.is_cros_full_version(
       version):
-    full_version = cros_util.version_to_full(board, version)
-    autotest_server_path = GS_AUTOTEST_SERVER_PATH.format(
-        board=board, full_version=full_version)
+    gs_build_path = cros_util.query_prebuilt_gs_path(board, version)
   else:
     gs_path = cros_util.query_dut_lsb_release(dut).get(
         'CHROMEOS_RELEASE_BUILDER_PATH')
-    autotest_server_path = GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH.format(
-        path=gs_path)
+    gs_build_path = GS_BUILDBUCKET_BUILD_PATH.format(path=gs_path)
+  autotest_server_path = f'{gs_build_path}/{AUTOTEST_SERVER_TARBALL}'
 
   logger.info('autotest_server_path %s', autotest_server_path)
 

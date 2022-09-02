@@ -19,7 +19,6 @@ from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import errors
-from bisect_kit import util
 import setup_cros_bisect
 
 logger = logging.getLogger(__name__)
@@ -97,7 +96,11 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                                                  self.config, dut)
 
         cros_prebuilt_extra_switch_cmd = common_switch_cmd
-        cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
+        # So far only the `release` images support the `--prebuilt` option
+        if cros_util.has_release_prebuilt(self.config['board'], self.config['old']):
+          cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
+        else:
+          cros_prebuilt_eval_cmd = common_eval_cmd + ['--tast_build']
         android_prebuilt_eval_cmd = common_eval_cmd
         if self.config['chrome_deploy_image']:
           chrome_localbuild_eval_cmd = common_eval_cmd + ['--tast_build']
