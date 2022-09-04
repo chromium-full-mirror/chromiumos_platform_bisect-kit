@@ -51,9 +51,14 @@ from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
-re_chromeos_full_version = r'^R\d+-\d+\.\d+\.\d+$'
-re_chromeos_short_version = r'^\d+\.\d+\.\d+$'
-re_chromeos_snapshot_version = r'^R\d+-\d+\.\d+\.\d+-\d+$'
+RE_NZ_NUM = r'(0|[1-9][0-9]*)'  # non-zero leading number
+RE_CROS_SHORT_VERSION = rf'{RE_NZ_NUM}\.{RE_NZ_NUM}\.{RE_NZ_NUM}'
+RE_CROS_FULL_VERSION = rf'R{RE_NZ_NUM}-{RE_CROS_SHORT_VERSION}'
+RE_CROS_SNAPSHOT_VERSION = rf'{RE_CROS_FULL_VERSION}-{RE_NZ_NUM}'
+
+PATTERN_CROS_SHORT_VERSION = re.compile(rf'^{RE_CROS_SHORT_VERSION}$')
+PATTERN_CROS_FULL_VERSION = re.compile(rf'^{RE_CROS_FULL_VERSION}$')
+PATTERN_CROS_SNAPSHOT_VERSION = re.compile(rf'^{RE_CROS_SNAPSHOT_VERSION}$')
 
 gs_archive_base = 'gs://chromeos-image-archive/'
 gs_archive_path = 'gs://chromeos-image-archive/{board}-{bucket}/{version}'
@@ -326,30 +331,30 @@ class SnapshotStore:
     return cls.parse_snapshot_path(path)
 
 
-def is_cros_short_version(s):
-  """Determines if `s` is chromeos short version.
+def is_cros_short_version(version: str) -> bool:
+  """Determines if `version` is chromeos short version.
 
   This function doesn't accept version number of local build.
   """
-  return bool(re.match(re_chromeos_short_version, s))
+  return bool(PATTERN_CROS_SHORT_VERSION.match(version))
 
 
-def is_cros_full_version(s):
-  """Determines if `s` is chromeos full version.
+def is_cros_full_version(version: str) -> bool:
+  """Determines if `version` is chromeos full version.
 
   This function doesn't accept version number of local build.
   """
-  return bool(re.match(re_chromeos_full_version, s))
+  return bool(PATTERN_CROS_FULL_VERSION.match(version))
 
 
-def is_cros_version(s):
-  """Determines if `s` is chromeos version (either short or full)"""
-  return is_cros_short_version(s) or is_cros_full_version(s)
+def is_cros_version(version: str) -> bool:
+  """Determines if `version` is chromeos version (either short or full)"""
+  return is_cros_short_version(version) or is_cros_full_version(version)
 
 
-def is_cros_snapshot_version(s):
-  """Determines if `s` is chromeos snapshot version"""
-  return bool(re.match(re_chromeos_snapshot_version, s))
+def is_cros_snapshot_version(version: str) -> bool:
+  """Determines if `version` is chromeos snapshot version"""
+  return bool(PATTERN_CROS_SNAPSHOT_VERSION.match(version))
 
 
 def is_cros_version_lesseq(ver1, ver2):
