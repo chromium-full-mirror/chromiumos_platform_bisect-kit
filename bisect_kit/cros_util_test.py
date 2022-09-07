@@ -533,8 +533,8 @@ class TestCrosUtil(unittest.TestCase):
     self.assertDictEqual(info, {'board': 'foo', 'bucket': 'release', 'version': 'R63-10001.0.0'})
     info = cros_util.extract_info_from_prebuilt_gs_path('gs://chromeos-image-archive/bar-factory/R71-10082.30.0/chromiumos_test_image.tar.xz')
     self.assertDictEqual(info, {'board': 'bar', 'bucket': 'factory', 'version': 'R71-10082.30.0'})
-
-    self.assertRaises(ValueError, cros_util.extract_info_from_prebuilt_gs_path, 'gs://chromeos-image-archive/bar-factory/R71-10082.30.0')
+    info = cros_util.extract_info_from_prebuilt_gs_path('gs://chromeos-image-archive/bar-factory/R71-10082.30.0')
+    self.assertDictEqual(info, {})
 
   def test_is_cros_version_lesseq(self):
     self.assertTrue(cros_util.is_cros_version_lesseq('R99-1.0.0', 'R99-1.0.0'))
