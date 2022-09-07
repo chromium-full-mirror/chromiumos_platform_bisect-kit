@@ -278,11 +278,11 @@ class CrosDiagnoser:
                                               self.config['base_cros_version'])
       self.old_info = {
           'android_build_id': self.config['android_prebuilt_old'],
-          'android_branch': base_cros_info['android_branch']
+          'android_branch': base_cros_info.get('android_branch')
       }
       self.new_info = {
           'android_build_id': self.config['android_prebuilt_new'],
-          'android_branch': base_cros_info['android_branch']
+          'android_branch': base_cros_info.get('android_branch')
       }
     else:
       self.old_info = cros_util.version_info(self.config['board'],
@@ -347,6 +347,12 @@ class CrosDiagnoser:
         new_info.get('android_build_id') is None):
       self.make_decision(
           'At least one version has no Android. skip Android bisect')
+      return False
+
+    if (old_info.get('android_branch') is None or
+        new_info.get('android_branch') is None):
+      self.make_decision('At least one chromeOS version has no Android branch '
+                         'information in the metadata. skip Android bisect')
       return False
 
     if old_info['android_build_id'] == new_info['android_build_id']:
