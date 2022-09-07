@@ -956,8 +956,11 @@ class CodeManager:
 
     # step 1, find all float and fixed specs in the given range.
     fixed_specs = self.spec_manager.collect_fixed_spec(old, new)
+    logger.debug('Found %d fixed specs', len(fixed_specs))
     assert fixed_specs
-    for spec in fixed_specs:
+    for idx, spec in enumerate(fixed_specs):
+      logger.debug('Fixed spec %d name:%s, timestamp: %d', idx, spec.name,
+                   spec.timestamp)
       self.spec_manager.parse_spec(spec)
 
     float_specs = self.spec_manager.collect_float_spec(old, new, fixed_specs)
@@ -965,7 +968,10 @@ class CodeManager:
     while float_specs[-1].timestamp > fixed_specs[-1].timestamp:
       float_specs.pop()
     assert float_specs
-    for spec in float_specs:
+    logger.debug('Found %d float specs', len(float_specs))
+    for idx,spec in enumerate(float_specs):
+      logger.debug('Float spec %d name:%s, timestamp: %d', idx, spec.name,
+                   spec.timestamp)
       self.spec_manager.parse_spec(spec)
 
     git_util.fast_lookup.optimize(
