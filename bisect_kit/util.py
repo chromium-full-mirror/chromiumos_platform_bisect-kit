@@ -44,13 +44,14 @@ class Popen:
     returncode: The child return code.
   """
 
-  def __init__(self,
-               args,
-               stdout_callback=None,
-               stderr_callback=None,
-               log_stdout=True,
-               binary=None,
-               **kwargs):
+  def __init__(
+      self,
+      args,
+      stdout_callback: typing.Callable | None = None,
+      stderr_callback: typing.Callable | None = None,
+      log_stdout : bool = True,
+      binary: bool = False,
+      **kwargs):
     """Initializes Popen.
 
     Args:
@@ -66,24 +67,21 @@ class Popen:
     if 'stderr' in kwargs:
       raise ValueError('stderr argument not allowed, it will be overridden.')
 
-    if binary:
+    self.binary_mode = binary
+    if self.binary_mode:
       assert not kwargs.get('encoding')
-      self.binary_mode = True
       self.encoding = None
       self.log_stdout = False
     else:
-      self.binary_mode = False
       self.encoding = kwargs.get('encoding', 'utf8')
       self.log_stdout = log_stdout
     kwargs['encoding'] = self.encoding
 
     self.stdout_callback = stdout_callback
     self.stderr_callback = stderr_callback
-    self.stdout_lines = []
-    self.stderr_lines = []
-    self.duration = -1
+    self.duration = -1.0
     self.start = time.time()
-    self.queue = queue.Queue(65536)
+    self.queue: queue.Queue = queue.Queue(65536)
     if isinstance(args, str):
       logger.debug('cwd=%s, run %r', kwargs.get('cwd'), args)
     else:
@@ -103,22 +101,22 @@ class Popen:
     self.stderr_thread.start()
 
   @property
-  def returncode(self):
+  def returncode(self) -> int:
     return self.p.returncode
 
-  def _reader_thread(self, where, child_file):
+  def _reader_thread(self, fd_name: str, fd: typing.IO) -> None:
     """Reader thread to help reading stdout and stderr.
 
     Args:
-      where: 'stdout' or 'stderr'.
-      child_file: file object which producing output.
+      fd_name: 'stdout' or 'stderr'.
+      fd: file object which producing output.
     """
-    for line in child_file:
-      self.queue.put((where, line))
-    self.queue.put((where, ''))
-    child_file.close()
+    for line in fd:
+      self.queue.put((fd_name, line))
+    self.queue.put((fd_name, ''))
+    fd.close()
 
-  def wait(self, timeout=None):
+  def wait(self, timeout: float | None = None) -> int:
     """Waits child process.
 
     Returns:
@@ -131,7 +129,7 @@ class Popen:
         try:
           remaining_time = timeout - (time.time() - t0)
           if remaining_time > 0:
-            where, line = self.queue.get(block=True, timeout=remaining_time)
+            fd_name, line = self.queue.get(block=True, timeout=remaining_time)
           else:
             # We follow queue.get's behavior to raise queue.Empty, so it's
             # always queue.Empty when time is up, no matter remaining_time is
@@ -143,25 +141,25 @@ class Popen:
           self.p.kill()
           raise TimeoutExpired from None
       else:
-        where, line = self.queue.get(block=True)
+        fd_name, line = self.queue.get(block=True)
       # line includes '\n', will be '' if EOF.
       if not line:
         ended += 1
         continue
-      if self.stdout_callback and where == 'stdout':
+      if self.stdout_callback and fd_name == 'stdout':
         self.stdout_callback(line)
-      if self.stderr_callback and where == 'stderr':
+      if self.stderr_callback and fd_name == 'stderr':
         self.stderr_callback(line)
-      if self.log_stdout or where == 'stderr':
+      if self.log_stdout or fd_name == 'stderr':
         if self.binary_mode:
           line = line.decode('utf8', errors='replace')
-        logger.debug('[%s] %s', where, line.rstrip('\n'))
+        logger.debug('[%s] %s', fd_name, line.rstrip('\n'))
     self.p.wait()
     self.duration = time.time() - self.start
     logger.debug('returncode %d', self.returncode)
     return self.returncode
 
-  def terminate(self):
+  def terminate(self) -> None:
     """Terminates child and descendant processes."""
     # Need to ignore failures because sometimes they are expected.
     # For example, the owner of child process is different to current and
@@ -182,7 +180,7 @@ class Popen:
       logger.warning('Unable to kill pid=%d; ignore', self.p.pid)
 
 
-def call(*args, timeout=None, **kwargs):
+def call(*args, timeout: float | None = None, **kwargs) -> int:
   """Run command.
 
   Modeled after subprocess.call.
@@ -194,7 +192,12 @@ def call(*args, timeout=None, **kwargs):
   return p.wait(timeout=timeout)
 
 
-def check_output(*args, timeout=None, retry=1, **kwargs):
+def _check_output(
+    *args,
+    timeout: float | None = None,
+    retry: int = 1,
+    stream_type: typing.Type[typing.AnyStr],
+    **kwargs) -> typing.AnyStr:
   """Runs command and return output.
 
   Modeled after subprocess.check_output.
@@ -206,31 +209,39 @@ def check_output(*args, timeout=None, retry=1, **kwargs):
     subprocess.CalledProcessError if the exit code is non-zero.
   """
 
-  def collect_stdout(line):
-    stdout_lines.append(line)
-
+  empty_string = stream_type()
+  binary = stream_type is bytes
   delay_duration = 1
-  while retry > 0:
-    retry -= 1
-    stdout_lines = []
-    p = Popen(args, stdout_callback=collect_stdout, **kwargs)
-    p.wait(timeout=timeout)
-    if kwargs.get('binary'):
-      stdout = b''.join(stdout_lines)
-    else:
-      stdout = ''.join(stdout_lines)
 
+  while True:
+    stdout_lines: list[typing.AnyStr] = []
+    p = Popen(
+        args, stdout_callback=stdout_lines.append, binary=binary, **kwargs)
+    p.wait(timeout=timeout)
+
+    stdout = empty_string.join(stdout_lines)
     if p.returncode == 0:
-      break
+      return stdout
+
+    retry -= 1
     if retry <= 0:
-      raise subprocess.CalledProcessError(p.returncode, args, stdout)
+      break
     time.sleep(delay_duration)
     delay_duration = min(delay_duration * 2, 100)
 
-  return stdout
+  raise subprocess.CalledProcessError(p.returncode, args, stdout)
 
 
-def check_call(*args, timeout=None, retry=1, **kwargs):
+def check_output(*args, **kwargs) -> str:
+  return _check_output(*args, stream_type=str, **kwargs)
+
+
+def check_output_in_bytes(*args, **kwargs) -> bytes:
+  return _check_output(*args, stream_type=bytes, **kwargs)
+
+
+def check_call(*args, timeout: float | None = None, retry: int = 1, **kwargs
+    ) -> None:
   """Runs command and ensures it succeeded.
 
   Modeled after subprocess.check_call.
@@ -252,7 +263,8 @@ def check_call(*args, timeout=None, retry=1, **kwargs):
     delay_duration = min(delay_duration * 2, 100)
 
 
-def ssh_cmd(host, *args, connect_timeout=None, allow_retry=False):
+def ssh_cmd(host: str, *args, connect_timeout: int | None = None,
+    allow_retry: bool = False) -> str:
   """Runs remote command using ssh.
 
   Args:
@@ -268,7 +280,7 @@ def ssh_cmd(host, *args, connect_timeout=None, allow_retry=False):
   # Avoid keyboard-interactive to prevent hang forever.
   cmd += ['-oPreferredAuthentications=publickey']
   if connect_timeout:
-    cmd += ['-oConnectTimeout=%d' % connect_timeout]
+    cmd += [f'-oConnectTimeout={connect_timeout}']
   cmd.append(host)
   cmd += list(args)
 
@@ -290,10 +302,11 @@ def ssh_cmd(host, *args, connect_timeout=None, allow_retry=False):
                        delay)
         time.sleep(delay)
         continue
-      raise errors.SshConnectionError('ssh connection to %r failed' % host)
+      raise errors.SshConnectionError(f'ssh connection to {host!r} failed')
 
 
-def scp_cmd(from_file, to_file, connect_timeout=None, allow_retry=False):
+def scp_cmd(from_file: str, to_file: str, connect_timeout: int | None = None,
+    allow_retry: bool = False) -> str:
   """Copies a file through scp.
 
   Args:
@@ -309,7 +322,7 @@ def scp_cmd(from_file, to_file, connect_timeout=None, allow_retry=False):
   # Avoid keyboard-interactive to prevent hang forever.
   cmd += ['-oPreferredAuthentications=publickey']
   if connect_timeout:
-    cmd += ['-oConnectTimeout=%d' % connect_timeout]
+    cmd += [f'-oConnectTimeout={connect_timeout}']
   cmd += [
       from_file,
       to_file,
@@ -333,11 +346,10 @@ def scp_cmd(from_file, to_file, connect_timeout=None, allow_retry=False):
                        delay)
         time.sleep(delay)
         continue
-      raise errors.SshConnectionError('scp %s to %s failed' %
-                                      (from_file, to_file))
+      raise errors.SshConnectionError(f'scp {from_file} to {to_file} failed')
 
 
-def escape_rev(rev):
+def escape_rev(rev: str) -> str:
   """Escapes special characters in version string.
 
   Sometimes we save files whose name is related to version, e.g. cache file and
@@ -356,7 +368,7 @@ def escape_rev(rev):
   return re.sub('[^a-zA-Z0-9~._-]', '_', rev)
 
 
-def version_key_func(v):
+def version_key_func(version: str) -> list[int | str]:
   """Splits version string into components.
 
   Split version number by '.', and convert to `int` if possible. After this
@@ -368,15 +380,15 @@ def version_key_func(v):
     [1, 'a', 3]
 
   Args:
-    v: version string
+    version: version string
 
   Returns:
     list of int or string
   """
-  return [int(x) if x.isdigit() else x for x in v.split('.')]
+  return [int(x) if x.isdigit() else x for x in version.split('.')]
 
 
-def is_version_lesseq(a, b):
+def is_version_lesseq(a: str, b: str) -> bool:
   """Compares whether version `a` is less or equal to version `b`.
 
   Note this only compares the numeric values component-wise. That is, '1.1' is
@@ -393,7 +405,7 @@ def is_version_lesseq(a, b):
   return version_key_func(a) <= version_key_func(b)
 
 
-def is_direct_relative_version(a, b):
+def is_direct_relative_version(a: str, b: str) -> bool:
   r"""Determines two versions are direct-relative.
 
   "Direct-relative" means "one is ancestor of the other".
@@ -420,14 +432,14 @@ def is_direct_relative_version(a, b):
   Returns:
     bool: True if `a` and `b` are direct-relative.
   """
-  a = version_key_func(a)
-  b = version_key_func(b)
-  assert len(a) == len(b)
-  if a > b:
-    a, b = b, a
+  ver_list_a = version_key_func(a)
+  ver_list_b = version_key_func(b)
+  assert len(ver_list_a) == len(ver_list_b)
+  if ver_list_a > ver_list_b:
+    ver_list_a, ver_list_b = ver_list_b, ver_list_a
 
   branched = False
-  for x, y in zip(a, b):
+  for x, y in zip(ver_list_a, ver_list_b):
     if branched:
       if x != 0:
         return False
@@ -442,11 +454,10 @@ def report_similar_candidates(key: str, value: str,
   assert value not in candidates
   if not candidates:
     raise errors.ExecutionFatalError(
-        'no candidates of %s at all, something wrong?' % key)
+        f'no candidates of {key} at all, something wrong?')
   similar_candidates = difflib.get_close_matches(value, candidates)
   if not similar_candidates:
-    raise errors.ExecutionFatalError('no %s candidates similar to %s' %
-                                     (key, value))
+    raise errors.ExecutionFatalError(f'no {key} candidates similar to {value}')
   logger.error('incorrect %s: %r; possible candidates:', key, value)
   for candidate in similar_candidates:
     logger.error('    %s', candidate)
@@ -472,7 +483,7 @@ def dict_get(element, *args):
 
 
 def wait_until(func: typing.Callable, timeout: float, period: float, *args,
-               **kwargs):
+               **kwargs) -> None:
   """Block until func(args, kwargs) becomes true or raise error.
 
   Args:
@@ -510,6 +521,7 @@ def forward_ssh(from_host: str, to_port: int):
     to_port (int): port number.
   """
   assert not is_port_in_use(to_port)
+  p = None
   try:
     p = Popen([
         'go', 'run',
@@ -521,5 +533,6 @@ def forward_ssh(from_host: str, to_port: int):
     wait_until(is_port_in_use, 60, 1, to_port)
     yield
   finally:
-    p.terminate()
+    if p:
+      p.terminate()
     assert not is_port_in_use(to_port)

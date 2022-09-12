@@ -427,15 +427,14 @@ def get_batch_commit_metadata(git_repo, revs):
   with tempfile.NamedTemporaryFile('w+t') as f:
     f.write(query)
     f.flush()
-    # util.check_output doesn't support stdin, so use shell
-    # redirect instead.
-    # binary=True because we need to count size in bytes later.
-    data = util.check_output(
+    # The `util.check_output_in_bytes()` function doesn't support stdin, so use
+    # shell redirect instead.
+    # Call binary version because we need to count size in bytes later.
+    data = util.check_output_in_bytes(
         'sh',
         '-c',
         'git cat-file --batch < ' + f.name,
-        cwd=git_repo,
-        binary=True)
+        cwd=git_repo)
 
   metas = {}
   while data:

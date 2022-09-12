@@ -40,15 +40,32 @@ class TestPopen(unittest.TestCase):
   """Test util.Popen."""
 
   def test_check_output(self):
-    self.assertEqual(util.check_output('echo', 'foobar'), 'foobar\n')
-    self.assertEqual(
-        util.check_output('sh', '-c', 'echo 1; sleep 0.05; echo 2'), '1\n2\n')
-    self.assertEqual(util.check_output('echo 1; echo 2', shell=True), '1\n2\n')
+    output = util.check_output('echo', 'foobar')
+    self.assertEqual(output, 'foobar\n')
+    output = util.check_output('sh', '-c', 'echo 1; sleep 0.05; echo 2')
+    self.assertEqual(output , '1\n2\n')
+    output = util.check_output('echo 1; echo 2', shell=True)
+    self.assertEqual(output, '1\n2\n')
 
     with self.assertRaises(subprocess.CalledProcessError):
       util.check_output('false')
 
-    self.assertEqual(util.check_output('env', env=dict(foo='bar')), 'foo=bar\n')
+    output = util.check_output('env', env=dict(foo='bar'))
+    self.assertEqual(output, 'foo=bar\n')
+
+  def test_check_output_in_bytes(self):
+    output = util.check_output_in_bytes('echo', 'foobar')
+    self.assertEqual(output, b'foobar\n')
+    output = util.check_output_in_bytes('sh', '-c', 'echo 1; sleep 0.05; echo 2')
+    self.assertEqual(output, b'1\n2\n')
+    output = util.check_output_in_bytes('echo 1; echo 2', shell=True)
+    self.assertEqual(output, b'1\n2\n')
+
+    with self.assertRaises(subprocess.CalledProcessError):
+      util.check_output_in_bytes('false')
+
+    output = util.check_output_in_bytes('env', env=dict(foo='bar'))
+    self.assertEqual(output, b'foo=bar\n')
 
   def test_check_call(self):
     util.check_call('true')
