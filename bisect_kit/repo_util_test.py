@@ -43,7 +43,7 @@ class TestRepoOperation(unittest.TestCase):
         <project name="g2.git" path="dir2/g2" revision="%s"></project>
         <project name="g3.git" path="dir3/g3" groups="notdefault"></project>
     </manifest>
-    """ % (self.gitbase, self.git2.commits[1])
+    """ % (self.gitbase, self.git2.revs[1])
     self.manifest_git.add_commit('2017-01-01T00:00:00', 'add manifest',
                                  'default.xml', manifest)
 

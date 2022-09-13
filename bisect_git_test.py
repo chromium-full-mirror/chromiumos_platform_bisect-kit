@@ -37,8 +37,8 @@ class TestGitDomain(unittest.TestCase):
     bisector = bisector_cli.BisectorCommandLine(bisect_git.GitDomain)
 
     self.git.create_commits(10)
-    commits = self.git.commits
-    old, new = commits[1], commits[-1]
+    revs = self.git.revs
+    old, new = revs[1], revs[-1]
 
     bisector.main('init', '--old', old, '--new', new, '--git_repo',
                   self.git_repo)

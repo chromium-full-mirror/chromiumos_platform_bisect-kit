@@ -74,7 +74,7 @@ class CommitMeta:
 
   @staticmethod
   def from_git_commit_object(git_cat_file_output: str) -> CommitMeta:
-    meta_dict = {}
+    meta_dict: dict[str, typing.Any] = {}
     header, meta_dict['message'] = git_cat_file_output.split('\n\n', 1)
     for line in header.splitlines():
       if m := re.match(r'^(object|tree|type) (\w+)', line):
@@ -113,30 +113,30 @@ class Period:
     raise TypeError('The membership test only accepts a `Period` or an `int`')
 
 
-def is_git_rev(s):
+def is_git_rev(rev: str) -> bool:
   """Is a git hash-like version string.
 
   It accepts shortened hash with at least 7 digits.
   """
-  if not GIT_MIN_COMMIT_ID_LENGTH <= len(s) <= GIT_FULL_COMMIT_ID_LENGTH:
+  if not GIT_MIN_COMMIT_ID_LENGTH <= len(rev) <= GIT_FULL_COMMIT_ID_LENGTH:
     return False
-  return bool(re.match(r'^[0-9a-f]+$', s))
+  return bool(re.match(r'^[0-9a-f]+$', rev))
 
 
-def argtype_git_rev(s):
+def argtype_git_rev(rev: str) -> str:
   """Validates git hash."""
-  if not is_git_rev(s):
+  if not is_git_rev(rev):
     msg = 'should be git hash, at least %d digits' % GIT_MIN_COMMIT_ID_LENGTH
     raise cli.ArgTypeError(msg, '1a2b3c4d5e')
-  return s
+  return rev
 
 
-def is_git_root(path):
+def is_git_root(path: str) -> bool:
   """Is given path root of git repo."""
   return os.path.exists(os.path.join(path, '.git'))
 
 
-def is_git_bare_dir(path):
+def is_git_bare_dir(path: str) -> bool:
   """Is inside .git folder or bare git checkout."""
   if not os.path.isdir(path):
     return False
@@ -147,7 +147,7 @@ def is_git_bare_dir(path):
     return False
 
 
-def clone(git_repo, repo_url, reference=None):
+def clone(git_repo: str, repo_url: str, reference: str | None = None) -> None:
   if not os.path.exists(git_repo):
     os.makedirs(git_repo)
   cmd = ['git', 'clone', repo_url, '.']
@@ -156,7 +156,7 @@ def clone(git_repo, repo_url, reference=None):
   util.check_call(*cmd, cwd=git_repo)
 
 
-def checkout_version(git_repo, rev):
+def checkout_version(git_repo: str, rev: str) -> None:
   """git checkout.
 
   Args:
@@ -166,7 +166,7 @@ def checkout_version(git_repo, rev):
   util.check_call('git', 'checkout', '-q', '-f', rev, cwd=git_repo)
 
 
-def init(git_repo, initial_branch='main'):
+def init(git_repo: str, initial_branch: str = 'main') -> None:
   """git init.
 
   git_repo and its parent directories will be created if they don't exist.
@@ -182,16 +182,18 @@ def init(git_repo, initial_branch='main'):
       'git', 'init', '-q', '--initial-branch', initial_branch, cwd=git_repo)
 
 
-def pull(git_repo):
+def pull(git_repo: str) -> None:
   util.check_call('git', 'pull', cwd=git_repo)
 
 
-def commit_file(git_repo,
-                path,
-                message,
-                content,
-                commit_time=None,
-                author_time=None):
+def commit_file(
+    git_repo: str,
+    path: str,
+    message: str,
+    content: str,
+    commit_time: str | None = None,
+    author_time: str | None = None,
+    ) -> None:
   """Commit a file.
 
   Args:
@@ -223,7 +225,7 @@ def commit_file(git_repo,
       'git', 'commit', '-q', '-m', message, path, cwd=git_repo, env=env)
 
 
-def config(git_repo, *args):
+def config(git_repo: str, *args) -> None:
   """Wrapper of 'git config'.
 
   Args:
@@ -233,7 +235,7 @@ def config(git_repo, *args):
   util.check_call('git', 'config', *args, cwd=git_repo)
 
 
-def fetch(git_repo, *args, retry_prune_if_conflict=False):
+def fetch(git_repo: str, *args, retry_prune_if_conflict: bool = False) -> None:
   """Wrapper of 'git fetch' with retry support.
 
   Args:
@@ -244,7 +246,7 @@ def fetch(git_repo, *args, retry_prune_if_conflict=False):
   tries = 0
   while True:
     tries += 1
-    stderr_lines = []
+    stderr_lines: list[str] = []
     try:
       util.check_call(
           'git',
@@ -320,12 +322,12 @@ class FastLookupEntry:
   With this class, we can look up commit via commit hash and timestamp fast.
   """
 
-  def __init__(self, git_repo, branch):
-    self.git_repo = git_repo
-    self.branch = branch
-    self.optimized_period = None
-    self.cached = []
-    self.commit_to_index = {}
+  def __init__(self, git_repo: str, branch: str):
+    self.git_repo: str = git_repo
+    self.branch: str = branch
+    self.optimized_period: Period | None = None
+    self.cached: list[Commit] = []
+    self.commit_to_index: dict[str, int] = {}
 
   def optimize(self, period: Period):
     assert period.begin <= period.end
@@ -343,7 +345,7 @@ class FastLookupEntry:
         commit.rev: i for i, commit in enumerate(self.cached)
     }
 
-  def get_rev_by_time(self, timestamp):
+  def get_rev_by_time(self, timestamp: int) -> str | None:
     if not self.optimized_period:
       raise FastLookupFailed
     if timestamp not in self.optimized_period:
@@ -358,7 +360,7 @@ class FastLookupEntry:
       idx -= 1
     return self.cached[idx].rev
 
-  def is_containing_commit(self, rev):
+  def is_containing_commit(self, rev: str) -> bool:
     if rev in self.commit_to_index:
       return True
     raise FastLookupFailed
@@ -368,17 +370,18 @@ class FastLookup:
   """Collection of FastLookupEntry"""
 
   def __init__(self):
-    self.entries = {}
-    self.target_period = None
+    self.entries: dict[str, dict[str, FastLookupEntry]] = {}
+    self.target_period: Period | None = None
 
-  def optimize(self, period):
+  def optimize(self, period: Period):
     self.target_period = period
 
   def disable(self):
     self.target_period = None
     self.entries = {}
 
-  def get_rev_by_time(self, git_repo, timestamp, branch):
+  def get_rev_by_time(self, git_repo: str, timestamp: int, branch: str
+      ) -> str | None:
     if not self.target_period:
       raise FastLookupFailed
     if timestamp not in self.target_period:
@@ -392,7 +395,7 @@ class FastLookup:
     entry.optimize(self.target_period)
     return entry.get_rev_by_time(timestamp)
 
-  def is_containing_commit(self, git_repo, rev):
+  def is_containing_commit(self, git_repo: str, rev: str) -> bool:
     # This function is optimized only after get_rev_by_time() is invoked.
     if git_repo not in self.entries:
       raise FastLookupFailed
@@ -409,7 +412,7 @@ fast_lookup = FastLookup()
 
 
 @cache_util.Cache.default_disabled
-def is_containing_commit(git_repo, rev):
+def is_containing_commit(git_repo: str, rev: str) -> bool:
   """Determines given commit exists.
 
   Args:
@@ -435,7 +438,7 @@ def is_containing_commit(git_repo, rev):
 
 
 @cache_util.Cache.default_disabled
-def is_ancestor_commit(git_repo, old, new):
+def is_ancestor_commit(git_repo: str, old: str, new: str) -> bool:
   """Determines `old` commit is ancestor of `new` commit.
 
   Args:
@@ -460,7 +463,7 @@ def is_ancestor_commit(git_repo, old, new):
 
 
 @cache_util.Cache.default_disabled
-def get_commit_metadata(git_repo, rev):
+def get_commit_metadata(git_repo: str, rev: str) -> CommitMeta:
   """Get metadata of given commit.
 
   Args:
@@ -483,7 +486,8 @@ def get_commit_metadata(git_repo, rev):
   return CommitMeta.from_git_commit_object(data)
 
 
-def get_batch_commit_metadata(git_repo, revs):
+def get_batch_commit_metadata(git_repo: str, revs: typing.Iterable[str]
+    ) -> dict[str, CommitMeta | None]:
   query = '\n'.join(revs)
   logger.debug('get_batch_commit_metadata %r', query)
   with tempfile.NamedTemporaryFile('w+t') as f:
@@ -513,7 +517,7 @@ def get_batch_commit_metadata(git_repo, revs):
   return metas
 
 
-def get_revlist(git_repo, old, new):
+def get_revlist(git_repo: str, old: str, new: str) -> list[str]:
   """Enumerates git commit between two revisions (inclusive).
 
   Args:
@@ -534,7 +538,7 @@ def get_revlist(git_repo, old, new):
   return revlist
 
 
-def get_commit_log(git_repo, rev):
+def get_commit_log(git_repo: str, rev: str) -> str:
   """Get git commit log.
 
   Args:
@@ -549,7 +553,7 @@ def get_commit_log(git_repo, rev):
   return msg
 
 
-def get_commit_hash(git_repo, rev):
+def get_commit_hash(git_repo: str, rev: str) -> str:
   """Get git commit hash.
 
   Args:
@@ -576,7 +580,7 @@ def get_commit_hash(git_repo, rev):
   return git_rev
 
 
-def get_commit_time(git_repo, rev, path=None):
+def get_commit_time(git_repo: str, rev: str, path: str | None = None) -> int:
   """Get git commit timestamp.
 
   Args:
@@ -594,7 +598,7 @@ def get_commit_time(git_repo, rev, path=None):
   return int(line)
 
 
-def is_symbolic_link(git_repo, rev, path):
+def is_symbolic_link(git_repo: str, rev: str, path: str) -> bool:
   """Check if a file is symbolic link.
 
   Args:
@@ -620,7 +624,7 @@ def is_symbolic_link(git_repo, rev, path):
 
 
 @cache_util.Cache.default_disabled
-def get_file_from_revision(git_repo, rev, path):
+def get_file_from_revision(git_repo: str, rev: str, path: str) -> str:
   """Get file content of given revision.
 
   Args:
@@ -644,7 +648,7 @@ def get_file_from_revision(git_repo, rev, path):
   return result
 
 
-def list_dir_from_revision(git_repo, rev, path):
+def list_dir_from_revision(git_repo: str, rev: str, path: str) -> list[str]:
   """Lists entries of directory of given revision.
 
   Args:
@@ -667,7 +671,8 @@ def list_dir_from_revision(git_repo, rev, path):
       log_stdout=False).splitlines()
 
 
-def get_rev_by_time(git_repo, timestamp, branch, path=None):
+def get_rev_by_time(git_repo: str, timestamp: int, branch: str | None,
+    path: str | None = None) -> str | None:
   """Query commit of given time.
 
   Args:
@@ -736,7 +741,7 @@ def get_revlist_by_period(git_repo: str, branch: str, period: Period
   return [Commit.from_rev_line(line) for line in text.splitlines()]
 
 
-def reset_hard(git_repo):
+def reset_hard(git_repo: str) -> None:
   """Restore modified and deleted files.
 
   This is simply wrapper of "git reset --hard".
@@ -747,7 +752,8 @@ def reset_hard(git_repo):
   util.check_call('git', 'reset', '--hard', cwd=git_repo)
 
 
-def list_untracked(git_repo, excludes=None):
+def list_untracked(git_repo: str, excludes: list[str] | None = None
+    ) -> list[str]:
   """List untracked files and directories.
 
   Args:
@@ -777,7 +783,7 @@ def list_untracked(git_repo, excludes=None):
   return result
 
 
-def distclean(git_repo, excludes=None):
+def distclean(git_repo: str, excludes: list[str] | None = None) -> None:
   """Clean up git repo directory.
 
   Restore modified and deleted files. Delete untracked files.
@@ -800,14 +806,15 @@ def distclean(git_repo, excludes=None):
       os.unlink(path)
 
 
-def get_history(git_repo,
-                path=None,
-                branch=None,
-                after=None,
-                before=None,
-                padding_begin=False,
-                padding_end=False,
-                with_subject=False):
+def get_history(
+    git_repo: str,
+    path: str | None = None,
+    branch: str | None = None,
+    after: int | None = None,
+    before: int | None = None,
+    padding_begin: bool = False,
+    padding_end: bool = False,
+    with_subject: bool = False) -> list[Commit]:
   """Get commit history of given path.
 
   `after` and `before` could be outside of lifetime of `path`. `padding` is
@@ -875,13 +882,14 @@ def get_history(git_repo,
   return result
 
 
-def get_history_recursively(git_repo,
-                            path,
-                            after,
-                            before,
-                            parser_callback,
-                            padding_end=True,
-                            branch=None):
+def get_history_recursively(
+    git_repo: str,
+    path: str,
+    after: int,
+    before: int,
+    parser_callback: typing.Callable[[str, str], list[str] | None],
+    padding_end: bool = True,
+    branch: str | None = None) -> list[Commit]:
   """Get commit history of given path and its dependencies.
 
   In comparison to get_history(), get_history_recursively also takes
@@ -917,7 +925,7 @@ def get_history_recursively(git_repo,
       branch=branch)
 
   # Collect include information of each commit.
-  includes = {}
+  includes: dict[str, set[str]] = {}
   for commit in history:
     content = get_file_from_revision(git_repo, commit.rev, path)
     parse_result = parser_callback(path, content)
@@ -963,7 +971,7 @@ def get_history_recursively(git_repo,
     result.append(Commit(before, result[-1].rev, result[-1].subject))
 
   # Dedup.
-  result2 = []
+  result2: list[Commit] = []
   for x in result:
     if result2 and result2[-1] == x:
       continue
@@ -972,7 +980,12 @@ def get_history_recursively(git_repo,
   return result2
 
 
-def get_branches(git_repo, all_branches=True, commit=None, remote=False):
+def get_branches(
+    git_repo: str,
+    all_branches: bool = True,
+    commit: str | None = None,
+    remote: bool = False
+    ) -> list[str]:
   """Get branches of a repository.
 
   Args:

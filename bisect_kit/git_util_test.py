@@ -22,7 +22,7 @@ class GitOperation:
 
   def __init__(self, git_repo):
     self.git_repo = git_repo
-    self.commits = []
+    self.revs = []
     self.default_filename = 'file'
 
   def init(self, initial_branch='main'):
@@ -103,14 +103,14 @@ class GitOperation:
   def create_commits(self, num):
     """Creates dummy commits.
 
-    Created commit hashes are added to `self.commits`.
+    Created commit hashes are added to `self.revs`.
 
     Args:
       num: number of commits to create
     """
     for i in range(1, num + 1):
       commit_time = '2017-01-%02dT00:00:00' % i
-      self.commits.append(
+      self.revs.append(
           self.add_commit(commit_time, 'commit %d' % i, self.default_filename,
                           'commit %d' % i))
 
@@ -125,7 +125,7 @@ class TestGitOperationReadOnly(unittest.TestCase):
     cls.git = GitOperation(cls.git_repo)
     cls.git.init()
     cls.git.create_commits(5)
-    cls.commits = cls.git.commits
+    cls.revs = cls.git.revs
 
   @classmethod
   def tearDownClass(cls):
@@ -133,33 +133,29 @@ class TestGitOperationReadOnly(unittest.TestCase):
 
   def test_is_containing_commit(self):
     self.assertTrue(
-        git_util.is_containing_commit(self.git_repo, self.commits[0]))
+        git_util.is_containing_commit(self.git_repo, self.revs[0]))
     self.assertTrue(
-        git_util.is_containing_commit(self.git_repo, self.commits[1]))
+        git_util.is_containing_commit(self.git_repo, self.revs[1]))
     self.assertTrue(
-        git_util.is_containing_commit(self.git_repo, self.commits[0][:10]))
+        git_util.is_containing_commit(self.git_repo, self.revs[0][:10]))
     self.assertFalse(
         git_util.is_containing_commit(self.git_repo,
-                                      self.commits[0][:-10] + 'a' * 10))
+                                      self.revs[0][:-10] + 'a' * 10))
 
   def test_is_ancestor_commit(self):
     self.assertTrue(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
-                                    self.commits[1]))
+        git_util.is_ancestor_commit(self.git_repo, self.revs[0], self.revs[1]))
     self.assertTrue(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
-                                    self.commits[2]))
+        git_util.is_ancestor_commit(self.git_repo, self.revs[0], self.revs[2]))
     self.assertFalse(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[0],
-                                    self.commits[0]))
+        git_util.is_ancestor_commit(self.git_repo, self.revs[0], self.revs[0]))
     self.assertFalse(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[2],
-                                    self.commits[0]))
+        git_util.is_ancestor_commit(self.git_repo, self.revs[2], self.revs[0]))
     # Non-existent commits
     self.assertFalse(
-        git_util.is_ancestor_commit(self.git_repo, 'a' * 40, self.commits[0]))
+        git_util.is_ancestor_commit(self.git_repo, 'a' * 40, self.revs[0]))
     self.assertFalse(
-        git_util.is_ancestor_commit(self.git_repo, self.commits[0], 'a' * 40))
+        git_util.is_ancestor_commit(self.git_repo, self.revs[0], 'a' * 40))
     self.assertFalse(
         git_util.is_ancestor_commit(self.git_repo, 'b' * 40, 'a' * 40))
     self.assertFalse(
@@ -167,39 +163,39 @@ class TestGitOperationReadOnly(unittest.TestCase):
 
   def test_get_commit_metadata(self):
     self.assertIsNone(
-        git_util.get_commit_metadata(self.git_repo, self.commits[0]).parent)
+        git_util.get_commit_metadata(self.git_repo, self.revs[0]).parent)
 
     self.assertEqual(
-        git_util.get_commit_metadata(self.git_repo, self.commits[1]).parent,
-        [self.commits[0]])
+        git_util.get_commit_metadata(self.git_repo, self.revs[1]).parent,
+        [self.revs[0]])
 
   def test_get_batch_commit_metadata(self):
     bad_obj = 'foobar'
     result = git_util.get_batch_commit_metadata(
-        self.git_repo, self.commits + [bad_obj])
-    self.assertEqual(result[self.commits[1]].parent, [self.commits[0]])
-    self.assertEqual(result[self.commits[3]].parent, [self.commits[2]])
-    self.assertEqual(result[bad_obj], None)
+        self.git_repo, self.revs + [bad_obj])
+    self.assertEqual(result[self.revs[1]].parent, [self.revs[0]])
+    self.assertEqual(result[self.revs[3]].parent, [self.revs[2]])
+    self.assertIsNone(result[bad_obj])
 
   def test_get_revlist(self):
     self.assertEqual(
-        git_util.get_revlist(self.git_repo, self.commits[1], self.commits[3]),
-        [self.commits[1], self.commits[2], self.commits[3]])
+        git_util.get_revlist(self.git_repo, self.revs[1], self.revs[3]),
+        [self.revs[1], self.revs[2], self.revs[3]])
 
   def test_get_commit_log(self):
     self.assertIn('commit 2',
-                  git_util.get_commit_log(self.git_repo, self.commits[1]))
+                  git_util.get_commit_log(self.git_repo, self.revs[1]))
 
   def test_get_rev_by_time(self):
     # simple case
     self.assertEqual(
         git_util.get_rev_by_time(self.git_repo, '2017-01-03T12:00:00', None),
-        self.commits[2])
+        self.revs[2])
 
     # boundary case: equal timestamp
     self.assertEqual(
         git_util.get_rev_by_time(self.git_repo, '2017-01-03T00:00:00', None),
-        self.commits[2])
+        self.revs[2])
 
   def test_get_history(self):
     timestamp = 1483286400  # 2017-01-02T00:00:00
@@ -214,8 +210,8 @@ class TestGitOperationReadOnly(unittest.TestCase):
             before=timestamp + day * 2 + 100,
         ),
         git_util.Commit.make_commit_list([
-            (timestamp + day * 1, self.commits[2]),
-            (timestamp + day * 2, self.commits[3]),
+            (timestamp + day * 1, self.revs[2]),
+            (timestamp + day * 2, self.revs[3]),
         ]),
     )
 
@@ -228,9 +224,9 @@ class TestGitOperationReadOnly(unittest.TestCase):
             before=timestamp + day * 2,
         ),
         git_util.Commit.make_commit_list([
-            (timestamp, self.commits[1]),
-            (timestamp + day * 1, self.commits[2]),
-            (timestamp + day * 2, self.commits[3]),
+            (timestamp, self.revs[1]),
+            (timestamp + day * 1, self.revs[2]),
+            (timestamp + day * 2, self.revs[3]),
         ]),
     )
 
@@ -245,10 +241,10 @@ class TestGitOperationReadOnly(unittest.TestCase):
             padding_end=True,
         ),
         git_util.Commit.make_commit_list([
-            (timestamp + 100, self.commits[1]),
-            (timestamp + day * 1, self.commits[2]),
-            (timestamp + day * 2, self.commits[3]),
-            (timestamp + day * 2 + 100, self.commits[3]),
+            (timestamp + 100, self.revs[1]),
+            (timestamp + day * 1, self.revs[2]),
+            (timestamp + day * 2, self.revs[3]),
+            (timestamp + day * 2 + 100, self.revs[3]),
         ]),
       )
 
@@ -264,7 +260,7 @@ class TestGitOperationReadOnly(unittest.TestCase):
             before=time + 10,
         ),
         git_util.Commit.make_commit_list([
-            (time, self.commits[0]),
+            (time, self.revs[0]),
         ]),
     )
 
@@ -278,8 +274,8 @@ class TestGitOperationReadOnly(unittest.TestCase):
             padding_end=True,
         ),
         git_util.Commit.make_commit_list([
-            (time, self.commits[0]),
-            (time + 10, self.commits[0]),
+            (time, self.revs[0]),
+            (time + 10, self.revs[0]),
         ]),
     )
 
@@ -323,20 +319,20 @@ class TestGitOperation(unittest.TestCase):
   def prepare_merged_repository(self):
     # Generates following commit graph:
     #  |
-    #  *  commit C (merge A B)  (2017-02-05)
+    #  *  rev C (merge A B)  (2017-02-05)
     #  |\
-    #  | *  commit B on branch foo (2017-02-02)
-    #  * |  commit A (2017-02-01)
+    #  | *  rev B on branch foo (2017-02-02)
+    #  * |  rev A (2017-02-01)
     #  |/
-    #  *  commits[0] (2017-01-01)
+    #  *  revs[0] (2017-01-01)
     #  |
     self.git.create_commits(1)
     branch_foo = 'foo'
     subprocess.check_call(['git', 'branch', branch_foo], cwd=self.git_repo)
-    commit_a = self.git.add_commit('2017-02-01T00:00:00', 'commit A', 'file2',
+    rev_a = self.git.add_commit('2017-02-01T00:00:00', 'commit A', 'file2',
                                    'commit A')
     subprocess.check_call(['git', 'checkout', branch_foo], cwd=self.git_repo)
-    commit_b = self.git.add_commit('2017-02-02T00:00:00', 'commit B',
+    rev_b = self.git.add_commit('2017-02-02T00:00:00', 'commit B',
                                    self.git.default_filename, 'commit B')
     subprocess.check_call(['git', 'checkout', 'main'], cwd=self.git_repo)
     # --no-edit: git may complain EDITOR is unset
@@ -344,11 +340,11 @@ class TestGitOperation(unittest.TestCase):
                           cwd=self.git_repo,
                           env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'))
 
-    commit_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+    rev_c = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
                                        cwd=self.git_repo,
                                        encoding='utf8')
-    commit_c = commit_c.strip()
-    return [commit_a, commit_b, commit_c]
+    rev_c = rev_c.strip()
+    return [rev_a, rev_b, rev_c]
 
   def test_git_init(self):
     # reinit existing git folder
@@ -381,95 +377,95 @@ class TestGitOperation(unittest.TestCase):
   def test_get_commit_hash(self):
     self.git.create_commits(3)
     tag_name = 'foo'
-    subprocess.check_call(['git', 'tag', tag_name, self.git.commits[2]],
+    subprocess.check_call(['git', 'tag', tag_name, self.git.revs[2]],
                           cwd=self.git_repo)
     self.assertEqual(
-        git_util.get_commit_hash(self.git_repo, tag_name), self.git.commits[2])
+        git_util.get_commit_hash(self.git_repo, tag_name), self.git.revs[2])
 
   def test_checkout_version(self):
     self.git.create_commits(5)
     full_path = os.path.join(self.git_repo, self.git.default_filename)
     with open(full_path) as f:
       self.assertEqual(f.read(), 'commit 5')
-    git_util.checkout_version(self.git_repo, self.git.commits[1])
+    git_util.checkout_version(self.git_repo, self.git.revs[1])
     with open(full_path) as f:
       self.assertEqual(f.read(), 'commit 2')
 
   def test_get_file_from_revision(self):
     path = 'foo'
     time = 1500000000
-    commit_1 = self.git.add_commit(time, 'msg', path, 'a')
-    commit_2 = self.git.add_commit(time + 100, 'msg', path + 'other', '')
-    commit_3 = self.git.add_commit(time + 200, 'msg', path, 'b')
+    rev_1 = self.git.add_commit(time, 'msg', path, 'a')
+    rev_2 = self.git.add_commit(time + 100, 'msg', path + 'other', '')
+    rev_3 = self.git.add_commit(time + 200, 'msg', path, 'b')
     self.assertEqual(
-        git_util.get_file_from_revision(self.git_repo, commit_1, path), 'a')
+        git_util.get_file_from_revision(self.git_repo, rev_1, path), 'a')
     self.assertEqual(
-        git_util.get_file_from_revision(self.git_repo, commit_2, path), 'a')
+        git_util.get_file_from_revision(self.git_repo, rev_2, path), 'a')
     self.assertEqual(
-        git_util.get_file_from_revision(self.git_repo, commit_3, path), 'b')
+        git_util.get_file_from_revision(self.git_repo, rev_3, path), 'b')
 
   def test_list_dir_from_revision(self):
     time = 1500000000
-    commit_1 = self.git.add_commit(time + 100, 'msg', 'path/a', '')
-    commit_2 = self.git.add_commit(time + 200, 'msg', 'path/b', '')
-    commit_3 = self.git.add_commit(time + 300, 'msg', 'path/foo/c', '')
-    commit_4 = self.git.add_commit(time + 400, 'msg', 'path/b', None)
-    commit_5 = self.git.add_commit(time + 500, 'msg', 'path/foo/c', None)
+    rev_1 = self.git.add_commit(time + 100, 'msg', 'path/a', '')
+    rev_2 = self.git.add_commit(time + 200, 'msg', 'path/b', '')
+    rev_3 = self.git.add_commit(time + 300, 'msg', 'path/foo/c', '')
+    rev_4 = self.git.add_commit(time + 400, 'msg', 'path/b', None)
+    rev_5 = self.git.add_commit(time + 500, 'msg', 'path/foo/c', None)
     self.assertCountEqual(
-        git_util.list_dir_from_revision(self.git_repo, commit_1, 'path'), ['a'])
+        git_util.list_dir_from_revision(self.git_repo, rev_1, 'path'), ['a'])
     self.assertCountEqual(
-        git_util.list_dir_from_revision(self.git_repo, commit_2, 'path'),
+        git_util.list_dir_from_revision(self.git_repo, rev_2, 'path'),
         ['a', 'b'])
     self.assertCountEqual(
-        git_util.list_dir_from_revision(self.git_repo, commit_3, 'path'),
+        git_util.list_dir_from_revision(self.git_repo, rev_3, 'path'),
         ['a', 'b', 'foo'])
     self.assertCountEqual(
-        git_util.list_dir_from_revision(self.git_repo, commit_4, 'path'),
+        git_util.list_dir_from_revision(self.git_repo, rev_4, 'path'),
         ['a', 'foo'])
     self.assertCountEqual(
-        git_util.list_dir_from_revision(self.git_repo, commit_5, 'path'), ['a'])
+        git_util.list_dir_from_revision(self.git_repo, rev_5, 'path'), ['a'])
 
     with self.assertRaises(subprocess.CalledProcessError):
-      git_util.list_dir_from_revision(self.git_repo, commit_1, 'path/foo')
+      git_util.list_dir_from_revision(self.git_repo, rev_1, 'path/foo')
 
   def test_get_commit_time(self):
     path = self.git.default_filename
     time = 1500000000
-    commit_1 = self.git.add_commit(
+    rev_1 = self.git.add_commit(
         time + 100, 'msg', path, 'a', author_time=time)
-    commit_2 = self.git.add_commit(
+    rev_2 = self.git.add_commit(
         time + 300, 'msg', path, 'b', author_time=time + 200)
     self.assertEqual(
-        git_util.get_commit_time(self.git_repo, commit_1, path), time + 100)
+        git_util.get_commit_time(self.git_repo, rev_1, path), time + 100)
     self.assertEqual(
-        git_util.get_commit_time(self.git_repo, commit_2, path), time + 300)
+        git_util.get_commit_time(self.git_repo, rev_2, path), time + 300)
 
   def test_get_rev_by_time_merge(self):
-    commit_a, _, commit_c = self.prepare_merged_repository()
+    rev_a, _, rev_c = self.prepare_merged_repository()
 
     # simple case
     self.assertEqual(
         git_util.get_rev_by_time(self.git_repo, '2017-02-10T00:00:00', None),
-        commit_c)
+        rev_c)
 
     # Not commit B because it is on different branch.
     self.assertEqual(
         git_util.get_rev_by_time(self.git_repo, '2017-02-03T00:00:00', None),
-        commit_a)
+        rev_a)
 
   def test_get_branches(self):
-    commit_a, commit_b, commit_c = self.prepare_merged_repository()
+    rev_a, rev_b, rev_c = self.prepare_merged_repository()
     self.assertCountEqual(
         git_util.get_branches(self.git_repo),
         ['refs/heads/foo', 'refs/heads/main'])
     self.assertCountEqual(
-        git_util.get_branches(self.git_repo, commit=commit_a),
+        git_util.get_branches(self.git_repo, commit=rev_a),
         ['refs/heads/main'])
     self.assertCountEqual(
-        git_util.get_branches(self.git_repo, commit=commit_b),
+        git_util.get_branches(self.git_repo, commit=rev_b),
         ['refs/heads/foo', 'refs/heads/main'])
     self.assertCountEqual(
-        git_util.get_branches(self.git_repo, commit=commit_c),
+        git_util.get_branches(self.git_repo, commit=rev_c),
         ['refs/heads/main'])
 
   def test_reset_hard(self):
@@ -657,20 +653,18 @@ class TestGitOperation(unittest.TestCase):
 
   def test_is_symbolic_link(self):
     time = 1500000000
-    _commit1 = self.git.add_commit(time, 'msg', 'foo', 'foo')
-    commit2 = self.git.add_commit(time + 1, 'msg', 'bar', 'bar')
-    _commit3 = self.git.add_commit(time + 2, 'msg', 'bar', None)
-    commit4 = self.git.add_commit(
-        time + 3, 'msg', 'bar', None, link_target='foo')
-    commit5 = self.git.add_commit(
+    _rev_1 = self.git.add_commit(time, 'msg', 'foo', 'foo')
+    rev_2 = self.git.add_commit(time + 1, 'msg', 'bar', 'bar')
+    _rev_3 = self.git.add_commit(time + 2, 'msg', 'bar', None)
+    rev_4 = self.git.add_commit(time + 3, 'msg', 'bar', None, link_target='foo')
+    rev_5 = self.git.add_commit(
         time + 4, 'msg', 'dir/baz', None, link_target='foo')
 
-    self.assertFalse(git_util.is_symbolic_link(self.git_repo, commit2, 'bar'))
-    self.assertTrue(git_util.is_symbolic_link(self.git_repo, commit4, 'bar'))
+    self.assertFalse(git_util.is_symbolic_link(self.git_repo, rev_2, 'bar'))
+    self.assertTrue(git_util.is_symbolic_link(self.git_repo, rev_4, 'bar'))
     with self.assertRaises(ValueError):
-        git_util.is_symbolic_link(self.git_repo, commit4, 'dir/baz')
-    self.assertTrue(
-        git_util.is_symbolic_link(self.git_repo, commit5, 'dir/baz'))
+        git_util.is_symbolic_link(self.git_repo, rev_4, 'dir/baz')
+    self.assertTrue(git_util.is_symbolic_link(self.git_repo, rev_5, 'dir/baz'))
 
 
 class TestGitUtil(unittest.TestCase):
