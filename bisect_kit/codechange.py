@@ -929,12 +929,8 @@ class CodeManager:
       revs = set(a['rev'] for a in actions)
       metas = git_util.get_batch_commit_metadata(git_root, revs)
       for action in actions:
-        meta = metas[action['rev']]
-        if meta is None:
-          commit_summary = '(unknown)'
-        else:
-          commit_summary = meta['message'].splitlines()[0]
-        action['commit_summary'] = commit_summary
+        meta = metas.get(action['rev'])
+        action['commit_summary'] = git_util.CommitMeta.get_summary(meta)
 
   def build_revlist(self, old, new):
     """Build revlist.
@@ -976,7 +972,7 @@ class CodeManager:
       self.spec_manager.parse_spec(spec)
 
     git_util.fast_lookup.optimize(
-        (float_specs[0].timestamp, float_specs[-1].timestamp))
+        git_util.Period(float_specs[0].timestamp, float_specs[-1].timestamp))
     # step 2, synthesize all fixed specs in the range from float specs.
     specs = float_specs + [fixed_specs[-1]]
     action_groups = []

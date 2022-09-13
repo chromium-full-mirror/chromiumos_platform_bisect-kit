@@ -997,10 +997,10 @@ class DepsParser:
       git_repo = repo_url
 
     if git_util.is_git_rev(at):
-      history = [
+      history = git_util.Commit.make_commit_list([
           (after, at),
           (before, at),
-      ]
+      ])
     else:
       if not allow_floating:
         raise errors.ExternalError(
@@ -1017,18 +1017,18 @@ class DepsParser:
 
     # If not equal, it means the file was deleted but is still referenced by
     # its parent.
-    assert history[-1][0] == before
+    assert history[-1].timestamp == before
 
     # TODO(kcwu): optimization: history[-1] is unused
-    for timestamp, git_rev in history[:-1]:
-      content = git_util.get_file_from_revision(git_repo, git_rev, deps_file)
+    for commit in history[:-1]:
+      content = git_util.get_file_from_revision(git_repo, commit.rev, deps_file)
 
       deps = self.parse_single_deps(
           content,
           parent_vars=parent_vars,
           parent_path=parent_path,
           parent_dep=parent_dep)
-      tstree.add_snapshot(timestamp, deps, deps.recursedeps)
+      tstree.add_snapshot(commit.timestamp, deps, deps.recursedeps)
 
     tstree.no_more_snapshot()
 

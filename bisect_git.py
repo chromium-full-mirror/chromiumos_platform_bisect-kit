@@ -55,11 +55,8 @@ class GitDomain(core.BisectDomain):
     details = {}
     metas = git_util.get_batch_commit_metadata(opts.git_repo, revlist)
     for rev in revlist:
-      meta = metas[rev]
-      if meta is None:
-        commit_summary = '(unknown)'
-      else:
-        commit_summary = meta['message'].splitlines()[0]
+      meta = metas.get(rev)
+      commit_summary = git_util.CommitMeta.get_summary(meta)
       action = {'rev': rev, 'commit_summary': commit_summary}
       details[rev] = {'actions': [action]}
 

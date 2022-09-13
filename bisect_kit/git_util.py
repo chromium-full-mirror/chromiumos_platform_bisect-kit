@@ -4,9 +4,11 @@
 # found in the LICENSE file.
 """Git utility."""
 
+from __future__ import annotations
 from __future__ import print_function
 
 import bisect
+import dataclasses
 import logging
 import os
 import re
@@ -15,6 +17,7 @@ import stat
 import subprocess
 import tempfile
 import time
+import typing
 
 from bisect_kit import cache_util
 from bisect_kit import cli
@@ -32,6 +35,82 @@ GIT_FULL_COMMIT_ID_LENGTH = 40
 #   - 8 digits: 0.01%
 # As foolproof check, 7 digits should be enough.
 GIT_MIN_COMMIT_ID_LENGTH = 7
+
+
+@dataclasses.dataclass(order=True, eq=True, frozen=True)
+class Commit:
+  """A data class represents a git commit."""
+  timestamp: int = 0
+  rev: str = ''
+  subject: str = 'dummy subject'
+
+  @staticmethod
+  def from_rev_line(rev_line: str) -> Commit:
+    # The input `rev_line` may not include the subject part, thus here we unpack
+    # `subject` as a list with an asterisk. The length of the `subject` list
+    # should be at most one.
+    ts_str, rev, *subject = rev_line.split(' ', 2)
+    return Commit(int(ts_str), rev, *subject)
+
+  @staticmethod
+  def make_commit_list(commit_tuples) -> list[Commit]:
+    return [Commit(*tuple) for tuple in commit_tuples]
+
+
+@dataclasses.dataclass(eq=True)
+class CommitMeta:
+  """A data class represents the metadata of a git commit."""
+  message: str | None = None
+  object: str | None = None
+  tree: str | None = None
+  type: str | None = None
+  parent: list[str] | None = None
+  author: str | None = None
+  committer: str | None = None
+  author_time: int | None = None
+  committer_time: int | None = None
+
+  UNKNOWN_SUMMARY: typing.ClassVar[str] = '(unknown)'
+
+  @staticmethod
+  def from_git_commit_object(git_cat_file_output: str) -> CommitMeta:
+    meta_dict = {}
+    header, meta_dict['message'] = git_cat_file_output.split('\n\n', 1)
+    for line in header.splitlines():
+      if m := re.match(r'^(object|tree|type) (\w+)', line):
+        meta_dict[m.group(1)] = m.group(2)
+        continue
+
+      if m := re.match(r'^parent (\w+)', line):
+        meta_dict['parent'] = line.split()[1:]
+        continue
+
+      if m := re.match(r'^(author|committer) (.*) (\d+) (\S+)$', line):
+        meta_dict[m.group(1)] = m.group(2)
+        meta_dict['%s_time' % m.group(1)] = int(m.group(3))
+        continue
+    return CommitMeta(**meta_dict)
+
+  @staticmethod
+  def get_summary(meta) -> str:
+    if meta is None or meta.message is None:
+      return CommitMeta.UNKNOWN_SUMMARY
+    else:
+      return meta.message.splitlines()[0]
+
+
+@dataclasses.dataclass(order=True, eq=True, frozen=True)
+class Period:
+  """A data class represents an inclusive period of time."""
+  begin: int = 0
+  end: int = 0
+
+  def __contains__(self, other):
+    if isinstance(other, int):
+      return self.begin <= other <= self.end
+    if isinstance(other, Period):
+      return self.begin <= other.begin and other.end <= self.end
+    raise TypeError('The membership test only accepts a `Period` or an `int`')
 
 
 def is_git_rev(s):
@@ -200,28 +279,32 @@ def fetch(git_repo, *args, retry_prune_if_conflict=False):
       raise
 
 
-def _adjust_timestamp_increasingly(commits):
+def _adjust_timestamp_increasingly(
+    commits: list[Commit], show_warning: bool = False) -> list[Commit]:
   """Adjust commit timestamps.
 
   After adjust, the timestamps are increasing.
 
   Args:
-    commits: list of (timestamp, commit hash)
+    commits: A list of `Commit` objects.
 
   Returns:
-    (adjusted count, list of (timestamp, commit hash))
+    The adjusted list of `Commit` objects.
   """
-  result = []
-  adjusted = 0
+  result: list[Commit] = []
+  adjusted_count = 0
   last_timestamp = -1
-  for timestamp, git_rev in commits:
-    if timestamp < last_timestamp:
-      adjusted += 1
-      timestamp = last_timestamp
-    else:
-      last_timestamp = timestamp
-    result.append((timestamp, git_rev))
-  return adjusted, result
+  for commit in commits:
+    if commit.timestamp < last_timestamp:
+      adjusted_count += 1
+    last_timestamp = max(last_timestamp, commit.timestamp)
+    result.append(Commit(last_timestamp, commit.rev, commit.subject))
+
+  if show_warning and adjusted_count > 0:
+    logger.warning('Commit timestamps are not increasing')
+    logger.warning('%d timestamps adjusted', adjusted_count)
+
+  return result
 
 
 class FastLookupFailed(Exception):
@@ -244,10 +327,9 @@ class FastLookupEntry:
     self.cached = []
     self.commit_to_index = {}
 
-  def optimize(self, period):
-    assert period[0] <= period[1]
-    if (self.optimized_period and self.optimized_period[0] <= period[0] and
-        period[1] <= self.optimized_period[1]):
+  def optimize(self, period: Period):
+    assert period.begin <= period.end
+    if self.optimized_period and period in self.optimized_period:
       # already done
       return
 
@@ -255,25 +337,26 @@ class FastLookupEntry:
     self.optimized_period = period
 
     # Adjust timestamps, so we can do binary search by timestamp
-    _adjusted, self.cached = _adjust_timestamp_increasingly(self.cached)
+    self.cached = _adjust_timestamp_increasingly(self.cached)
 
-    self.commit_to_index = {}
-    for i, (_timestamp, rev) in enumerate(self.cached):
-      self.commit_to_index[rev] = i
+    self.commit_to_index = {
+        commit.rev: i for i, commit in enumerate(self.cached)
+    }
 
   def get_rev_by_time(self, timestamp):
-    if not self.optimized_period[0] <= timestamp <= self.optimized_period[1]:
+    if not self.optimized_period:
+      raise FastLookupFailed
+    if timestamp not in self.optimized_period:
       raise FastLookupFailed
 
     # Note that, the return value might be different as "git rev-list" if the
     # actual commit timestamps are not fully increasing.
-    x = (timestamp, '')
-    idx = bisect.bisect_right(self.cached, x)
-    if idx == 0 and timestamp < self.cached[0][0]:
+    idx = bisect.bisect_right(self.cached, Commit(timestamp))
+    if idx == 0 and timestamp < self.cached[0].timestamp:
       return None
-    if idx == len(self.cached) or self.cached[idx][0] != timestamp:
+    if idx == len(self.cached) or self.cached[idx].timestamp != timestamp:
       idx -= 1
-    return self.cached[idx][1]
+    return self.cached[idx].rev
 
   def is_containing_commit(self, rev):
     if rev in self.commit_to_index:
@@ -298,7 +381,7 @@ class FastLookup:
   def get_rev_by_time(self, git_repo, timestamp, branch):
     if not self.target_period:
       raise FastLookupFailed
-    if not self.target_period[0] <= timestamp <= self.target_period[1]:
+    if timestamp not in self.target_period:
       raise FastLookupFailed
 
     if git_repo not in self.entries:
@@ -376,28 +459,6 @@ def is_ancestor_commit(git_repo, old, new):
     return False
 
 
-def _parse_commit_object(s):
-  meta = {}
-  header, meta['message'] = s.split('\n\n', 1)
-  for line in header.splitlines():
-    m = re.match(r'^(object|tree|type) (\w+)', line)
-    if m:
-      meta[m.group(1)] = m.group(2)
-      continue
-
-    m = re.match(r'^parent (\w+)', line)
-    if m:
-      meta['parent'] = line.split()[1:]
-      continue
-
-    m = re.match(r'^(author|committer) (.*) (\d+) (\S+)$', line)
-    if m:
-      meta[m.group(1)] = m.group(2)
-      meta['%s_time' % m.group(1)] = int(m.group(3))
-      continue
-  return meta
-
-
 @cache_util.Cache.default_disabled
 def get_commit_metadata(git_repo, rev):
   """Get metadata of given commit.
@@ -419,7 +480,7 @@ def get_commit_metadata(git_repo, rev):
   """
   data = util.check_output(
       'git', 'cat-file', '-p', rev, cwd=git_repo, log_stdout=False)
-  return _parse_commit_object(data)
+  return CommitMeta.from_git_commit_object(data)
 
 
 def get_batch_commit_metadata(git_repo, revs):
@@ -434,7 +495,7 @@ def get_batch_commit_metadata(git_repo, revs):
     data = util.check_output_in_bytes(
         'sh', '-c', 'git cat-file --batch < ' + f.name, cwd=git_repo)
 
-  metas = {}
+  metas: dict[str, CommitMeta | None] = {}
   while data:
     first_line, data = data.split(b'\n', 1)
     m = re.match(r'^(\w+) (\w+)(?: (\d+))?', first_line.decode('utf8'))
@@ -448,7 +509,7 @@ def get_batch_commit_metadata(git_repo, revs):
     object_size = int(m.group(3))
     assert data[object_size] == ord(b'\n'), repr(data[object_size])
     obj, data = data[:object_size], data[object_size + 1:]
-    metas[object_name] = _parse_commit_object(obj.decode('utf8'))
+    metas[object_name] = CommitMeta.from_git_commit_object(obj.decode('utf8'))
   return metas
 
 
@@ -644,8 +705,9 @@ def get_rev_by_time(git_repo, timestamp, branch, path=None):
   return result or None
 
 
-def get_revlist_by_period(git_repo, branch, period):
-  # Find the last commit before period[0].
+def get_revlist_by_period(git_repo: str, branch: str, period: Period
+    ) -> list[Commit]:
+  # Find the last commit before the begin of given period.
   text = util.check_output(
       'git',
       'rev-list',
@@ -653,7 +715,7 @@ def get_revlist_by_period(git_repo, branch, period):
       '--timestamp',
       '-1',
       '--before',
-      str(period[0] - 1),
+      str(period.begin - 1),
       branch,
       cwd=git_repo)
 
@@ -665,17 +727,13 @@ def get_revlist_by_period(git_repo, branch, period):
       '--timestamp',
       '--reverse',
       '--after',
-      str(period[0]),
+      str(period.begin),
       '--before',
-      str(period[1]),
+      str(period.end),
       branch,
       cwd=git_repo)
 
-  result = []
-  for line in text.splitlines():
-    timestamp, commit = line.split()
-    result.append((int(timestamp), commit))
-  return result
+  return [Commit.from_rev_line(line) for line in text.splitlines()]
 
 
 def reset_hard(git_repo):
@@ -793,37 +851,26 @@ def get_history(git_repo,
     # else (like git branch name, tag name, etc.)
     cmd += ['--', path]
 
-  result = []
-  for line in util.check_output(*cmd, cwd=git_repo).splitlines():
-    # array = [timestamp, git_rev, subject] or [timestamp, git_rev]
-    array = line.split(' ', 2)
-    array[0] = int(array[0])
-    result.append(tuple(array))
-
-  if padding_begin or padding_end:
-    history = [0, '']
-    if with_subject:
-      history.append('dummy subject')
+  lines = util.check_output(*cmd, cwd=git_repo).splitlines()
+  result = [Commit.from_rev_line(line) for line in lines]
 
   if padding_end:
     assert before, 'padding_end=True make no sense if before=None'
     if get_rev_by_time(git_repo, before, branch, path=path):
       before = int(before)
-      if not result or result[-1][0] != before:
+      if not result or result[-1].timestamp != before:
         git_rev = get_rev_by_time(git_repo, before, branch)
         assert git_rev
-        history[0:2] = [before, git_rev]
-        result.append(tuple(history))
+        result.append(Commit(before, git_rev))
 
   if padding_begin:
     assert after, 'padding_begin=True make no sense if after=None'
     if get_rev_by_time(git_repo, after, branch, path=path):
       after = int(after)
-      if not result or result[0][0] != after:
+      if not result or result[0].timestamp != after:
         git_rev = get_rev_by_time(git_repo, after, branch)
         assert git_rev
-        history[0:2] = [after, git_rev]
-        result.insert(0, tuple(history))
+        result.insert(0, Commit(after, git_rev))
 
   return result
 
@@ -871,28 +918,28 @@ def get_history_recursively(git_repo,
 
   # Collect include information of each commit.
   includes = {}
-  for commit_time, git_rev in history:
-    content = get_file_from_revision(git_repo, git_rev, path)
+  for commit in history:
+    content = get_file_from_revision(git_repo, commit.rev, path)
     parse_result = parser_callback(path, content)
     if parse_result is None:
       continue
     for include_name in parse_result:
       if include_name not in includes:
         includes[include_name] = set()
-      includes[include_name].add(git_rev)
+      includes[include_name].add(commit.rev)
 
   # Analyze the start time and end time of each include.
   dependencies = []
   for include in includes:
     appeared = None
-    for commit_time, git_rev in history:
-      if git_rev in includes[include]:
+    for commit in history:
+      if commit.rev in includes[include]:
         if not appeared:
-          appeared = commit_time
+          appeared = commit.timestamp
       else:
         if appeared:
-          # dependency file exists in time range [appeared, commit_time)
-          dependencies.append((include, appeared, commit_time - 1))
+          # dependency file exists in time range [appeared, commit.timestamp)
+          dependencies.append((include, appeared, commit.timestamp - 1))
           appeared = None
 
     if appeared is not None:
@@ -911,11 +958,9 @@ def get_history_recursively(git_repo,
         branch=branch)
 
   # Sort and padding.
-  result.sort(key=lambda x: x[0])
+  result.sort(key=lambda x: x.timestamp)
   if padding_end:
-    pad = (before,)
-    pad += result[-1][1:]
-    result.append(pad)
+    result.append(Commit(before, result[-1].rev, result[-1].subject))
 
   # Dedup.
   result2 = []
@@ -994,29 +1039,24 @@ def list_commits_between_commits(git_repo, old, new):
     return []
 
   assert is_ancestor_commit(git_repo, old, new)
-  commits = []
   # --first-parent is necessary for Android, see following link for more
   # discussion.
   # https://docs.google.com/document/d/1c8qiq14_ObRRjLT62sk9r5V5cyCGHX66dLYab4MVnks/edit#heading=h.n3i6mt2n6xuu
-  for line in util.check_output(
+  lines = util.check_output(
       'git',
       'rev-list',
       '--timestamp',
       '--reverse',
       '--first-parent',
       '%s..%s' % (old, new),
-      cwd=git_repo).splitlines():
-    timestamp, git_rev = line.split()
-    commits.append((int(timestamp), git_rev))
+      cwd=git_repo).splitlines()
+  commits = [Commit.from_rev_line(line) for line in lines]
 
   # bisect-kit has a fundamental assumption that commit timestamps are
   # increasing because we sort and bisect the commits by timestamp across git
   # repos. If not increasing, we have to adjust the timestamp as workaround.
   # This might lead to bad bisect result, however the bad probability is low in
   # practice since most machines' clocks are good enough.
-  adjusted, commits = _adjust_timestamp_increasingly(commits)
-  if adjusted != 0:
-    logger.warning('Commit timestamps are not increasing')
-    logger.warning('%d timestamps adjusted', adjusted)
+  commits = _adjust_timestamp_increasingly(commits, show_warning=True)
 
   return commits

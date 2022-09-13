@@ -234,16 +234,16 @@ class AndroidSpecManager(codechange.SpecManager):
     commits = []
     old_timestamp = lookup_build_timestamp(self.config['flavor'], old)
     new_timestamp = lookup_build_timestamp(self.config['flavor'], new)
-    for timestamp, git_rev in git_util.get_history(self.manifest_dir, path):
-      if timestamp < old_timestamp:
+    for commit in git_util.get_history(self.manifest_dir, path):
+      if commit.timestamp < old_timestamp:
         commits = []
-      commits.append((timestamp, git_rev))
-      if timestamp > new_timestamp:
+      commits.append(commit)
+      if commit.timestamp > new_timestamp:
         break
 
-    for timestamp, git_rev in commits:
+    for commit in commits:
       result.append(
-          codechange.Spec(codechange.SPEC_FLOAT, git_rev, timestamp, path))
+          codechange.Spec(codechange.SPEC_FLOAT, commit.rev, commit.timestamp, path))
     return result
 
   def collect_fixed_spec(self, old, new):

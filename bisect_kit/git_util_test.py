@@ -166,19 +166,19 @@ class TestGitOperationReadOnly(unittest.TestCase):
         git_util.is_ancestor_commit(self.git_repo, 'a' * 40, 'a' * 40))
 
   def test_get_commit_metadata(self):
-    self.assertNotIn(
-        'parent', git_util.get_commit_metadata(self.git_repo, self.commits[0]))
+    self.assertIsNone(
+        git_util.get_commit_metadata(self.git_repo, self.commits[0]).parent)
 
     self.assertEqual(
-        git_util.get_commit_metadata(self.git_repo, self.commits[1])['parent'],
+        git_util.get_commit_metadata(self.git_repo, self.commits[1]).parent,
         [self.commits[0]])
 
   def test_get_batch_commit_metadata(self):
     bad_obj = 'foobar'
-    result = git_util.get_batch_commit_metadata(self.git_repo,
-                                                self.commits + [bad_obj])
-    self.assertEqual(result[self.commits[1]]['parent'], [self.commits[0]])
-    self.assertEqual(result[self.commits[3]]['parent'], [self.commits[2]])
+    result = git_util.get_batch_commit_metadata(
+        self.git_repo, self.commits + [bad_obj])
+    self.assertEqual(result[self.commits[1]].parent, [self.commits[0]])
+    self.assertEqual(result[self.commits[3]].parent, [self.commits[2]])
     self.assertEqual(result[bad_obj], None)
 
   def test_get_revlist(self):
@@ -211,9 +211,13 @@ class TestGitOperationReadOnly(unittest.TestCase):
             self.git_repo,
             self.git.default_filename,
             after=timestamp + 100,
-            before=timestamp + day * 2 + 100),
-        [(timestamp + day * 1, self.commits[2]),
-         (timestamp + day * 2, self.commits[3])])
+            before=timestamp + day * 2 + 100,
+        ),
+        git_util.Commit.make_commit_list([
+            (timestamp + day * 1, self.commits[2]),
+            (timestamp + day * 2, self.commits[3]),
+        ]),
+    )
 
     # Test boundary condition (inclusive).
     self.assertEqual(
@@ -221,11 +225,14 @@ class TestGitOperationReadOnly(unittest.TestCase):
             self.git_repo,
             self.git.default_filename,
             after=timestamp,
-            before=timestamp + day * 2), [
-                (timestamp, self.commits[1]),
-                (timestamp + day * 1, self.commits[2]),
-                (timestamp + day * 2, self.commits[3]),
-            ])
+            before=timestamp + day * 2,
+        ),
+        git_util.Commit.make_commit_list([
+            (timestamp, self.commits[1]),
+            (timestamp + day * 1, self.commits[2]),
+            (timestamp + day * 2, self.commits[3]),
+        ]),
+    )
 
     # Padding.
     self.assertEqual(
@@ -235,12 +242,15 @@ class TestGitOperationReadOnly(unittest.TestCase):
             after=timestamp + 100,
             before=timestamp + day * 2 + 100,
             padding_begin=True,
-            padding_end=True), [
-                (timestamp + 100, self.commits[1]),
-                (timestamp + day * 1, self.commits[2]),
-                (timestamp + day * 2, self.commits[3]),
-                (timestamp + day * 2 + 100, self.commits[3]),
-            ])
+            padding_end=True,
+        ),
+        git_util.Commit.make_commit_list([
+            (timestamp + 100, self.commits[1]),
+            (timestamp + day * 1, self.commits[2]),
+            (timestamp + day * 2, self.commits[3]),
+            (timestamp + day * 2 + 100, self.commits[3]),
+        ]),
+      )
 
   def test_get_history_before_first_commit(self):
     # timestamp of the first commit of git repo
@@ -251,9 +261,12 @@ class TestGitOperationReadOnly(unittest.TestCase):
             self.git_repo,
             self.git.default_filename,
             after=time - 10,
-            before=time + 10), [
-                (time, self.commits[0]),
-            ])
+            before=time + 10,
+        ),
+        git_util.Commit.make_commit_list([
+            (time, self.commits[0]),
+        ]),
+    )
 
     self.assertEqual(
         git_util.get_history(
@@ -262,10 +275,13 @@ class TestGitOperationReadOnly(unittest.TestCase):
             after=time - 10,
             before=time + 10,
             padding_begin=True,
-            padding_end=True), [
-                (time, self.commits[0]),
-                (time + 10, self.commits[0]),
-            ])
+            padding_end=True,
+        ),
+        git_util.Commit.make_commit_list([
+            (time, self.commits[0]),
+            (time + 10, self.commits[0]),
+        ]),
+    )
 
     self.assertEqual(
         git_util.get_history(
@@ -274,7 +290,10 @@ class TestGitOperationReadOnly(unittest.TestCase):
             after=time - 10,
             before=time - 5,
             padding_begin=True,
-            padding_end=True), [])
+            padding_end=True,
+        ),
+        [],
+    )
 
     self.assertEqual(
         git_util.get_history(
@@ -283,7 +302,10 @@ class TestGitOperationReadOnly(unittest.TestCase):
             after=time - 10,
             before=time + 10,
             padding_begin=True,
-            padding_end=True), [])
+            padding_end=True,
+        ),
+        [],
+    )
 
 
 class TestGitOperation(unittest.TestCase):
@@ -508,13 +530,14 @@ class TestGitOperation(unittest.TestCase):
 
     self.assertEqual(
         git_util.get_history(self.git_repo, path, after=time, before=time + 60),
-        [
+        git_util.Commit.make_commit_list([
             (time + 10, c1),
             (time + 20, c2),
             (time + 30, c3),
             (time + 40, c4),
             (time + 50, c5),
-        ])
+        ]),
+    )
 
   def test_get_history_recursively(self):
     time = 1500000000
@@ -533,26 +556,41 @@ class TestGitOperation(unittest.TestCase):
       return content.split()
 
     self.assertEqual(
-        git_util.get_history_recursively(self.git_repo, 'c', time, time + 100,
-                                         parse), [(time + 30, c3),
-                                                  (time + 90, c9),
-                                                  (time + 100, c9)])
+        git_util.get_history_recursively(
+            self.git_repo, 'c', time, time + 100, parse,
+        ),
+        git_util.Commit.make_commit_list([
+            (time + 30, c3),
+            (time + 90, c9),
+            (time + 100, c9),
+        ]),
+    )
     self.assertEqual(
-        git_util.get_history_recursively(self.git_repo, 'b', time, time + 100,
-                                         parse), [(time + 20, c2),
-                                                  (time + 70, c7),
-                                                  (time + 90, c9),
-                                                  (time + 100, c9)])
+        git_util.get_history_recursively(
+            self.git_repo, 'b', time, time + 100, parse,
+        ),
+        git_util.Commit.make_commit_list([
+            (time + 20, c2),
+            (time + 70, c7),
+            (time + 90, c9),
+            (time + 100, c9),
+        ]),
+    )
 
     self.assertEqual(
-        git_util.get_history_recursively(self.git_repo, 'a', time, time + 100,
-                                         parse), [(time + 10, c1),
-                                                  (time + 40, c4),
-                                                  (time + 50, c5),
-                                                  (time + 60, c6),
-                                                  (time + 80, c8),
-                                                  (time + 90, c9),
-                                                  (time + 100, c9)])
+        git_util.get_history_recursively(
+            self.git_repo, 'a', time, time + 100, parse,
+        ),
+        git_util.Commit.make_commit_list([
+            (time + 10, c1),
+            (time + 40, c4),
+            (time + 50, c5),
+            (time + 60, c6),
+            (time + 80, c8),
+            (time + 90, c9),
+            (time + 100, c9),
+        ]),
+    )
 
   def test_get_history_recursively2(self):
 
@@ -566,27 +604,42 @@ class TestGitOperation(unittest.TestCase):
     c4 = self.git.add_commit(time + 40, 'msg', 'f2', ' ')
 
     self.assertEqual(
-        git_util.get_history_recursively(self.git_repo, 'f1', time, time + 100,
-                                         parse), [(time + 30, c3),
-                                                  (time + 40, c4),
-                                                  (time + 100, c4)])
+        git_util.get_history_recursively(
+            self.git_repo, 'f1', time, time + 100, parse,
+        ),
+        git_util.Commit.make_commit_list([
+            (time + 30, c3),
+            (time + 40, c4),
+            (time + 100, c4),
+        ]),
+    )
 
     c5 = self.git.add_commit(time + 50, 'msg', 'f3', ' ')
     self.assertEqual(
-        git_util.get_history_recursively(self.git_repo, 'f1', time, time + 100,
-                                         parse), [(time + 30, c3),
-                                                  (time + 40, c4),
-                                                  (time + 50, c5),
-                                                  (time + 100, c5)])
+        git_util.get_history_recursively(
+            self.git_repo, 'f1', time, time + 100, parse,
+        ),
+        git_util.Commit.make_commit_list([
+            (time + 30, c3),
+            (time + 40, c4),
+            (time + 50, c5),
+            (time + 100, c5),
+        ]),
+    )
 
     c6 = self.git.add_commit(time + 60, 'msg', 'f2', '  ')
     self.assertEqual(
-        git_util.get_history_recursively(self.git_repo, 'f1', time, time + 100,
-                                         parse), [(time + 30, c3),
-                                                  (time + 40, c4),
-                                                  (time + 50, c5),
-                                                  (time + 60, c6),
-                                                  (time + 100, c6)])
+        git_util.get_history_recursively(
+            self.git_repo, 'f1', time, time + 100, parse,
+        ),
+        git_util.Commit.make_commit_list([
+            (time + 30, c3),
+            (time + 40, c4),
+            (time + 50, c5),
+            (time + 60, c6),
+            (time + 100, c6),
+        ]),
+    )
 
   def test_get_history_recursively_ordering(self):
     # All commits have identical commit time.
@@ -595,7 +648,7 @@ class TestGitOperation(unittest.TestCase):
     commits = []
     for i in range(10):
       commit = self.git.add_commit(time, 'msg', 'foo', str(i))
-      commits.append((time, commit))
+      commits.append(git_util.Commit(time, commit))
 
     # The commit ordering should be preserved.
     self.assertEqual(
@@ -615,8 +668,7 @@ class TestGitOperation(unittest.TestCase):
     self.assertFalse(git_util.is_symbolic_link(self.git_repo, commit2, 'bar'))
     self.assertTrue(git_util.is_symbolic_link(self.git_repo, commit4, 'bar'))
     with self.assertRaises(ValueError):
-      self.assertFalse(
-          git_util.is_symbolic_link(self.git_repo, commit4, 'dir/baz'))
+        git_util.is_symbolic_link(self.git_repo, commit4, 'dir/baz')
     self.assertTrue(
         git_util.is_symbolic_link(self.git_repo, commit5, 'dir/baz'))
 
@@ -648,13 +700,13 @@ class TestFastLookup(unittest.TestCase):
 
   git_repo = '/dummy/git/repo/path'
   branch = 'dummy-branch'
-  commits = [
+  commits = git_util.Commit.make_commit_list([
       (100, 'aaaaa'),
       (200, 'bbbbb'),
       (300, 'ccccc'),
       (400, 'ddddd'),
       (500, 'eeeee'),
-  ]
+  ])
 
   def test_disabled(self):
     lookup = git_util.FastLookup()
@@ -667,7 +719,7 @@ class TestFastLookup(unittest.TestCase):
     with mock.patch(
         'bisect_kit.git_util.get_revlist_by_period', return_value=self.commits):
       lookup = git_util.FastLookup()
-      lookup.optimize((100, 500))
+      lookup.optimize(git_util.Period(100, 500))
       self.assertEqual(
           lookup.get_rev_by_time(self.git_repo, 100, self.branch), 'aaaaa')
       self.assertEqual(
@@ -685,7 +737,7 @@ class TestFastLookup(unittest.TestCase):
     with mock.patch(
         'bisect_kit.git_util.get_revlist_by_period', return_value=self.commits):
       lookup = git_util.FastLookup()
-      lookup.optimize((100, 500))
+      lookup.optimize(git_util.Period(100, 500))
       lookup.get_rev_by_time(self.git_repo, 100, self.branch)
       self.assertTrue(lookup.is_containing_commit(self.git_repo, 'bbbbb'))
       self.assertTrue(lookup.is_containing_commit(self.git_repo, 'ccccc'))

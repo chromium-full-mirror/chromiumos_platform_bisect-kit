@@ -558,14 +558,14 @@ class ChromeSpecManager(codechange.SpecManager):
         continue
       while True:
         metadata = git_util.get_commit_metadata(git_repo, path_spec.at)
-        if 'parent' not in metadata:
+        if metadata.parent is None:
           break
         bot_email = 'chrome-release-bot@chromium.org'
-        if (bot_email not in metadata['committer'] and
-            bot_email not in metadata['author']):
+        if (bot_email not in metadata.committer and
+            bot_email not in metadata.author):
           break
 
-        path_spec.at = metadata['parent'][0]
+        path_spec.at = metadata.parent[0]
 
   def sync_to_release(self, rev):
     """Switch source tree to given release version.

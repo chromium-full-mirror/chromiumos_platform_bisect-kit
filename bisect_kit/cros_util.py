@@ -2340,8 +2340,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
     # commits before snapshot_id=2, this method works fine after
     # snapshot 2, except snapshot 2633
     for commit in reversed(commits):
-      msg = commit[2]
-      if commit[1] in ignore_list:
+      msg = commit.subject
+      if commit.rev in ignore_list:
         continue
 
       match = re.match(r'^annealing manifest snapshot (\d+)', msg)
@@ -2356,7 +2356,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
       if 29288 <= int(snapshot_id) <= 29439:
         continue
       if int(old_snapshot_id) <= int(snapshot_id) <= int(new_snapshot_id):
-        result.append((commit[0], commit[1], snapshot_id))
+        result.append((commit.timestamp, commit.rev, snapshot_id))
     # We find commits in reversed order, now reverse it again to chronological
     # order.
     return list(reversed(result))
@@ -2515,10 +2515,11 @@ class ChromeOSSpecManager(codechange.SpecManager):
     result = []
     path = 'default.xml'
     parser = repo_util.ManifestParser(self.manifest_dir)
-    for timestamp, git_rev in parser.enumerate_manifest_commits(
+    for commit in parser.enumerate_manifest_commits(
         old_timestamp, new_timestamp, path, branch=branch):
-      result.append(
-          codechange.Spec(codechange.SPEC_FLOAT, git_rev, timestamp, path))
+      result.append(codechange.Spec(
+          codechange.SPEC_FLOAT, commit.rev, commit.timestamp, path
+      ))
     return result
 
   def collect_fixed_spec(self, old, new):

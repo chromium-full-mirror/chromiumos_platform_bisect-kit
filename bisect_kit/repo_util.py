@@ -549,8 +549,7 @@ class Manifest:
     """
     commits = git_util.get_history(
         self.manifest_internal_dir, before=timestamp + 1)
-    commit = commits[-1][1]
-    self.load_from_commit(commit)
+    self.load_from_commit(commits[-1].rev)
 
   def to_string(self):
     """Dump current xml to a string.
