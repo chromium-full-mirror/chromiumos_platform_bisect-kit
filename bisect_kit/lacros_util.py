@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2022 The ChromiumOS Authors.
+# Copyright 2022 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -160,7 +160,7 @@ def get_dut_cpu_architecture(dut_ip: str) -> str:
     dut_architecture = util.ssh_cmd(dut_ip, "uname", "-m")
     # There is a extra newline in the output
     dut_architecture = dut_architecture.splitlines()[0]
-    logger.info("DUT CPU architecture: %s", dut_architecture)
+    logger.debug("DUT CPU architecture: %s", dut_architecture)
     return dut_architecture
   except subprocess.CalledProcessError:
     logger.error("Get DUT architecture failed")

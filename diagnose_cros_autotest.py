@@ -173,6 +173,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         cros_prebuilt_extra_switch_cmd = common_switch_cmd
         android_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
+        lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
         chrome_with_tests = bool(self.config['test_name'])  # not CTS/GTS
         cros_buildbucket_build = (
@@ -191,6 +192,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cros_prebuilt_extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
             cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
             android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
+            lacros_prebuilt_eval_cmd=lacros_prebuilt_eval_cmd,
             chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
             chrome_localbuild_with_tests=chrome_with_tests,
             cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,

@@ -97,15 +97,26 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         cros_prebuilt_extra_switch_cmd = common_switch_cmd
         # So far only the `release` images support the `--prebuilt` option
-        if cros_util.has_release_prebuilt(self.config['board'], self.config['old']):
+        if cros_util.has_release_prebuilt(self.config['board'],
+                                          self.config['old']):
           cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
+          lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         else:
           cros_prebuilt_eval_cmd = common_eval_cmd + ['--tast_build']
+          lacros_prebuilt_eval_cmd = common_eval_cmd + ['--tast_build']
+
+        lacros_prebuilt_eval_cmd = lacros_prebuilt_eval_cmd + ['--args'] + [
+            'lacros.DeployedBinary=/usr/local/lacros-chrome'
+        ]
         android_prebuilt_eval_cmd = common_eval_cmd
         if self.config['chrome_deploy_image']:
           chrome_localbuild_eval_cmd = common_eval_cmd + ['--tast_build']
         else:
           chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
+
+        chrome_localbuild_eval_cmd = chrome_localbuild_eval_cmd + ['--args'] + [
+            'lacros.DeployedBinary=/usr/local/lacros-chrome'
+        ]
 
         cros_buildbucket_build = (
             cros_util.is_buildbucket_buildable(self.config['cros_prebuilt_old'])
@@ -122,6 +133,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cros_prebuilt_extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
             cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
             android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
+            lacros_prebuilt_eval_cmd=lacros_prebuilt_eval_cmd,
             chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
             cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,
             cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd)

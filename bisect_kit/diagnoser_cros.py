@@ -124,6 +124,7 @@ class CrosDiagnoser:
                cros_prebuilt_extra_switch_cmd: list[str] = None,
                cros_prebuilt_eval_cmd: list[str] = None,
                android_prebuilt_eval_cmd: list[str] = None,
+               lacros_prebuilt_eval_cmd: list[str] = None,
                chrome_localbuild_eval_cmd: list[str] = None,
                chrome_localbuild_with_tests: bool = True,
                cros_localbuild_eval_cmd: list[str] = None,
@@ -156,7 +157,21 @@ class CrosDiagnoser:
     assert dut_os_version == cros_util.query_dut_short_version(self.dut), (
         'Someone else reflashed the DUT. DUT locking is not respected?')
 
-    # Step 3: Narrows down Chrome local build. If the error can be reproduced,
+    # Step 3: Narrows down Lacros prebuilt. If the error can be reproduced,
+    # returns the result and skips other steps.
+    try:
+      self.narrow_down_lacros_prebuilt(lacros_prebuilt_eval_cmd)
+    except errors.DiagnoseContradiction:
+      raise
+    except Exception:
+      self.make_decision('Exception in Lacros bisector before verification; '
+                         'assume the culprit is not inside Lacros and continue')
+    # Assume it's ok to leave random version of Lacros prebuilt on DUT.
+    # Sanity check. The OS version should not change after lacros bisect.
+    assert dut_os_version == cros_util.query_dut_short_version(self.dut), (
+        'Someone else reflashed the DUT. DUT locking is not respected?')
+
+    # Step 4: Narrows down Chrome local build. If the error can be reproduced,
     # returns the result and skips other steps.
     buildbucket_buildable = cros_util.is_buildbucket_buildable(
         self.config['cros_prebuilt_old'])
@@ -188,7 +203,7 @@ class CrosDiagnoser:
       assert dut_os_version == cros_util.query_dut_short_version(self.dut), (
           'Someone else reflashed the DUT. DUT locking is not respected?')
 
-    # Step 4: Narrowdown chromeos localbuild.
+    # Step 5: Narrowdown chromeos localbuild.
     self.narrow_down_chromeos_localbuild(
         cros_localbuild_eval_cmd,
         buildbucket_buildable and
@@ -514,6 +529,99 @@ class CrosDiagnoser:
       return verified
     return verified
 
+  def narrow_down_lacros_prebuilt(self, eval_cmd: str, extra_switch_cmd=None):
+    """Bisect with Lacros Prebuilt.
+
+    It's known that the version of ChromeOS has old behavior.
+
+    Args:
+      eval_cmd: command to reproduce the regression
+      extra_switch_cmd: additional command to run when switch lacros version
+
+    Returns:
+      True: culprit is inside Lacros
+      False: culprit is not inside Lacros or unable to bisect
+
+    """
+    if self.config['bisect_android']:
+      self.make_decision(
+          'The bisection with Lacros prebuilt is bypassed since --bisect_android is on'
+      )
+      return False
+
+    if self.old_info['cr_version'] == self.new_info['cr_version']:
+      self.make_decision(
+          'The Lacros version is identical, no need to bisect Lacros')
+      return False
+
+    if self.config['bypass_chrome_build']:
+      self.make_decision('The bisection with Lacros is bypassed')
+      return False
+
+    logger.info('bisect lacros prebuilt')
+    self.states.add_history(
+        'bisect',
+        text='bisect lacros prebuilt',
+        bisector='bisect_lacros_prebuilt',
+        session=self.config['session'])
+
+    switch_cmd = [
+        './switch_lacros_prebuilt.py',
+        '--rich_result',
+        '--dut',
+        self.dut,
+        '--chromeos_root',
+        self.config['chromeos_root'],
+    ]
+
+    bisector = wrapper.BisectorWrapper('bisect_lacros_prebuilt',
+                                       self.config['session'])
+
+    init_args = [
+        '--dut',
+        self.dut,
+        '--board',
+        self.config['board'],
+        '--chromeos_root',
+        self.config['chromeos_root'],
+    ]
+
+    try:
+      bisector.init_if_necessary(
+          self.old_info['cr_version'],
+          self.new_info['cr_version'],
+          init_args=init_args,
+          switch_cmd=switch_cmd,
+          eval_cmd=eval_cmd,
+          old_value=self.config['old_value'],
+          new_value=self.config['new_value'],
+          term_old=self.config['term_old'],
+          term_new=self.config['term_new'],
+          recompute_init_values=self.config['recompute_init_values'],
+          noisy=self.noisy)
+      if extra_switch_cmd:
+        bisector.append_switch_command(extra_switch_cmd)
+
+      lacros_old, lacros_new, self.noisy = bisector.narrow_down()
+
+      # If lacros prebuilt successfully narrow down to a range,
+      # Run chrome bisection from that range
+      self.old_info['cr_version'] = lacros_old
+      self.new_info['cr_version'] = lacros_new
+      logger.info(f'Lacros prebuilt narrowerd down to {lacros_old} -> {lacros_new}')
+    except errors.VerifyOldBehaviorFailed as e:
+      self.make_decision('Expect old Lacros has old behavior (%s) but failed' %
+                         self.config['term_old'])
+      raise errors.DiagnoseContradiction(
+          '%s that old chrome os has old behavior (%s); '
+          'but it became new behavior (%s) after deploying Lacros' %
+          (self._verified_chromeos_prebuilt(), self.config['term_old'],
+           self.config['term_new'])) from e
+    except errors.VerifyNewBehaviorFailed:
+      self.make_decision('Unable to reproduce, the culprit is not in Lacros')
+      return False
+    return True
+
   def narrow_down_chrome(self,
                          eval_cmd,
                          buildbucket_build=False,
@@ -827,7 +935,7 @@ class DiagnoseCommandLineBase:
       opts.chrome_root = path_factory.get_chrome_tree()
       logger.info('chrome_root = %s', opts.chrome_root)
 
-    if opts.bisect_chrome:
+    if opts.bisect_chrome or opts.bisect_lacros:
       if not cr_util.is_version_lesseq(
           opts.old, opts.new) or not cr_util.is_direct_relative_version(
               opts.old, opts.new):
@@ -864,7 +972,7 @@ class DiagnoseCommandLineBase:
     if opts.bisect_chrome and opts.bisect_android:
       self.argument_parser.error(
           '--bisect_chrome and --bisect_android are not allowed together')
-    elif opts.bisect_chrome:
+    elif opts.bisect_chrome or opts.bisect_lacros:
       opts.base_cros_version = self.check_cros_image_exists(
           '--base_cros_version', opts.board, opts.base_cros_version)
       self.check_chrome_version('--old', opts.old)
@@ -930,19 +1038,17 @@ class DiagnoseCommandLineBase:
       if not cros_lab_util.repair(opts.dut):
         raise ValueError('DUT is in bad state')
 
-    # Determines CrOS, Chrome old and new versions from argument.
+    cros_prebuilt_old, cros_prebuilt_new = opts.base_cros_version, opts.base_cros_version
+    chrome_localbuild_old, chrome_localbuild_new = None, None
+    android_prebuilt_old, android_prebuilt_new = None, None
+
+    # Determines CrOS, Chrome, Android, Lacros old and new versions from argument.
     if opts.bisect_chrome:
-      cros_prebuilt_old, cros_prebuilt_new = opts.base_cros_version, opts.base_cros_version
       chrome_localbuild_old, chrome_localbuild_new = opts.old, opts.new
-      android_prebuilt_old, android_prebuilt_new = None, None
     elif opts.bisect_android:
-      cros_prebuilt_old, cros_prebuilt_new = opts.base_cros_version, opts.base_cros_version
-      chrome_localbuild_old, chrome_localbuild_new = None, None
       android_prebuilt_old, android_prebuilt_new = opts.old, opts.new
     else:
       cros_prebuilt_old, cros_prebuilt_new = opts.old, opts.new
-      chrome_localbuild_old, chrome_localbuild_new = None, None
-      android_prebuilt_old, android_prebuilt_new = None, None
 
     config = dict(
         session=opts.session,
