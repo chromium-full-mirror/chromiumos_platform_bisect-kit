@@ -969,7 +969,7 @@ class CodeManager:
       float_specs.pop()
     assert float_specs
     logger.debug('Found %d float specs', len(float_specs))
-    for idx,spec in enumerate(float_specs):
+    for idx, spec in enumerate(float_specs):
       logger.debug('Float spec %d name:%s, timestamp: %d', idx, spec.name,
                    spec.timestamp)
       self.spec_manager.parse_spec(spec)

@@ -608,7 +608,8 @@ class CrosDiagnoser:
       # Run chrome bisection from that range
       self.old_info['cr_version'] = lacros_old
       self.new_info['cr_version'] = lacros_new
-      logger.info(f'Lacros prebuilt narrowerd down to {lacros_old} -> {lacros_new}')
+      logger.info(
+          f'Lacros prebuilt narrowerd down to {lacros_old} -> {lacros_new}')
     except errors.VerifyOldBehaviorFailed as e:
       self.make_decision('Expect old Lacros has old behavior (%s) but failed' %
                          self.config['term_old'])

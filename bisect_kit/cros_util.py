@@ -537,7 +537,8 @@ def query_dut_short_version(host):
   This function may return version of local build, which
   is_cros_short_version() is false.
   """
-  return version_to_short(query_dut_lsb_release(host).get('CHROMEOS_RELEASE_VERSION'))
+  return version_to_short(
+      query_dut_lsb_release(host).get('CHROMEOS_RELEASE_VERSION'))
 
 
 def query_dut_prebuilt_version(host):
@@ -805,8 +806,10 @@ def should_fetch_release_manifest_from_gs(version: str) -> bool:
   return int(milestone) >= gs_manifest_cutoff_milestone
 
 
-def _iter_valid_prebuilt_gs_path(board: str, version: str,
-    buckets: list[str] = prebuilt_image_buckets) -> typing.Iterator[str]:
+def _iter_valid_prebuilt_gs_path(board: str,
+                                 version: str,
+                                 buckets: list[str] = prebuilt_image_buckets
+                                ) -> typing.Iterator[str]:
   """Iterate the valid paths of prebuilt images on `gs_archive_path`.
 
   Args:
@@ -830,8 +833,9 @@ def _iter_valid_prebuilt_gs_path(board: str, version: str,
       yield gs_path.rstrip('/')
 
 
-def query_prebuilt_gs_path(board: str, version: str,
-    buckets: list[str] = prebuilt_image_buckets) -> str:
+def query_prebuilt_gs_path(board: str,
+                           version: str,
+                           buckets: list[str] = prebuilt_image_buckets) -> str:
   """Query the first valid path of prebuilt image on `gs_archive_path`.
 
   Args:
@@ -864,8 +868,8 @@ def has_release_prebuilt(board: str, version: str) -> bool:
   return bool(query_prebuilt_gs_path(board, version, [release_bucket]))
 
 
-def query_milestone_by_version(board: str, short_version: str
-    ) -> typing.Optional[str]:
+def query_milestone_by_version(board: str,
+                               short_version: str) -> typing.Optional[str]:
   """Query milestone by ChromeOS version number.
 
   Args:
@@ -1177,8 +1181,7 @@ def extract_info_from_prebuilt_gs_path(gs_path) -> dict:
   bucket_pattern = '|'.join(prebuilt_image_buckets)
   gs_path_pattern = (
       gs_archive_base +
-      rf'(?P<board>[^/]+?)-(?P<bucket>{bucket_pattern})/(?P<version>[^/]+)/'
-  )
+      rf'(?P<board>[^/]+?)-(?P<bucket>{bucket_pattern})/(?P<version>[^/]+)/')
   if (m := re.search(gs_path_pattern, gs_path)):
     return m.groupdict()
   return {}
@@ -1203,8 +1206,8 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
       return f'xbuddy://remote/{info["board"]}/{info["version"]}/test'
 
     if info.get('bucket') == factory_bucket:
-      cache_path = _cache_path_for_download(
-          chromeos_root, f'{path}.{test_image_filename}')
+      cache_path = _cache_path_for_download(chromeos_root,
+                                            f'{path}.{test_image_filename}')
       cache_path_full = os.path.join(chromeos_root, cache_path)
       if os.path.exists(cache_path_full):
         return cache_path
@@ -1212,7 +1215,8 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
         gsutil('cp', path, tmp_dir)
         local_path = os.path.join(tmp_dir, os.path.basename(path))
         assert os.path.exists(local_path)
-        util.check_call('tar', 'xf', local_path, test_image_filename, cwd=tmp_dir)
+        util.check_call(
+            'tar', 'xf', local_path, test_image_filename, cwd=tmp_dir)
         shutil.move(os.path.join(tmp_dir, test_image_filename), cache_path_full)
       return cache_path
 
@@ -1237,8 +1241,8 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
 
   path = image_info.get(ImageType.ZIP_FILE)
   if path:
-    cache_path = _cache_path_for_download(
-        chromeos_root, f'{path}.{test_image_filename}')
+    cache_path = _cache_path_for_download(chromeos_root,
+                                          f'{path}.{test_image_filename}')
     cache_path_full = os.path.join(chromeos_root, cache_path)
     if os.path.exists(cache_path_full):
       return cache_path
@@ -1249,7 +1253,8 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
         gsutil('cp', path, tmp_dir)
         local_path = os.path.join(tmp_dir, os.path.basename(path))
         assert os.path.exists(local_path)
-      util.check_call('unzip', '-j', local_path, test_image_filename, cwd=tmp_dir)
+      util.check_call(
+          'unzip', '-j', local_path, test_image_filename, cwd=tmp_dir)
       shutil.move(os.path.join(tmp_dir, test_image_filename), cache_path_full)
 
     return cache_path
@@ -1361,7 +1366,8 @@ def search_prebuilt_image(board, version) -> ImageInfo:
   image_info = ImageInfo()
   for gs_path in _iter_valid_prebuilt_gs_path(board, version):
     if gsutil_ls(f'{gs_path}/{disk_image_bundle_filename}', ignore_errors=True):
-      image_info[ImageType.DISK_IMAGE] = f'{gs_path}/{disk_image_bundle_filename}'
+      image_info[
+          ImageType.DISK_IMAGE] = f'{gs_path}/{disk_image_bundle_filename}'
     if gsutil_ls(f'{gs_path}/{sample_partition_filename}', ignore_errors=True):
       image_info[ImageType.PARTITION_IMAGE] = gs_path
     if image_info:
@@ -1535,7 +1541,8 @@ def version_info(board, version) -> dict:
   metadata_filenames = ['metadata.json', 'partial-metadata.json']
   for gs_path in _iter_valid_prebuilt_gs_path(board, version):
     for metadata_filename in metadata_filenames:
-      metadata_str = gsutil('cat', f'{gs_path}/{metadata_filename}', ignore_errors=True)
+      metadata_str = gsutil(
+          'cat', f'{gs_path}/{metadata_filename}', ignore_errors=True)
       if not metadata_str:
         continue
       metadata = json.loads(metadata_str)

@@ -431,10 +431,7 @@ def get_batch_commit_metadata(git_repo, revs):
     # shell redirect instead.
     # Call binary version because we need to count size in bytes later.
     data = util.check_output_in_bytes(
-        'sh',
-        '-c',
-        'git cat-file --batch < ' + f.name,
-        cwd=git_repo)
+        'sh', '-c', 'git cat-file --batch < ' + f.name, cwd=git_repo)
 
   metas = {}
   while data:

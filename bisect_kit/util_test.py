@@ -43,7 +43,7 @@ class TestPopen(unittest.TestCase):
     output = util.check_output('echo', 'foobar')
     self.assertEqual(output, 'foobar\n')
     output = util.check_output('sh', '-c', 'echo 1; sleep 0.05; echo 2')
-    self.assertEqual(output , '1\n2\n')
+    self.assertEqual(output, '1\n2\n')
     output = util.check_output('echo 1; echo 2', shell=True)
     self.assertEqual(output, '1\n2\n')
 
@@ -56,7 +56,8 @@ class TestPopen(unittest.TestCase):
   def test_check_output_in_bytes(self):
     output = util.check_output_in_bytes('echo', 'foobar')
     self.assertEqual(output, b'foobar\n')
-    output = util.check_output_in_bytes('sh', '-c', 'echo 1; sleep 0.05; echo 2')
+    output = util.check_output_in_bytes('sh', '-c',
+                                        'echo 1; sleep 0.05; echo 2')
     self.assertEqual(output, b'1\n2\n')
     output = util.check_output_in_bytes('echo 1; echo 2', shell=True)
     self.assertEqual(output, b'1\n2\n')

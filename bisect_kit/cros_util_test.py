@@ -181,32 +181,36 @@ class TestCrosUtil(unittest.TestCase):
       with self.assertRaises(subprocess.CalledProcessError):
         cros_util.gsutil('cat', 'bar')
 
-
   def test_query_prebuilt_gs_path(self):
+
     def gsutil_ls(*args, **kwargs):
       logger.debug('gsutil_ls %r %r', args, kwargs)
       if args in [
           ('-d', 'gs://chromeos-image-archive/samus-release/R64-10123.0.0'),
           ('-d', 'gs://chromeos-image-archive/samus-release/R*-10123.0.0'),
-        ]:
+      ]:
         return ['gs://chromeos-image-archive/samus-release/R64-10123.0.0/']
       if args in [
           ('-d', 'gs://chromeos-image-archive/samus-factory/R64-10123.5.0'),
           ('-d', 'gs://chromeos-image-archive/samus-factory/R*-10123.5.0'),
-        ]:
+      ]:
         return ['gs://chromeos-image-archive/samus-factory/R64-10123.5.0/']
       return []
 
     with mock.patch.object(cros_util, 'gsutil_ls', gsutil_ls):
       gs_path = cros_util.query_prebuilt_gs_path('samus', 'R64-10123.0.0')
-      self.assertEqual(gs_path, 'gs://chromeos-image-archive/samus-release/R64-10123.0.0')
+      self.assertEqual(
+          gs_path, 'gs://chromeos-image-archive/samus-release/R64-10123.0.0')
       gs_path = cros_util.query_prebuilt_gs_path('samus', '10123.0.0')
-      self.assertEqual(gs_path, 'gs://chromeos-image-archive/samus-release/R64-10123.0.0')
+      self.assertEqual(
+          gs_path, 'gs://chromeos-image-archive/samus-release/R64-10123.0.0')
 
       gs_path = cros_util.query_prebuilt_gs_path('samus', 'R64-10123.5.0')
-      self.assertEqual(gs_path, 'gs://chromeos-image-archive/samus-factory/R64-10123.5.0')
+      self.assertEqual(
+          gs_path, 'gs://chromeos-image-archive/samus-factory/R64-10123.5.0')
       gs_path = cros_util.query_prebuilt_gs_path('samus', '10123.5.0')
-      self.assertEqual(gs_path, 'gs://chromeos-image-archive/samus-factory/R64-10123.5.0')
+      self.assertEqual(
+          gs_path, 'gs://chromeos-image-archive/samus-factory/R64-10123.5.0')
 
       gs_path = cros_util.query_prebuilt_gs_path('foo', 'R64-10123.5.0')
       self.assertEqual(gs_path, '')
@@ -214,12 +218,13 @@ class TestCrosUtil(unittest.TestCase):
       self.assertEqual(gs_path, '')
 
   def test_has_release_prebuilt(self):
+
     def gsutil_ls(*args, **kwargs):
       logger.debug('gsutil_ls %r %r', args, kwargs)
       if args in [
           ('-d', 'gs://chromeos-image-archive/samus-release/R64-10123.0.0'),
           ('-d', 'gs://chromeos-image-archive/samus-release/R*-10123.0.0'),
-        ]:
+      ]:
         return ['gs://chromeos-image-archive/samus-release/R64-10123.0.0/']
       return []
 
@@ -235,9 +240,11 @@ class TestCrosUtil(unittest.TestCase):
     # Assume query_milestone_by_version is implemented via gsutil.
     def gsutil_ls(*args, **kwargs):
       logger.debug('gsutil_ls %r %r', args, kwargs)
-      if args == ('-d', 'gs://chromeos-image-archive/samus-release/R*-10123.0.0'):
+      if args == ('-d',
+                  'gs://chromeos-image-archive/samus-release/R*-10123.0.0'):
         return ['gs://chromeos-image-archive/samus-release/R64-10123.0.0/']
-      if args == ('-d', 'gs://chromeos-image-archive/samus-factory/R*-10123.5.0'):
+      if args == ('-d',
+                  'gs://chromeos-image-archive/samus-factory/R*-10123.5.0'):
         return ['gs://chromeos-image-archive/samus-factory/R64-10123.5.0/']
       return []
 
@@ -529,11 +536,23 @@ class TestCrosUtil(unittest.TestCase):
             ])
 
   def test_extract_info_from_prebuilt_gs_path(self):
-    info = cros_util.extract_info_from_prebuilt_gs_path('gs://chromeos-image-archive/foo-release/R63-10001.0.0/image.zip')
-    self.assertDictEqual(info, {'board': 'foo', 'bucket': 'release', 'version': 'R63-10001.0.0'})
-    info = cros_util.extract_info_from_prebuilt_gs_path('gs://chromeos-image-archive/bar-factory/R71-10082.30.0/chromiumos_test_image.tar.xz')
-    self.assertDictEqual(info, {'board': 'bar', 'bucket': 'factory', 'version': 'R71-10082.30.0'})
-    info = cros_util.extract_info_from_prebuilt_gs_path('gs://chromeos-image-archive/bar-factory/R71-10082.30.0')
+    info = cros_util.extract_info_from_prebuilt_gs_path(
+        'gs://chromeos-image-archive/foo-release/R63-10001.0.0/image.zip')
+    self.assertDictEqual(info, {
+        'board': 'foo',
+        'bucket': 'release',
+        'version': 'R63-10001.0.0'
+    })
+    info = cros_util.extract_info_from_prebuilt_gs_path(
+        'gs://chromeos-image-archive/bar-factory/R71-10082.30.0/chromiumos_test_image.tar.xz'
+    )
+    self.assertDictEqual(info, {
+        'board': 'bar',
+        'bucket': 'factory',
+        'version': 'R71-10082.30.0'
+    })
+    info = cros_util.extract_info_from_prebuilt_gs_path(
+        'gs://chromeos-image-archive/bar-factory/R71-10082.30.0')
     self.assertDictEqual(info, {})
 
   def test_is_cros_version_lesseq(self):

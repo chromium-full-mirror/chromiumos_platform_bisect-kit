@@ -44,14 +44,13 @@ class Popen:
     returncode: The child return code.
   """
 
-  def __init__(
-      self,
-      args,
-      stdout_callback: typing.Callable | None = None,
-      stderr_callback: typing.Callable | None = None,
-      log_stdout : bool = True,
-      binary: bool = False,
-      **kwargs):
+  def __init__(self,
+               args,
+               stdout_callback: typing.Callable | None = None,
+               stderr_callback: typing.Callable | None = None,
+               log_stdout: bool = True,
+               binary: bool = False,
+               **kwargs):
     """Initializes Popen.
 
     Args:
@@ -192,12 +191,11 @@ def call(*args, timeout: float | None = None, **kwargs) -> int:
   return p.wait(timeout=timeout)
 
 
-def _check_output(
-    *args,
-    timeout: float | None = None,
-    retry: int = 1,
-    stream_type: typing.Type[typing.AnyStr],
-    **kwargs) -> typing.AnyStr:
+def _check_output(*args,
+                  timeout: float | None = None,
+                  retry: int = 1,
+                  stream_type: typing.Type[typing.AnyStr],
+                  **kwargs) -> typing.AnyStr:
   """Runs command and return output.
 
   Modeled after subprocess.check_output.
@@ -240,8 +238,8 @@ def check_output_in_bytes(*args, **kwargs) -> bytes:
   return _check_output(*args, stream_type=bytes, **kwargs)
 
 
-def check_call(*args, timeout: float | None = None, retry: int = 1, **kwargs
-    ) -> None:
+def check_call(*args, timeout: float | None = None, retry: int = 1,
+               **kwargs) -> None:
   """Runs command and ensures it succeeded.
 
   Modeled after subprocess.check_call.
@@ -263,8 +261,10 @@ def check_call(*args, timeout: float | None = None, retry: int = 1, **kwargs
     delay_duration = min(delay_duration * 2, 100)
 
 
-def ssh_cmd(host: str, *args, connect_timeout: int | None = None,
-    allow_retry: bool = False) -> str:
+def ssh_cmd(host: str,
+            *args,
+            connect_timeout: int | None = None,
+            allow_retry: bool = False) -> str:
   """Runs remote command using ssh.
 
   Args:
@@ -305,8 +305,10 @@ def ssh_cmd(host: str, *args, connect_timeout: int | None = None,
       raise errors.SshConnectionError(f'ssh connection to {host!r} failed')
 
 
-def scp_cmd(from_file: str, to_file: str, connect_timeout: int | None = None,
-    allow_retry: bool = False) -> str:
+def scp_cmd(from_file: str,
+            to_file: str,
+            connect_timeout: int | None = None,
+            allow_retry: bool = False) -> str:
   """Copies a file through scp.
 
   Args:
