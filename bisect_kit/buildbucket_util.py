@@ -17,10 +17,10 @@ import tempfile
 # from third_party
 from google.protobuf import json_format
 from google.protobuf.field_mask_pb2 import FieldMask
-from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.message import DecodeError
-from infra_libs.buildbucket.proto.builder_pb2 import BuilderID
+from google.protobuf.timestamp_pb2 import Timestamp
 from infra_libs.buildbucket.proto.build_pb2 import Build
+from infra_libs.buildbucket.proto.builder_pb2 import BuilderID
 from infra_libs.buildbucket.proto.builds_service_pb2 import BuildPredicate
 from infra_libs.buildbucket.proto.builds_service_pb2 import GetBuildRequest
 from infra_libs.buildbucket.proto.builds_service_pb2 import ScheduleBuildRequest

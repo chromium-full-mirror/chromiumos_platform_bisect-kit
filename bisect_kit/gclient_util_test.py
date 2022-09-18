@@ -5,6 +5,7 @@
 """Test gclient_util module."""
 
 from __future__ import print_function
+
 import copy
 import os
 import shutil
@@ -149,6 +150,7 @@ class TestDepsParser(unittest.TestCase):
 
 
 class TestDep(unittest.TestCase):
+  """Test class for DEPS parsing."""
 
   def test_simple(self):
     url = 'http://example.com@12345'
@@ -220,6 +222,7 @@ class TestDep(unittest.TestCase):
 
 
 class TestTimeSeriesTree(unittest.TestCase):
+  """Test class for TimeSeriesTree."""
 
   def test_trivial(self):
     base = 'http://example.com'

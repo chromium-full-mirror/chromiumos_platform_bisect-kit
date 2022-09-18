@@ -5,6 +5,7 @@
 """Test util module."""
 
 from __future__ import print_function
+
 import subprocess
 import unittest
 

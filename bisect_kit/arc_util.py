@@ -5,6 +5,7 @@
 """ChromeOS ARC utility."""
 
 from __future__ import print_function
+
 import logging
 import os
 import re
@@ -78,8 +79,7 @@ def push_prebuilt_to_device(dut, flavor, build_id):
   # assume ARC's flavor is always product-variant
   assert '-' in flavor
   product, _ = flavor.split('-')
-  build_filename = '{product}-img-{build_id}.zip'.format(
-      product=product, build_id=build_id)
+  build_filename = f'{product}-img-{build_id}.zip'
   sepolicy_filename = 'sepolicy.zip'
 
   tmp_dir = tempfile.mkdtemp()

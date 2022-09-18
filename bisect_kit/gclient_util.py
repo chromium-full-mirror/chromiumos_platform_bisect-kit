@@ -5,6 +5,7 @@
 """Gclient utility."""
 
 from __future__ import print_function
+
 import ast
 import collections
 import itertools
@@ -158,6 +159,7 @@ def runhook(gclient_dir, jobs=8, gclientfile=None):
   Args:
     gclient_dir: root directory of gclient project
     jobs: how many workers running in parallel
+    gclientfile: specify an alternate .gclient file
   """
   cmd = ['gclient', 'runhook', '--job', str(jobs)]
   if gclientfile:
@@ -796,7 +798,7 @@ class TimeSeriesTree:
       # i.e. modification, so use counter to track.
       end_counter = collections.Counter()
 
-      for timestamp, entry, deps, end in events:
+      for _timestamp, entry, deps, end in events:
         forest[entry] = deps
         if end:
           end_counter[entry] += 1
@@ -1064,12 +1066,12 @@ class DepsParser:
                              end_time)
     return tstree.iter_forest()
 
-  def flatten(self, solutions, entry_point):
+  def flatten(self, solutions, entry_point: str):
     """Flatten all given Deps
 
     Args:
       solutions: A name => Deps dict, name can be either a str or a tuple.
-      entry_point (str): An entry_point name of solutions.
+      entry_point: An entry_point name of solutions.
 
     Returns:
       Deps: A flatten Deps.

@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Test cros_lab_util module."""
 from __future__ import print_function
+
 import unittest
 
 from bisect_kit import cros_lab_util

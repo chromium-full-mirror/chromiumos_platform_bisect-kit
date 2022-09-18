@@ -14,6 +14,7 @@ Terminology used in this module.
 
 from __future__ import annotations
 from __future__ import print_function
+
 import ast
 import calendar
 import datetime
@@ -69,7 +70,8 @@ prebuilt_image_buckets = [release_bucket, factory_bucket]
 # only fetches manifest from gs when milestone >= 92
 gs_manifest_cutoff_milestone = 92
 gs_manifest_base = 'gs://chromeos-manifest-versions/'
-gs_manifest_path = 'gs://chromeos-manifest-versions/buildspecs/{milestone}/{short_version}.xml'
+gs_manifest_path = ('gs://chromeos-manifest-versions/buildspecs/{milestone}'
+                    '/{short_version}.xml')
 
 # Assume gsutil is in PATH.
 gsutil_bin = 'gsutil'
@@ -185,6 +187,7 @@ class NeedRecreateChrootException(Exception):
 
 
 class SnapshotStore:
+  """Stores image version of snapshots."""
   default_path = ('gs://chromeos-image-archive/{board}-{bucket}'
                   '/{snapshot_version}-*/{filename}')
   images: dict[str, ImageInfo] = {}
@@ -259,7 +262,7 @@ class SnapshotStore:
   def query_snapshot_version_by_id(cls, board: str,
                                    snapshot_id: str) -> typing.Optional[str]:
     """Given a snapshot id, return its corresponding snapshot version."""
-    for snapshot_version in cls.images.keys():
+    for snapshot_version in cls.images:
       gs_path = cls.query_snapshot_image(board, snapshot_version)
       if gs_path and cls.parse_snapshot_path(gs_path).get(
           'snapshot_id') == snapshot_id:
@@ -268,7 +271,7 @@ class SnapshotStore:
     # No existing BisectStates or version not found in the state file,
     # fetch snapshots from cloud storage
     logger.warning(
-        'snapshot_id %s not found in SnapshotStore, try to fetch from buckets %s',
+        'snapshot_id %s not found in SnapshotStore, fetch from buckets %s',
         snapshot_id, snapshot_buckets)
     for bucket in snapshot_buckets:
       gs_path = gs_archive_path.format(
@@ -691,14 +694,14 @@ def gsutil_ls(*args, **kwargs) -> list[str]:
   return gsutil('ls', *args, **kwargs).splitlines()
 
 
-def gsutil_stat_max_creation_time(*files, **kwargs):
+def gsutil_stat_max_creation_time(*args, **kwargs):
   """Returns the max creation time of a set of files.
 
   For each file, the function will lookup the `create_time_seconds` key is
   set in metadata.
 
   Args:
-    files: a list of filenames passed to gsutil
+    args: a list of filenames passed to gsutil
     kwargs: extra parameters for gsutil
 
   Returns:
@@ -711,7 +714,7 @@ def gsutil_stat_max_creation_time(*files, **kwargs):
   timestamps = [
       x['create_time_seconds']
       if 'create_time_seconds' in x else x.get('Creation time')
-      for x in gsutil_stat(*files, **kwargs).values()
+      for x in gsutil_stat(*args, **kwargs).values()
   ]
   if None in timestamps:
     raise errors.ExternalError(
@@ -719,13 +722,13 @@ def gsutil_stat_max_creation_time(*files, **kwargs):
   return max(timestamps)
 
 
-def gsutil_stat(*files, **kwargs) -> dict[str, dict[str], any]:
+def gsutil_stat(*args, **kwargs) -> dict[str, dict[str], any]:
   """Returns a key-value dict for each file in gsutil stat.
 
   Note that it only supports a small set of field names.
 
   Args:
-    files: a list of filename passed to gsutil
+    args: a list of filename passed to gsutil
     kwargs: extra parameters for gsutil
 
   Returns:
@@ -762,7 +765,7 @@ def gsutil_stat(*files, **kwargs) -> dict[str, dict[str], any]:
   result = {}
   current_file = None
 
-  for line in gsutil('stat', *files, **kwargs).splitlines():
+  for line in gsutil('stat', *args, **kwargs).splitlines():
     if ':' not in line:
       continue
     key, value = line.split(':', 1)
@@ -772,7 +775,7 @@ def gsutil_stat(*files, **kwargs) -> dict[str, dict[str], any]:
     # gs://file_name: will be splitted to key=gs value=//file_name: here
     if key == 'gs':
       file_name = 'gs:%s' % value.rstrip(':')
-      if file_name in files:
+      if file_name in args:
         current_file = file_name
         result[current_file] = {}
       continue
@@ -793,7 +796,7 @@ def gsutil_stat(*files, **kwargs) -> dict[str, dict[str], any]:
 
 
 def should_fetch_release_manifest_from_gs(version: str) -> bool:
-  """Returns whether the manifest of given version is avaliable on google storage.
+  """Returns whether the manifest of given version is avaliable on gs.
 
   Args:
     version: CrOS full or snapshot version

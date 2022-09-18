@@ -5,6 +5,7 @@
 """Common functions used by almost of all bisect kit scripts."""
 
 from __future__ import print_function
+
 import argparse
 import logging
 import logging.config

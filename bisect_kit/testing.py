@@ -5,11 +5,11 @@
 """Common functions for testing"""
 
 from __future__ import print_function
+
 import contextlib
 import os
 import shutil
 import tempfile
-
 from unittest import mock
 
 from bisect_kit import common

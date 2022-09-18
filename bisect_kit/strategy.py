@@ -5,6 +5,7 @@
 """The binary search algorithm."""
 
 from __future__ import print_function
+
 import logging
 import math
 import re
@@ -144,15 +145,16 @@ class NoisyBinarySearch:
   }
 
   # INIT_ROUNDS:
-  #   INIT_ROUNDS[i] represents the cumulative number of times it has run on both
-  #   ends in the i-th round.
+  #   INIT_ROUNDS[i] represents the cumulative number of times it has run on
+  #   both ends in the i-th round.
   # INIT_P_BOUND:
-  #   For the first three rounds(e.g. round i), if the p-value calculated by the
-  #   statistical method is greater than or equal to INIT_P_BOUND[i], the
+  #   For the first three rounds(e.g. round i), if the p-value calculated by
+  #   the statistical method is greater than or equal to INIT_P_BOUND[i], the
   #   regression doesn't exist.
-  #   For the last round, if the p-value calculated by the statistical method is
-  #   greater than or equal to alpha, the regression doesn't exist.
-  # INIT_P_BOUND is used to eliminate tests which apparently don't have regression.
+  #   For the last round, if the p-value calculated by the statistical method
+  #   is greater than or equal to alpha, the regression doesn't exist.
+  # INIT_P_BOUND is used to eliminate tests which apparently don't have
+  #   regression.
   INIT_ROUND = [5, 10, 15, 25]
   INIT_P_BOUND = [0.65, 0.55, 0.5]
 
@@ -216,9 +218,10 @@ class NoisyBinarySearch:
       observation: Observed test results.
       confidence: Required confidence for bisection result.
       verify_confidence: Bisect range verification confidence.
-      endpoint_verification: Flag indicating whether the statistical verification
-        method is enabled.
-      init_range_verified: Record of whether the initial range has been verified.
+      endpoint_verification: Flag indicating whether the statistical
+        verification method is enabled.
+      init_range_verified: Record of whether the initial range has been
+        verified.
     """
     assert oracle is None or observation is None
     self._state = self.INITED
@@ -903,9 +906,8 @@ class NoisyBinarySearch:
     """Is bisection range already been verified?"""
     if self.endpoint_verification and not self.is_value_bisection():
       return self.init_range_verified
-    else:
-      return self.rev_info[self.old_idx]['old'] > 0 and self.rev_info[
-          self.new_idx]['new'] > 0
+    return self.rev_info[self.old_idx]['old'] > 0 and self.rev_info[
+        self.new_idx]['new'] > 0
 
   def check_verification_range(self):
     """Checks if bisection range is reasonable.
@@ -1174,12 +1176,11 @@ class NoisyBinarySearch:
               'last_state']
         return self.new_idx
 
-      else:
-        raise errors.VerifyInitialRangeFailed(self.init_rounds)
+      raise errors.VerifyInitialRangeFailed(self.init_rounds)
 
     # get the wrong init_verify_state
     raise AssertionError(
-        'current state should be one of init_verify_state\'s states, but got %s'
+        "current state should be one of init_verify_state's states, but got %s"
         % current_state)
 
   def _next_idx_for_initial(self):
@@ -1202,12 +1203,14 @@ class NoisyBinarySearch:
       if self.init_range_verified:
         return None
 
-      # Test the initial range of functional tests with statistical method, and get the next index.
+      # Test the initial range of functional tests with statistical method,
+      # and get the next index.
       if self.endpoint_verification and not self.is_value_bisection():
         idx = self._verify_for_init_state()
         return idx
 
-      # Test the initial range without statistical method, and get the next index.
+      # Test the initial range without statistical method, and get the next
+      # index.
       else:
         if self.rev_info[self.new_idx]['new'] == 0:
           return self.new_idx

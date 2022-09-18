@@ -5,6 +5,7 @@
 """Test common module."""
 
 from __future__ import print_function
+
 import argparse
 import logging
 import os

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 from __future__ import print_function
+
 import json
 import logging
 import os
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class StepResult:
+  """Result for each bisection test run."""
 
   def __init__(self,
                status: typing.Literal['old', 'new', 'skip', 'fatal', 'value'],

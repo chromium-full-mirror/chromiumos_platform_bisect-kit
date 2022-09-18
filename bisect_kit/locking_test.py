@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Test locking module"""
 from __future__ import print_function
+
 import multiprocessing
 import os
 import tempfile

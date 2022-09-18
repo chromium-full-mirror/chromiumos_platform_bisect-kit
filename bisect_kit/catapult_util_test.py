@@ -5,6 +5,7 @@
 """Test catapult_util module."""
 
 from __future__ import print_function
+
 import unittest
 
 from bisect_kit import catapult_util

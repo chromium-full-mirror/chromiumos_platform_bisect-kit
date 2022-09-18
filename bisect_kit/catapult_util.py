@@ -14,15 +14,17 @@ References:
     https://chromium.googlesource.com/catapult/+/HEAD/dashboard/dashboard/add_point.py
 """
 
+from __future__ import annotations
 from __future__ import print_function
+
 import json
 import logging
 import math
 import os
 import re
 
-from bisect_kit import util
 from bisect_kit import errors
+from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 

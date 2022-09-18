@@ -5,6 +5,7 @@
 """Git utility."""
 
 from __future__ import print_function
+
 import bisect
 import logging
 import os
@@ -192,8 +193,8 @@ def fetch(git_repo, *args, retry_prune_if_conflict=False):
       if ('(unable to update local ref)' in stderr and
           retry_prune_if_conflict and '--prune' not in args):
         logger.warning(
-            'git fetch failed due to conflicting references; try again with --prune'
-        )
+            ('git fetch failed due to conflicting references; try again with'
+             ' --prune'))
         args = '--prune', *args
         continue
       raise

@@ -5,12 +5,12 @@
 """Test cros_util module."""
 
 from __future__ import print_function
+
 import fnmatch
 import logging
 import os
 import subprocess
 import unittest
-
 from unittest import mock
 
 from bisect_kit import cli
@@ -344,9 +344,10 @@ class TestCrosUtil(unittest.TestCase):
         '    Generation:             1649439096753030',
         '    Metageneration:         2',
     ]
+    # timestamp = 1649438944
     stat_14469_7 = [
         'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml:',
-        '    Creation time:          Fri, 08 Apr 2022 17:29:04 GMT',  # 1649438944
+        '    Creation time:          Fri, 08 Apr 2022 17:29:04 GMT',
         '    Update time:            Fri, 08 Apr 2022 17:29:41 GMT',
         '    Storage class:          STANDARD',
         '    Content-Length:         244194',

@@ -5,8 +5,8 @@
 """Test bisector_cli module."""
 
 from __future__ import print_function
+
 import io
-import random
 import unittest
 from unittest import mock
 
@@ -15,7 +15,6 @@ from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import errors
-from bisect_kit import strategy
 from bisect_kit import testing
 
 
@@ -318,9 +317,7 @@ class TestBisectorCommandLine(unittest.TestCase):
       self.assertEqual(bisector.strategy.get_best_guess(), 42)
 
   def test_run_noisy_many_times(self):
-    """
-    Test noisy cases with different ratio
-    """
+    """Test noisy cases with different ratio"""
     bisector = bisector_cli.BisectorCommandLine(DummyDomain)
     total_correct_count = 0
     total_wrong_count = 0

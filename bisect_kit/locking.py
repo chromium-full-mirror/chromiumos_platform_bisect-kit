@@ -4,11 +4,12 @@
 # found in the LICENSE file.
 """File locks"""
 from __future__ import print_function
+
 import contextlib
+import errno
 import fcntl
 import logging
 import time
-import errno
 
 logger = logging.getLogger(__name__)
 

@@ -2,6 +2,9 @@
 # Copyright 2022 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Lacros related util functions."""
+
+from __future__ import annotations
 
 import logging
 import multiprocessing
@@ -17,7 +20,8 @@ from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
-LACROS_ZIP_PATH = 'gs://chrome-unsigned/desktop-5c0tCh/{version}/{lacros_folder_name}/lacros.zip'
+LACROS_ZIP_PATH = ('gs://chrome-unsigned/desktop-5c0tCh/{version}/'
+                   '{lacros_folder_name}/lacros.zip')
 LACROS_FILENAME = 'lacros.zip'
 BOARD_ARCHITECTURES = {
     'x64': {
@@ -41,7 +45,8 @@ def get_lacros_gs_path_list(
   """Get all the lacros gs paths from bucket between 2 milestones.
 
   For every milestone the gsutill is called in a seperate worker process.
-  Without mutli process the query takes around 8 minutes for 88 to 106 milestones.
+  Without mutli process the query takes around 8 minutes for 88 to 106
+    milestones.
   With multi process it takes less than 20 seconds.
   Example query for one worker process:
   `gsutil ls gs://chrome-unsigned/desktop-5c0tCh/100.**/lacros64/lacros.zip`
@@ -50,7 +55,8 @@ def get_lacros_gs_path_list(
   Args:
     old_milestone: Old milestone of chrome version.
     new_milestone: New milestone of chrome version.
-    lacros_folder_name: either 'lacros-64' or 'lacros-arm32' depending on DUT architecture
+    lacros_folder_name: either 'lacros-64' or 'lacros-arm32' depending on DUT
+      architecture.
 
   Returns:
     A list of gs path
@@ -77,12 +83,13 @@ def get_lacros_gs_path_list(
 
 def get_lacros_prebuilt_versions_between(old_version: str, new_version: str,
                                          lacros_folder_name: str) -> list[str]:
-  """Returns a list of lacros prebuilt versions between old and new version (included).
+  """Returns a list of lacros prebuilt versions between old and new (included).
 
   Args:
     old_version: Old lacros version
     new_version: New lacros version
-    lacros_folder_name: either 'lacros-64' or 'lacros-arm32' depending on DUT architecture
+    lacros_folder_name: either 'lacros-64' or 'lacros-arm32' depending on DUT
+      architecture
 
   Returns:
     A list of lacros versions. (list[str]).
@@ -104,8 +111,8 @@ def get_lacros_prebuilt_versions_between(old_version: str, new_version: str,
       continue
     lacros_version = seperated_gs_path[-3]
     assert cr_util.is_chrome_version(lacros_version)
-    if lacros_versions != new_version and not cr_util.is_direct_relative_version(
-        lacros_version, new_version):
+    if (lacros_versions != new_version and
+        not cr_util.is_direct_relative_version(lacros_version, new_version)):
       continue
     if not (cr_util.is_version_lesseq(old_version, lacros_version) and
             cr_util.is_version_lesseq(lacros_version, new_version)):
@@ -147,7 +154,7 @@ def is_prebuilt_version_available(lacros_version: str, dut_ip: str) -> bool:
 
 
 def get_dut_cpu_architecture(dut_ip: str) -> str:
-  """We can ssh into the dut and run 'uname -m' to get the architecture of the dut.
+  """Ssh into the dut and run 'uname -m' to get the architecture of the dut.
 
   Args:
     dut_ip: IP of a DUT
@@ -157,20 +164,21 @@ def get_dut_cpu_architecture(dut_ip: str) -> str:
   """
   try:
     # TODO(njrafi): Update if any dut architecture is wrong for this command
-    dut_architecture = util.ssh_cmd(dut_ip, "uname", "-m")
+    dut_architecture = util.ssh_cmd(dut_ip, 'uname', '-m')
     # There is a extra newline in the output
     dut_architecture = dut_architecture.splitlines()[0]
-    logger.debug("DUT CPU architecture: %s", dut_architecture)
+    logger.debug('DUT CPU architecture: %s', dut_architecture)
     return dut_architecture
   except subprocess.CalledProcessError:
-    logger.error("Get DUT architecture failed")
+    logger.error('Get DUT architecture failed')
     raise
 
 
 def get_lacross_folder_name(dut_ip: str) -> str:
-  """To get a lacros prebuilt we need to determine the folder name in the GS bucket.
+  """Get a lacros prebuilt to determine the folder name in the GS bucket.
 
-  Currently there are 2 folder names: 'lacros-64' and 'lacros-arm32' depending on architecture.
+  Currently there are 2 folder names: 'lacros-64' and 'lacros-arm32' depending
+    on architecture.
 
   Args:
     dut_ip: IP of a DUT
@@ -207,11 +215,11 @@ def fetch_lacros_prebuilt(lacros_version: str, dut_ip: str) -> str:
 
     # Creates a temp directory with a prefix bisect_tmp
     temp_dir = tempfile.mkdtemp(prefix='bisect_tmp')
-    logger.debug("Temp directory for lacros prebuilt: %s", temp_dir)
+    logger.debug('Temp directory for lacros prebuilt: %s', temp_dir)
 
     # Downloading lacros.zip to the temp directory
 
-    cros_util.gsutil("cp", lacros_bucket_url, temp_dir)
+    cros_util.gsutil('cp', lacros_bucket_url, temp_dir)
 
     # unzip lacros.zip
     logger.debug('fetch and unpack lacros.zip to %s', temp_dir)
@@ -220,7 +228,7 @@ def fetch_lacros_prebuilt(lacros_version: str, dut_ip: str) -> str:
 
     return temp_dir
   except:
-    logger.error("Fetch lacros prebuilt failed")
+    logger.error('Fetch lacros prebuilt failed')
     raise
 
 

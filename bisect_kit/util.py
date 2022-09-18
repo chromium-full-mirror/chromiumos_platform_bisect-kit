@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 from __future__ import print_function
+
 import contextlib
 import difflib
 import logging
@@ -489,9 +490,9 @@ def wait_until(func: typing.Callable, timeout: float, period: float, *args,
   """Block until func(args, kwargs) becomes true or raise error.
 
   Args:
-    func (typing.Callable): A callable function.
-    timeout (float): Timeout seconds.
-    period (float): Function call period, in seconds.
+    func: A callable function.
+    timeout: Timeout seconds.
+    period: Function call period, in seconds.
   """
   until = time.time() + timeout
   while time.time() < until:
@@ -519,8 +520,8 @@ def forward_ssh(from_host: str, to_port: int):
   """Foward from_host:22 to localhost:to_port.
 
   Args:
-    from_host (str): DUT host.
-    to_port (int): port number.
+    from_host: DUT host.
+    to_port: port number.
   """
   assert not is_port_in_use(to_port)
   p = None

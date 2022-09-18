@@ -5,6 +5,7 @@
 """Diagnose ChromeOS regressions on top of subcomponent bisectors."""
 from __future__ import annotations
 from __future__ import print_function
+
 import argparse
 import datetime
 import json
@@ -197,7 +198,8 @@ class CrosDiagnoser:
     except Exception:
       self.make_decision('Exception in Chrome bisector before verification; '
                          'assume the culprit is not inside Chrome and continue')
-    # If chrome is not deployed with cros image, do the sanity check to ensure OS version.
+    # If chrome is not deployed with cros image, do the sanity check to ensure
+    # OS version.
     if not self.config['chrome_deploy_image'] and not self.config[
         'enable_buildbucket_chrome']:
       assert dut_os_version == cros_util.query_dut_short_version(self.dut), (
@@ -225,13 +227,13 @@ class CrosDiagnoser:
     """
     if self.config['bisect_chrome']:
       self.make_decision(
-          'The Chrome OS prebuilt bisection is bypassed since --bisect_chrome is on'
-      )
+          ('The Chrome OS prebuilt bisection is bypassed since --bisect_chrome'
+           ' is on'))
       self.cros_old = self.cros_new = self.config['base_cros_version']
     elif self.config['bisect_android']:
       self.make_decision(
-          'The Chrome OS prebuilt bisection is bypassed since --bisect_android is on'
-      )
+          ('The Chrome OS prebuilt bisection is bypassed since --bisect_android'
+           ' is on'))
       self.cros_old = self.cros_new = self.config['base_cros_version']
     elif self.config['bypass_chromeos_prebuilt']:
       self.make_decision(
@@ -354,8 +356,8 @@ class CrosDiagnoser:
     """
     if self.config['bisect_chrome']:
       self.make_decision(
-          'The Android prebuilt bisection is bypassed since --bisect_chrome is on'
-      )
+          ('The Android prebuilt bisection is bypassed since --bisect_chrome'
+           ' is on'))
       return False
 
     if (old_info.get('android_build_id') is None or
@@ -541,12 +543,11 @@ class CrosDiagnoser:
     Returns:
       True: culprit is inside Lacros
       False: culprit is not inside Lacros or unable to bisect
-
     """
     if self.config['bisect_android']:
       self.make_decision(
-          'The bisection with Lacros prebuilt is bypassed since --bisect_android is on'
-      )
+          ('The bisection with Lacros prebuilt is bypassed since '
+           '--bisect_android is on'))
       return False
 
     if self.old_info['cr_version'] == self.new_info['cr_version']:
@@ -608,8 +609,8 @@ class CrosDiagnoser:
       # Run chrome bisection from that range
       self.old_info['cr_version'] = lacros_old
       self.new_info['cr_version'] = lacros_new
-      logger.info(
-          f'Lacros prebuilt narrowerd down to {lacros_old} -> {lacros_new}')
+      logger.info('Lacros prebuilt narrowerd down to %s -> %s', lacros_old,
+                  lacros_new)
     except errors.VerifyOldBehaviorFailed as e:
       self.make_decision('Expect old Lacros has old behavior (%s) but failed' %
                          self.config['term_old'])
@@ -645,8 +646,8 @@ class CrosDiagnoser:
 
     if self.config['bisect_android']:
       self.make_decision(
-          'The bisection with Chrome local build is bypassed since --bisect_android is on'
-      )
+          ('The bisection with Chrome local build is bypassed since '
+           '--bisect_android is on'))
       return False
 
     if self.old_info['cr_version'] == self.new_info['cr_version']:
@@ -747,7 +748,7 @@ class CrosDiagnoser:
       self.make_decision(
           'Bypass Chrome OS local build since --bisect_chrome is on')
       return
-    elif self.config['bisect_android']:
+    if self.config['bisect_android']:
       self.make_decision(
           'Bypass Chrome OS local build since --bisect_android is on')
       return
@@ -1039,11 +1040,12 @@ class DiagnoseCommandLineBase:
       if not cros_lab_util.repair(opts.dut):
         raise ValueError('DUT is in bad state')
 
-    cros_prebuilt_old, cros_prebuilt_new = opts.base_cros_version, opts.base_cros_version
+    cros_prebuilt_old = opts.base_cros_version
+    cros_prebuilt_new = opts.base_cros_version
     chrome_localbuild_old, chrome_localbuild_new = None, None
     android_prebuilt_old, android_prebuilt_new = None, None
 
-    # Determines CrOS, Chrome, Android, Lacros old and new versions from argument.
+    # Determines CrOS, Chrome, Android, Lacros versions from argument.
     if opts.bisect_chrome:
       chrome_localbuild_old, chrome_localbuild_new = opts.old, opts.new
     elif opts.bisect_android:

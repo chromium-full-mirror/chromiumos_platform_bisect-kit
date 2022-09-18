@@ -5,6 +5,7 @@
 """Test strategy module."""
 
 from __future__ import print_function
+
 import collections
 import random
 import unittest
@@ -280,8 +281,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
       old_p: False-positive probability for old candidates.
       new_p: True-positive probability for new candidates.
       confidence: Required confidence.
-      endpoint_verification: Flag indicating whether the statistical verification
-        method is enabled.
+      endpoint_verification: Flag indicating whether the statistical
+        verification method is enabled.
       random_seed: Random seed.
       cost_func: cost function.
 
@@ -376,6 +377,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
       new_p: True-positive probability for new candidates.
       observation: Test results observed by users.
       confidence: Required confidence.
+      endpoint_verification: Flag indicating whether the statistical
+        verification method is enabled.
       cost_func: cost function.
 
     Returns:
@@ -676,7 +679,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
 
   def test_pass_noise_rate(self):
     """Tests whether noise rate was passed to the noisy binary search."""
-    # With endpoint_verification, prior_observation will be appointed by the results of statistical tests.
+    # With endpoint_verification, prior_observation will be appointed by the
+    # results of statistical tests.
     observation = self.perform_search_for_noise_rate(
         1000,
         42,
@@ -688,7 +692,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
     self.assertEqual(observation[0], (7, 25))
     self.assertEqual(observation[1], (20, 25))
 
-    # Without endpoint_verification, prior_observation will be appointed by users.
+    # Without endpoint_verification, prior_observation will be appointed by
+    # users.
     observation = self.perform_search_for_noise_rate(
         1000,
         42,
