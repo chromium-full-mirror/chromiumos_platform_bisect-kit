@@ -13,6 +13,7 @@ Sometimes the script failed to figure out the final CL for various reasons, it
 will cut down the search range as narrow as it can.
 """
 from __future__ import print_function
+
 import logging
 
 from bisect_kit import cros_lab_util

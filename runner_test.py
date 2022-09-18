@@ -5,13 +5,14 @@
 """Test runner.py script"""
 
 from __future__ import print_function
+
 import argparse
 import unittest
 from unittest import mock
 
-import runner
 from bisect_kit import common
 from bisect_kit import configure
+import runner
 
 
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())

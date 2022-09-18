@@ -29,6 +29,7 @@ will be set:
 """
 # Note, this script only works for the main branch of chrome.
 from __future__ import print_function
+
 import logging
 import os
 
@@ -36,8 +37,8 @@ from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
-from bisect_kit import cros_util
 from bisect_kit import cr_util
+from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util

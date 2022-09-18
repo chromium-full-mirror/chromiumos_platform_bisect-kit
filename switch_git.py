@@ -15,6 +15,7 @@ This is actually equivalent to
 be expanded at switch time, not now.)
 """
 from __future__ import print_function
+
 import argparse
 import logging
 

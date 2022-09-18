@@ -8,8 +8,11 @@
 Typical usage:
   $ bisect_lacros_prebuilt.py config switch ./switch_lacros_prebuilt.py
 
-It fetches specified lacros version and deploy to a DUT using deploy_chrome script.
+It fetches specified lacros version and deploy to a DUT using deploy_chrome
+  script.
 """
+
+from __future__ import annotations
 
 import argparse
 import logging

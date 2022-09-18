@@ -5,8 +5,8 @@
 """Test switch_arc_prebuilt script."""
 
 from __future__ import print_function
-import unittest
 
+import unittest
 from unittest import mock
 
 import switch_arc_prebuilt

@@ -6,6 +6,7 @@
 """Helper script to manipulate chromeos DUT or query info."""
 from __future__ import annotations
 from __future__ import print_function
+
 import argparse
 import asyncio
 import json

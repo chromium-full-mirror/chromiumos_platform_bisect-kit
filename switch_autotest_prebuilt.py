@@ -11,7 +11,9 @@ Later, you can run tests using "eval_cros_autotest.py --prebuilt" or
 "test_that --autotest_dir".
 """
 
+from __future__ import annotations
 from __future__ import print_function
+
 import argparse
 import logging
 import os

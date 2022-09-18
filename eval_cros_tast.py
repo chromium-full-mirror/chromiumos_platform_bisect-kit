@@ -6,6 +6,7 @@
 """Evaluate ChromeOS tast tests."""
 from __future__ import annotations
 from __future__ import print_function
+
 import argparse
 import json
 import logging
@@ -243,10 +244,10 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
                               'results-chart.json')
     try:
       values = catapult_util.get_benchmark_values(chart_path, opts.metric)
-    except Exception:
+    except Exception as e:
       if not passed:
         raise errors.BisectionTemporaryError(
-            'test failed to generate metric values, reason: %s' % reason)
+            'test failed to generate metric values, reason: %s' % reason) from e
       raise
     return core.StepResult('value', values=values)
 
@@ -315,9 +316,9 @@ def step_main(args: 'typing.Optional[tuple[str]]') -> core.StepResult:
   bundle = tast_bundle_info[opts.test_name]
   try:
     result_dir = run_test(opts, bundle)
-  except subprocess.CalledProcessError:
+  except subprocess.CalledProcessError as e:
     raise errors.BisectionTemporaryError(
-        'failed to run tast; maybe build, ssh, or setup failures')
+        'failed to run tast; maybe build, ssh, or setup failures') from e
 
   return gather_test_result(opts, result_dir)
 

@@ -15,23 +15,25 @@ Typical usage companion with bisect_cr_localbuild_master:
 By default, it will build and deploy chrome. You can specify --target for
 alternative binaries.
 """
+from __future__ import annotations
 from __future__ import print_function
+
 import argparse
 import logging
 import os
 import sys
 import typing
 
+import bisect_cr_localbuild_master
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
-from bisect_kit import cros_util
 from bisect_kit import cr_util
+from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util
-import bisect_cr_localbuild_master
 import switch_cros_localbuild
 
 logger = logging.getLogger(__name__)

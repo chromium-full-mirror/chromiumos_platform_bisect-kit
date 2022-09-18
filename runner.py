@@ -6,6 +6,7 @@
 """Helper script to report exit code according to execution result."""
 
 from __future__ import print_function
+
 import argparse
 import collections
 import logging
@@ -16,8 +17,8 @@ import textwrap
 import time
 
 from bisect_kit import cli
-from bisect_kit import util
 from bisect_kit import common
+from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 

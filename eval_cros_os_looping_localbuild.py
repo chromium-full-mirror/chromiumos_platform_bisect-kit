@@ -6,13 +6,14 @@
 """Eval for ChromeOS localbuild to handle bad images"""
 
 from __future__ import print_function
+
 import logging
 import sys
 
-import switch_cros_localbuild
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import cros_util
+import switch_cros_localbuild
 
 logger = logging.getLogger(__name__)
 

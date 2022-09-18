@@ -5,14 +5,14 @@
 """Test bisect_cr_localbuild_master script."""
 
 from __future__ import print_function
+
 import os
 import shutil
 import tempfile
 import unittest
 
-from bisect_kit import testing
-
 import bisect_cr_localbuild_master
+from bisect_kit import testing
 
 
 class TestBisectCrLocalbuildMaster(unittest.TestCase):

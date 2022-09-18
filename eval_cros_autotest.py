@@ -12,6 +12,7 @@ matches. Otherwise your test binary will be overwritten.
 """
 from __future__ import annotations
 from __future__ import print_function
+
 import argparse
 import glob
 import logging
@@ -339,10 +340,11 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
         full_path = os.path.join(root, filename)
         try:
           values = catapult_util.get_benchmark_values(full_path, opts.metric)
-        except Exception:
+        except Exception as e:
           if not passed:
             raise errors.BisectionTemporaryError(
-                'test failed to generate metric values, reason: %s' % reason)
+                'test failed to generate metric values, reason: %s' %
+                reason) from e
           raise
         return core.StepResult('value', values=values)
     if not passed:

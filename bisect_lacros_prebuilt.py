@@ -34,8 +34,8 @@ from bisect_kit import lacros_util
 logger = logging.getLogger(__name__)
 
 diff_url_template = (
-    'https://chromium.googlesource.com/chromium/src/+log/{old}..{new}?pretty=fuller&n=10000'
-)
+    'https://chromium.googlesource.com/chromium/src/+log/{old}..{new}'
+    '?pretty=fuller&n=10000')
 
 
 class LacrosVersionDomain(core.BisectDomain):

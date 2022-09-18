@@ -5,15 +5,16 @@
 """Test bisect_git script."""
 
 from __future__ import print_function
+
 import shutil
 import tempfile
 import unittest
 from unittest import mock
 
+import bisect_git
 from bisect_kit import bisector_cli
 from bisect_kit import git_util_test
 from bisect_kit import testing
-import bisect_git
 
 
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())

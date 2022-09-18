@@ -8,6 +8,7 @@
 This bisector bisects commits between branched chrome and releases.
 """
 from __future__ import print_function
+
 import logging
 import os
 
@@ -16,8 +17,8 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import configure
 from bisect_kit import core
-from bisect_kit import cros_util
 from bisect_kit import cr_util
+from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 

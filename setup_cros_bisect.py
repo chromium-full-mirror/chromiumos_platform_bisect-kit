@@ -22,6 +22,7 @@ Typical usage:
     $ %(prog)s delete --session=12345
 """
 from __future__ import print_function
+
 import argparse
 import glob
 import logging
@@ -29,9 +30,9 @@ import multiprocessing
 import os
 import subprocess
 import time
-import xml.etree.ElementTree
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree
 
 from bisect_kit import common
 from bisect_kit import configure

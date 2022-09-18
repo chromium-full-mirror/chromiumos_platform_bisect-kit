@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 from __future__ import print_function
+
 import argparse
 import copy
 import logging
@@ -357,7 +358,8 @@ def schedule_build(opts) -> int:
 
 
 def wait_build_complete(opts, build_id: int):
-  """
+  """Wait until a build completes.
+
   Raises:
     errors.ExternalError
   """

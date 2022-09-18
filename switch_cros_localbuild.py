@@ -5,7 +5,9 @@
 # found in the LICENSE file.
 """Switcher for chromeos localbuild bisecting."""
 
+from __future__ import annotations
 from __future__ import print_function
+
 import argparse
 import logging
 import os
