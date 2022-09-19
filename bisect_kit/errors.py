@@ -100,9 +100,11 @@ class VerifyNewBehaviorFailed(VerifyBehaviorFailed):
 class VerifyInitialRangeFailed(VerificationFailed):
   """Fail to pass the statistical tests."""
 
-  def __init__(self, rounds):
+  def __init__(self, rounds: int, old_failure_rate: float,
+               new_failure_rate: float):
     self.rounds = rounds
-    msg = 'Fail to pass the Boschloo Exact Test in round %d' % self.rounds
+    msg = (f'Fail to pass the Boschloo Exact Test in round {self.rounds}'
+           f' (Failure rate {old_failure_rate:.2%} vs {new_failure_rate:.2%})')
     super().__init__(msg)
 
 

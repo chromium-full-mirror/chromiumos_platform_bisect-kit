@@ -526,10 +526,10 @@ class NoisyBinarySearch:
             'Failure rate is recalculated: old=%d/%d (%f%%), new=%d/%d (%f%%)',
             self.observation[0][0],
             self.observation[0][1],
-            self.old_p,
+            self.old_p * 100,
             self.observation[1][0],
             self.observation[1][1],
-            self.new_p,
+            self.new_p * 100,
         )
         self.passed_noise_rate = True
 
@@ -1176,7 +1176,13 @@ class NoisyBinarySearch:
               'last_state']
         return self.new_idx
 
-      raise errors.VerifyInitialRangeFailed(self.init_rounds)
+      left_new = self.count_revold_new
+      left_trial = self.count_revold_old + self.count_revold_new
+      right_new = self.count_revnew_new
+      right_trial = self.count_revnew_old + self.count_revnew_new
+      old_p, new_p = self._observation_to_prob(left_new, left_trial, right_new,
+                                               right_trial)
+      raise errors.VerifyInitialRangeFailed(self.init_rounds, old_p, new_p)
 
     # get the wrong init_verify_state
     raise AssertionError(
