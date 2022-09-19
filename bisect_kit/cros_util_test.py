@@ -288,9 +288,11 @@ class TestCrosUtil(unittest.TestCase):
     with open(testing.get_testdata_path('partial-metadata.json')) as f:
       sample = f.read()
     with mock.patch.object(cros_util, 'gsutil', return_value=sample):
-      info = cros_util.version_info('caroline', '13664.0.0')
-      self.assertEqual(info[cros_util.VERSION_KEY_CROS_SHORT_VERSION],
-                       '13664.0.0')
+      with mock.patch.object(
+          cros_util, 'fetch_builbucket_version_info', return_value={}):
+        info = cros_util.version_info('caroline', 'R89-13664.0.0')
+        self.assertEqual(info[cros_util.VERSION_KEY_CROS_SHORT_VERSION],
+                         '13664.0.0')
 
   def _gsutil_ls(*args, **_kwargs):
     archive_base = 'gs://chromeos-image-archive/foo-release/'
