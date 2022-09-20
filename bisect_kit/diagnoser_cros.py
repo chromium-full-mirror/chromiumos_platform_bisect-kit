@@ -937,7 +937,7 @@ class DiagnoseCommandLineBase:
       opts.chrome_root = path_factory.get_chrome_tree()
       logger.info('chrome_root = %s', opts.chrome_root)
 
-    if opts.bisect_chrome or opts.bisect_lacros:
+    if opts.bisect_chrome:
       if not cr_util.is_version_lesseq(
           opts.old, opts.new) or not cr_util.is_direct_relative_version(
               opts.old, opts.new):
@@ -974,7 +974,7 @@ class DiagnoseCommandLineBase:
     if opts.bisect_chrome and opts.bisect_android:
       self.argument_parser.error(
           '--bisect_chrome and --bisect_android are not allowed together')
-    elif opts.bisect_chrome or opts.bisect_lacros:
+    elif opts.bisect_chrome:
       opts.base_cros_version = self.check_cros_image_exists(
           '--base_cros_version', opts.board, opts.base_cros_version)
       self.check_chrome_version('--old', opts.old)
