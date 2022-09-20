@@ -687,9 +687,6 @@ class BisectorCommandLine:
         'rev_info': [],
     }
 
-    summary.update({
-        'reproduced': self.strategy.check_reproduced(),
-    })
     for info in self.strategy.rev_info:
       info_dict = info.to_dict()
       detail = self.states.details.get(info.rev, {})
@@ -727,6 +724,12 @@ class BisectorCommandLine:
             interesting_indexes.add(i)
 
     self.domain.fill_candidate_summary(summary)
+    # This function should be called after get_range(), otherwise reclassify()
+    # won't be called and we will get incorrect result_counter for value
+    # bisection.
+    summary.update({
+        'reproduced': self.strategy.check_reproduced(),
+    })
 
     if opts.json:
       print(json.dumps(summary, indent=2, sort_keys=True))
