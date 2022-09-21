@@ -188,7 +188,7 @@ class Spec:
     Returns:
       score of similarity. Smaller value is more similar.
     """
-    score = 0
+    score = 0.0
     for path in set(self.entries) & set(rhs.entries):
       if rhs[path] == self[path]:
         continue
@@ -636,10 +636,10 @@ class CodeStorage:
           GitCheckoutCommit(timestamp, path, spec[path].repo_url, new))
       return result
 
-    for timestamp, git_rev in git_util.list_commits_between_commits(
+    for commit in git_util.list_commits_between_commits(
         git_root, old, new):
-      result.append(
-          GitCheckoutCommit(timestamp, path, spec[path].repo_url, git_rev))
+      result.append(GitCheckoutCommit(
+        commit.timestamp, path, spec[path].repo_url, commit.rev))
     return result
 
   def is_containing_commit(self, spec, path, rev):
