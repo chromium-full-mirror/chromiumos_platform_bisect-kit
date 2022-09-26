@@ -383,6 +383,50 @@ def build_and_deploy(chrome_src,
   simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
 
 
+def _get_ancestors(target_version: str, version_list: list[str]) -> list[str]:
+  """Get the ancestor version list of a target version.
+
+  Args:
+    target_version: The version we want to find the ancestors for
+    version_list: A list of chrome/lacros versions
+
+  Returns:
+    A list of ancestor version of target version
+  """
+  ancestors: list[str] = []
+  for candidate_ancestor in version_list:
+    if not is_chrome_version(candidate_ancestor):
+      continue
+    if is_version_lesseq(candidate_ancestor,
+                         target_version) and is_direct_relative_version(
+                             candidate_ancestor, target_version):
+      ancestors.append(candidate_ancestor)
+  return sorted(ancestors, key=util.version_key_func)
+
+
+def get_lca(old_version: str, new_version: str, version_list: list[str]) -> str:
+  """Get the lowest common ancestor of old_version and new_version.
+
+  Args:
+    old_version: Old chrome/lacros version
+    new_version: New chrome/lacros version
+    version_list: A list of chrome/lacros versions
+
+  Returns:
+    The lowest common ancestor of old_version and new_version
+  """
+  ancestors_of_old_version = _get_ancestors(old_version, version_list)
+  ancestors_of_new_version = _get_ancestors(new_version, version_list)
+
+  ancestors_of_old_version.sort(key=util.version_key_func)
+
+  for old_ancestor in reversed(ancestors_of_old_version):
+    if old_ancestor in ancestors_of_new_version:
+      return old_ancestor
+  raise errors.InternalError('Unable to find their common ancestor: %s, %s' %
+                             (old_version, new_version))
+
+
 class ChromeSpecManager(codechange.SpecManager):
   """Gclient DEPS related operations.
 
@@ -500,6 +544,26 @@ class ChromeSpecManager(codechange.SpecManager):
       if is_version_lesseq(rev, new) and is_direct_relative_version(rev, new):
         result.append(rev)
     return sorted(result, key=util.version_key_func)
+
+  def get_lca_chrome_localbuild(self, old_version: str,
+                                new_version: str) -> str:
+    """Get the lowest common ancestor of 2 chrome localbuild version
+
+    Args:
+      old_version: Old chrome version
+      new_version: New chrome version
+
+    Returns:
+      The lowest common ancestor of 2 chrome localbuild version
+    """
+    version_list_chrome: list[str] = []
+    for rev in git_util.get_tags(self.chrome_src):
+      # 74.0.3696.0/DEPS is bad and rejected by gclient (crbug/929544)
+      if rev in ['74.0.3696.0']:
+        continue
+      version_list_chrome.append(rev)
+
+    return get_lca(old_version, new_version, version_list_chrome)
 
   def collect_fixed_spec(self, old, new):
     logger.info('collect_fixed_spec')

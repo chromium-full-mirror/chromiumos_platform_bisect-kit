@@ -81,6 +81,39 @@ class TestCrUtil(unittest.TestCase):
       with self.assertRaises(errors.InternalError):
         cr_util.query_commit_position(chrome_src, git_rev)
 
+  def test_get_ancestors(self):
+    # Disabling protected member access cros lint error
+    # pylint: disable=W0212
+    chrome_version_list = [
+        '100.0.1.0', '100.0.1.1', '100.0.2.0', '100.0.2.1', '100.0.3.0',
+        '100.0.3.1', '100.0.3.2'
+    ]
+
+    self.assertEqual(
+        cr_util._get_ancestors('100.0.3.1', chrome_version_list),
+        ['100.0.1.0', '100.0.2.0', '100.0.3.0', '100.0.3.1'])
+    self.assertEqual(
+        cr_util._get_ancestors('100.0.2.1', chrome_version_list),
+        ['100.0.1.0', '100.0.2.0', '100.0.2.1'])
+
+  def test_get_lca(self):
+    chrome_version_list = [
+        '100.0.1.0', '100.0.1.1', '100.0.2.0', '100.0.2.1', '100.0.3.0',
+        '100.0.3.1', '100.0.3.2'
+    ]
+    self.assertEqual(
+        cr_util.get_lca('100.0.3.1', '100.0.1.1', chrome_version_list),
+        '100.0.1.0')
+    self.assertEqual(
+        cr_util.get_lca('100.0.1.1', '100.0.3.1', chrome_version_list),
+        '100.0.1.0')
+    self.assertEqual(
+        cr_util.get_lca('100.0.1.1', '100.0.1.1', chrome_version_list),
+        '100.0.1.1')
+    self.assertEqual(
+        cr_util.get_lca('100.0.2.0', '100.0.3.1', chrome_version_list),
+        '100.0.2.0')
+
 
 if __name__ == '__main__':
   unittest.main()

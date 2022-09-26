@@ -122,26 +122,18 @@ class ChromeSrcDomain(core.BisectDomain):
     spec_manager = cr_util.ChromeSpecManager(config)
     cache = gclient_util.GclientCache(opts.chrome_mirror)
 
-    if not cr_util.is_direct_relative_version(old, new):
-      logger.warning('old=%s is not parent of new=%s', old, new)
-      old_ancestor = spec_manager.enumerate_ancestor(old)
-      new_ancestor = spec_manager.enumerate_ancestor(new)
-      for rev in reversed(old_ancestor):
-        if rev in new_ancestor:
-          lowest_common_ancestor = rev
-          break
-      else:
-        raise errors.InternalError(
-            'Unable to find their common ancestor: %s, %s' % (old, new))
-      logger.warning(
-          'Assume their lowest common ancestor, %s,'
-          'still have expected old behavior as %s', lowest_common_ancestor, old)
-      config['old'] = old = lowest_common_ancestor
-
     # b/227415522: Sync Chrome source tree to old and new to fetch unreachable
     # commits.
     gclient_util.sync(opts.chrome_root, revision=opts.new)
     gclient_util.sync(opts.chrome_root, revision=opts.old)
+
+    if not cr_util.is_direct_relative_version(old, new):
+      logger.warning('old=%s is not parent of new=%s', old, new)
+      lowest_common_ancestor = spec_manager.get_lca_chrome_localbuild(old, new)
+      logger.warning(
+          'Assume their lowest common ancestor, %s,'
+          'still have expected old behavior as %s', lowest_common_ancestor, old)
+      config['old'] = old = lowest_common_ancestor
 
     code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
     revlist, details = code_manager.build_revlist(old, new)

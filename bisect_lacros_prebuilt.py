@@ -72,6 +72,22 @@ class LacrosVersionDomain(core.BisectDomain):
 
     assert cros_util.is_dut(opts.dut)
 
+    if not opts.board:
+      assert opts.dut
+      opts.board = cros_util.query_dut_board(opts.dut)
+
+    lacros_folder_name = lacros_util.get_lacross_folder_name(opts.dut)
+
+    if not cr_util.is_direct_relative_version(opts.old, opts.new):
+      logger.warning('old=%s is not ancestor of new=%s', opts.old, opts.new)
+      lowest_common_ancestor = lacros_util.get_lca_lacros_prebuilt(
+          opts.old, opts.new, lacros_folder_name)
+      logger.warning(
+          'Assume their lowest common ancestor, %s,'
+          'still have expected old behavior as %s', lowest_common_ancestor,
+          opts.old)
+      opts.old = lowest_common_ancestor
+
     if not lacros_util.is_prebuilt_version_available(opts.old, opts.dut):
       raise errors.ArgumentError(
           '--old', 'Lacros version %s is not available for dut %s' %
@@ -81,12 +97,6 @@ class LacrosVersionDomain(core.BisectDomain):
       raise errors.ArgumentError(
           '--new', 'Lacros version %s is not available for dut %s' %
           (opts.new, opts.dut))
-
-    if not opts.board:
-      assert opts.dut
-      opts.board = cros_util.query_dut_board(opts.dut)
-
-    lacros_folder_name = lacros_util.get_lacross_folder_name(opts.dut)
 
     revlist = lacros_util.get_lacros_prebuilt_versions_between(
         opts.old, opts.new, lacros_folder_name)

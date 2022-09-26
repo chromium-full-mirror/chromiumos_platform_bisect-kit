@@ -8,9 +8,9 @@ import unittest
 from unittest import mock
 
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import lacros_util
 from bisect_kit import util
-from bisect_kit import errors
 
 
 class TestLacrosUtil(unittest.TestCase):
@@ -23,7 +23,7 @@ class TestLacrosUtil(unittest.TestCase):
         return_value=f'{lacros_util.BOARD_ARCHITECTURES["x64"]["name"]}\n'):
       self.assertEqual(
           lacros_util.get_dut_cpu_architecture('x64_dut'),
-          lacros_util.BOARD_ARCHITECTURES["x64"]["name"])
+          lacros_util.BOARD_ARCHITECTURES['x64']['name'])
 
     with mock.patch.object(
         util,
@@ -31,37 +31,38 @@ class TestLacrosUtil(unittest.TestCase):
         return_value=f'{lacros_util.BOARD_ARCHITECTURES["arm"]["name"]}\n'):
       self.assertEqual(
           lacros_util.get_dut_cpu_architecture('arm_dut'),
-          lacros_util.BOARD_ARCHITECTURES["arm"]["name"])
+          lacros_util.BOARD_ARCHITECTURES['arm']['name'])
 
     with self.assertRaises(errors.SshConnectionError):
-      lacros_util.get_dut_cpu_architecture("not_sshable_dut")
+      lacros_util.get_dut_cpu_architecture('not_sshable_dut')
 
   def test_get_lacross_folder_name(self):
     with mock.patch.object(
         lacros_util,
         'get_dut_cpu_architecture',
-        return_value=lacros_util.BOARD_ARCHITECTURES["x64"]["name"]):
+        return_value=lacros_util.BOARD_ARCHITECTURES['x64']['name']):
       self.assertEqual(
           lacros_util.get_lacross_folder_name('x64_dut'),
-          lacros_util.BOARD_ARCHITECTURES["x64"]["lacros_dir"])
+          lacros_util.BOARD_ARCHITECTURES['x64']['lacros_dir'])
 
     with mock.patch.object(
         lacros_util,
         'get_dut_cpu_architecture',
-        return_value=lacros_util.BOARD_ARCHITECTURES["arm"]["name"]):
+        return_value=lacros_util.BOARD_ARCHITECTURES['arm']['name']):
       self.assertEqual(
           lacros_util.get_lacross_folder_name('arm_dut'),
-          lacros_util.BOARD_ARCHITECTURES["arm"]["lacros_dir"])
+          lacros_util.BOARD_ARCHITECTURES['arm']['lacros_dir'])
 
     with mock.patch.object(
         lacros_util,
         'get_dut_cpu_architecture',
-        return_value="unknown_architecture"):
+        return_value='unknown_architecture'):
       with self.assertRaises(errors.InternalError):
         lacros_util.get_lacross_folder_name('unknown_architecture_dut')
 
   def test_is_prebuilt_path_available(self):
-    lacros_image_url = 'gs://chrome-unsigned/desktop-5c0tCh/100.0.4896.6/lacros64/lacros.zip'
+    lacros_image_url = ('gs://chrome-unsigned/desktop-5c0tCh/'
+                        '100.0.4896.6/lacros64/lacros.zip')
     with mock.patch.object(
         cros_util, 'gsutil_ls', return_value=[lacros_image_url]):
       self.assertEqual(

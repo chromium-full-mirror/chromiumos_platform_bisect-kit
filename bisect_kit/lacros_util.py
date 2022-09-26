@@ -81,6 +81,39 @@ def get_lacros_gs_path_list(
     return result
 
 
+def _get_all_lacros_prebuilt_between_two_milestone(old_milestone: str,
+                                                   new_milestone: str,
+                                                   lacros_folder_name: str
+                                                  ) -> list[str]:
+  """Returns a list of lacros prebuilt version between 2 ChromeOS milestone.
+
+  Args:
+    old_milestone: Old ChromeOS milestone
+    new_milestone: New ChromeOS milestone
+    lacros_folder_name: either 'lacros-64' or 'lacros-arm32' depending on DUT
+      architecture
+
+  Returns:
+    A list of lacros version. (list[str]).
+  """
+  assert lacros_folder_name in [
+      x['lacros_dir'] for x in BOARD_ARCHITECTURES.values()
+  ]
+
+  lacros_gs_path_list = get_lacros_gs_path_list(old_milestone, new_milestone,
+                                                lacros_folder_name)
+  lacros_version_list: list[str] = []
+
+  for gs_path in lacros_gs_path_list:
+    seperated_gs_path = gs_path.split('/')
+    if len(seperated_gs_path) < 3:
+      continue
+    lacros_version = seperated_gs_path[-3]
+    lacros_version_list.append(lacros_version)
+
+  return lacros_version_list
+
+
 def get_lacros_prebuilt_versions_between(old_version: str, new_version: str,
                                          lacros_folder_name: str) -> list[str]:
   """Returns a list of lacros prebuilt versions between old and new (included).
@@ -94,32 +127,41 @@ def get_lacros_prebuilt_versions_between(old_version: str, new_version: str,
   Returns:
     A list of lacros versions. (list[str]).
   """
-
-  assert lacros_folder_name in [
-      x['lacros_dir'] for x in BOARD_ARCHITECTURES.values()
-  ]
-  lacros_versions = []
   old_milestone = int(cr_util.extract_milestone_from_version(old_version))
   new_milestone = int(cr_util.extract_milestone_from_version(new_version))
 
-  lacros_gs_path_list = get_lacros_gs_path_list(old_milestone, new_milestone,
-                                                lacros_folder_name)
+  lacros_version_list = _get_all_lacros_prebuilt_between_two_milestone(
+      old_milestone, new_milestone, lacros_folder_name)
 
-  for gs_path in lacros_gs_path_list:
-    seperated_gs_path = gs_path.split('/')
-    if len(seperated_gs_path) < 3:
-      continue
-    lacros_version = seperated_gs_path[-3]
+  filtered_lacros_versions: list[str] = []
+  for lacros_version in lacros_version_list:
     assert cr_util.is_chrome_version(lacros_version)
-    if (lacros_versions != new_version and
+    if (lacros_version != new_version and
         not cr_util.is_direct_relative_version(lacros_version, new_version)):
       continue
     if not (cr_util.is_version_lesseq(old_version, lacros_version) and
             cr_util.is_version_lesseq(lacros_version, new_version)):
       continue
-    lacros_versions.append(lacros_version)
-  lacros_versions.sort(key=util.version_key_func)
-  return lacros_versions
+    filtered_lacros_versions.append(lacros_version)
+  filtered_lacros_versions.sort(key=util.version_key_func)
+  return filtered_lacros_versions
+
+
+def get_lca_lacros_prebuilt(old_version: str, new_version: str,
+                            lacros_folder_name: str) -> str:
+  """Get the lowest common ancestor of 2 lacros prebuilt version
+
+  Args:
+    old_version: Old lacros version
+    new_version: New lacros version
+    lacros_folder_name: either 'lacros-64' or 'lacros-arm32' depending on DUT
+      architecture.
+  """
+  old_milestone = int(cr_util.extract_milestone_from_version(old_version))
+  new_milestone = int(cr_util.extract_milestone_from_version(new_version))
+  version_list_lacros = _get_all_lacros_prebuilt_between_two_milestone(
+      old_milestone, new_milestone, lacros_folder_name)
+  return cr_util.get_lca(old_version, new_version, version_list_lacros)
 
 
 def is_prebuilt_path_available(lacros_bucket_url: str) -> bool:
