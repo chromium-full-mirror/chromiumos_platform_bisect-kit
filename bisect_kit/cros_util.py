@@ -1563,8 +1563,8 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> dict:
   return {}
 
 
-def fetch_builbucket_version_info(buildbucket_id: int,
-                                  cros_version: str) -> dict:
+def fetch_buildbucket_version_info(buildbucket_id: int,
+                                   cros_version: str) -> dict:
   """Query version info of given version of ChromeOS from buildbucket
 
   Args:
@@ -1585,8 +1585,9 @@ def fetch_builbucket_version_info(buildbucket_id: int,
   api = buildbucket_util.BuildbucketApi()
   milestone, short_version = version_split(cros_version)
   data = api.get_build(int(buildbucket_id)).output.properties
-  target_versions = json_format.MessageToDict(data['target_versions'])
-  return {
+  target_versions = json_format.MessageToDict(
+      data['target_versions']) if 'target_versions' in data else {}
+  result = {
       VERSION_KEY_MILESTONE: milestone,
       VERSION_KEY_CROS_FULL_VERSION: cros_version,
       VERSION_KEY_CROS_SHORT_VERSION: short_version,
@@ -1594,6 +1595,7 @@ def fetch_builbucket_version_info(buildbucket_id: int,
       VERSION_KEY_ANDROID_BUILD_ID: target_versions.get('androidVersion'),
       VERSION_KEY_ANDROID_BRANCH: target_versions.get('androidBranchVersion'),
   }
+  return {k: v for k, v in result.items() if v is not None}
 
 
 def version_info(board, cros_version) -> dict:
@@ -1624,14 +1626,14 @@ def version_info(board, cros_version) -> dict:
         SnapshotStore.query_snapshot_buildbucket_id(board, cros_version))
 
   if buildbucket_id:
-    builbucket_version_info = fetch_builbucket_version_info(
+    buildbucket_version_info = fetch_buildbucket_version_info(
         buildbucket_id, cros_version)
-    if any(result[k] != builbucket_version_info[k]
-           for k in result.keys() & builbucket_version_info.keys()):
+    if any(result[k] != buildbucket_version_info[k]
+           for k in result.keys() & buildbucket_version_info.keys()):
       logger.warning(
           'Version data has conflict:\n  metadata: %s\n  buildbucket: %s',
-          result, builbucket_version_info)
-    result = result | builbucket_version_info
+          result, buildbucket_version_info)
+    result = result | buildbucket_version_info
   return result
 
 
@@ -2579,9 +2581,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
     parser = repo_util.ManifestParser(self.manifest_dir)
     for commit in parser.enumerate_manifest_commits(
         old_timestamp, new_timestamp, path, branch=branch):
-      result.append(codechange.Spec(
-          codechange.SPEC_FLOAT, commit.rev, commit.timestamp, path
-      ))
+      result.append(
+          codechange.Spec(codechange.SPEC_FLOAT, commit.rev, commit.timestamp,
+                          path))
     return result
 
   def collect_fixed_spec(self, old, new):

@@ -289,7 +289,7 @@ class TestCrosUtil(unittest.TestCase):
       sample = f.read()
     with mock.patch.object(cros_util, 'gsutil', return_value=sample):
       with mock.patch.object(
-          cros_util, 'fetch_builbucket_version_info', return_value={}):
+          cros_util, 'fetch_buildbucket_version_info', return_value={}):
         info = cros_util.version_info('caroline', 'R89-13664.0.0')
         self.assertEqual(info[cros_util.VERSION_KEY_CROS_SHORT_VERSION],
                          '13664.0.0')
