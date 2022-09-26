@@ -550,13 +550,13 @@ class CrosDiagnoser:
            '--bisect_android is on'))
       return False
 
+    if self.config['bypass_chrome_build']:
+      self.make_decision('The bisection with Lacros is bypassed')
+      return False
+
     if self.old_info['cr_version'] == self.new_info['cr_version']:
       self.make_decision(
           'The Lacros version is identical, no need to bisect Lacros')
-      return False
-
-    if self.config['bypass_chrome_build']:
-      self.make_decision('The bisection with Lacros is bypassed')
       return False
 
     logger.info('bisect lacros prebuilt')
@@ -650,13 +650,13 @@ class CrosDiagnoser:
            '--bisect_android is on'))
       return False
 
+    if self.config['bypass_chrome_build']:
+      self.make_decision('The bisection with Chrome local build is bypassed')
+      return False
+
     if self.old_info['cr_version'] == self.new_info['cr_version']:
       self.make_decision(
           'The Chrome version is identical, no need to bisect Chrome')
-      return False
-
-    if self.config['bypass_chrome_build']:
-      self.make_decision('The bisection with Chrome local build is bypassed')
       return False
 
     logger.info('bisect chrome local build')
