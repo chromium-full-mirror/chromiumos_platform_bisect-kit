@@ -565,13 +565,7 @@ def query_dut_prebuilt_version(host):
 
 def query_dut_is_by_official_builder(host):
   """Query if given DUT is build by official builder"""
-  build_type = query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILD_TYPE',
-                                               '')
-  build_type = build_type.split(' - ')[0]
-  assert build_type in ('Official Build', 'Continuous Builder',
-                        'Developer Build',
-                        'Test Build'), 'unknown build type (%s)' % build_type
-  return build_type in ['Official Build', 'Continuous Builder']
+  return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILDER_PATH', '')
 
 
 def query_dut_boot_id(host, connect_timeout=None):
