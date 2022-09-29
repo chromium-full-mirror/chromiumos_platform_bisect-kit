@@ -1437,20 +1437,11 @@ def cros_flash(chromeos_root,
   if '://' not in image_path and not os.path.isabs(image_path):
     image_path = os.path.join(chromeos_root_inside_chroot, image_path)
 
-  args = [
-      '--debug',
-      '--no-ping',
-      # Speed up for slow network connection.
-      '--send-payload-in-parallel',
-      host,
-      image_path,
-  ]
-  # TODO(kcwu): remove this check if we don't need to support chromeos versions
-  # earlier than Dec 2020.
-  if git_util.is_ancestor_commit(
-      os.path.join(chromeos_root, 'chromite'), '9ed30bc3ed292b', 'HEAD'):
-    # To reduce disk usage on DUT.
-    args.append('--no-copy-payloads-to-device')
+  # The arguments --send-payload-in-parallel and --no-copy-payloads-to-device
+  # have been deprecated. Please see
+  # https://chromium.googlesource.com/chromiumos/chromite/+/9a0199fd48fb9466153d8598dc8602b26c9d21ba
+  # https://chromium.googlesource.com/chromiumos/chromite/+/9ed30bc3ed292b02d85fde89c64207484b7a3aa4
+  args = ['--debug', '--no-ping', host, image_path]
   if clobber_stateful:
     args.append('--clobber-stateful')
   if disable_rootfs_verification:
