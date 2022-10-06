@@ -17,6 +17,7 @@ from __future__ import print_function
 
 import ast
 import calendar
+import contextlib
 import datetime
 import enum
 import errno
@@ -2761,7 +2762,20 @@ class ChromeOSSpecManager(codechange.SpecManager):
     repo_util.sync(self.config['chromeos_root'])
 
 
-def repair_dut(chromeos_root, dut):
+@contextlib.contextmanager
+def _prepare_results_stores(src: str, dst: str):
+  """Copy folders from `src` to `dst` and cleanup `dst` at exit"""
+  try:
+    if os.path.exists(dst):
+      shutil.rmtree(dst)
+    shutil.copytree(src, dst, symlinks=True, dirs_exist_ok=True)
+    yield
+  finally:
+    if os.path.exists(dst):
+      shutil.rmtree(dst)
+
+
+def repair_dut(chromeos_root: str, dut: str, max_attempts=3) -> bool:
   """Repairs the DUT based off the host-info files.
 
   Currently, the host-info file stores are under the stores folders.
@@ -2790,31 +2804,17 @@ def repair_dut(chromeos_root, dut):
   if os.path.exists(autoserv_results):
     repair_cmd.append('--use-existing-results')
 
-  # Copy the stores.
   autoserv_results_stores = os.path.join(autoserv_results, host_info_subdir)
-  if os.path.exists(autoserv_results_stores):
-    shutil.rmtree(autoserv_results_stores)
-  shutil.copytree(
-      'autoserv-stores',
-      autoserv_results_stores,
-      symlinks=True,
-      dirs_exist_ok=True)
 
-  # The USB in the servo might have flaked or SSH connections.
-  try:
-    retries = 0
-    while True:
-      # Repair the DUT.
-      cros_sdk(chromeos_root, *repair_cmd)
-      logger.info('Repair successful')
-      return True
-  except subprocess.CalledProcessError:
-    retries += 1
-    if retries == 3:
-      logger.info('Repair failed')
-      return False
-    logger.info('Retrying repair')
-  finally:
-    # Cleanup the stores.
-    if os.path.exists(autoserv_results_stores):
-      shutil.rmtree(autoserv_results_stores)
+  with _prepare_results_stores('autoserv-stores', autoserv_results_stores):
+    for attempt in range(1, max_attempts + 1):
+      try:
+        logger.info(f'Repairing the DUT, {attempt=}')
+        cros_sdk(chromeos_root, *repair_cmd)
+        logger.info('Repair successful')
+        return True
+      except subprocess.CalledProcessError:
+        # The USB in the servo might have flaked or SSH connections.
+        pass
+    logger.info('Repair failed')
+    return False

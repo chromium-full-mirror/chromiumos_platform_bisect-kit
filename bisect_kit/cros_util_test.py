@@ -704,6 +704,20 @@ class TestCrosUtil(unittest.TestCase):
             'gs://my-bucket/hatch-snapshot/R96-14171.0.0-53037-123456789/mystery.bin'
         ), None)
 
+  def test_repair_dut_retry_failed(self):
+    error = subprocess.CalledProcessError(1, 'cmd')
+
+    with mock.patch('shutil.rmtree'), mock.patch('shutil.copytree'):
+      with mock.patch('bisect_kit.cros_util.cros_sdk', side_effect=[error] * 3):
+        result = cros_util.repair_dut('root', 'dut')
+        self.assertFalse(result)
+        self.assertIsNotNone(result)  # `None` passes the assertFalse() test
+
+  def test_repair_dut_ok(self):
+    error = subprocess.CalledProcessError(1, 'cmd')
+    with mock.patch('shutil.rmtree'), mock.patch('shutil.copytree'):
+      with mock.patch('bisect_kit.cros_util.cros_sdk', side_effect=[error, error, 'ok']):
+        self.assertTrue(cros_util.repair_dut('root', 'dut'))
 
 if __name__ == '__main__':
   unittest.main()
