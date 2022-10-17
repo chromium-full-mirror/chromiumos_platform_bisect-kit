@@ -79,6 +79,7 @@ class TestBisectorCli(unittest.TestCase):
           values, 'BISECT_RESULT_VALUES=hello\n')
 
 
+@mock.patch('bisect_kit.common.config_logging', mock.Mock())
 class TestBisectorCommandLine(unittest.TestCase):
   """Test bisector_cli.BisectorCommandLine class."""
 

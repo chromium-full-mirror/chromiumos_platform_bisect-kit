@@ -46,7 +46,7 @@ def config_logging(opts):
   Args:
     opts: An argparse.Namespace to hold command line arguments.
   """
-  if hasattr(config_logging, 'configured'):
+  if getattr(config_logging, 'configured', False):
     return
   config_logging.configured = True
 

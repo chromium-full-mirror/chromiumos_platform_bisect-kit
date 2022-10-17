@@ -11,6 +11,7 @@ import logging
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 from bisect_kit import common
 from bisect_kit import configure
@@ -29,6 +30,7 @@ class TestCommon(unittest.TestCase):
       os.unlink(self.log_file)
     configure.reset()
 
+  @mock.patch('bisect_kit.common.config_logging.configured', False)
   def test_logging(self):
     common.init()
     parents = [common.common_argument_parser]
