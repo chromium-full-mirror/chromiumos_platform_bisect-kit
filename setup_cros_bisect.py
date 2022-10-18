@@ -362,10 +362,14 @@ def setup_chrome_repos(path_factory, use_btrfs: bool):
   spec = """
 solutions = [
   { "name"        : "src",
-    "url"         : "https://chromium.googlesource.com/a/chromium/src.git",
+    "url"         : "https://chromium.googlesource.com/chromium/src.git",
     "custom_deps" : {
     },
-    "custom_vars": {'checkout_src_internal': True},
+    "custom_vars": {
+      'checkout_src_internal': True,
+      'cros_boards': 'amd64-generic:arm-generic',
+      'checkout_lacros_sdk': True
+    },
   },
 ]
 target_os = ['chromeos']

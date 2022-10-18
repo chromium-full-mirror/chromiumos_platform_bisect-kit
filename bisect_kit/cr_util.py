@@ -642,10 +642,14 @@ class ChromeSpecManager(codechange.SpecManager):
         os.path.join(self.config['chrome_mirror'],
                      locking.LOCK_FILE_FOR_MIRROR_SYNC)):
       git_util.checkout_version(self.chrome_src, rev)
+      custom_var_list = [
+          'checkout_src_internal=True',
+          'cros_boards="arm-generic:amd64-generic"', 'checkout_lacros_sdk=True'
+      ]
       gclient_util.config(
           self.config['chrome_root'],
           url='https://chromium.googlesource.com/chromium/src.git',
-          custom_var='checkout_src_internal=True',
+          custom_var_list=custom_var_list,
           cache_dir=self.config['chrome_mirror'],
           managed=False,
           target_os='chromeos')

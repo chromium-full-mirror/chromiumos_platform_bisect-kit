@@ -17,41 +17,29 @@ class TestLacrosUtil(unittest.TestCase):
   """Test functions for lacros_util module."""
 
   def test_get_dut_cpu_architecture(self):
-    with mock.patch.object(
-        util,
-        'ssh_cmd',
-        return_value=f'{lacros_util.BOARD_ARCHITECTURES["x64"]["name"]}\n'):
+    with mock.patch.object(util, 'ssh_cmd', return_value=f'x86_64\n'):
       self.assertEqual(
-          lacros_util.get_dut_cpu_architecture('x64_dut'),
-          lacros_util.BOARD_ARCHITECTURES['x64']['name'])
+          lacros_util.get_dut_cpu_architecture('x64_dut'), 'x86_64')
 
-    with mock.patch.object(
-        util,
-        'ssh_cmd',
-        return_value=f'{lacros_util.BOARD_ARCHITECTURES["arm"]["name"]}\n'):
+    with mock.patch.object(util, 'ssh_cmd', return_value=f'aarch64\n'):
       self.assertEqual(
-          lacros_util.get_dut_cpu_architecture('arm_dut'),
-          lacros_util.BOARD_ARCHITECTURES['arm']['name'])
+          lacros_util.get_dut_cpu_architecture('arm_dut'), 'aarch64')
 
     with self.assertRaises(errors.SshConnectionError):
       lacros_util.get_dut_cpu_architecture('not_sshable_dut')
 
   def test_get_lacross_folder_name(self):
     with mock.patch.object(
-        lacros_util,
-        'get_dut_cpu_architecture',
-        return_value=lacros_util.BOARD_ARCHITECTURES['x64']['name']):
+        lacros_util, 'get_dut_cpu_architecture', return_value='x86_64'):
       self.assertEqual(
           lacros_util.get_lacross_folder_name('x64_dut'),
-          lacros_util.BOARD_ARCHITECTURES['x64']['lacros_dir'])
+          lacros_util.BOARD_ARCHITECTURES['x86_64']['lacros_dir'])
 
     with mock.patch.object(
-        lacros_util,
-        'get_dut_cpu_architecture',
-        return_value=lacros_util.BOARD_ARCHITECTURES['arm']['name']):
+        lacros_util, 'get_dut_cpu_architecture', return_value='aarch64'):
       self.assertEqual(
           lacros_util.get_lacross_folder_name('arm_dut'),
-          lacros_util.BOARD_ARCHITECTURES['arm']['lacros_dir'])
+          lacros_util.BOARD_ARCHITECTURES['aarch64']['lacros_dir'])
 
     with mock.patch.object(
         lacros_util,
@@ -59,6 +47,29 @@ class TestLacrosUtil(unittest.TestCase):
         return_value='unknown_architecture'):
       with self.assertRaises(errors.InternalError):
         lacros_util.get_lacross_folder_name('unknown_architecture_dut')
+
+  def test_get_device_architecture_arg_for_gn(self):
+    # Disabling protected member access cros lint error
+    # pylint: disable=W0212
+    with mock.patch.object(
+        lacros_util, 'get_dut_cpu_architecture', return_value='x86_64'):
+      self.assertEqual(
+          lacros_util._get_device_architecture_arg_for_gn('x64_dut'),
+          lacros_util.BOARD_ARCHITECTURES['x86_64']['arg_for_gn'])
+
+    with mock.patch.object(
+        lacros_util, 'get_dut_cpu_architecture', return_value='aarch64'):
+      self.assertEqual(
+          lacros_util._get_device_architecture_arg_for_gn('arm_dut'),
+          lacros_util.BOARD_ARCHITECTURES['aarch64']['arg_for_gn'])
+
+    with mock.patch.object(
+        lacros_util,
+        'get_dut_cpu_architecture',
+        return_value='unknown_architecture'):
+      with self.assertRaises(errors.InternalError):
+        lacros_util._get_device_architecture_arg_for_gn(
+            'unknown_architecture_dut')
 
   def test_is_prebuilt_path_available(self):
     lacros_image_url = ('gs://chrome-unsigned/desktop-5c0tCh/'

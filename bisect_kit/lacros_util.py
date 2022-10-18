@@ -9,13 +9,16 @@ from __future__ import annotations
 import logging
 import multiprocessing
 import os
+import pathlib
 import shutil
 import subprocess
 import tempfile
+import time
 
 from bisect_kit import cr_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import locking
 from bisect_kit import util
 
 logger = logging.getLogger(__name__)
@@ -24,23 +27,22 @@ LACROS_ZIP_PATH = ('gs://chrome-unsigned/desktop-5c0tCh/{version}/'
                    '{lacros_folder_name}/lacros.zip')
 LACROS_FILENAME = 'lacros.zip'
 BOARD_ARCHITECTURES = {
-    'x64': {
-        'name': 'x86_64',
+    'x86_64': {
         'lacros_dir': 'lacros64',
+        'arg_for_gn': 'amd64',
     },
-    'arm': {
-        'name': 'aarch64',
+    'aarch64': {
         'lacros_dir': 'lacros-arm32',
+        'arg_for_gn': 'arm',
     }
 }
 DEFAULT_CHROMEOS_ROOT = os.path.expanduser('~/chromiumos')
-DEPLOY_CHROME_PATH = 'chromite/bin/deploy_chrome'
 
 
 def get_lacros_gs_path_list(
     old_milestone: int = 88,
     new_milestone: int = 150,
-    lacros_folder_name: str = BOARD_ARCHITECTURES['x64']['lacros_dir']
+    lacros_folder_name: str = BOARD_ARCHITECTURES['x86_64']['lacros_dir']
 ) -> list[str]:
   """Get all the lacros gs paths from bucket between 2 milestones.
 
@@ -231,9 +233,28 @@ def get_lacross_folder_name(dut_ip: str) -> str:
 
   dut_architecture = get_dut_cpu_architecture(dut_ip)
 
-  for architecture_info in BOARD_ARCHITECTURES.values():
-    if dut_architecture == architecture_info['name']:
-      return architecture_info['lacros_dir']
+  if BOARD_ARCHITECTURES.get(dut_architecture) is not None:
+    return BOARD_ARCHITECTURES[dut_architecture]['lacros_dir']
+
+  raise errors.InternalError('Unknown board architecture %s' % dut_architecture)
+
+
+def _get_device_architecture_arg_for_gn(dut_ip: str) -> str:
+  """Get the device architecture argument for args.gn file
+
+  Currently there are 2 supported acchitecture: 'amd64' and 'arm' depending
+    on architecture.
+
+  Args:
+    dut_ip: IP of a DUT
+
+  Returns:
+    the appropriate architecture name
+  """
+  dut_architecture = get_dut_cpu_architecture(dut_ip)
+
+  if BOARD_ARCHITECTURES.get(dut_architecture) is not None:
+    return BOARD_ARCHITECTURES[dut_architecture]['arg_for_gn']
 
   raise errors.InternalError('Unknown board architecture %s' % dut_architecture)
 
@@ -274,21 +295,38 @@ def fetch_lacros_prebuilt(lacros_version: str, dut_ip: str) -> str:
     raise
 
 
+def _get_deploy_chrome_path(chrome_src: str | None = None,
+                            chromeos_root: str | None = None):
+  """Get deploy_chrome script path
+
+  Args:
+    chrome_src: Chrome source root directory
+    chromeos_root: ChromeOS source root directory
+
+  Returns:
+    Deploy_chrome script path
+  """
+  if chromeos_root:
+    return os.path.join(chromeos_root, 'chromite/bin/deploy_chrome')
+  if chrome_src:
+    return os.path.join(chrome_src, 'third_party/chromite/bin/deploy_chrome')
+
+  return os.path.join(DEFAULT_CHROMEOS_ROOT, 'chromite/bin/deploy_chrome')
+
+
 def deploy_lacros_to_dut(lacros_build_dir: str, dut_ip: str,
-                         chromeos_root: str) -> int:
+                         deploy_chrome_script_path: str) -> int:
   """Deploy a lacros build to a DUT
 
   Args:
     lacros_build_dir: Lacros build directory
     dut_ip: IP of the DUT
-    chromeos_root: ChromeOS source root directory
+    deploy_chrome_script_path: Deploy_chrome script path
 
   Returns:
     0 for successful deployment. Raises exception for failures.
   """
   try:
-    deploy_chrome_script_path = os.path.join(chromeos_root, DEPLOY_CHROME_PATH)
-
     assert os.path.exists(deploy_chrome_script_path)
 
     lacros_deploy_command = [
@@ -307,10 +345,8 @@ def deploy_lacros_to_dut(lacros_build_dir: str, dut_ip: str,
     raise
 
 
-def fetch_and_deploy_lacros_prebuilt_to_dut(lacros_version: str,
-                                            dut_ip: str,
-                                            chromeos_root=DEFAULT_CHROMEOS_ROOT
-                                           ) -> int:
+def fetch_and_deploy_lacros_prebuilt_to_dut(lacros_version: str, dut_ip: str,
+                                            chromeos_root: str) -> int:
   """Fetch and deploy a specific lacros prebuilt version to a DUT.
 
   Args:
@@ -325,7 +361,8 @@ def fetch_and_deploy_lacros_prebuilt_to_dut(lacros_version: str,
   try:
     lacros_prebuilt_directory = fetch_lacros_prebuilt(lacros_version, dut_ip)
 
-    deploy_lacros_to_dut(lacros_prebuilt_directory, dut_ip, chromeos_root)
+    deploy_chrome_path = _get_deploy_chrome_path(chromeos_root=chromeos_root)
+    deploy_lacros_to_dut(lacros_prebuilt_directory, dut_ip, deploy_chrome_path)
 
     return 0
   except:
@@ -335,3 +372,102 @@ def fetch_and_deploy_lacros_prebuilt_to_dut(lacros_version: str,
     logger.debug('clean up lacros prebuilt directory %s',
                  lacros_prebuilt_directory)
     shutil.rmtree(lacros_prebuilt_directory, True)
+
+
+def _get_args_gn_config(device_architecture: str) -> str:
+  """Get GN arguments for lacros build
+
+  Args:
+    device_architecture: The device architecture for lacros
+    build ("amd64" or "arm")
+
+  Returns:
+    A multi line config which can be written to args.gn file
+  """
+  args_gn_config = """
+import("//build/args/chromeos/%s-generic-crostoolchain.gni")
+target_os="chromeos"
+is_chromeos_device=true
+chromeos_is_browser_only=true
+use_goma=true
+is_chrome_branded=true
+is_official_build=false
+is_debug=false
+use_thin_lto = false
+is_cfi = false
+is_component_build = false
+""" % (
+      device_architecture)
+  return args_gn_config
+
+
+def _generate_gn_arguments(chrome_src: str, dut_ip: str,
+                           out_device_lacros_dir: str):
+  """Generate GN arguments for lacros build
+
+  Args:
+    chrome_src: Chrome source root directory
+    dut_ip: IP of the DUT
+    out_device_lacros_dir: The directory where the arg.gn file will be created
+  """
+  device_architecture_arg_for_gn = _get_device_architecture_arg_for_gn(dut_ip)
+
+  logger.debug('Generating lacros gn arguments for %s',
+               device_architecture_arg_for_gn)
+
+  output_directory = os.path.join(chrome_src, out_device_lacros_dir)
+  args_gn_path = os.path.join(output_directory, 'args.gn')
+  with open(args_gn_path, 'w') as f:
+    f.write(_get_args_gn_config(device_architecture_arg_for_gn))
+
+  # TODO(njrafi): Check if `goma_ctl ensure_start` command is required
+  gn_gen_command = ['gn', 'gen', out_device_lacros_dir]
+  util.check_output(*gn_gen_command, cwd=chrome_src)
+
+
+def build_lacros(chrome_src: str, dut_ip: str):
+  """Build lacros from chrome source tree
+
+  Args:
+    chrome_src: Chrome source root directory
+    dut_ip: IP of the DUT
+
+  Returns:
+    The output directory of lacros build
+  """
+  out_device_lacros_dir = os.path.join('out_device_lacros', 'Release')
+  output_directory = os.path.join(chrome_src, out_device_lacros_dir)
+  pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
+  _generate_gn_arguments(chrome_src, dut_ip, output_directory)
+
+  logger.debug('Building lacros from source')
+  with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
+    lacros_build_cmd = [
+        './third_party/depot_tools/autoninja', '-C', out_device_lacros_dir,
+        'chrome'
+    ]
+    logger.debug('Lacros Build Command: %s', ' '.join(lacros_build_cmd))
+    try:
+      util.check_output(*lacros_build_cmd, cwd=chrome_src)
+    except subprocess.CalledProcessError:
+      logger.warning('build failed, delete out directory and retry again')
+      # Some compiler processes are still terminating. Short delay is
+      # necessary.
+      time.sleep(10)
+      shutil.rmtree(output_directory)
+      util.check_output(*lacros_build_cmd, cwd=chrome_src)
+    return output_directory
+
+
+def build_and_deploy(chrome_src: str, dut_ip: str):
+  """Build and deploy lacros
+
+  Build lacros from chrome source and deploy to dut
+
+  Args:
+    chrome_src: Chrome source root directory
+    dut_ip: IP of the DUT
+  """
+  build_dir = build_lacros(chrome_src, dut_ip)
+  deploy_chrome_script_path = _get_deploy_chrome_path(chrome_src=chrome_src)
+  deploy_lacros_to_dut(build_dir, dut_ip, deploy_chrome_script_path)

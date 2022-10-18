@@ -34,6 +34,7 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util
+from bisect_kit import lacros_util
 import switch_cros_localbuild
 
 logger = logging.getLogger(__name__)
@@ -168,6 +169,8 @@ def switch_main(args: typing.Optional[tuple[str]]):
         nodeploy=opts.nodeploy)
   elif opts.deploy_method == 'image':
     switch_cros_localbuild.build_and_deploy(opts)
+
+  lacros_util.build_and_deploy(opts.chrome_src, opts.dut)
 
 
 def main(args: typing.Optional[tuple[str]] = None) -> int:

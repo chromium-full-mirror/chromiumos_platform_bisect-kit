@@ -37,15 +37,15 @@ emitted_warnings = set()
 DEFAULT_BRANCH_NAME = 'master'
 
 
-def config(gclient_dir,
-           url=None,
-           cache_dir=None,
-           deps_file=None,
-           custom_var=None,
-           gclientfile=None,
-           managed=True,
-           spec=None,
-           target_os=None):
+def config(gclient_dir: str,
+           url: str | None = None,
+           cache_dir: str | None = None,
+           deps_file: str | None = None,
+           custom_var_list: list[str] | None = None,
+           gclientfile: str | None = None,
+           managed: bool = True,
+           spec: str | None = None,
+           target_os: str | None = None):
   """Simply wrapper of `gclient config`.
 
   Args:
@@ -53,7 +53,7 @@ def config(gclient_dir,
     url: URL of gclient configuration files
     cache_dir: gclient's git cache folder
     deps_file: override the default DEPS file name
-    custom_var: custom variables
+    custom_var_list: A list of custom variables
     gclientfile: alternate .gclient file name
     managed: use managed dependencies
     spec: content of gclient file
@@ -64,8 +64,9 @@ def config(gclient_dir,
     cmd += ['--deps-file', deps_file]
   if cache_dir:
     cmd += ['--cache-dir', cache_dir]
-  if custom_var:
-    cmd += ['--custom-var', custom_var]
+  if custom_var_list:
+    for custom_var in custom_var_list:
+      cmd += ['--custom-var', custom_var]
   if gclientfile:
     cmd += ['--gclientfile', gclientfile]
   if not managed:

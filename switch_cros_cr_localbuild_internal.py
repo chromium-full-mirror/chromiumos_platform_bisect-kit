@@ -34,6 +34,7 @@ from bisect_kit import cr_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
+from bisect_kit import lacros_util
 from bisect_kit import util
 import switch_cros_localbuild
 
@@ -204,11 +205,15 @@ def switch_main(args: typing.Optional[tuple[str]]):
     # live DEPS in the tree. Note this gclient file is used only for runhook,
     # not for code sync.
     gclientfile = '.gclient-for-runhook'
+    custom_var_list = [
+        'checkout_src_internal=True', 'cros_boards="arm-generic:amd64-generic"',
+        'checkout_lacros_sdk=True'
+    ]
     gclient_util.config(
         opts.chrome_root,
         url='https://chromium.googlesource.com/chromium/src.git',
         gclientfile=gclientfile,
-        custom_var='checkout_src_internal=True',
+        custom_var_list=custom_var_list,
         cache_dir=opts.chrome_mirror,
         target_os='chromeos')
   gclient_util.runhook(opts.chrome_root, gclientfile=gclientfile)
@@ -224,6 +229,8 @@ def switch_main(args: typing.Optional[tuple[str]]):
         nodeploy=opts.nodeploy)
   elif opts.deploy_method == 'image':
     switch_cros_localbuild.build_and_deploy(opts)
+
+  lacros_util.build_and_deploy(opts.chrome_src, opts.dut)
 
   # Sanity check. The OS version should not change.
   if opts.dut:
