@@ -1,0 +1,17 @@
+# Copyright 2022 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = [
+    "--log-level=DEBUG",
+    "--quiet",
+    "--numprocesses=auto",
+    "--maxprocesses=16",
+    "--durations=5",
+]
+norecursedirs = [
+    "third_party",
+    "venv",
+]
