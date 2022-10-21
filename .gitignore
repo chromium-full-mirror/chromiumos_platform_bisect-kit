@@ -1,2 +1,55 @@
-/internal/
-*.pyc
+# Byte-compiled files
+*$py.class
+*.py[cod]
+__pycache__/
+
+# Distribution and packaging files
+*.egg
+*.egg-info/
+.eggs/
+MANIFEST
+build/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+share/python-wheels/
+var/
+wheels/
+
+# Unit test and coverage reports
+*.cover
+*.py,cover
+.cache
+.coverage
+.coverage.*
+.hypothesis/
+.nox/
+.pytest_cache/
+.tox/
+cover/
+coverage.xml
+htmlcov/
+nosetests.xml
+
+# Python environments
+.env
+.venv
+ENV/
+env.bak/
+env/
+venv.bak/
+venv/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Bisector
+*.log
+bisect.sessions/
+bisect_kit.json
+internal/
