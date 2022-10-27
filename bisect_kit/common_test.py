@@ -30,7 +30,7 @@ class TestCommon(unittest.TestCase):
       os.unlink(self.log_file)
     configure.reset()
 
-  @mock.patch('bisect_kit.common.config_logging.configured', False)
+  @mock.patch('bisect_kit.common.config_logging.configured', False, create=True)
   def test_logging(self):
     common.init()
     parents = [common.common_argument_parser]

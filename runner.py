@@ -172,6 +172,8 @@ def run_once(opts):
       meet_terminate=False)
 
   def output_handler(line):
+    if output_result['meet_terminate']:
+      return
     if opts.output and not output_result['output_matched']:
       if opts.output.search(line):
         logger.debug('matched output')
@@ -181,11 +183,10 @@ def run_once(opts):
       if opts.precondition_output.search(line):
         logger.debug('matched precondition_output')
         output_result['precondition_output_matched'] = True
-    if opts.terminate_output and not output_result['meet_terminate']:
-      if opts.terminate_output.search(line):
-        logger.debug('terminate condition matched, stop execution')
-        output_result['meet_terminate'] = True
-        p.terminate()
+    if opts.terminate_output and opts.terminate_output.search(line):
+      logger.debug('terminate condition matched, stop execution')
+      output_result['meet_terminate'] = True
+      p.terminate()
 
   p = util.Popen(
       cmdline,
