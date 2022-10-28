@@ -14,23 +14,31 @@ import eval_cros_tast
 
 
 class TestEvalCrosTast(unittest.TestCase):
-  """Test eval_cros_tast."""
+    """Test eval_cros_tast."""
 
-  def test_parse_results_json(self):
-    self.assertEqual(
-        eval_cros_tast.parse_results_json(
-            testing.get_testdata_path('tast_test_result/pass'), 'example.Pass'),
-        (True, None))
+    def test_parse_results_json(self):
+        self.assertEqual(
+            eval_cros_tast.parse_results_json(
+                testing.get_testdata_path('tast_test_result/pass'),
+                'example.Pass',
+            ),
+            (True, None),
+        )
 
-    self.assertEqual(
-        eval_cros_tast.parse_results_json(
-            testing.get_testdata_path('tast_test_result/fail'), 'example.Fail'),
-        (False, 'Finally, a fatal error'))
+        self.assertEqual(
+            eval_cros_tast.parse_results_json(
+                testing.get_testdata_path('tast_test_result/fail'),
+                'example.Fail',
+            ),
+            (False, 'Finally, a fatal error'),
+        )
 
-    with self.assertRaises(errors.ExternalError):
-      eval_cros_tast.parse_results_json(
-          testing.get_testdata_path('tast_test_result/pass'), 'bad.testname')
+        with self.assertRaises(errors.ExternalError):
+            eval_cros_tast.parse_results_json(
+                testing.get_testdata_path('tast_test_result/pass'),
+                'bad.testname',
+            )
 
 
 if __name__ == '__main__':
-  unittest.main()
+    unittest.main()

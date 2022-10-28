@@ -31,106 +31,123 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import lacros_util
 
+
 logger = logging.getLogger(__name__)
 
 diff_url_template = (
     'https://chromium.googlesource.com/chromium/src/+log/{old}..{new}'
-    '?pretty=fuller&n=10000')
+    '?pretty=fuller&n=10000'
+)
 
 
 class LacrosVersionDomain(core.BisectDomain):
-  """BisectDomain for lacros versions."""
-  revtype = staticmethod(cr_util.argtype_chrome_version)
-  help = globals()['__doc__']
+    """BisectDomain for lacros versions."""
 
-  @staticmethod
-  def add_init_arguments(parser):
-    parser.add_argument(
-        '--chromeos_root',
-        required=True,
-        metavar='CHROMEOS_ROOT',
-        type=cli.argtype_dir_path,
-        default=configure.get('CHROMEOS_ROOT'),
-        help='Root of chromeOS source tree, like ~/chromiumos')
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='Address of DUT (Device Under Test)')
-    parser.add_argument(
-        '--board',
-        metavar='BOARD',
-        default=configure.get('BOARD'),
-        help='ChromeOS board name')
+    revtype = staticmethod(cr_util.argtype_chrome_version)
+    help = globals()['__doc__']
 
-  @staticmethod
-  def init(opts):
+    @staticmethod
+    def add_init_arguments(parser):
+        parser.add_argument(
+            '--chromeos_root',
+            required=True,
+            metavar='CHROMEOS_ROOT',
+            type=cli.argtype_dir_path,
+            default=configure.get('CHROMEOS_ROOT'),
+            help='Root of chromeOS source tree, like ~/chromiumos',
+        )
+        parser.add_argument(
+            '--dut',
+            type=cli.argtype_notempty,
+            metavar='DUT',
+            default=configure.get('DUT'),
+            help='Address of DUT (Device Under Test)',
+        )
+        parser.add_argument(
+            '--board',
+            metavar='BOARD',
+            default=configure.get('BOARD'),
+            help='ChromeOS board name',
+        )
 
-    if not opts.dut:
-      raise errors.ArgumentError('--dut', 'is required')
+    @staticmethod
+    def init(opts):
 
-    assert cros_util.is_dut(opts.dut)
+        if not opts.dut:
+            raise errors.ArgumentError('--dut', 'is required')
 
-    if not opts.board:
-      assert opts.dut
-      opts.board = cros_util.query_dut_board(opts.dut)
+        assert cros_util.is_dut(opts.dut)
 
-    lacros_folder_name = lacros_util.get_lacross_folder_name(opts.dut)
+        if not opts.board:
+            assert opts.dut
+            opts.board = cros_util.query_dut_board(opts.dut)
 
-    if not cr_util.is_direct_relative_version(opts.old, opts.new):
-      logger.warning('old=%s is not ancestor of new=%s', opts.old, opts.new)
-      lowest_common_ancestor = lacros_util.get_lca_lacros_prebuilt(
-          opts.old, opts.new, lacros_folder_name)
-      logger.warning(
-          'Assume their lowest common ancestor, %s,'
-          'still have expected old behavior as %s', lowest_common_ancestor,
-          opts.old)
-      opts.old = lowest_common_ancestor
+        lacros_folder_name = lacros_util.get_lacross_folder_name(opts.dut)
 
-    if not lacros_util.is_prebuilt_version_available(opts.old, opts.dut):
-      raise errors.ArgumentError(
-          '--old', 'Lacros version %s is not available for dut %s' %
-          (opts.old, opts.dut))
+        if not cr_util.is_direct_relative_version(opts.old, opts.new):
+            logger.warning(
+                'old=%s is not ancestor of new=%s', opts.old, opts.new
+            )
+            lowest_common_ancestor = lacros_util.get_lca_lacros_prebuilt(
+                opts.old, opts.new, lacros_folder_name
+            )
+            logger.warning(
+                'Assume their lowest common ancestor, %s,'
+                'still have expected old behavior as %s',
+                lowest_common_ancestor,
+                opts.old,
+            )
+            opts.old = lowest_common_ancestor
 
-    if not lacros_util.is_prebuilt_version_available(opts.new, opts.dut):
-      raise errors.ArgumentError(
-          '--new', 'Lacros version %s is not available for dut %s' %
-          (opts.new, opts.dut))
+        if not lacros_util.is_prebuilt_version_available(opts.old, opts.dut):
+            raise errors.ArgumentError(
+                '--old',
+                'Lacros version %s is not available for dut %s'
+                % (opts.old, opts.dut),
+            )
 
-    revlist = lacros_util.get_lacros_prebuilt_versions_between(
-        opts.old, opts.new, lacros_folder_name)
-    config = dict(
-        dut=opts.dut,
-        board=opts.board,
-        old=opts.old,
-        new=opts.new,
-        chromeos_root=opts.chromeos_root)
+        if not lacros_util.is_prebuilt_version_available(opts.new, opts.dut):
+            raise errors.ArgumentError(
+                '--new',
+                'Lacros version %s is not available for dut %s'
+                % (opts.new, opts.dut),
+            )
 
-    details = {}
-    for i in range(1, len(revlist)):
-      url = diff_url_template.format(old=revlist[i - 1], new=revlist[i])
-      details[revlist[i]] = {'actions': [{'link': url}]}
+        revlist = lacros_util.get_lacros_prebuilt_versions_between(
+            opts.old, opts.new, lacros_folder_name
+        )
+        config = dict(
+            dut=opts.dut,
+            board=opts.board,
+            old=opts.old,
+            new=opts.new,
+            chromeos_root=opts.chromeos_root,
+        )
 
-    return config, {'revlist': revlist, 'details': details}
+        details = {}
+        for i in range(1, len(revlist)):
+            url = diff_url_template.format(old=revlist[i - 1], new=revlist[i])
+            details[revlist[i]] = {'actions': [{'link': url}]}
 
-  def __init__(self, config):
-    self.config = config
+        return config, {'revlist': revlist, 'details': details}
 
-  def setenv(self, env, rev):
-    env['CHROMEOS_ROOT'] = self.config['chromeos_root']
-    env['LACROS_VERSION'] = rev
-    if self.config['board']:
-      env['BOARD'] = self.config['board']
-    if self.config['dut']:
-      env['DUT'] = self.config['dut']
+    def __init__(self, config):
+        self.config = config
 
-  def fill_candidate_summary(self, summary):
-    if 'current_range' in summary:
-      old, new = summary['current_range']
-      url = diff_url_template.format(old=old, new=new)
-      summary['links'] = [dict(name='change_list', url=url)]
+    def setenv(self, env, rev):
+        env['CHROMEOS_ROOT'] = self.config['chromeos_root']
+        env['LACROS_VERSION'] = rev
+        if self.config['board']:
+            env['BOARD'] = self.config['board']
+        if self.config['dut']:
+            env['DUT'] = self.config['dut']
+
+    def fill_candidate_summary(self, summary):
+        if 'current_range' in summary:
+            old, new = summary['current_range']
+            url = diff_url_template.format(old=old, new=new)
+            summary['links'] = [dict(name='change_list', url=url)]
 
 
 if __name__ == '__main__':
-  bisector_cli.BisectorCommandLine(LacrosVersionDomain).main()
+    bisector_cli.BisectorCommandLine(LacrosVersionDomain).main()

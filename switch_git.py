@@ -24,39 +24,42 @@ from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import git_util
 
+
 logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-  parents = [common.common_argument_parser, common.session_optional_parser]
-  parser = argparse.ArgumentParser(parents=parents)
-  cli.patching_argparser_exit(parser)
-  parser.add_argument(
-      'git_rev',
-      nargs='?',
-      type=git_util.argtype_git_rev,
-      metavar='GIT_REV',
-      default=configure.get('GIT_REV', ''),
-      help='Git revision id')
-  parser.add_argument(
-      '--git_repo',
-      type=cli.argtype_dir_path,
-      metavar='GIT_REPO',
-      default=configure.get('GIT_REPO'),
-      help='Git repository path')
+    parents = [common.common_argument_parser, common.session_optional_parser]
+    parser = argparse.ArgumentParser(parents=parents)
+    cli.patching_argparser_exit(parser)
+    parser.add_argument(
+        'git_rev',
+        nargs='?',
+        type=git_util.argtype_git_rev,
+        metavar='GIT_REV',
+        default=configure.get('GIT_REV', ''),
+        help='Git revision id',
+    )
+    parser.add_argument(
+        '--git_repo',
+        type=cli.argtype_dir_path,
+        metavar='GIT_REPO',
+        default=configure.get('GIT_REPO'),
+        help='Git repository path',
+    )
 
-  return parser
+    return parser
 
 
 @cli.fatal_error_handler
 def main(args=None):
-  common.init()
-  parser = create_argument_parser()
-  opts = parser.parse_args(args)
-  common.config_logging(opts)
+    common.init()
+    parser = create_argument_parser()
+    opts = parser.parse_args(args)
+    common.config_logging(opts)
 
-  git_util.checkout_version(opts.git_repo, opts.git_rev)
+    git_util.checkout_version(opts.git_repo, opts.git_rev)
 
 
 if __name__ == '__main__':
-  main()
+    main()

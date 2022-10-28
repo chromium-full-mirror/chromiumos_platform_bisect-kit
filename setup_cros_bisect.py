@@ -42,6 +42,7 @@ from bisect_kit import locking
 from bisect_kit import repo_util
 from bisect_kit import util
 
+
 DEFAULT_MIRROR_BASE = os.path.expanduser('~/git-mirrors')
 DEFAULT_WORK_BASE = os.path.expanduser('~/bisect-workdir')
 CHECKOUT_TEMPLATE_NAME = 'template'
@@ -51,315 +52,351 @@ logger = logging.getLogger(__name__)
 
 
 class DefaultProjectPathFactory:
-  """Factory for chromeos/chrome/android source tree paths."""
+    """Factory for chromeos/chrome/android source tree paths."""
 
-  def __init__(self, mirror_base, work_base, session):
-    self.mirror_base = mirror_base
-    self.work_base = work_base
-    self.session = session
+    def __init__(self, mirror_base, work_base, session):
+        self.mirror_base = mirror_base
+        self.work_base = work_base
+        self.session = session
 
-  def get_chromeos_mirror(self):
-    return os.path.join(self.mirror_base, 'chromeos')
+    def get_chromeos_mirror(self):
+        return os.path.join(self.mirror_base, 'chromeos')
 
-  def get_chromeos_tree(self):
-    return os.path.join(self.work_base, self.session, 'chromeos')
+    def get_chromeos_tree(self):
+        return os.path.join(self.work_base, self.session, 'chromeos')
 
-  def get_android_mirror(self, branch):
-    return os.path.join(self.mirror_base, 'android.%s' % branch)
+    def get_android_mirror(self, branch):
+        return os.path.join(self.mirror_base, 'android.%s' % branch)
 
-  def get_android_tree(self, branch):
-    return os.path.join(self.work_base, self.session, 'android.%s' % branch)
+    def get_android_tree(self, branch):
+        return os.path.join(self.work_base, self.session, 'android.%s' % branch)
 
-  def get_chrome_cache(self):
-    return os.path.join(self.mirror_base, 'chrome')
+    def get_chrome_cache(self):
+        return os.path.join(self.mirror_base, 'chrome')
 
-  def get_chrome_tree(self):
-    return os.path.join(self.work_base, self.session, 'chrome')
+    def get_chrome_tree(self):
+        return os.path.join(self.work_base, self.session, 'chrome')
 
 
 def make_subvolume(path):
-  if os.path.exists(path):
-    return
-  dirname, basename = os.path.split(path)
-  if not os.path.exists(dirname):
-    os.makedirs(dirname)
-  util.check_call('btrfs', 'subvolume', 'create', basename, cwd=dirname)
+    if os.path.exists(path):
+        return
+    dirname, basename = os.path.split(path)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    util.check_call('btrfs', 'subvolume', 'create', basename, cwd=dirname)
 
 
 def subvolume_or_makedirs(use_btrfs: bool, path: str):
-  if os.path.exists(path):
-    return
+    if os.path.exists(path):
+        return
 
-  path = os.path.abspath(path)
-  if use_btrfs:
-    make_subvolume(path)
-  else:
-    os.makedirs(path)
+    path = os.path.abspath(path)
+    if use_btrfs:
+        make_subvolume(path)
+    else:
+        os.makedirs(path)
 
 
 def is_btrfs_subvolume(path):
-  if os.path.islink(path):
-    return False
-  if util.check_output('stat', '-f', '--format=%T', path).strip() != 'btrfs':
-    return False
-  return util.check_output('stat', '--format=%i', path).strip() == '256'
+    if os.path.islink(path):
+        return False
+    if util.check_output('stat', '-f', '--format=%T', path).strip() != 'btrfs':
+        return False
+    return util.check_output('stat', '--format=%i', path).strip() == '256'
 
 
 def snapshot_or_copytree(src, dst):
-  assert os.path.isdir(src), '%s does not exist' % src
-  assert os.path.isdir(os.path.dirname(dst))
+    assert os.path.isdir(src), '%s does not exist' % src
+    assert os.path.isdir(os.path.dirname(dst))
 
-  # Make sure dst do not exist, otherwise it becomes "dst/name" (one extra
-  # depth) instead of "dst".
-  assert not os.path.exists(dst)
+    # Make sure dst do not exist, otherwise it becomes "dst/name" (one extra
+    # depth) instead of "dst".
+    assert not os.path.exists(dst)
 
-  if is_btrfs_subvolume(src):
-    util.check_call('btrfs', 'subvolume', 'snapshot', src, dst)
-  else:
-    # -a for recursion and preserve all attributes.
-    util.check_call('cp', '-a', src, dst)
+    if is_btrfs_subvolume(src):
+        util.check_call('btrfs', 'subvolume', 'snapshot', src, dst)
+    else:
+        # -a for recursion and preserve all attributes.
+        util.check_call('cp', '-a', src, dst)
 
 
 def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
-  manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
-  manifest_path = 'default.xml'
-  manifest_full_path = os.path.join(manifest_dir, manifest_path)
-  # hack for chromeos symlink
-  if os.path.islink(manifest_full_path):
-    manifest_path = os.readlink(manifest_full_path)
+    manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
+    manifest_path = 'default.xml'
+    manifest_full_path = os.path.join(manifest_dir, manifest_path)
+    # hack for chromeos symlink
+    if os.path.islink(manifest_full_path):
+        manifest_path = os.readlink(manifest_full_path)
 
-  parser = repo_util.ManifestParser(manifest_dir)
-  git_rev = git_util.get_commit_hash(manifest_dir, 'HEAD')
-  root = parser.parse_xml_recursive(git_rev, manifest_path)
-  latest_all = parser.process_parsed_result(root, group_constraint='all')
-  latest_default = parser.process_parsed_result(
-      root, group_constraint='default')
+    parser = repo_util.ManifestParser(manifest_dir)
+    git_rev = git_util.get_commit_hash(manifest_dir, 'HEAD')
+    root = parser.parse_xml_recursive(git_rev, manifest_path)
+    latest_all = parser.process_parsed_result(root, group_constraint='all')
+    latest_default = parser.process_parsed_result(
+        root, group_constraint='default'
+    )
 
-  removed = {}
-  for commit in reversed(
-      parser.enumerate_manifest_commits(last_sync_time, None, manifest_path)):
-    try:
-      root = parser.parse_xml_recursive(commit.rev, manifest_path)
-    except xml.etree.ElementTree.ParseError:
-      logger.warning('%s %s@%s syntax error, skip', manifest_dir, manifest_path,
-                     commit.rev[:12])
-      continue
-    if (only_branch and root.find('default') is not None and
-        root.find('default').get('revision') != only_branch):
-      break
-    entries = parser.process_parsed_result(root)
-    for path, path_spec in entries.items():
-      if path in latest_default:
-        continue
-      if path in latest_all:
-        logger.warning(
-            'path=%s was removed from default group; assume skip is harmless',
-            path)
-        continue
-      if path in removed:
-        continue
-      removed[path] = path_spec
+    removed = {}
+    for commit in reversed(
+        parser.enumerate_manifest_commits(last_sync_time, None, manifest_path)
+    ):
+        try:
+            root = parser.parse_xml_recursive(commit.rev, manifest_path)
+        except xml.etree.ElementTree.ParseError:
+            logger.warning(
+                '%s %s@%s syntax error, skip',
+                manifest_dir,
+                manifest_path,
+                commit.rev[:12],
+            )
+            continue
+        if (
+            only_branch
+            and root.find('default') is not None
+            and root.find('default').get('revision') != only_branch
+        ):
+            break
+        entries = parser.process_parsed_result(root)
+        for path, path_spec in entries.items():
+            if path in latest_default:
+                continue
+            if path in latest_all:
+                logger.warning(
+                    'path=%s was removed from default group; assume skip is harmless',
+                    path,
+                )
+                continue
+            if path in removed:
+                continue
+            removed[path] = path_spec
 
-  return removed
+    return removed
 
 
 def add_local_mount(chromeos_tree: str):
-  """Add gsutil cred in ~/.config folder in chromeos local mount setting.
+    """Add gsutil cred in ~/.config folder in chromeos local mount setting.
 
-  This is necessary to run gsutil commands under chroot.
-  """
-  user_config_dir = os.path.expanduser('~/.config')
-  if not os.path.isdir(user_config_dir):
-    return
+    This is necessary to run gsutil commands under chroot.
+    """
+    user_config_dir = os.path.expanduser('~/.config')
+    if not os.path.isdir(user_config_dir):
+        return
 
-  mount_config = []
-  mount_config_file = os.path.join(chromeos_tree, 'src/scripts/.local_mounts')
-  if os.path.exists(mount_config_file):
-    with open(mount_config_file, 'r') as f:
-      mount_config = [line.strip() for line in f.readlines()]
+    mount_config = []
+    mount_config_file = os.path.join(chromeos_tree, 'src/scripts/.local_mounts')
+    if os.path.exists(mount_config_file):
+        with open(mount_config_file, 'r') as f:
+            mount_config = [line.strip() for line in f.readlines()]
 
-  if user_config_dir not in mount_config:
-    logger.info('add %s in local_mounts', user_config_dir)
-    mount_config.append(user_config_dir)
-    with open(mount_config_file, 'w') as f:
-      print('\n'.join(mount_config), file=f)
+    if user_config_dir not in mount_config:
+        logger.info('add %s in local_mounts', user_config_dir)
+        mount_config.append(user_config_dir)
+        with open(mount_config_file, 'w') as f:
+            print('\n'.join(mount_config), file=f)
 
 
 def setup_chromeos_repos(path_factory, use_btrfs: bool):
-  chromeos_mirror = path_factory.get_chromeos_mirror()
-  chromeos_tree = path_factory.get_chromeos_tree()
-  subvolume_or_makedirs(use_btrfs, chromeos_mirror)
-  subvolume_or_makedirs(use_btrfs, chromeos_tree)
+    chromeos_mirror = path_factory.get_chromeos_mirror()
+    chromeos_tree = path_factory.get_chromeos_tree()
+    subvolume_or_makedirs(use_btrfs, chromeos_mirror)
+    subvolume_or_makedirs(use_btrfs, chromeos_tree)
 
-  manifest_url = (
-      'https://chrome-internal.googlesource.com/chromeos/manifest-internal')
-  repo_url = 'https://chromium.googlesource.com/external/repo.git'
+    manifest_url = (
+        'https://chrome-internal.googlesource.com/chromeos/manifest-internal'
+    )
+    repo_url = 'https://chromium.googlesource.com/external/repo.git'
 
-  if os.path.exists(os.path.join(chromeos_mirror, '.repo', 'manifests')):
-    logger.warning(
-        '%s has already been initialized, assume it is setup properly',
-        chromeos_mirror)
-  else:
-    logger.info('repo init for chromeos mirror')
-    repo_util.init(
-        chromeos_mirror,
-        manifest_url=manifest_url,
-        repo_url=repo_url,
-        mirror=True)
+    if os.path.exists(os.path.join(chromeos_mirror, '.repo', 'manifests')):
+        logger.warning(
+            '%s has already been initialized, assume it is setup properly',
+            chromeos_mirror,
+        )
+    else:
+        logger.info('repo init for chromeos mirror')
+        repo_util.init(
+            chromeos_mirror,
+            manifest_url=manifest_url,
+            repo_url=repo_url,
+            mirror=True,
+        )
 
-    local_manifest_dir = os.path.join(chromeos_mirror,
-                                      repo_util.LOCAL_MANIFESTS_DIR)
-    os.mkdir(local_manifest_dir)
-    with open(os.path.join(local_manifest_dir, 'manifest-versions.xml'),
-              'w') as f:
-      f.write("""<?xml version="1.0" encoding="UTF-8"?>
+        local_manifest_dir = os.path.join(
+            chromeos_mirror, repo_util.LOCAL_MANIFESTS_DIR
+        )
+        os.mkdir(local_manifest_dir)
+        with open(
+            os.path.join(local_manifest_dir, 'manifest-versions.xml'), 'w'
+        ) as f:
+            f.write(
+                """<?xml version="1.0" encoding="UTF-8"?>
           <manifest>
             <project name="chromeos/manifest-versions" remote="cros-internal" />
           </manifest>
-          """)
+          """
+            )
 
-  logger.info('repo init for chromeos tree')
-  repo_util.init(
-      chromeos_tree,
-      manifest_url=manifest_url,
-      repo_url=repo_url,
-      reference=chromeos_mirror)
+    logger.info('repo init for chromeos tree')
+    repo_util.init(
+        chromeos_tree,
+        manifest_url=manifest_url,
+        repo_url=repo_url,
+        reference=chromeos_mirror,
+    )
 
-  with locking.lock_file(
-      os.path.join(chromeos_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
-    logger.info('repo sync for chromeos mirror (this takes hours; be patient)')
-    repo_util.sync(chromeos_mirror, current_branch=False)
+    with locking.lock_file(
+        os.path.join(chromeos_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)
+    ):
+        logger.info(
+            'repo sync for chromeos mirror (this takes hours; be patient)'
+        )
+        repo_util.sync(chromeos_mirror, current_branch=False)
 
-  logger.info('repo sync for chromeos tree')
-  repo_util.sync(chromeos_tree)
-  add_local_mount(chromeos_tree)
+    logger.info('repo sync for chromeos tree')
+    repo_util.sync(chromeos_tree)
+    add_local_mount(chromeos_tree)
 
 
 def read_last_sync_time(repo_dir):
-  timestamp_path = os.path.join(repo_dir, 'last_sync_time')
-  if os.path.exists(timestamp_path):
-    with open(timestamp_path) as f:
-      return int(f.read())
-  else:
-    # 4 months should be enough for most bisect cases.
-    return int(time.time()) - 86400 * 120
+    timestamp_path = os.path.join(repo_dir, 'last_sync_time')
+    if os.path.exists(timestamp_path):
+        with open(timestamp_path) as f:
+            return int(f.read())
+    else:
+        # 4 months should be enough for most bisect cases.
+        return int(time.time()) - 86400 * 120
 
 
 def write_sync_time(repo_dir, sync_time):
-  timestamp_path = os.path.join(repo_dir, 'last_sync_time')
-  with open(timestamp_path, 'w') as f:
-    f.write('%d\n' % sync_time)
+    timestamp_path = os.path.join(repo_dir, 'last_sync_time')
+    with open(timestamp_path, 'w') as f:
+        f.write('%d\n' % sync_time)
 
 
 def write_extra_manifest_to_mirror(repo_dir, removed):
-  local_manifest_dir = os.path.join(repo_dir, repo_util.LOCAL_MANIFESTS_DIR)
-  if not os.path.exists(local_manifest_dir):
-    os.mkdir(local_manifest_dir)
-  with open(os.path.join(local_manifest_dir, MANIFEST_FOR_DELETED), 'w') as f:
-    f.write("""<?xml version="1.0" encoding="UTF-8"?>\n<manifest>\n""")
-    remotes = {}
-    for path_spec in removed.values():
-      scheme, netloc, remote_path = urllib.parse.urlsplit(
-          path_spec.repo_url)[:3]
-      assert remote_path[0] == '/'
-      remote_path = remote_path[1:]
-      if (scheme, netloc) not in remotes:
-        remote_name = 'remote_for_deleted_repo_%s' % (scheme + netloc)
-        remotes[scheme, netloc] = remote_name
-        f.write("""  <remote name="%s" fetch="%s" />\n""" %
-                (remote_name, '%s://%s' % (scheme, netloc)))
-      f.write(
-          """  <project name="%s" path="%s" remote="%s" revision="%s" />\n""" %
-          (remote_path, path_spec.path, remotes[scheme, netloc], path_spec.at))
-    f.write("""</manifest>\n""")
+    local_manifest_dir = os.path.join(repo_dir, repo_util.LOCAL_MANIFESTS_DIR)
+    if not os.path.exists(local_manifest_dir):
+        os.mkdir(local_manifest_dir)
+    with open(os.path.join(local_manifest_dir, MANIFEST_FOR_DELETED), 'w') as f:
+        f.write("""<?xml version="1.0" encoding="UTF-8"?>\n<manifest>\n""")
+        remotes = {}
+        for path_spec in removed.values():
+            scheme, netloc, remote_path = urllib.parse.urlsplit(
+                path_spec.repo_url
+            )[:3]
+            assert remote_path[0] == '/'
+            remote_path = remote_path[1:]
+            if (scheme, netloc) not in remotes:
+                remote_name = 'remote_for_deleted_repo_%s' % (scheme + netloc)
+                remotes[scheme, netloc] = remote_name
+                f.write(
+                    """  <remote name="%s" fetch="%s" />\n"""
+                    % (remote_name, '%s://%s' % (scheme, netloc))
+                )
+            f.write(
+                """  <project name="%s" path="%s" remote="%s" revision="%s" />\n"""
+                % (
+                    remote_path,
+                    path_spec.path,
+                    remotes[scheme, netloc],
+                    path_spec.at,
+                )
+            )
+        f.write("""</manifest>\n""")
 
 
 def delete_extra_manifest(repo_dir):
-  path = os.path.join(repo_dir, repo_util.LOCAL_MANIFESTS_DIR,
-                      MANIFEST_FOR_DELETED)
-  if os.path.exists(path):
-    os.unlink(path)
+    path = os.path.join(
+        repo_dir, repo_util.LOCAL_MANIFESTS_DIR, MANIFEST_FOR_DELETED
+    )
+    if os.path.exists(path):
+        os.unlink(path)
 
 
 def generate_extra_manifest_for_deleted_repo(repo_dir, only_branch=None):
-  last_sync_time = read_last_sync_time(repo_dir)
-  removed = collect_removed_manifest_repos(
-      repo_dir, last_sync_time, only_branch=only_branch)
-  write_extra_manifest_to_mirror(repo_dir, removed)
-  logger.info('since last sync, %d repo got removed', len(removed))
-  return len(removed)
+    last_sync_time = read_last_sync_time(repo_dir)
+    removed = collect_removed_manifest_repos(
+        repo_dir, last_sync_time, only_branch=only_branch
+    )
+    write_extra_manifest_to_mirror(repo_dir, removed)
+    logger.info('since last sync, %d repo got removed', len(removed))
+    return len(removed)
 
 
 def additional_chrome_mirror_sync(chrome_cache):
-  # Why additional sync is necessary:
-  #   1. `gclient sync` take cares only for the state of the DEPS files on the
-  #      current working directory (main branch). If a repo has been removed
-  #      from the main branch, gclient no longer fetch anything for the said
-  #      repo. We need this additional sync to fetch
-  #        a. history between the last sync and the removal time.
-  #        b. history on other branches
-  #   2. If the DEPS file refers a git repo with a static commit hash and the
-  #      repo already contains the said commit on the local disk, gclient will
-  #      skip to update the git mirror. We need this additional sync to fetch
-  #      history on other branches. (b/206567489)
-  #
-  # However, there are still corner cases. If a repo was added and removed
-  # after our last sync, we have no simple methods to detect them. They will
-  # be synced during DEPS file processing because the necessary information
-  # requires full DEPS parsing. (crbug.com/902238)
-  #
-  # One wasteful problem of this additional sync operation is, we keep sync
-  # repos even if they are removed for a long time. This should be acceptable
-  # because the cost to sync a repo with zero changes should be negligible.
-  logger.info('additional sync for chrome mirror')
-  with multiprocessing.Pool() as pool:
-    results = []
-    for git_repo_name in os.listdir(chrome_cache):
-      # another gclient is running or leftover of previous run; skip
-      if git_repo_name.startswith('_cache_tmp'):
-        continue
-      git_repo = os.path.join(chrome_cache, git_repo_name)
-      if not git_util.is_git_bare_dir(git_repo):
-        continue
-      results.append(
-          pool.apply_async(git_util.fetch, (git_repo,),
-                           dict(retry_prune_if_conflict=True)))
-    for r in results:
-      # git_util.fetch doesn't return values. Here we call get() in order to
-      # propagate exceptions if any.
-      r.get()
+    # Why additional sync is necessary:
+    #   1. `gclient sync` take cares only for the state of the DEPS files on the
+    #      current working directory (main branch). If a repo has been removed
+    #      from the main branch, gclient no longer fetch anything for the said
+    #      repo. We need this additional sync to fetch
+    #        a. history between the last sync and the removal time.
+    #        b. history on other branches
+    #   2. If the DEPS file refers a git repo with a static commit hash and the
+    #      repo already contains the said commit on the local disk, gclient will
+    #      skip to update the git mirror. We need this additional sync to fetch
+    #      history on other branches. (b/206567489)
+    #
+    # However, there are still corner cases. If a repo was added and removed
+    # after our last sync, we have no simple methods to detect them. They will
+    # be synced during DEPS file processing because the necessary information
+    # requires full DEPS parsing. (crbug.com/902238)
+    #
+    # One wasteful problem of this additional sync operation is, we keep sync
+    # repos even if they are removed for a long time. This should be acceptable
+    # because the cost to sync a repo with zero changes should be negligible.
+    logger.info('additional sync for chrome mirror')
+    with multiprocessing.Pool() as pool:
+        results = []
+        for git_repo_name in os.listdir(chrome_cache):
+            # another gclient is running or leftover of previous run; skip
+            if git_repo_name.startswith('_cache_tmp'):
+                continue
+            git_repo = os.path.join(chrome_cache, git_repo_name)
+            if not git_util.is_git_bare_dir(git_repo):
+                continue
+            results.append(
+                pool.apply_async(
+                    git_util.fetch,
+                    (git_repo,),
+                    dict(retry_prune_if_conflict=True),
+                )
+            )
+        for r in results:
+            # git_util.fetch doesn't return values. Here we call get() in order to
+            # propagate exceptions if any.
+            r.get()
 
 
 def sync_chromeos_code(opts, path_factory):
-  del opts  # unused
+    del opts  # unused
 
-  start_sync_time = int(time.time())
-  chromeos_mirror = path_factory.get_chromeos_mirror()
+    start_sync_time = int(time.time())
+    chromeos_mirror = path_factory.get_chromeos_mirror()
 
-  logger.info('repo sync for chromeos mirror')
-  delete_extra_manifest(chromeos_mirror)
-  # current_branch=False to ignore "sync-c=true" in the manifest file.
-  repo_util.sync(chromeos_mirror, current_branch=False)
-  # If there are repos deleted after last sync, generate custom manifest and
-  # sync again for those repos. So we can mirror commits just before the repo
-  # deletion.
-  if generate_extra_manifest_for_deleted_repo(chromeos_mirror) != 0:
-    logger.info('repo sync again')
+    logger.info('repo sync for chromeos mirror')
+    delete_extra_manifest(chromeos_mirror)
+    # current_branch=False to ignore "sync-c=true" in the manifest file.
     repo_util.sync(chromeos_mirror, current_branch=False)
-  write_sync_time(chromeos_mirror, start_sync_time)
+    # If there are repos deleted after last sync, generate custom manifest and
+    # sync again for those repos. So we can mirror commits just before the repo
+    # deletion.
+    if generate_extra_manifest_for_deleted_repo(chromeos_mirror) != 0:
+        logger.info('repo sync again')
+        repo_util.sync(chromeos_mirror, current_branch=False)
+    write_sync_time(chromeos_mirror, start_sync_time)
 
-  logger.info('repo sync for chromeos tree')
-  chromeos_tree = path_factory.get_chromeos_tree()
-  repo_util.sync(chromeos_tree)
+    logger.info('repo sync for chromeos tree')
+    chromeos_tree = path_factory.get_chromeos_tree()
+    repo_util.sync(chromeos_tree)
 
 
 def setup_chrome_repos(path_factory, use_btrfs: bool):
-  chrome_cache = path_factory.get_chrome_cache()
-  subvolume_or_makedirs(use_btrfs, chrome_cache)
-  chrome_tree = path_factory.get_chrome_tree()
-  subvolume_or_makedirs(use_btrfs, chrome_tree)
+    chrome_cache = path_factory.get_chrome_cache()
+    subvolume_or_makedirs(use_btrfs, chrome_cache)
+    chrome_tree = path_factory.get_chrome_tree()
+    subvolume_or_makedirs(use_btrfs, chrome_tree)
 
-  spec = """
+    spec = """
 solutions = [
   { "name"        : "src",
     "url"         : "https://chromium.googlesource.com/a/chromium/src.git",
@@ -375,358 +412,419 @@ solutions = [
 target_os = ['chromeos']
 cache_dir = %r
 """ % (
-      chrome_cache)
+        chrome_cache
+    )
 
-  with locking.lock_file(
-      os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
-    logger.info('gclient config for chrome')
-    gclient_util.config(chrome_tree, spec=spec)
+    with locking.lock_file(
+        os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)
+    ):
+        logger.info('gclient config for chrome')
+        gclient_util.config(chrome_tree, spec=spec)
 
-    is_first_sync = not os.listdir(chrome_cache)
-    if is_first_sync:
-      logger.info('gclient sync for chrome (this takes hours; be patient)')
-    else:
-      logger.info('gclient sync for chrome')
-    gclient_util.sync(chrome_tree, with_branch_heads=True, with_tags=True)
-    additional_chrome_mirror_sync(chrome_cache)
+        is_first_sync = not os.listdir(chrome_cache)
+        if is_first_sync:
+            logger.info(
+                'gclient sync for chrome (this takes hours; be patient)'
+            )
+        else:
+            logger.info('gclient sync for chrome')
+        gclient_util.sync(chrome_tree, with_branch_heads=True, with_tags=True)
+        additional_chrome_mirror_sync(chrome_cache)
 
 
 def sync_chrome_code(path_factory, use_btrfs: bool):
-  # The sync step is identical to the initial gclient config step.
-  setup_chrome_repos(path_factory, use_btrfs)
+    # The sync step is identical to the initial gclient config step.
+    setup_chrome_repos(path_factory, use_btrfs)
 
 
 def setup_android_repos(path_factory, branch, use_btrfs: bool):
-  android_mirror = path_factory.get_android_mirror(branch)
-  android_tree = path_factory.get_android_tree(branch)
-  subvolume_or_makedirs(use_btrfs, android_mirror)
-  subvolume_or_makedirs(use_btrfs, android_tree)
+    android_mirror = path_factory.get_android_mirror(branch)
+    android_tree = path_factory.get_android_tree(branch)
+    subvolume_or_makedirs(use_btrfs, android_mirror)
+    subvolume_or_makedirs(use_btrfs, android_tree)
 
-  manifest_url = ('persistent-https://googleplex-android.git.corp.google.com'
-                  '/platform/manifest')
-  repo_url = 'https://gerrit.googlesource.com/git-repo'
+    manifest_url = (
+        'persistent-https://googleplex-android.git.corp.google.com'
+        '/platform/manifest'
+    )
+    repo_url = 'https://gerrit.googlesource.com/git-repo'
 
-  if os.path.exists(os.path.join(android_mirror, '.repo', 'manifests')):
-    logger.warning(
-        '%s has already been initialized, assume it is setup properly',
-        android_mirror)
-  else:
-    logger.info('repo init for android mirror branch=%s', branch)
+    if os.path.exists(os.path.join(android_mirror, '.repo', 'manifests')):
+        logger.warning(
+            '%s has already been initialized, assume it is setup properly',
+            android_mirror,
+        )
+    else:
+        logger.info('repo init for android mirror branch=%s', branch)
+        repo_util.init(
+            android_mirror,
+            manifest_url=manifest_url,
+            repo_url=repo_url,
+            manifest_branch=branch,
+            mirror=True,
+        )
+
+    logger.info('repo init for android tree branch=%s', branch)
     repo_util.init(
-        android_mirror,
+        android_tree,
         manifest_url=manifest_url,
         repo_url=repo_url,
         manifest_branch=branch,
-        mirror=True)
+        reference=android_mirror,
+    )
 
-  logger.info('repo init for android tree branch=%s', branch)
-  repo_util.init(
-      android_tree,
-      manifest_url=manifest_url,
-      repo_url=repo_url,
-      manifest_branch=branch,
-      reference=android_mirror)
+    logger.info('repo sync for android mirror (this takes hours; be patient)')
+    repo_util.sync(android_mirror, current_branch=True)
 
-  logger.info('repo sync for android mirror (this takes hours; be patient)')
-  repo_util.sync(android_mirror, current_branch=True)
-
-  logger.info('repo sync for android tree branch=%s', branch)
-  repo_util.sync(android_tree, current_branch=True)
+    logger.info('repo sync for android tree branch=%s', branch)
+    repo_util.sync(android_tree, current_branch=True)
 
 
 def sync_android_code(opts, path_factory, branch):
-  del opts  # unused
-  start_sync_time = int(time.time())
-  android_mirror = path_factory.get_android_mirror(branch)
-  android_tree = path_factory.get_android_tree(branch)
+    del opts  # unused
+    start_sync_time = int(time.time())
+    android_mirror = path_factory.get_android_mirror(branch)
+    android_tree = path_factory.get_android_tree(branch)
 
-  with locking.lock_file(
-      os.path.join(android_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)):
-    logger.info('repo sync for android mirror branch=%s', branch)
-    delete_extra_manifest(android_mirror)
-    repo_util.sync(android_mirror, current_branch=True)
-    # Android usually big jump between milestone releases and add/delete lots of
-    # repos when switch releases. Because it's infeasible to bisect between such
-    # big jump, the deleted repo is useless. In order to save disk, do not sync
-    # repos deleted in other branches.
-    if generate_extra_manifest_for_deleted_repo(
-        android_mirror, only_branch=branch) != 0:
-      logger.info('repo sync again')
-      repo_util.sync(android_mirror, current_branch=True)
-    write_sync_time(android_mirror, start_sync_time)
+    with locking.lock_file(
+        os.path.join(android_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)
+    ):
+        logger.info('repo sync for android mirror branch=%s', branch)
+        delete_extra_manifest(android_mirror)
+        repo_util.sync(android_mirror, current_branch=True)
+        # Android usually big jump between milestone releases and add/delete lots of
+        # repos when switch releases. Because it's infeasible to bisect between such
+        # big jump, the deleted repo is useless. In order to save disk, do not sync
+        # repos deleted in other branches.
+        if (
+            generate_extra_manifest_for_deleted_repo(
+                android_mirror, only_branch=branch
+            )
+            != 0
+        ):
+            logger.info('repo sync again')
+            repo_util.sync(android_mirror, current_branch=True)
+        write_sync_time(android_mirror, start_sync_time)
 
-  logger.info('repo sync for android tree branch=%s', branch)
-  repo_util.sync(android_tree, current_branch=True)
+    logger.info('repo sync for android tree branch=%s', branch)
+    repo_util.sync(android_tree, current_branch=True)
 
 
 def cmd_init(opts):
-  path_factory = DefaultProjectPathFactory(opts.mirror_base, opts.work_base,
-                                           CHECKOUT_TEMPLATE_NAME)
+    path_factory = DefaultProjectPathFactory(
+        opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
+    )
 
-  if opts.chromeos:
-    setup_chromeos_repos(path_factory, opts.btrfs)
-  if opts.chrome:
-    setup_chrome_repos(path_factory, opts.btrfs)
-  for branch in opts.android:
-    setup_android_repos(path_factory, branch, opts.btrfs)
+    if opts.chromeos:
+        setup_chromeos_repos(path_factory, opts.btrfs)
+    if opts.chrome:
+        setup_chrome_repos(path_factory, opts.btrfs)
+    for branch in opts.android:
+        setup_android_repos(path_factory, branch, opts.btrfs)
 
 
 def enumerate_android_branches_available(base):
-  branches = []
-  for name in os.listdir(base):
-    if name.startswith('android.'):
-      branches.append(name.partition('.')[2])
-  return branches
+    branches = []
+    for name in os.listdir(base):
+        if name.startswith('android.'):
+            branches.append(name.partition('.')[2])
+    return branches
 
 
 def do_sync(opts):
-  path_factory = DefaultProjectPathFactory(opts.mirror_base, opts.work_base,
-                                           CHECKOUT_TEMPLATE_NAME)
+    path_factory = DefaultProjectPathFactory(
+        opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
+    )
 
-  sync_all = False
-  if not opts.chromeos and not opts.chrome and not opts.android:
-    logger.info('sync trees for all')
-    sync_all = True
+    sync_all = False
+    if not opts.chromeos and not opts.chrome and not opts.android:
+        logger.info('sync trees for all')
+        sync_all = True
 
-  if sync_all or opts.chromeos:
-    try:
-      sync_chromeos_code(opts, path_factory)
-    except subprocess.CalledProcessError:
-      # b/222638221: repo may be broken due to infra issues
-      # re-create the whole repo and sync again
-      logger.warning('chromeos sync failed, re-init chromeos repo '
-                     '(this takes hours; be patient)')
-      chromeos_tree = path_factory.get_chromeos_tree()
-      use_btrfs = is_btrfs_subvolume(chromeos_tree)
-      delete_tree(chromeos_tree)
-      setup_chromeos_repos(path_factory, use_btrfs)
-  if sync_all or opts.chrome:
-    use_btrfs = is_btrfs_subvolume(path_factory.get_chrome_tree())
-    sync_chrome_code(path_factory, use_btrfs)
+    if sync_all or opts.chromeos:
+        try:
+            sync_chromeos_code(opts, path_factory)
+        except subprocess.CalledProcessError:
+            # b/222638221: repo may be broken due to infra issues
+            # re-create the whole repo and sync again
+            logger.warning(
+                'chromeos sync failed, re-init chromeos repo '
+                '(this takes hours; be patient)'
+            )
+            chromeos_tree = path_factory.get_chromeos_tree()
+            use_btrfs = is_btrfs_subvolume(chromeos_tree)
+            delete_tree(chromeos_tree)
+            setup_chromeos_repos(path_factory, use_btrfs)
+    if sync_all or opts.chrome:
+        use_btrfs = is_btrfs_subvolume(path_factory.get_chrome_tree())
+        sync_chrome_code(path_factory, use_btrfs)
 
-  if sync_all:
-    android_branches = enumerate_android_branches_available(opts.mirror_base)
-  else:
-    android_branches = opts.android
-  for branch in android_branches:
-    sync_android_code(opts, path_factory, branch)
+    if sync_all:
+        android_branches = enumerate_android_branches_available(
+            opts.mirror_base
+        )
+    else:
+        android_branches = opts.android
+    for branch in android_branches:
+        sync_android_code(opts, path_factory, branch)
 
 
 def cmd_sync(opts):
-  try:
-    do_sync(opts)
-  except subprocess.CalledProcessError:
-    # Sync may fail due to network or server issues.
-    logger.exception('do_sync failed, will retry one minute later')
-    time.sleep(60)
-    do_sync(opts)
+    try:
+        do_sync(opts)
+    except subprocess.CalledProcessError:
+        # Sync may fail due to network or server issues.
+        logger.exception('do_sync failed, will retry one minute later')
+        time.sleep(60)
+        do_sync(opts)
 
 
 def cmd_new(opts):
-  work_dir = os.path.join(opts.work_base, opts.session)
-  if not os.path.exists(work_dir):
-    os.makedirs(work_dir)
+    work_dir = os.path.join(opts.work_base, opts.session)
+    if not os.path.exists(work_dir):
+        os.makedirs(work_dir)
 
-  template_factory = DefaultProjectPathFactory(opts.mirror_base, opts.work_base,
-                                               CHECKOUT_TEMPLATE_NAME)
-  path_factory = DefaultProjectPathFactory(opts.mirror_base, opts.work_base,
-                                           opts.session)
+    template_factory = DefaultProjectPathFactory(
+        opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
+    )
+    path_factory = DefaultProjectPathFactory(
+        opts.mirror_base, opts.work_base, opts.session
+    )
 
-  prepare_all = False
-  if not opts.chromeos and not opts.chrome and not opts.android:
-    logger.info('prepare trees for all')
-    prepare_all = True
+    prepare_all = False
+    if not opts.chromeos and not opts.chrome and not opts.android:
+        logger.info('prepare trees for all')
+        prepare_all = True
 
-  chromeos_template = template_factory.get_chromeos_tree()
-  if (prepare_all and os.path.exists(chromeos_template)) or opts.chromeos:
-    # Add mount config again if it's missing.
-    add_local_mount(chromeos_template)
-    logger.info('prepare tree for chromeos, %s',
-                path_factory.get_chromeos_tree())
-    snapshot_or_copytree(chromeos_template, path_factory.get_chromeos_tree())
+    chromeos_template = template_factory.get_chromeos_tree()
+    if (prepare_all and os.path.exists(chromeos_template)) or opts.chromeos:
+        # Add mount config again if it's missing.
+        add_local_mount(chromeos_template)
+        logger.info(
+            'prepare tree for chromeos, %s', path_factory.get_chromeos_tree()
+        )
+        snapshot_or_copytree(
+            chromeos_template, path_factory.get_chromeos_tree()
+        )
 
-  chrome_template = template_factory.get_chrome_tree()
-  if (prepare_all and os.path.exists(chrome_template)) or opts.chrome:
-    logger.info('prepare tree for chrome, %s', path_factory.get_chrome_tree())
-    snapshot_or_copytree(chrome_template, path_factory.get_chrome_tree())
+    chrome_template = template_factory.get_chrome_tree()
+    if (prepare_all and os.path.exists(chrome_template)) or opts.chrome:
+        logger.info(
+            'prepare tree for chrome, %s', path_factory.get_chrome_tree()
+        )
+        snapshot_or_copytree(chrome_template, path_factory.get_chrome_tree())
 
-  if prepare_all:
-    android_branches = enumerate_android_branches_available(opts.mirror_base)
-  else:
-    android_branches = opts.android
-  for branch in android_branches:
-    logger.info('prepare tree for android branch=%s, %s', branch,
-                path_factory.get_android_tree(branch))
-    snapshot_or_copytree(
-        template_factory.get_android_tree(branch),
-        path_factory.get_android_tree(branch))
+    if prepare_all:
+        android_branches = enumerate_android_branches_available(
+            opts.mirror_base
+        )
+    else:
+        android_branches = opts.android
+    for branch in android_branches:
+        logger.info(
+            'prepare tree for android branch=%s, %s',
+            branch,
+            path_factory.get_android_tree(branch),
+        )
+        snapshot_or_copytree(
+            template_factory.get_android_tree(branch),
+            path_factory.get_android_tree(branch),
+        )
 
 
 def delete_tree(path):
-  if is_btrfs_subvolume(path):
-    # btrfs should be mounted with 'user_subvol_rm_allowed' option and thus
-    # normal user permission is enough.
-    util.check_call('btrfs', 'subvolume', 'delete', path)
-  else:
-    util.check_call('sudo', 'rm', '-rf', path)
+    if is_btrfs_subvolume(path):
+        # btrfs should be mounted with 'user_subvol_rm_allowed' option and thus
+        # normal user permission is enough.
+        util.check_call('btrfs', 'subvolume', 'delete', path)
+    else:
+        util.check_call('sudo', 'rm', '-rf', path)
 
 
 def cmd_list(opts):
-  print('%-20s  %s' % ('Session', 'Path'))
-  for name in os.listdir(opts.work_base):
-    if name == CHECKOUT_TEMPLATE_NAME:
-      continue
-    path = os.path.join(opts.work_base, name)
-    print('%-20s  %s' % (name, path))
+    print('%-20s  %s' % ('Session', 'Path'))
+    for name in os.listdir(opts.work_base):
+        if name == CHECKOUT_TEMPLATE_NAME:
+            continue
+        path = os.path.join(opts.work_base, name)
+        print('%-20s  %s' % (name, path))
 
 
 def cmd_delete(opts):
-  assert opts.session
-  path_factory = DefaultProjectPathFactory(opts.mirror_base, opts.work_base,
-                                           opts.session)
+    assert opts.session
+    path_factory = DefaultProjectPathFactory(
+        opts.mirror_base, opts.work_base, opts.session
+    )
 
-  chromeos_tree = path_factory.get_chromeos_tree()
-  if os.path.exists(chromeos_tree):
-    if os.path.exists(os.path.join(chromeos_tree, 'chromite')):
-      # ignore error
-      util.call('cros_sdk', '--unmount', cwd=chromeos_tree)
-    delete_tree(chromeos_tree)
+    chromeos_tree = path_factory.get_chromeos_tree()
+    if os.path.exists(chromeos_tree):
+        if os.path.exists(os.path.join(chromeos_tree, 'chromite')):
+            # ignore error
+            util.call('cros_sdk', '--unmount', cwd=chromeos_tree)
+        delete_tree(chromeos_tree)
 
-  chrome_tree = path_factory.get_chrome_tree()
-  if os.path.exists(chrome_tree):
-    delete_tree(chrome_tree)
+    chrome_tree = path_factory.get_chrome_tree()
+    if os.path.exists(chrome_tree):
+        delete_tree(chrome_tree)
 
-  android_branches = enumerate_android_branches_available(opts.mirror_base)
-  for branch in android_branches:
-    android_tree = path_factory.get_android_tree(branch)
-    if os.path.exists(android_tree):
-      delete_tree(android_tree)
+    android_branches = enumerate_android_branches_available(opts.mirror_base)
+    for branch in android_branches:
+        android_tree = path_factory.get_android_tree(branch)
+        if os.path.exists(android_tree):
+            delete_tree(android_tree)
 
-  os.rmdir(os.path.join(opts.work_base, opts.session))
+    os.rmdir(os.path.join(opts.work_base, opts.session))
 
-  # remove caches
-  chromeos_root = os.getenv('DEFAULT_CHROMEOS_ROOT')
-  if chromeos_root:
-    path = os.path.join(chromeos_root, 'devserver/static')
-    if os.path.exists(path):
-      logger.debug('remove cache (cros flash): %s', path)
-      util.call('cros', 'clean', '--flash', cwd=path)
+    # remove caches
+    chromeos_root = os.getenv('DEFAULT_CHROMEOS_ROOT')
+    if chromeos_root:
+        path = os.path.join(chromeos_root, 'devserver/static')
+        if os.path.exists(path):
+            logger.debug('remove cache (cros flash): %s', path)
+            util.call('cros', 'clean', '--flash', cwd=path)
 
-    for path in glob.glob(os.path.join(chromeos_root, 'chroot/tmp/*')):
-      logger.debug('remove cache (chroot/tmp): %s', path)
-      delete_tree(path)
+        for path in glob.glob(os.path.join(chromeos_root, 'chroot/tmp/*')):
+            logger.debug('remove cache (chroot/tmp): %s', path)
+            delete_tree(path)
 
-    for path in glob.glob(os.path.join(chromeos_root, 'tmp/*')):
-      logger.debug('remove cache (chromeos root tmp): %s', path)
-      delete_tree(path)
+        for path in glob.glob(os.path.join(chromeos_root, 'tmp/*')):
+            logger.debug('remove cache (chromeos root tmp): %s', path)
+            delete_tree(path)
 
-  for path in glob.glob(
-      os.path.join(path_factory.get_chrome_cache(), '_cache_*')):
-    logger.debug('remove cache (chrome gclient cache): %s', path)
-    delete_tree(path)
+    for path in glob.glob(
+        os.path.join(path_factory.get_chrome_cache(), '_cache_*')
+    ):
+        logger.debug('remove cache (chrome gclient cache): %s', path)
+        delete_tree(path)
 
 
 def create_parser():
-  base_parser = argparse.ArgumentParser(add_help=False)
-  base_parser.add_argument(
-      '--mirror_base',
-      metavar='MIRROR_BASE',
-      default=configure.get('MIRROR_BASE', DEFAULT_MIRROR_BASE),
-      help='Directory for mirrors (default: %(default)s)')
-  base_parser.add_argument(
-      '--work_base',
-      metavar='WORK_BASE',
-      default=configure.get('WORK_BASE', DEFAULT_WORK_BASE),
-      help='Directory for bisection working directories'
-      ' (default: %(default)s)')
-  parents_session_optional = [
-      common.common_argument_parser, common.session_optional_parser, base_parser
-  ]
-  parents_session_required = [
-      common.common_argument_parser, common.session_required_parser, base_parser
-  ]
+    base_parser = argparse.ArgumentParser(add_help=False)
+    base_parser.add_argument(
+        '--mirror_base',
+        metavar='MIRROR_BASE',
+        default=configure.get('MIRROR_BASE', DEFAULT_MIRROR_BASE),
+        help='Directory for mirrors (default: %(default)s)',
+    )
+    base_parser.add_argument(
+        '--work_base',
+        metavar='WORK_BASE',
+        default=configure.get('WORK_BASE', DEFAULT_WORK_BASE),
+        help='Directory for bisection working directories'
+        ' (default: %(default)s)',
+    )
+    parents_session_optional = [
+        common.common_argument_parser,
+        common.session_optional_parser,
+        base_parser,
+    ]
+    parents_session_required = [
+        common.common_argument_parser,
+        common.session_required_parser,
+        base_parser,
+    ]
 
-  parser = argparse.ArgumentParser(
-      formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
-  subparsers = parser.add_subparsers(
-      dest='command', title='commands', metavar='<command>', required=True)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+    )
+    subparsers = parser.add_subparsers(
+        dest='command', title='commands', metavar='<command>', required=True
+    )
 
-  parser_init = subparsers.add_parser(
-      'init',
-      help='Mirror source trees and create template checkout',
-      parents=parents_session_optional)
-  parser_init.add_argument(
-      '--chrome', action='store_true', help='init chrome mirror and tree')
-  parser_init.add_argument(
-      '--chromeos', action='store_true', help='init chromeos mirror and tree')
-  parser_init.add_argument(
-      '--android',
-      metavar='BRANCH',
-      action='append',
-      default=[],
-      help='init android mirror and tree of BRANCH')
-  parser_init.add_argument(
-      '--btrfs',
-      action='store_true',
-      help='create btrfs subvolume for source tree')
-  parser_init.set_defaults(func=cmd_init)
+    parser_init = subparsers.add_parser(
+        'init',
+        help='Mirror source trees and create template checkout',
+        parents=parents_session_optional,
+    )
+    parser_init.add_argument(
+        '--chrome', action='store_true', help='init chrome mirror and tree'
+    )
+    parser_init.add_argument(
+        '--chromeos', action='store_true', help='init chromeos mirror and tree'
+    )
+    parser_init.add_argument(
+        '--android',
+        metavar='BRANCH',
+        action='append',
+        default=[],
+        help='init android mirror and tree of BRANCH',
+    )
+    parser_init.add_argument(
+        '--btrfs',
+        action='store_true',
+        help='create btrfs subvolume for source tree',
+    )
+    parser_init.set_defaults(func=cmd_init)
 
-  parser_sync = subparsers.add_parser(
-      'sync',
-      help='Sync source trees',
-      description='Sync all if no projects are specified '
-      '(--chrome, --chromeos, or --android)',
-      parents=parents_session_optional)
-  parser_sync.add_argument(
-      '--chrome', action='store_true', help='sync chrome mirror and tree')
-  parser_sync.add_argument(
-      '--chromeos', action='store_true', help='sync chromeos mirror and tree')
-  parser_sync.add_argument(
-      '--android',
-      metavar='BRANCH',
-      action='append',
-      default=[],
-      help='sync android mirror and tree of BRANCH')
-  parser_sync.set_defaults(func=cmd_sync)
+    parser_sync = subparsers.add_parser(
+        'sync',
+        help='Sync source trees',
+        description='Sync all if no projects are specified '
+        '(--chrome, --chromeos, or --android)',
+        parents=parents_session_optional,
+    )
+    parser_sync.add_argument(
+        '--chrome', action='store_true', help='sync chrome mirror and tree'
+    )
+    parser_sync.add_argument(
+        '--chromeos', action='store_true', help='sync chromeos mirror and tree'
+    )
+    parser_sync.add_argument(
+        '--android',
+        metavar='BRANCH',
+        action='append',
+        default=[],
+        help='sync android mirror and tree of BRANCH',
+    )
+    parser_sync.set_defaults(func=cmd_sync)
 
-  parser_new = subparsers.add_parser(
-      'new',
-      help='Create new source checkout for bisect',
-      description='Create for all if no projects are specified '
-      '(--chrome, --chromeos, or --android)',
-      parents=parents_session_required)
-  parser_new.add_argument(
-      '--chrome', action='store_true', help='create chrome checkout')
-  parser_new.add_argument(
-      '--chromeos', action='store_true', help='create chromeos checkout')
-  parser_new.add_argument(
-      '--android',
-      metavar='BRANCH',
-      action='append',
-      default=[],
-      help='create android checkout of BRANCH')
-  parser_new.set_defaults(func=cmd_new)
+    parser_new = subparsers.add_parser(
+        'new',
+        help='Create new source checkout for bisect',
+        description='Create for all if no projects are specified '
+        '(--chrome, --chromeos, or --android)',
+        parents=parents_session_required,
+    )
+    parser_new.add_argument(
+        '--chrome', action='store_true', help='create chrome checkout'
+    )
+    parser_new.add_argument(
+        '--chromeos', action='store_true', help='create chromeos checkout'
+    )
+    parser_new.add_argument(
+        '--android',
+        metavar='BRANCH',
+        action='append',
+        default=[],
+        help='create android checkout of BRANCH',
+    )
+    parser_new.set_defaults(func=cmd_new)
 
-  parser_list = subparsers.add_parser(
-      'list',
-      help='List existing sessions with source checkout',
-      parents=parents_session_optional)
-  parser_list.set_defaults(func=cmd_list)
+    parser_list = subparsers.add_parser(
+        'list',
+        help='List existing sessions with source checkout',
+        parents=parents_session_optional,
+    )
+    parser_list.set_defaults(func=cmd_list)
 
-  parser_delete = subparsers.add_parser(
-      'delete', help='Delete source checkout', parents=parents_session_required)
-  parser_delete.set_defaults(func=cmd_delete)
+    parser_delete = subparsers.add_parser(
+        'delete',
+        help='Delete source checkout',
+        parents=parents_session_required,
+    )
+    parser_delete.set_defaults(func=cmd_delete)
 
-  return parser
+    return parser
 
 
 def main():
-  common.init()
-  parser = create_parser()
-  opts = parser.parse_args()
-  common.config_logging(opts)
-  opts.func(opts)
+    common.init()
+    parser = create_parser()
+    opts = parser.parse_args()
+    common.config_logging(opts)
+    opts.func(opts)
 
 
 if __name__ == '__main__':
-  main()
+    main()

@@ -33,34 +33,36 @@ from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import core
 
+
 logger = logging.getLogger(__name__)
 
 
 class ListDomain(core.BisectDomain):
-  """Enumerate list of string for bisection."""
-  revtype = staticmethod(cli.argtype_notempty)
+    """Enumerate list of string for bisection."""
 
-  @staticmethod
-  def add_init_arguments(parser):
-    # Do nothing because no additional arguments required for this bisector.
-    pass
+    revtype = staticmethod(cli.argtype_notempty)
 
-  @staticmethod
-  def init(opts):
-    config = {}
-    revlist = [line.strip() for line in sys.stdin.readlines()]
-    return config, {'revlist': revlist}
+    @staticmethod
+    def add_init_arguments(parser):
+        # Do nothing because no additional arguments required for this bisector.
+        pass
 
-  def __init__(self, config):
-    self.config = config
+    @staticmethod
+    def init(opts):
+        config = {}
+        revlist = [line.strip() for line in sys.stdin.readlines()]
+        return config, {'revlist': revlist}
 
-  def setenv(self, env, rev):
-    pass
+    def __init__(self, config):
+        self.config = config
 
-  def fill_candidate_summary(self, summary):
-    # Do nothing.
-    return
+    def setenv(self, env, rev):
+        pass
+
+    def fill_candidate_summary(self, summary):
+        # Do nothing.
+        return
 
 
 if __name__ == '__main__':
-  bisector_cli.BisectorCommandLine(ListDomain).main()
+    bisector_cli.BisectorCommandLine(ListDomain).main()

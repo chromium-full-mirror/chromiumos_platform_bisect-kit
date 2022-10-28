@@ -6,8 +6,11 @@
 import os
 import sys
 
+
 # grpc, buildbucket protobuf modules
 sys.path.append(
     os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'third_party'))
+        'third_party',
+    )
+)

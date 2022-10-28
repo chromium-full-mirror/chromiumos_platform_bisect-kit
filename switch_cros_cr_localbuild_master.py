@@ -37,145 +37,165 @@ from bisect_kit import git_util
 from bisect_kit import lacros_util
 import switch_cros_localbuild
 
+
 logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-  parents = [common.common_argument_parser, common.session_optional_parser]
-  parser = argparse.ArgumentParser(parents=parents)
-  cli.patching_argparser_exit(parser)
-  parser.add_argument(
-      '--rich_result',
-      action='store_true',
-      help='Instead of mere exit code, output detailed information in json')
-  parser.add_argument(
-      '--dut',
-      type=cli.argtype_notempty,
-      metavar='DUT',
-      default=configure.get('DUT'),
-      help='Address of DUT')
-  parser.add_argument(
-      'rev',
-      nargs='?',
-      type=cli.argtype_notempty,
-      metavar='REV',
-      default=configure.get('REV', ''),
-      help='Version string')
-  parser.add_argument(
-      '--board', default=configure.get('BOARD'), help='ChromeOS board name')
-  parser.add_argument(
-      '--chrome_root',
-      metavar='CHROME_ROOT',
-      type=cli.argtype_dir_path,
-      default=configure.get('CHROME_ROOT', ''),
-      help='Root of Chrome source tree, like ~/chromium')
+    parents = [common.common_argument_parser, common.session_optional_parser]
+    parser = argparse.ArgumentParser(parents=parents)
+    cli.patching_argparser_exit(parser)
+    parser.add_argument(
+        '--rich_result',
+        action='store_true',
+        help='Instead of mere exit code, output detailed information in json',
+    )
+    parser.add_argument(
+        '--dut',
+        type=cli.argtype_notempty,
+        metavar='DUT',
+        default=configure.get('DUT'),
+        help='Address of DUT',
+    )
+    parser.add_argument(
+        'rev',
+        nargs='?',
+        type=cli.argtype_notempty,
+        metavar='REV',
+        default=configure.get('REV', ''),
+        help='Version string',
+    )
+    parser.add_argument(
+        '--board', default=configure.get('BOARD'), help='ChromeOS board name'
+    )
+    parser.add_argument(
+        '--chrome_root',
+        metavar='CHROME_ROOT',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROME_ROOT', ''),
+        help='Root of Chrome source tree, like ~/chromium',
+    )
 
-  group = parser.add_mutually_exclusive_group()
-  group.add_argument(
-      '--target',
-      action='append',
-      help='Binary to build and deploy, like unittest or fuzzers. '
-      'Example value: "video_decode_accelerator_unittest". '
-      'This option could be specified multiple times.')
-  group.add_argument(
-      '--without_tests',
-      action='store_false',
-      dest='with_tests',
-      help='(if --target is not specified) '
-      'Besides chrome, build test binaries as well.')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '--target',
+        action='append',
+        help='Binary to build and deploy, like unittest or fuzzers. '
+        'Example value: "video_decode_accelerator_unittest". '
+        'This option could be specified multiple times.',
+    )
+    group.add_argument(
+        '--without_tests',
+        action='store_false',
+        dest='with_tests',
+        help='(if --target is not specified) '
+        'Besides chrome, build test binaries as well.',
+    )
 
-  parser.add_argument(
-      '--deploy_method',
-      choices=['chrome_deploy', 'image'],
-      default='chrome_deploy',
-      help='Deploy method (default: %(default)s)')
-  parser.add_argument(
-      '--skip_sync_code',
-      action='store_true',
-      help='Skip the step syncing source code')
-  parser.add_argument(
-      '--nobuild',
-      action='store_true',
-      help='Stop after source code sync; do not build; imply --nodeploy')
-  parser.add_argument(
-      '--nodeploy', action='store_true', help='Do not deploy after build')
+    parser.add_argument(
+        '--deploy_method',
+        choices=['chrome_deploy', 'image'],
+        default='chrome_deploy',
+        help='Deploy method (default: %(default)s)',
+    )
+    parser.add_argument(
+        '--skip_sync_code',
+        action='store_true',
+        help='Skip the step syncing source code',
+    )
+    parser.add_argument(
+        '--nobuild',
+        action='store_true',
+        help='Stop after source code sync; do not build; imply --nodeploy',
+    )
+    parser.add_argument(
+        '--nodeploy', action='store_true', help='Do not deploy after build'
+    )
 
-  group = parser.add_argument_group(
-      title='Options for building chrome in chromeos sdk chroot')
-  group.add_argument(
-      '--noimage',
-      action='store_true',
-      help='Build packages only; do not build image; imply --nodeploy')
-  group.add_argument(
-      '--chromeos_root',
-      type=cli.argtype_dir_path,
-      metavar='CHROMEOS_ROOT',
-      default=configure.get('CHROMEOS_ROOT'),
-      help='ChromeOS tree root; only necessary if deploy_method is '
-      'cros_deploy or image')
-  switch_cros_localbuild.add_build_and_deploy_arguments(group)
-  return parser
+    group = parser.add_argument_group(
+        title='Options for building chrome in chromeos sdk chroot'
+    )
+    group.add_argument(
+        '--noimage',
+        action='store_true',
+        help='Build packages only; do not build image; imply --nodeploy',
+    )
+    group.add_argument(
+        '--chromeos_root',
+        type=cli.argtype_dir_path,
+        metavar='CHROMEOS_ROOT',
+        default=configure.get('CHROMEOS_ROOT'),
+        help='ChromeOS tree root; only necessary if deploy_method is '
+        'cros_deploy or image',
+    )
+    switch_cros_localbuild.add_build_and_deploy_arguments(group)
+    return parser
 
 
 def switch_main(args: typing.Optional[tuple[str]]):
-  common.init()
-  parser = create_argument_parser()
-  opts = parser.parse_args(args)
-  common.config_logging(opts)
+    common.init()
+    parser = create_argument_parser()
+    opts = parser.parse_args(args)
+    common.config_logging(opts)
 
-  # --nobuild imply --nodeploy
-  if opts.nobuild:
-    opts.nodeploy = True
+    # --nobuild imply --nodeploy
+    if opts.nobuild:
+        opts.nodeploy = True
 
-  if opts.skip_sync_code and opts.nobuild:
-    raise errors.ArgumentError('--skip_sync_code and --nobuild',
-                               'nothing to do')
-  if not opts.dut:
-    if not opts.nodeploy:
-      raise errors.ArgumentError('--dut',
-                                 'DUT can be omitted only if --nodeploy')
+    if opts.skip_sync_code and opts.nobuild:
+        raise errors.ArgumentError(
+            '--skip_sync_code and --nobuild', 'nothing to do'
+        )
+    if not opts.dut:
+        if not opts.nodeploy:
+            raise errors.ArgumentError(
+                '--dut', 'DUT can be omitted only if --nodeploy'
+            )
+        if not opts.board:
+            raise errors.ArgumentError(
+                '--board', 'board must be specified if no --dut'
+            )
     if not opts.board:
-      raise errors.ArgumentError('--board',
-                                 'board must be specified if no --dut')
-  if not opts.board:
-    opts.board = cros_util.query_dut_board(opts.dut)
-  if opts.deploy_method != 'chrome_deploy':
-    if not opts.chromeos_root:
-      raise errors.ArgumentError(
-          '--chromeos_root',
-          'should be specified for --deploy_method=' + opts.deploy_method)
+        opts.board = cros_util.query_dut_board(opts.dut)
+    if opts.deploy_method != 'chrome_deploy':
+        if not opts.chromeos_root:
+            raise errors.ArgumentError(
+                '--chromeos_root',
+                'should be specified for --deploy_method=' + opts.deploy_method,
+            )
 
-  opts.chrome_src = os.path.join(opts.chrome_root, 'src')
-  assert os.path.exists(opts.chrome_src)
+    opts.chrome_src = os.path.join(opts.chrome_root, 'src')
+    assert os.path.exists(opts.chrome_src)
 
-  assert bisect_cr_localbuild_master.verify_gclient_dep(opts.chrome_root)
-  rev = bisect_cr_localbuild_master.guess_git_rev(opts, opts.rev)
+    assert bisect_cr_localbuild_master.verify_gclient_dep(opts.chrome_root)
+    rev = bisect_cr_localbuild_master.guess_git_rev(opts, opts.rev)
 
-  if not opts.skip_sync_code:
-    git_util.checkout_version(opts.chrome_src, rev)
-    gclient_util.sync(opts.chrome_root)
+    if not opts.skip_sync_code:
+        git_util.checkout_version(opts.chrome_src, rev)
+        gclient_util.sync(opts.chrome_root)
 
-  if opts.nobuild:
-    return
+    if opts.nobuild:
+        return
 
-  # TODO(kcwu): support local patch.
-  if opts.deploy_method == 'chrome_deploy':
-    cr_util.build_and_deploy(
-        opts.chrome_src,
-        opts.board,
-        opts.dut,
-        opts.target,
-        opts.with_tests,
-        nodeploy=opts.nodeploy)
-  elif opts.deploy_method == 'image':
-    switch_cros_localbuild.build_and_deploy(opts)
+    # TODO(kcwu): support local patch.
+    if opts.deploy_method == 'chrome_deploy':
+        cr_util.build_and_deploy(
+            opts.chrome_src,
+            opts.board,
+            opts.dut,
+            opts.target,
+            opts.with_tests,
+            nodeploy=opts.nodeploy,
+        )
+    elif opts.deploy_method == 'image':
+        switch_cros_localbuild.build_and_deploy(opts)
 
-  lacros_util.build_and_deploy(opts.chrome_src, opts.dut)
+    lacros_util.build_and_deploy(opts.chrome_src, opts.dut)
 
 
 def main(args: typing.Optional[tuple[str]] = None) -> int:
-  return bisector_cli.switch_main_wrapper(switch_main, args)
+    return bisector_cli.switch_main_wrapper(switch_main, args)
 
 
 if __name__ == '__main__':
-  sys.exit(main())
+    sys.exit(main())

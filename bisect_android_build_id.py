@@ -31,104 +31,115 @@ from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_util
 
+
 logger = logging.getLogger(__name__)
 
 diff_url_template = (
     'https://android-build.googleplex.com/'
-    'builds/{new}/branches/{branch}/targets/{flavor}/cls?end={old}')
+    'builds/{new}/branches/{branch}/targets/{flavor}/cls?end={old}'
+)
 
 
 class AndroidBuildIDDomain(core.BisectDomain):
-  """BisectDomain for Android build IDs."""
-  revtype = staticmethod(android_util.argtype_android_build_id)
-  help = globals()['__doc__']
+    """BisectDomain for Android build IDs."""
 
-  @staticmethod
-  def add_init_arguments(parser):
-    parser.add_argument(
-        '--branch',
-        metavar='ANDROID_BRANCH',
-        default=configure.get('ANDROID_BRANCH'),
-        help='git branch like "git_mnc-dr-arc-dev"')
-    parser.add_argument(
-        '--flavor',
-        metavar='ANDROID_FLAVOR',
-        default=configure.get('ANDROID_FLAVOR'),
-        help='example: cheets_x86-user')
-    parser.add_argument(
-        '--only_good_build',
-        action='store_true',
-        help='Bisect only good builds. '
-        'This flag is only needed if weird builds blocked bisection')
+    revtype = staticmethod(android_util.argtype_android_build_id)
+    help = globals()['__doc__']
 
-    # Only used for Android on ChromeOS.
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='For ChromeOS, address of DUT (Device Under Test)')
+    @staticmethod
+    def add_init_arguments(parser):
+        parser.add_argument(
+            '--branch',
+            metavar='ANDROID_BRANCH',
+            default=configure.get('ANDROID_BRANCH'),
+            help='git branch like "git_mnc-dr-arc-dev"',
+        )
+        parser.add_argument(
+            '--flavor',
+            metavar='ANDROID_FLAVOR',
+            default=configure.get('ANDROID_FLAVOR'),
+            help='example: cheets_x86-user',
+        )
+        parser.add_argument(
+            '--only_good_build',
+            action='store_true',
+            help='Bisect only good builds. '
+            'This flag is only needed if weird builds blocked bisection',
+        )
 
-  @staticmethod
-  def init(opts):
-    if opts.dut:
-      assert cros_util.is_dut(opts.dut)
+        # Only used for Android on ChromeOS.
+        parser.add_argument(
+            '--dut',
+            type=cli.argtype_notempty,
+            metavar='DUT',
+            default=configure.get('DUT'),
+            help='For ChromeOS, address of DUT (Device Under Test)',
+        )
 
-    if not opts.flavor:
-      assert opts.dut
-      opts.flavor = arc_util.query_flavor(opts.dut)
+    @staticmethod
+    def init(opts):
+        if opts.dut:
+            assert cros_util.is_dut(opts.dut)
 
-    if not opts.branch:
-      assert opts.dut
-      board = cros_util.query_dut_board(opts.dut)
-      version = cros_util.query_dut_short_version(opts.dut)
-      opts.branch = cros_util.query_android_branch(board, version)
-      assert opts.branch
+        if not opts.flavor:
+            assert opts.dut
+            opts.flavor = arc_util.query_flavor(opts.dut)
 
-    config = dict(branch=opts.branch, flavor=opts.flavor)
-    if opts.dut:
-      config['dut'] = opts.dut
+        if not opts.branch:
+            assert opts.dut
+            board = cros_util.query_dut_board(opts.dut)
+            version = cros_util.query_dut_short_version(opts.dut)
+            opts.branch = cros_util.query_android_branch(board, version)
+            assert opts.branch
 
-    revlist = android_util.get_build_ids_between(opts.branch, opts.flavor,
-                                                 opts.old, opts.new)
+        config = dict(branch=opts.branch, flavor=opts.flavor)
+        if opts.dut:
+            config['dut'] = opts.dut
 
-    if opts.only_good_build:
-      revlist = [
-          bid for bid in revlist
-          if android_util.is_good_build(opts.branch, opts.flavor, bid)
-      ]
+        revlist = android_util.get_build_ids_between(
+            opts.branch, opts.flavor, opts.old, opts.new
+        )
 
-    details = {}
-    for i in range(1, len(revlist)):
-      url = diff_url_template.format(
-          branch=opts.branch,
-          flavor=opts.flavor,
-          old=revlist[i - 1],
-          new=revlist[i])
-      details[revlist[i]] = {'actions': [{'link': url}]}
+        if opts.only_good_build:
+            revlist = [
+                bid
+                for bid in revlist
+                if android_util.is_good_build(opts.branch, opts.flavor, bid)
+            ]
 
-    return config, {'revlist': revlist, 'details': details}
+        details = {}
+        for i in range(1, len(revlist)):
+            url = diff_url_template.format(
+                branch=opts.branch,
+                flavor=opts.flavor,
+                old=revlist[i - 1],
+                new=revlist[i],
+            )
+            details[revlist[i]] = {'actions': [{'link': url}]}
 
-  def __init__(self, config):
-    self.config = config
+        return config, {'revlist': revlist, 'details': details}
 
-  def setenv(self, env, rev):
-    env['ANDROID_BRANCH'] = self.config['branch']
-    env['ANDROID_FLAVOR'] = self.config['flavor']
-    env['ANDROID_BUILD_ID'] = rev
-    if self.config.get('dut'):
-      env['DUT'] = self.config['dut']
+    def __init__(self, config):
+        self.config = config
 
-  def fill_candidate_summary(self, summary):
-    if 'current_range' in summary:
-      old, new = summary['current_range']
-      url = diff_url_template.format(
-          branch=self.config['branch'],
-          flavor=self.config['flavor'],
-          old=old,
-          new=new)
-      summary['links'] = [dict(name='change_list', url=url)]
+    def setenv(self, env, rev):
+        env['ANDROID_BRANCH'] = self.config['branch']
+        env['ANDROID_FLAVOR'] = self.config['flavor']
+        env['ANDROID_BUILD_ID'] = rev
+        if self.config.get('dut'):
+            env['DUT'] = self.config['dut']
+
+    def fill_candidate_summary(self, summary):
+        if 'current_range' in summary:
+            old, new = summary['current_range']
+            url = diff_url_template.format(
+                branch=self.config['branch'],
+                flavor=self.config['flavor'],
+                old=old,
+                new=new,
+            )
+            summary['links'] = [dict(name='change_list', url=url)]
 
 
 if __name__ == '__main__':
-  bisector_cli.BisectorCommandLine(AndroidBuildIDDomain).main()
+    bisector_cli.BisectorCommandLine(AndroidBuildIDDomain).main()

@@ -36,167 +36,194 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import repo_util
 
+
 logger = logging.getLogger(__name__)
 
 
 def determine_android_build_id(opts, rev):
-  """Determine android build id.
+    """Determine android build id.
 
-  If `rev` is ChromeOS version, query its corresponding Android build id.
+    If `rev` is ChromeOS version, query its corresponding Android build id.
 
-  Args:
-    opts: parse result of argparse
-    rev: Android build id or ChromeOS version
+    Args:
+      opts: parse result of argparse
+      rev: Android build id or ChromeOS version
 
-  Returns:
-    Android build id
-  """
-  if cros_util.is_cros_version(rev):
-    assert opts.board, 'need to specify BOARD for cros version'
-    android_build_id = cros_util.query_android_build_id(opts.board, rev)
-    assert android_util.is_android_build_id(android_build_id)
-    logger.info('Converted given CrOS version %s to Android build id %s', rev,
-                android_build_id)
-    rev = android_build_id
-  return rev
+    Returns:
+      Android build id
+    """
+    if cros_util.is_cros_version(rev):
+        assert opts.board, 'need to specify BOARD for cros version'
+        android_build_id = cros_util.query_android_build_id(opts.board, rev)
+        assert android_util.is_android_build_id(android_build_id)
+        logger.info(
+            'Converted given CrOS version %s to Android build id %s',
+            rev,
+            android_build_id,
+        )
+        rev = android_build_id
+    return rev
 
 
 def generate_action_link(action):
-  if action['action_type'] == 'commit':
-    repo_url = action['repo_url']
-    action['link'] = repo_url + '/+/' + action['rev']
+    if action['action_type'] == 'commit':
+        repo_url = action['repo_url']
+        action['link'] = repo_url + '/+/' + action['rev']
 
 
 class AndroidRepoDomain(core.BisectDomain):
-  """BisectDomain for Android code changes."""
-  # Accepts Android build id or ChromeOS version
-  revtype = staticmethod(
-      cli.argtype_multiplexer(cros_util.argtype_cros_version,
-                              android_util.argtype_android_build_id))
-  intra_revtype = staticmethod(
-      codechange.argtype_intra_rev(android_util.argtype_android_build_id))
-  help = globals()['__doc__']
+    """BisectDomain for Android code changes."""
 
-  @staticmethod
-  def add_init_arguments(parser):
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='DUT address')
-    parser.add_argument(
-        '--android_root',
-        metavar='ANDROID_ROOT',
-        type=cli.argtype_dir_path,
-        required=True,
-        default=configure.get('ANDROID_ROOT'),
-        help='Android tree root')
-    parser.add_argument(
-        '--android_mirror',
-        type=cli.argtype_dir_path,
-        required=True,
-        default=configure.get('ANDROID_MIRROR'),
-        help='Android repo mirror path')
-    parser.add_argument(
-        '--branch',
-        metavar='ANDROID_BRANCH',
-        help='branch name like "git_mnc-dr-arc-dev"; '
-        'default is auto detect via DUT')
-    parser.add_argument(
-        '--flavor',
-        metavar='ANDROID_FLAVOR',
-        default=configure.get('ANDROID_FLAVOR'),
-        help='example: cheets_x86-user; default is auto detect via DUT')
-    parser.add_argument(
-        '--board',
-        metavar='BOARD',
-        default=configure.get('BOARD'),
-        help='ChromeOS board name, if ARC++')
+    # Accepts Android build id or ChromeOS version
+    revtype = staticmethod(
+        cli.argtype_multiplexer(
+            cros_util.argtype_cros_version,
+            android_util.argtype_android_build_id,
+        )
+    )
+    intra_revtype = staticmethod(
+        codechange.argtype_intra_rev(android_util.argtype_android_build_id)
+    )
+    help = globals()['__doc__']
 
-  @staticmethod
-  def init(opts):
-    if opts.dut:
-      assert cros_util.is_dut(opts.dut)
+    @staticmethod
+    def add_init_arguments(parser):
+        parser.add_argument(
+            '--dut',
+            type=cli.argtype_notempty,
+            metavar='DUT',
+            default=configure.get('DUT'),
+            help='DUT address',
+        )
+        parser.add_argument(
+            '--android_root',
+            metavar='ANDROID_ROOT',
+            type=cli.argtype_dir_path,
+            required=True,
+            default=configure.get('ANDROID_ROOT'),
+            help='Android tree root',
+        )
+        parser.add_argument(
+            '--android_mirror',
+            type=cli.argtype_dir_path,
+            required=True,
+            default=configure.get('ANDROID_MIRROR'),
+            help='Android repo mirror path',
+        )
+        parser.add_argument(
+            '--branch',
+            metavar='ANDROID_BRANCH',
+            help='branch name like "git_mnc-dr-arc-dev"; '
+            'default is auto detect via DUT',
+        )
+        parser.add_argument(
+            '--flavor',
+            metavar='ANDROID_FLAVOR',
+            default=configure.get('ANDROID_FLAVOR'),
+            help='example: cheets_x86-user; default is auto detect via DUT',
+        )
+        parser.add_argument(
+            '--board',
+            metavar='BOARD',
+            default=configure.get('BOARD'),
+            help='ChromeOS board name, if ARC++',
+        )
 
-    if not opts.flavor:
-      if not opts.dut:
-        raise errors.ArgumentError('--dut and --flavor', 'Neither is specified')
-      opts.flavor = arc_util.query_flavor(opts.dut)
+    @staticmethod
+    def init(opts):
+        if opts.dut:
+            assert cros_util.is_dut(opts.dut)
 
-    if not opts.board:
-      if not opts.dut:
-        raise errors.ArgumentError('--dut and --board', 'Neither is specified')
-      opts.board = cros_util.query_dut_board(opts.dut)
-    if not opts.branch:
-      if not opts.dut:
-        raise errors.ArgumentError('--dut and --branch', 'Neither is specified')
-      version = cros_util.query_dut_short_version(opts.dut)
-      if not cros_util.is_cros_short_version(version):
-        base = '.'.join(version.split('.')[:-1] + ['0'])
-        logger.info(
-            'ChromeOS version of DUT (%s) is local build, '
-            'use its base version %s to determine Android branch', version,
-            base)
-        version = base
-      opts.branch = cros_util.query_android_branch(opts.board, version)
-      logger.debug('branch=%s', opts.branch)
-      assert opts.branch
+        if not opts.flavor:
+            if not opts.dut:
+                raise errors.ArgumentError(
+                    '--dut and --flavor', 'Neither is specified'
+                )
+            opts.flavor = arc_util.query_flavor(opts.dut)
 
-    old = determine_android_build_id(opts, opts.old)
-    new = determine_android_build_id(opts, opts.new)
+        if not opts.board:
+            if not opts.dut:
+                raise errors.ArgumentError(
+                    '--dut and --board', 'Neither is specified'
+                )
+            opts.board = cros_util.query_dut_board(opts.dut)
+        if not opts.branch:
+            if not opts.dut:
+                raise errors.ArgumentError(
+                    '--dut and --branch', 'Neither is specified'
+                )
+            version = cros_util.query_dut_short_version(opts.dut)
+            if not cros_util.is_cros_short_version(version):
+                base = '.'.join(version.split('.')[:-1] + ['0'])
+                logger.info(
+                    'ChromeOS version of DUT (%s) is local build, '
+                    'use its base version %s to determine Android branch',
+                    version,
+                    base,
+                )
+                version = base
+            opts.branch = cros_util.query_android_branch(opts.board, version)
+            logger.debug('branch=%s', opts.branch)
+            assert opts.branch
 
-    if int(old) >= int(new):
-      raise errors.ArgumentError('--old and --new',
-                                 'bad bisect range (%s, %s)' % (old, new))
+        old = determine_android_build_id(opts, opts.old)
+        new = determine_android_build_id(opts, opts.new)
 
-    config = dict(
-        dut=opts.dut,
-        android_root=opts.android_root,
-        android_mirror=opts.android_mirror,
-        branch=opts.branch,
-        flavor=opts.flavor,
-        old=old,
-        new=new)
+        if int(old) >= int(new):
+            raise errors.ArgumentError(
+                '--old and --new', 'bad bisect range (%s, %s)' % (old, new)
+            )
 
-    spec_manager = android_util.AndroidSpecManager(config)
-    cache = repo_util.RepoMirror(opts.android_mirror)
-    code_manager = codechange.CodeManager(opts.android_root, spec_manager,
-                                          cache)
-    revlist, details = code_manager.build_revlist(old, new)
-    for detail in details.values():
-      for action in detail.get('actions', []):
-        generate_action_link(action)
+        config = dict(
+            dut=opts.dut,
+            android_root=opts.android_root,
+            android_mirror=opts.android_mirror,
+            branch=opts.branch,
+            flavor=opts.flavor,
+            old=old,
+            new=new,
+        )
 
-    return config, {'revlist': revlist, 'details': details}
+        spec_manager = android_util.AndroidSpecManager(config)
+        cache = repo_util.RepoMirror(opts.android_mirror)
+        code_manager = codechange.CodeManager(
+            opts.android_root, spec_manager, cache
+        )
+        revlist, details = code_manager.build_revlist(old, new)
+        for detail in details.values():
+            for action in detail.get('actions', []):
+                generate_action_link(action)
 
-  def __init__(self, config):
-    self.config = config
+        return config, {'revlist': revlist, 'details': details}
 
-  def setenv(self, env, rev=None):
-    env['DUT'] = self.config['dut']
-    env['ANDROID_ROOT'] = self.config['android_root']
-    env['ANDROID_FLAVOR'] = self.config['flavor']
-    env['ANDROID_BRANCH'] = self.config['branch']
-    env['ANDROID_MIRROR'] = self.config['android_mirror']
-    env['INTRA_REV'] = rev
+    def __init__(self, config):
+        self.config = config
 
-  def fill_candidate_summary(self, summary):
-    if 'current_range' in summary:
-      old, new = summary['current_range']
-      old_base, _, _ = codechange.parse_intra_rev(old)
-      _, new_next, _ = codechange.parse_intra_rev(new)
-      url_template = ('https://android-build.googleplex.com/'
-                      'builds/{new}/branches/%s/targets/%s/cls?end={old}') % (
-                          self.config['branch'], self.config['flavor'])
+    def setenv(self, env, rev=None):
+        env['DUT'] = self.config['dut']
+        env['ANDROID_ROOT'] = self.config['android_root']
+        env['ANDROID_FLAVOR'] = self.config['flavor']
+        env['ANDROID_BRANCH'] = self.config['branch']
+        env['ANDROID_MIRROR'] = self.config['android_mirror']
+        env['INTRA_REV'] = rev
 
-      summary['links'] = [
-          {
-              'name': 'change_list',
-              'url': url_template.format(old=old_base, new=new_next),
-          },
-      ]
+    def fill_candidate_summary(self, summary):
+        if 'current_range' in summary:
+            old, new = summary['current_range']
+            old_base, _, _ = codechange.parse_intra_rev(old)
+            _, new_next, _ = codechange.parse_intra_rev(new)
+            url_template = (
+                'https://android-build.googleplex.com/'
+                'builds/{new}/branches/%s/targets/%s/cls?end={old}'
+            ) % (self.config['branch'], self.config['flavor'])
+
+            summary['links'] = [
+                {
+                    'name': 'change_list',
+                    'url': url_template.format(old=old_base, new=new_next),
+                },
+            ]
 
 
 if __name__ == '__main__':
-  bisector_cli.BisectorCommandLine(AndroidRepoDomain).main()
+    bisector_cli.BisectorCommandLine(AndroidRepoDomain).main()

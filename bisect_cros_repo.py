@@ -34,120 +34,136 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import repo_util
 
+
 logger = logging.getLogger(__name__)
 
 
 def generate_action_link(action):
-  if action['action_type'] == 'commit':
-    repo_url = action['repo_url']
-    action['link'] = repo_url + '/+/' + action['rev']
+    if action['action_type'] == 'commit':
+        repo_url = action['repo_url']
+        action['link'] = repo_url + '/+/' + action['rev']
 
 
 class ChromeOSRepoDomain(core.BisectDomain):
-  """BisectDomain for ChromeOS code changes."""
-  revtype = staticmethod(cros_util.argtype_cros_version)
-  intra_revtype = staticmethod(
-      codechange.argtype_intra_rev(cros_util.argtype_cros_version))
-  help = globals()['__doc__']
+    """BisectDomain for ChromeOS code changes."""
 
-  @staticmethod
-  def add_init_arguments(parser):
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='DUT address')
-    parser.add_argument(
-        '--board',
-        metavar='BOARD',
-        default=configure.get('BOARD', ''),
-        help='ChromeOS board name')
-    parser.add_argument(
-        '--chromeos_root',
-        metavar='CHROMEOS_ROOT',
-        type=cli.argtype_dir_path,
-        required=True,
-        default=configure.get('CHROMEOS_ROOT'),
-        help='ChromeOS tree root')
-    parser.add_argument(
-        '--chromeos_mirror',
-        type=cli.argtype_dir_path,
-        default=configure.get('CHROMEOS_MIRROR', ''),
-        help='ChromeOS repo mirror path')
+    revtype = staticmethod(cros_util.argtype_cros_version)
+    intra_revtype = staticmethod(
+        codechange.argtype_intra_rev(cros_util.argtype_cros_version)
+    )
+    help = globals()['__doc__']
 
-  @staticmethod
-  def init(opts):
-    if not opts.dut and not opts.board:
-      raise errors.ArgumentError('--dut and --board', 'Neither is specified')
+    @staticmethod
+    def add_init_arguments(parser):
+        parser.add_argument(
+            '--dut',
+            type=cli.argtype_notempty,
+            metavar='DUT',
+            default=configure.get('DUT'),
+            help='DUT address',
+        )
+        parser.add_argument(
+            '--board',
+            metavar='BOARD',
+            default=configure.get('BOARD', ''),
+            help='ChromeOS board name',
+        )
+        parser.add_argument(
+            '--chromeos_root',
+            metavar='CHROMEOS_ROOT',
+            type=cli.argtype_dir_path,
+            required=True,
+            default=configure.get('CHROMEOS_ROOT'),
+            help='ChromeOS tree root',
+        )
+        parser.add_argument(
+            '--chromeos_mirror',
+            type=cli.argtype_dir_path,
+            default=configure.get('CHROMEOS_MIRROR', ''),
+            help='ChromeOS repo mirror path',
+        )
 
-    if opts.dut:
-      assert cros_util.is_dut(opts.dut)
-    else:
-      logger.info("Tips: unless you don't need to build, otherwise it's "
-                  'recommended to specify --dut in bisector instead of '
-                  'switcher and evaluator.')
+    @staticmethod
+    def init(opts):
+        if not opts.dut and not opts.board:
+            raise errors.ArgumentError(
+                '--dut and --board', 'Neither is specified'
+            )
 
-    if not opts.board:
-      opts.board = cros_util.query_dut_board(opts.dut)
+        if opts.dut:
+            assert cros_util.is_dut(opts.dut)
+        else:
+            logger.info(
+                "Tips: unless you don't need to build, otherwise it's "
+                'recommended to specify --dut in bisector instead of '
+                'switcher and evaluator.'
+            )
 
-    if not cros_util.is_ancestor_version(opts.old, opts.new):
-      raise errors.ArgumentError(
-          '--old and --new', '%s is not ancestor of %s' % (opts.old, opts.new))
-    if cros_util.is_cros_short_version(opts.old):
-      opts.old = cros_util.version_to_full(opts.board, opts.old)
-    if cros_util.is_cros_short_version(opts.new):
-      opts.new = cros_util.version_to_full(opts.board, opts.new)
+        if not opts.board:
+            opts.board = cros_util.query_dut_board(opts.dut)
 
-    logger.info('Clean up previous result of "mark as stable"')
-    repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
+        if not cros_util.is_ancestor_version(opts.old, opts.new):
+            raise errors.ArgumentError(
+                '--old and --new',
+                '%s is not ancestor of %s' % (opts.old, opts.new),
+            )
+        if cros_util.is_cros_short_version(opts.old):
+            opts.old = cros_util.version_to_full(opts.board, opts.old)
+        if cros_util.is_cros_short_version(opts.new):
+            opts.new = cros_util.version_to_full(opts.board, opts.new)
 
-    config = dict(
-        dut=opts.dut,
-        board=opts.board,
-        chromeos_root=opts.chromeos_root,
-        chromeos_mirror=opts.chromeos_mirror)
+        logger.info('Clean up previous result of "mark as stable"')
+        repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
 
-    spec_manager = cros_util.ChromeOSSpecManager(config)
-    cache = repo_util.RepoMirror(opts.chromeos_mirror)
-    code_manager = codechange.CodeManager(opts.chromeos_root, spec_manager,
-                                          cache)
-    states = core.BisectStates.from_bisector_class('ChromeOSVersionDomain',
-                                                   opts.session)
-    if states.load_states():
-      cros_util.SnapshotStore.init_with_state(states)
+        config = dict(
+            dut=opts.dut,
+            board=opts.board,
+            chromeos_root=opts.chromeos_root,
+            chromeos_mirror=opts.chromeos_mirror,
+        )
 
-    revlist, details = code_manager.build_revlist(opts.old, opts.new)
-    for detail in details.values():
-      for action in detail.get('actions', []):
-        generate_action_link(action)
+        spec_manager = cros_util.ChromeOSSpecManager(config)
+        cache = repo_util.RepoMirror(opts.chromeos_mirror)
+        code_manager = codechange.CodeManager(
+            opts.chromeos_root, spec_manager, cache
+        )
+        states = core.BisectStates.from_bisector_class(
+            'ChromeOSVersionDomain', opts.session
+        )
+        if states.load_states():
+            cros_util.SnapshotStore.init_with_state(states)
 
-    return config, {'revlist': revlist, 'details': details}
+        revlist, details = code_manager.build_revlist(opts.old, opts.new)
+        for detail in details.values():
+            for action in detail.get('actions', []):
+                generate_action_link(action)
 
-  def __init__(self, config):
-    self.config = config
+        return config, {'revlist': revlist, 'details': details}
 
-  def setenv(self, env, rev):
-    if self.config['dut']:
-      env['DUT'] = self.config['dut']
-    if self.config['board']:
-      env['BOARD'] = self.config['board']
-    env['CHROMEOS_ROOT'] = self.config['chromeos_root']
-    env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
-    env['CROS_VERSION'] = rev
+    def __init__(self, config):
+        self.config = config
 
-  def fill_candidate_summary(self, summary):
-    if 'current_range' in summary:
-      old, new = summary['current_range']
-      old_base, _, _ = codechange.parse_intra_rev(old)
-      _, new_next, _ = codechange.parse_intra_rev(new)
-      summary['links'] = [
-          {
-              'name': 'change_list',
-              'url': cros_util.get_crosland_link(old_base, new_next),
-          },
-      ]
+    def setenv(self, env, rev):
+        if self.config['dut']:
+            env['DUT'] = self.config['dut']
+        if self.config['board']:
+            env['BOARD'] = self.config['board']
+        env['CHROMEOS_ROOT'] = self.config['chromeos_root']
+        env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
+        env['CROS_VERSION'] = rev
+
+    def fill_candidate_summary(self, summary):
+        if 'current_range' in summary:
+            old, new = summary['current_range']
+            old_base, _, _ = codechange.parse_intra_rev(old)
+            _, new_next, _ = codechange.parse_intra_rev(new)
+            summary['links'] = [
+                {
+                    'name': 'change_list',
+                    'url': cros_util.get_crosland_link(old_base, new_next),
+                },
+            ]
 
 
 if __name__ == '__main__':
-  bisector_cli.BisectorCommandLine(ChromeOSRepoDomain).main()
+    bisector_cli.BisectorCommandLine(ChromeOSRepoDomain).main()

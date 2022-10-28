@@ -16,22 +16,24 @@ from bisect_kit import testing
 
 
 class TestBisectCrLocalbuildMaster(unittest.TestCase):
-  """Test bisect_cr_localbuild_master.py."""
+    """Test bisect_cr_localbuild_master.py."""
 
-  def setUp(self):
-    self.chrome_root = tempfile.mkdtemp()
+    def setUp(self):
+        self.chrome_root = tempfile.mkdtemp()
 
-  def tearDown(self):
-    shutil.rmtree(self.chrome_root)
+    def tearDown(self):
+        shutil.rmtree(self.chrome_root)
 
-  def test_verify_gclient_dep(self):
-    shutil.copy(
-        testing.get_testdata_path('gclient_chromium_src'),
-        os.path.join(self.chrome_root, '.gclient'))
+    def test_verify_gclient_dep(self):
+        shutil.copy(
+            testing.get_testdata_path('gclient_chromium_src'),
+            os.path.join(self.chrome_root, '.gclient'),
+        )
 
-    self.assertTrue(
-        bisect_cr_localbuild_master.verify_gclient_dep(self.chrome_root))
+        self.assertTrue(
+            bisect_cr_localbuild_master.verify_gclient_dep(self.chrome_root)
+        )
 
 
 if __name__ == '__main__':
-  unittest.main()
+    unittest.main()

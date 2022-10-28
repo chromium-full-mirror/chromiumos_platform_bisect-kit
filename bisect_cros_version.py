@@ -32,113 +32,137 @@ from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import errors
 
+
 logger = logging.getLogger(__name__)
 
 
 def get_revlist(board, old, new, use_snapshot=False):
-  logger.info('get_revlist %s %s %s', board, old, new)
-  logger.info('use_snapshot: %s', use_snapshot)
-  full_versions, details = cros_util.list_chromeos_prebuilt_versions(
-      board, old, new, use_snapshot=use_snapshot)
-  short_versions = [
-      v if cros_util.is_cros_snapshot_version(v) else
-      cros_util.version_to_short(v) for v in full_versions
-  ]
+    logger.info('get_revlist %s %s %s', board, old, new)
+    logger.info('use_snapshot: %s', use_snapshot)
+    full_versions, details = cros_util.list_chromeos_prebuilt_versions(
+        board, old, new, use_snapshot=use_snapshot
+    )
+    short_versions = [
+        v
+        if cros_util.is_cros_snapshot_version(v)
+        else cros_util.version_to_short(v)
+        for v in full_versions
+    ]
 
-  if cros_util.is_cros_snapshot_version(old):
-    old_idx = full_versions.index(old)
-  else:
-    old_idx = short_versions.index(cros_util.version_to_short(old))
-  if cros_util.is_cros_snapshot_version(new):
-    new_idx = full_versions.index(new)
-  else:
-    new_idx = short_versions.index(cros_util.version_to_short(new))
-  return full_versions[old_idx], full_versions[new_idx], full_versions, details
+    if cros_util.is_cros_snapshot_version(old):
+        old_idx = full_versions.index(old)
+    else:
+        old_idx = short_versions.index(cros_util.version_to_short(old))
+    if cros_util.is_cros_snapshot_version(new):
+        new_idx = full_versions.index(new)
+    else:
+        new_idx = short_versions.index(cros_util.version_to_short(new))
+    return (
+        full_versions[old_idx],
+        full_versions[new_idx],
+        full_versions,
+        details,
+    )
 
 
 class ChromeOSVersionDomain(core.BisectDomain):
-  """BisectDomain for chromeos versions."""
-  revtype = staticmethod(cros_util.argtype_cros_version)
-  help = globals()['__doc__']
+    """BisectDomain for chromeos versions."""
 
-  @staticmethod
-  def add_init_arguments(parser):
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='Address of DUT (Device Under Test). Either --dut or '
-        '--board need to be specified')
-    parser.add_argument(
-        '--board',
-        metavar='BOARD',
-        default=configure.get('BOARD'),
-        help='ChromeOS board name. Either --dut or --board need '
-        'to be specified')
-    parser.add_argument(
-        '--disable_snapshot',
-        action='store_true',
-        help='Disable snapshot for bisect chromeos prebuilt')
+    revtype = staticmethod(cros_util.argtype_cros_version)
+    help = globals()['__doc__']
 
-  @staticmethod
-  def init(opts):
-    if not opts.dut and not opts.board:
-      raise errors.ArgumentError('--dut and --board', 'Neither is specified')
-    if not cros_util.is_ancestor_version(opts.old, opts.new):
-      raise errors.ArgumentError(
-          '--old and --new', '%s is not ancestor of %s' % (opts.old, opts.new))
-    if opts.dut:
-      assert cros_util.is_dut(opts.dut)
-    if not opts.board:
-      opts.board = cros_util.query_dut_board(opts.dut)
-    if not cros_util.has_test_image(opts.board, opts.old):
-      raise errors.ArgumentError(
-          '--old', '%s has no image for %s' % (opts.board, opts.old))
-    if not cros_util.has_test_image(opts.board, opts.new):
-      raise errors.ArgumentError(
-          '--new', '%s has no image for %s' % (opts.board, opts.new))
+    @staticmethod
+    def add_init_arguments(parser):
+        parser.add_argument(
+            '--dut',
+            type=cli.argtype_notempty,
+            metavar='DUT',
+            default=configure.get('DUT'),
+            help='Address of DUT (Device Under Test). Either --dut or '
+            '--board need to be specified',
+        )
+        parser.add_argument(
+            '--board',
+            metavar='BOARD',
+            default=configure.get('BOARD'),
+            help='ChromeOS board name. Either --dut or --board need '
+            'to be specified',
+        )
+        parser.add_argument(
+            '--disable_snapshot',
+            action='store_true',
+            help='Disable snapshot for bisect chromeos prebuilt',
+        )
 
-    old, new, revlist, details = get_revlist(
-        opts.board, opts.old, opts.new, use_snapshot=not opts.disable_snapshot)
-    config = dict(dut=opts.dut, board=opts.board, old=old, new=new)
+    @staticmethod
+    def init(opts):
+        if not opts.dut and not opts.board:
+            raise errors.ArgumentError(
+                '--dut and --board', 'Neither is specified'
+            )
+        if not cros_util.is_ancestor_version(opts.old, opts.new):
+            raise errors.ArgumentError(
+                '--old and --new',
+                '%s is not ancestor of %s' % (opts.old, opts.new),
+            )
+        if opts.dut:
+            assert cros_util.is_dut(opts.dut)
+        if not opts.board:
+            opts.board = cros_util.query_dut_board(opts.dut)
+        if not cros_util.has_test_image(opts.board, opts.old):
+            raise errors.ArgumentError(
+                '--old', '%s has no image for %s' % (opts.board, opts.old)
+            )
+        if not cros_util.has_test_image(opts.board, opts.new):
+            raise errors.ArgumentError(
+                '--new', '%s has no image for %s' % (opts.board, opts.new)
+            )
 
-    for i in range(1, len(revlist)):
-      link = cros_util.get_crosland_link(revlist[i - 1], revlist[i])
-      details[revlist[i]]['actions'] = [{'link': link}]
+        old, new, revlist, details = get_revlist(
+            opts.board,
+            opts.old,
+            opts.new,
+            use_snapshot=not opts.disable_snapshot,
+        )
+        config = dict(dut=opts.dut, board=opts.board, old=old, new=new)
 
-    return config, {'revlist': revlist, 'details': details}
+        for i in range(1, len(revlist)):
+            link = cros_util.get_crosland_link(revlist[i - 1], revlist[i])
+            details[revlist[i]]['actions'] = [{'link': link}]
 
-  def __init__(self, config):
-    self.config = config
+        return config, {'revlist': revlist, 'details': details}
 
-  def setenv(self, env, rev):
-    if self.config['dut']:
-      env['DUT'] = self.config['dut']
-    env['BOARD'] = self.config['board']
+    def __init__(self, config):
+        self.config = config
 
-    assert cros_util.is_cros_full_version(
-        rev) or cros_util.is_cros_snapshot_version(rev)
-    if cros_util.is_cros_snapshot_version(rev):
-      milestone, short_version, _ = cros_util.snapshot_version_split(rev)
-    else:
-      milestone, short_version = cros_util.version_split(rev)
+    def setenv(self, env, rev):
+        if self.config['dut']:
+            env['DUT'] = self.config['dut']
+        env['BOARD'] = self.config['board']
 
-    env['MILESTONE'] = milestone
-    env['CROS_SHORT_VERSION'] = short_version
-    env['CROS_FULL_VERSION'] = rev
-    env['CROS_VERSION'] = rev
+        assert cros_util.is_cros_full_version(
+            rev
+        ) or cros_util.is_cros_snapshot_version(rev)
+        if cros_util.is_cros_snapshot_version(rev):
+            milestone, short_version, _ = cros_util.snapshot_version_split(rev)
+        else:
+            milestone, short_version = cros_util.version_split(rev)
 
-  def fill_candidate_summary(self, summary):
-    if 'current_range' in summary:
-      old, new = summary['current_range']
-      summary['links'] = [
-          {
-              'name': 'change_list',
-              'url': cros_util.get_crosland_link(old, new),
-          },
-      ]
+        env['MILESTONE'] = milestone
+        env['CROS_SHORT_VERSION'] = short_version
+        env['CROS_FULL_VERSION'] = rev
+        env['CROS_VERSION'] = rev
+
+    def fill_candidate_summary(self, summary):
+        if 'current_range' in summary:
+            old, new = summary['current_range']
+            summary['links'] = [
+                {
+                    'name': 'change_list',
+                    'url': cros_util.get_crosland_link(old, new),
+                },
+            ]
 
 
 if __name__ == '__main__':
-  bisector_cli.BisectorCommandLine(ChromeOSVersionDomain).main()
+    bisector_cli.BisectorCommandLine(ChromeOSVersionDomain).main()

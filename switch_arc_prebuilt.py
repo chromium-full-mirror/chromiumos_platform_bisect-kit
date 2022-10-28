@@ -29,68 +29,75 @@ from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 
+
 logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-  parents = [common.common_argument_parser, common.session_optional_parser]
-  parser = argparse.ArgumentParser(description=__doc__, parents=parents)
-  cli.patching_argparser_exit(parser)
-  parser.add_argument(
-      '--rich_result',
-      action='store_true',
-      help='Instead of mere exit code, output detailed information in json')
-  parser.add_argument(
-      '--dut',
-      type=cli.argtype_notempty,
-      metavar='DUT',
-      default=configure.get('DUT', ''))
-  parser.add_argument(
-      'build_id',
-      nargs='?',
-      type=android_util.argtype_android_build_id,
-      metavar='ANDROID_BUILD_ID',
-      default=configure.get('ANDROID_BUILD_ID', ''))
-  parser.add_argument(
-      '--flavor',
-      metavar='ANDROID_FLAVOR',
-      default=configure.get('ANDROID_FLAVOR'),
-      help='example: cheets_x86-user')
+    parents = [common.common_argument_parser, common.session_optional_parser]
+    parser = argparse.ArgumentParser(description=__doc__, parents=parents)
+    cli.patching_argparser_exit(parser)
+    parser.add_argument(
+        '--rich_result',
+        action='store_true',
+        help='Instead of mere exit code, output detailed information in json',
+    )
+    parser.add_argument(
+        '--dut',
+        type=cli.argtype_notempty,
+        metavar='DUT',
+        default=configure.get('DUT', ''),
+    )
+    parser.add_argument(
+        'build_id',
+        nargs='?',
+        type=android_util.argtype_android_build_id,
+        metavar='ANDROID_BUILD_ID',
+        default=configure.get('ANDROID_BUILD_ID', ''),
+    )
+    parser.add_argument(
+        '--flavor',
+        metavar='ANDROID_FLAVOR',
+        default=configure.get('ANDROID_FLAVOR'),
+        help='example: cheets_x86-user',
+    )
 
-  return parser
+    return parser
 
 
 def switch_main(args: typing.Optional[tuple[str]]):
-  common.init()
-  parser = create_argument_parser()
-  opts = parser.parse_args(args)
-  common.config_logging(opts)
+    common.init()
+    parser = create_argument_parser()
+    opts = parser.parse_args(args)
+    common.config_logging(opts)
 
-  if not opts.flavor:
-    opts.flavor = arc_util.query_flavor(opts.dut)
-    assert opts.flavor
-  logger.info('use flavor=%s', opts.flavor)
+    if not opts.flavor:
+        opts.flavor = arc_util.query_flavor(opts.dut)
+        assert opts.flavor
+    logger.info('use flavor=%s', opts.flavor)
 
-  if not cros_util.is_good_dut(opts.dut):
-    logger.fatal('%r is not a good DUT', opts.dut)
-    if not cros_lab_util.repair(opts.dut):
-      raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
+    if not cros_util.is_good_dut(opts.dut):
+        logger.fatal('%r is not a good DUT', opts.dut)
+        if not cros_lab_util.repair(opts.dut):
+            raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
 
-  arc_util.push_prebuilt_to_device(opts.dut, opts.flavor, opts.build_id)
+    arc_util.push_prebuilt_to_device(opts.dut, opts.flavor, opts.build_id)
 
-  arc_version = cros_util.query_dut_lsb_release(
-      opts.dut).get('CHROMEOS_ARC_VERSION')
-  if not arc_version or str(opts.build_id) not in arc_version:
-    raise errors.ExecutionFatalError(
-        'arc version is expected matching "%s" but actual "%s"' %
-        (opts.build_id, arc_version))
+    arc_version = cros_util.query_dut_lsb_release(opts.dut).get(
+        'CHROMEOS_ARC_VERSION'
+    )
+    if not arc_version or str(opts.build_id) not in arc_version:
+        raise errors.ExecutionFatalError(
+            'arc version is expected matching "%s" but actual "%s"'
+            % (opts.build_id, arc_version)
+        )
 
-  logger.info('updated to "%s", done', arc_version)
+    logger.info('updated to "%s", done', arc_version)
 
 
 def main(args: typing.Optional[tuple[str]] = None) -> int:
-  return bisector_cli.switch_main_wrapper(switch_main, args)
+    return bisector_cli.switch_main_wrapper(switch_main, args)
 
 
 if __name__ == '__main__':
-  sys.exit(main())
+    sys.exit(main())

@@ -29,6 +29,7 @@ from bisect_kit import configure
 from bisect_kit import cros_util
 from bisect_kit import util
 
+
 logger = logging.getLogger(__name__)
 
 AUTOTEST_CLIENT_TARBALL = 'autotest_packages.tar'
@@ -39,140 +40,164 @@ GS_AUTOTEST_SERVER_PATH = GS_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL
 
 GS_BUILDBUCKET_BUILD_PATH = 'gs://chromeos-image-archive/{path}'
 GS_BUILDBUCKET_BUILD_AUTOTEST_CLIENT_PATH = (
-    GS_BUILDBUCKET_BUILD_PATH + '/' + AUTOTEST_CLIENT_TARBALL)
+    GS_BUILDBUCKET_BUILD_PATH + '/' + AUTOTEST_CLIENT_TARBALL
+)
 GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH = (
-    GS_BUILDBUCKET_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL)
+    GS_BUILDBUCKET_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL
+)
 
 
 def create_argument_parser():
-  parents = [common.common_argument_parser, common.session_optional_parser]
-  parser = argparse.ArgumentParser(description=__doc__, parents=parents)
-  cli.patching_argparser_exit(parser)
-  parser.add_argument(
-      '--rich_result',
-      action='store_true',
-      help='Instead of mere exit code, output detailed information in json')
-  parser.add_argument(
-      '--chromeos_root',
-      type=cli.argtype_dir_path,
-      default=configure.get('CHROMEOS_ROOT', ''),
-      help='ChromeOS tree root')
-  parser.add_argument(
-      '--test_name',
-      help='Client test name, like "video_VideoDecodeAccelerator.h264"')
-  parser.add_argument(
-      '--board',
-      metavar='BOARD',
-      default=configure.get('BOARD', ''),
-      help='ChromeOS board name')
-  parser.add_argument(
-      '--dut',
-      type=cli.argtype_notempty,
-      metavar='DUT',
-      default=configure.get('DUT'),
-      help='Address of DUT')
-  parser.add_argument(
-      'version',
-      nargs='?',
-      type=cli.argtype_notempty,
-      metavar='CROS_VERSION',
-      default=configure.get('CROS_VERSION', ''),
-      help='ChromeOS local build version string, in format short version, '
-      'full version, or "full,full+N"')
+    parents = [common.common_argument_parser, common.session_optional_parser]
+    parser = argparse.ArgumentParser(description=__doc__, parents=parents)
+    cli.patching_argparser_exit(parser)
+    parser.add_argument(
+        '--rich_result',
+        action='store_true',
+        help='Instead of mere exit code, output detailed information in json',
+    )
+    parser.add_argument(
+        '--chromeos_root',
+        type=cli.argtype_dir_path,
+        default=configure.get('CHROMEOS_ROOT', ''),
+        help='ChromeOS tree root',
+    )
+    parser.add_argument(
+        '--test_name',
+        help='Client test name, like "video_VideoDecodeAccelerator.h264"',
+    )
+    parser.add_argument(
+        '--board',
+        metavar='BOARD',
+        default=configure.get('BOARD', ''),
+        help='ChromeOS board name',
+    )
+    parser.add_argument(
+        '--dut',
+        type=cli.argtype_notempty,
+        metavar='DUT',
+        default=configure.get('DUT'),
+        help='Address of DUT',
+    )
+    parser.add_argument(
+        'version',
+        nargs='?',
+        type=cli.argtype_notempty,
+        metavar='CROS_VERSION',
+        default=configure.get('CROS_VERSION', ''),
+        help='ChromeOS local build version string, in format short version, '
+        'full version, or "full,full+N"',
+    )
 
-  return parser
+    return parser
 
 
 def switch(autotest_dir, board, version, test_name, dut):
-  logger.info('Unpack autotest packages for %s %s', board, version)
-  if cros_util.is_cros_short_version(version) or cros_util.is_cros_full_version(
-      version):
-    full_version = cros_util.version_to_full(board, version)
-    autotest_client_path = GS_AUTOTEST_CLIENT_PATH.format(
-        board=board, full_version=full_version)
-    autotest_server_path = GS_AUTOTEST_SERVER_PATH.format(
-        board=board, full_version=full_version)
-  else:
-    gs_path = cros_util.query_dut_lsb_release(dut).get(
-        'CHROMEOS_RELEASE_BUILDER_PATH')
-    autotest_client_path = GS_BUILDBUCKET_BUILD_AUTOTEST_CLIENT_PATH.format(
-        path=gs_path)
-    autotest_server_path = GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH.format(
-        path=gs_path)
+    logger.info('Unpack autotest packages for %s %s', board, version)
+    if cros_util.is_cros_short_version(
+        version
+    ) or cros_util.is_cros_full_version(version):
+        full_version = cros_util.version_to_full(board, version)
+        autotest_client_path = GS_AUTOTEST_CLIENT_PATH.format(
+            board=board, full_version=full_version
+        )
+        autotest_server_path = GS_AUTOTEST_SERVER_PATH.format(
+            board=board, full_version=full_version
+        )
+    else:
+        gs_path = cros_util.query_dut_lsb_release(dut).get(
+            'CHROMEOS_RELEASE_BUILDER_PATH'
+        )
+        autotest_client_path = GS_BUILDBUCKET_BUILD_AUTOTEST_CLIENT_PATH.format(
+            path=gs_path
+        )
+        autotest_server_path = GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH.format(
+            path=gs_path
+        )
 
-  logger.info('autotest_client_path %s', autotest_client_path)
-  logger.info('autotest_server_path %s', autotest_server_path)
+    logger.info('autotest_client_path %s', autotest_client_path)
+    logger.info('autotest_server_path %s', autotest_server_path)
 
-  # TODO(kcwu): cache downloaded tarballs
-  tmp_dir = tempfile.mkdtemp()
-  if os.path.exists(autotest_dir):
-    shutil.rmtree(autotest_dir)
-  os.makedirs(autotest_dir)
+    # TODO(kcwu): cache downloaded tarballs
+    tmp_dir = tempfile.mkdtemp()
+    if os.path.exists(autotest_dir):
+        shutil.rmtree(autotest_dir)
+    os.makedirs(autotest_dir)
 
-  cros_util.gsutil('cp', autotest_client_path, tmp_dir)
-  tarball = os.path.join(tmp_dir, AUTOTEST_CLIENT_TARBALL)
-  util.check_call(
-      'tar',
-      'xvf',
-      tarball,
-      '--strip-components=1',  # strip 'autotest/'
-      'autotest',  # only extract autotest/
-      cwd=autotest_dir)
-  cros_util.gsutil('cp', autotest_server_path, tmp_dir)
-  tarball = os.path.join(tmp_dir, AUTOTEST_SERVER_TARBALL)
-  util.check_call(
-      'tar',
-      'xf',
-      tarball,
-      '--strip-components=1',  # strip 'autotest/'
-      'autotest',  # only extract autotest/
-      cwd=autotest_dir)
+    cros_util.gsutil('cp', autotest_client_path, tmp_dir)
+    tarball = os.path.join(tmp_dir, AUTOTEST_CLIENT_TARBALL)
+    util.check_call(
+        'tar',
+        'xvf',
+        tarball,
+        '--strip-components=1',  # strip 'autotest/'
+        'autotest',  # only extract autotest/
+        cwd=autotest_dir,
+    )
+    cros_util.gsutil('cp', autotest_server_path, tmp_dir)
+    tarball = os.path.join(tmp_dir, AUTOTEST_SERVER_TARBALL)
+    util.check_call(
+        'tar',
+        'xf',
+        tarball,
+        '--strip-components=1',  # strip 'autotest/'
+        'autotest',  # only extract autotest/
+        cwd=autotest_dir,
+    )
 
-  # Need to extract the control file if the target is a client site test.
-  if test_name:
-    test_name = test_name.split('.')[0]
-    client_tarball = os.path.abspath(
-        os.path.join(autotest_dir, 'packages', 'test-%s.tar.bz2' % test_name))
-    if os.path.exists(client_tarball):
-      client_test_dir = os.path.join(autotest_dir, 'client', 'site_tests',
-                                     test_name)
-      if not os.path.exists(client_test_dir):
-        os.makedirs(client_test_dir)
-        util.check_call('tar', 'xvf', client_tarball, cwd=client_test_dir)
+    # Need to extract the control file if the target is a client site test.
+    if test_name:
+        test_name = test_name.split('.')[0]
+        client_tarball = os.path.abspath(
+            os.path.join(
+                autotest_dir, 'packages', 'test-%s.tar.bz2' % test_name
+            )
+        )
+        if os.path.exists(client_tarball):
+            client_test_dir = os.path.join(
+                autotest_dir, 'client', 'site_tests', test_name
+            )
+            if not os.path.exists(client_test_dir):
+                os.makedirs(client_test_dir)
+                util.check_call(
+                    'tar', 'xvf', client_tarball, cwd=client_test_dir
+                )
 
-  shutil.rmtree(tmp_dir)
+    shutil.rmtree(tmp_dir)
 
 
 def switch_main(args: typing.Optional[tuple[str]]):
-  common.init()
-  parser = create_argument_parser()
-  opts = parser.parse_args(args)
-  common.config_logging(opts)
+    common.init()
+    parser = create_argument_parser()
+    opts = parser.parse_args(args)
+    common.config_logging(opts)
 
-  autotest_dir = os.path.join(opts.chromeos_root,
-                              cros_util.prebuilt_autotest_dir)
-  switch(autotest_dir, opts.board, opts.version, opts.test_name, opts.dut)
+    autotest_dir = os.path.join(
+        opts.chromeos_root, cros_util.prebuilt_autotest_dir
+    )
+    switch(autotest_dir, opts.board, opts.version, opts.test_name, opts.dut)
 
-  # Verify test control file exists.
-  if opts.test_name:
-    found = cros_util.get_autotest_test_info(autotest_dir, opts.test_name)
-    if not found:
-      names = []
-      for control_file in cros_util.enumerate_autotest_control_files(
-          autotest_dir):
-        try:
-          info = cros_util.parse_autotest_control_file(control_file)
-        except SyntaxError:
-          logger.warning('%s is not parsable, ignore', control_file)
-          continue
-        names.append(info.name)
-      util.report_similar_candidates('test_name', opts.test_name, names)
-      assert 0  # unreachable
+    # Verify test control file exists.
+    if opts.test_name:
+        found = cros_util.get_autotest_test_info(autotest_dir, opts.test_name)
+        if not found:
+            names = []
+            for control_file in cros_util.enumerate_autotest_control_files(
+                autotest_dir
+            ):
+                try:
+                    info = cros_util.parse_autotest_control_file(control_file)
+                except SyntaxError:
+                    logger.warning('%s is not parsable, ignore', control_file)
+                    continue
+                names.append(info.name)
+            util.report_similar_candidates('test_name', opts.test_name, names)
+            assert 0  # unreachable
 
 
 def main(args: typing.Optional[tuple[str]] = None) -> int:
-  return bisector_cli.switch_main_wrapper(switch_main, args)
+    return bisector_cli.switch_main_wrapper(switch_main, args)
 
 
 if __name__ == '__main__':
-  sys.exit(main())
+    sys.exit(main())

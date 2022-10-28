@@ -22,57 +22,60 @@ from bisect_kit import core
 from bisect_kit import errors
 from bisect_kit import git_util
 
+
 logger = logging.getLogger(__name__)
 
 
 class GitDomain(core.BisectDomain):
-  """BisectDomain for git revisions."""
-  revtype = staticmethod(cli.argtype_notempty)
-  help = globals()['__doc__']
+    """BisectDomain for git revisions."""
 
-  @staticmethod
-  def add_init_arguments(parser):
-    parser.add_argument(
-        '--git_repo',
-        required=True,
-        type=cli.argtype_dir_path,
-        help='Git repository path')
+    revtype = staticmethod(cli.argtype_notempty)
+    help = globals()['__doc__']
 
-  @staticmethod
-  def init(opts):
-    try:
-      opts.old = git_util.get_commit_hash(opts.git_repo, opts.old)
-    except ValueError as e:
-      raise errors.ArgumentError('--old', str(e))
-    try:
-      opts.new = git_util.get_commit_hash(opts.git_repo, opts.new)
-    except ValueError as e:
-      raise errors.ArgumentError('--new', str(e))
+    @staticmethod
+    def add_init_arguments(parser):
+        parser.add_argument(
+            '--git_repo',
+            required=True,
+            type=cli.argtype_dir_path,
+            help='Git repository path',
+        )
 
-    config = dict(git_repo=opts.git_repo)
-    revlist = git_util.get_revlist(opts.git_repo, opts.old, opts.new)
+    @staticmethod
+    def init(opts):
+        try:
+            opts.old = git_util.get_commit_hash(opts.git_repo, opts.old)
+        except ValueError as e:
+            raise errors.ArgumentError('--old', str(e))
+        try:
+            opts.new = git_util.get_commit_hash(opts.git_repo, opts.new)
+        except ValueError as e:
+            raise errors.ArgumentError('--new', str(e))
 
-    details = {}
-    metas = git_util.get_batch_commit_metadata(opts.git_repo, revlist)
-    for rev in revlist:
-      meta = metas.get(rev)
-      commit_summary = git_util.CommitMeta.get_summary(meta)
-      action = {'rev': rev, 'commit_summary': commit_summary}
-      details[rev] = {'actions': [action]}
+        config = dict(git_repo=opts.git_repo)
+        revlist = git_util.get_revlist(opts.git_repo, opts.old, opts.new)
 
-    return config, {'revlist': revlist}
+        details = {}
+        metas = git_util.get_batch_commit_metadata(opts.git_repo, revlist)
+        for rev in revlist:
+            meta = metas.get(rev)
+            commit_summary = git_util.CommitMeta.get_summary(meta)
+            action = {'rev': rev, 'commit_summary': commit_summary}
+            details[rev] = {'actions': [action]}
 
-  def __init__(self, config):
-    self.config = config
+        return config, {'revlist': revlist}
 
-  def setenv(self, env, rev):
-    env['GIT_REPO'] = self.config['git_repo']
-    env['GIT_REV'] = rev
+    def __init__(self, config):
+        self.config = config
 
-  def fill_candidate_summary(self, summary):
-    # Do nothing.
-    pass
+    def setenv(self, env, rev):
+        env['GIT_REPO'] = self.config['git_repo']
+        env['GIT_REV'] = rev
+
+    def fill_candidate_summary(self, summary):
+        # Do nothing.
+        pass
 
 
 if __name__ == '__main__':
-  bisector_cli.BisectorCommandLine(GitDomain).main()
+    bisector_cli.BisectorCommandLine(GitDomain).main()
