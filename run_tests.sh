@@ -18,5 +18,8 @@ update_depot_tools
 # Check python format with isort.
 isort --check .
 
+# Check python format with black.
+black --check --diff .
+
 # Run test cases with pytest.
 pytest -v

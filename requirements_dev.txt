@@ -1,3 +1,4 @@
+#black  # provided by depot_tool
 #isort  # provided by depot_tool
 pytest
 pytest-xdist

@@ -17,3 +17,6 @@ update_depot_tools
 
 # Format python files with isort.
 isort .
+
+# Format python files with black.
+black .
