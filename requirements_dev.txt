@@ -1,2 +1,3 @@
+#isort  # provided by depot_tool
 pytest
 pytest-xdist

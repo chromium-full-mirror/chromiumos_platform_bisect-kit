@@ -2,6 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+[tool.isort]
+profile = "black"
+line_length = 80
+lines_after_imports = 2
+skip_glob = [
+    "third_party",
+    "internal",
+    "venv",
+]
+extend_skip_glob = "*_pb2.py"
+length_sort = false
+force_single_line = true
+from_first = false
+case_sensitive = false
+force_sort_within_sections = true
+order_by_type = false
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = [
@@ -13,5 +30,6 @@ addopts = [
 ]
 norecursedirs = [
     "third_party",
+    "internal",
     "venv",
 ]
