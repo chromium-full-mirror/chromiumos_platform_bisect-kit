@@ -99,7 +99,7 @@ class TestCrUtil(unittest.TestCase):
 
     def test_get_ancestors(self):
         # Disabling protected member access cros lint error
-        # pylint: disable=W0212
+        # pylint: disable=protected-access
         chrome_version_list = [
             '100.0.1.0',
             '100.0.1.1',

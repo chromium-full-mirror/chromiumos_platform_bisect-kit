@@ -9,6 +9,7 @@ from __future__ import print_function
 
 import argparse
 import asyncio
+import functools
 import json
 import logging
 import os
@@ -365,9 +366,9 @@ def do_allocate_dut(opts):
             )
         variants = filtered
 
+    filter_func = functools.partial(is_acceptable_bot, boards_with_prebuilt)
     fail_count = 0
     while True:
-        filter_func = lambda bot: is_acceptable_bot(boards_with_prebuilt, bot)
         # Query every time because each iteration takes a few minutes
         # Query bots that satisfy is_busy=False
         bots = select_available_bots_randomly(

@@ -90,7 +90,7 @@ class EntropyStats:
 
       So we can maintain sum=|S| and sum_log=|\sum_i { p_i*log p_i }| for
       incremental update.
-    """  # pylint: disable=docstring-trailing-quotes
+    """
 
     def __init__(self, p):
         """Initializes EntropyStats.

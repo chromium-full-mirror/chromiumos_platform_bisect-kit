@@ -424,9 +424,9 @@ def is_ancestor_version(ver1, ver2):
     assert is_cros_version(ver1) or is_cros_snapshot_version(ver1)
     assert is_cros_version(ver2) or is_cros_snapshot_version(ver2)
 
-    if is_cros_version_lesseq(
+    if is_cros_version_lesseq(  # pylint: disable=arguments-out-of-order
         ver2, ver1
-    ):  # pylint: disable=arguments-out-of-order
+    ):
         return False
     if not is_cros_version_lesseq(ver1, ver2):
         return False
@@ -451,11 +451,9 @@ def is_buildbucket_buildable(version):
     short_version = version_to_short(version)
     # If given version is child of any cutover, then it's buildable
     return any(
-        [
-            util.is_direct_relative_version(x, short_version)
-            and is_cros_version_lesseq(x, version)
-            for x in buildbucket_cutover_versions
-        ]
+        util.is_direct_relative_version(x, short_version)
+        and is_cros_version_lesseq(x, version)
+        for x in buildbucket_cutover_versions
     )
 
 
@@ -705,7 +703,7 @@ def gsutil(*args, **kwargs):
                 'gsutil failed due to permission. '
                 + 'Run "%s config" and follow its instruction. ' % gsutil_bin
                 + 'Fill any string if it asks for project-id'
-            )
+            ) from e
         if kwargs.get('ignore_errors'):
             return ''
         raise
@@ -854,7 +852,9 @@ def should_fetch_release_manifest_from_gs(version: str) -> bool:
 
 
 def _iter_valid_prebuilt_gs_path(
-    board: str, version: str, buckets: list[str] = prebuilt_image_buckets
+    board: str,
+    version: str,
+    buckets: list[str] | None = None,
 ) -> typing.Iterator[str]:
     """Iterate the valid paths of prebuilt images on `gs_archive_path`.
 
@@ -871,6 +871,8 @@ def _iter_valid_prebuilt_gs_path(
 
       `"gs://chromeos-image-archive/samus-release/R64-10123.0.0"`
     """
+    if buckets is None:
+        buckets = prebuilt_image_buckets
     if is_cros_short_version(version):
         version = f'R*-{version}'
     for bucket in buckets:
@@ -882,7 +884,9 @@ def _iter_valid_prebuilt_gs_path(
 
 
 def query_prebuilt_gs_path(
-    board: str, version: str, buckets: list[str] = prebuilt_image_buckets
+    board: str,
+    version: str,
+    buckets: list[str] | None = None,
 ) -> str:
     """Query the first valid path of prebuilt image on `gs_archive_path`.
 
@@ -897,6 +901,8 @@ def query_prebuilt_gs_path(
       The first valid prebuilt path matches given `board`, `version`, and
       `buckets`.  An empty string `''` if there is no valid prebuilt path.
     """
+    if buckets is None:
+        buckets = prebuilt_image_buckets
     for archive_path in _iter_valid_prebuilt_gs_path(board, version, buckets):
         return archive_path
     return ''
@@ -2126,7 +2132,8 @@ def build_packages(
                 stderr_callback=stderr_lines.append,
             )
         except subprocess.CalledProcessError:
-            help_output = ''.join(stderr_lines)
+            pass
+        help_output = ''.join(stderr_lines)
         return '--[no]%s' % argument in help_output
 
     common_env = {
@@ -3047,7 +3054,7 @@ def repair_dut(chromeos_root: str, dut: str, max_attempts=3) -> bool:
     with _prepare_results_stores('autoserv-stores', autoserv_results_stores):
         for attempt in range(1, max_attempts + 1):
             try:
-                logger.info(f'Repairing the DUT, {attempt=}')
+                logger.info('Repairing the DUT, attempt=%d', attempt)
                 cros_sdk(chromeos_root, *repair_cmd)
                 logger.info('Repair successful')
                 return True

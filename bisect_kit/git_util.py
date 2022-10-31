@@ -98,8 +98,7 @@ class CommitMeta:
     def get_summary(meta) -> str:
         if meta is None or meta.message is None:
             return CommitMeta.UNKNOWN_SUMMARY
-        else:
-            return meta.message.splitlines()[0]
+        return meta.message.splitlines()[0]
 
 
 @dataclasses.dataclass(order=True, eq=True, frozen=True)
@@ -997,22 +996,22 @@ def get_history_recursively(
 
     # Analyze the start time and end time of each include.
     dependencies = []
-    for include in includes:
+    for include_name, rev_set in includes.items():
         appeared = None
         for commit in history:
-            if commit.rev in includes[include]:
+            if commit.rev in rev_set:
                 if not appeared:
                     appeared = commit.timestamp
             else:
                 if appeared:
                     # dependency file exists in time range [appeared, commit.timestamp)
                     dependencies.append(
-                        (include, appeared, commit.timestamp - 1)
+                        (include_name, appeared, commit.timestamp - 1)
                     )
                     appeared = None
 
         if appeared is not None:
-            dependencies.append((include, appeared, before))
+            dependencies.append((include_name, appeared, before))
 
     # Recursion and merge.
     result = list(history)

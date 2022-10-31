@@ -313,6 +313,7 @@ class TestNoisyBinarySearch(unittest.TestCase):
             guess: Best guess.
         """
         if cost_func is None:
+            # pylint: disable=unnecessary-lambda-assignment
             cost_func = lambda *a: None
         rev_info = [core.RevInfo(str(i)) for i in range(size)]
         bsearch = strategy.NoisyBinarySearch(
@@ -411,6 +412,7 @@ class TestNoisyBinarySearch(unittest.TestCase):
           prior_observation: prior_observation after the initial verification stage.
         """
         if cost_func is None:
+            # pylint: disable=unnecessary-lambda-assignment
             cost_func = lambda *a: None
         rev_info = [core.RevInfo(str(i)) for i in range(size)]
         bsearch = strategy.NoisyBinarySearch(

@@ -35,9 +35,7 @@ from bisect_kit import util
 
 logger = logging.getLogger(__name__)
 
-ANDROID_URL_BASE = (
-    'https://android-build.googleplex.com/' 'builds/branch/{branch}'
-)
+ANDROID_URL_BASE = 'https://android-build.googleplex.com/builds/branch/{branch}'
 BUILD_IDS_BETWEEN_URL_TEMPLATE = (
     ANDROID_URL_BASE + '/build-ids/between/{end}/{start}'
 )
@@ -345,7 +343,6 @@ class AndroidInternalApi:
 
     def get_credentials(self):
         # TODO(zjchang): support compute engine type credential
-        # pylint: disable=line-too-long
         credentials = (
             google.oauth2.service_account.Credentials.from_service_account_file(
                 os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'),

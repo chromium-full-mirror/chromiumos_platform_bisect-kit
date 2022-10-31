@@ -77,8 +77,6 @@ def trend_score(prev_from, prev_to, now_from, now_to):
     return max(abs_score, ratio_score)
 
 
-# Old version of pylint may give false-positive warning.
-# pylint: disable=unpacking-non-sequence
 class NoisyBinarySearch:
     """Binary search algorithm supporting noisy signal.
 
@@ -1272,7 +1270,7 @@ class NoisyBinarySearch:
                 self.init_range_verified = True
                 return None
 
-            elif (
+            if (
                 self.INIT_STATUS_MAP[current_state]['next_state'] is not None
                 and pvalue < self.INIT_P_BOUND[self.init_rounds]
             ):
@@ -1332,12 +1330,11 @@ class NoisyBinarySearch:
 
             # Test the initial range without statistical method, and get the next
             # index.
-            else:
-                if self.rev_info[self.new_idx]['new'] == 0:
-                    return self.new_idx
-                if self.rev_info[self.old_idx]['old'] == 0:
-                    return self.old_idx
-                return None
+            if self.rev_info[self.new_idx]['new'] == 0:
+                return self.new_idx
+            if self.rev_info[self.old_idx]['old'] == 0:
+                return self.old_idx
+            return None
 
         def is_one_side_enough(info):
             count = info['value']

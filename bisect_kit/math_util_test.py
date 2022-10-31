@@ -147,7 +147,6 @@ class TestExtendedFloat(unittest.TestCase):
         self.assertTrue(ExtendedFloat(16) == ExtendedFloat(1, 4))
         self.assertTrue(ExtendedFloat(-20) == ExtendedFloat(-20))
         self.assertTrue(ExtendedFloat(1) == 1)
-        # pylint: disable=misplaced-comparison-constant
         self.assertTrue(1 == ExtendedFloat(1))
 
     def test_ne(self):

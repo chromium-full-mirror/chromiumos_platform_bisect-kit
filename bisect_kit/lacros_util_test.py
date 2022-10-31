@@ -17,12 +17,12 @@ class TestLacrosUtil(unittest.TestCase):
     """Test functions for lacros_util module."""
 
     def test_get_dut_cpu_architecture(self):
-        with mock.patch.object(util, 'ssh_cmd', return_value=f'x86_64\n'):
+        with mock.patch.object(util, 'ssh_cmd', return_value='x86_64\n'):
             self.assertEqual(
                 lacros_util.get_dut_cpu_architecture('x64_dut'), 'x86_64'
             )
 
-        with mock.patch.object(util, 'ssh_cmd', return_value=f'aarch64\n'):
+        with mock.patch.object(util, 'ssh_cmd', return_value='aarch64\n'):
             self.assertEqual(
                 lacros_util.get_dut_cpu_architecture('arm_dut'), 'aarch64'
             )
@@ -57,7 +57,7 @@ class TestLacrosUtil(unittest.TestCase):
 
     def test_get_device_architecture_arg_for_gn(self):
         # Disabling protected member access cros lint error
-        # pylint: disable=W0212
+        # pylint: disable=protected-access
         with mock.patch.object(
             lacros_util, 'get_dut_cpu_architecture', return_value='x86_64'
         ):

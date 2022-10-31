@@ -282,7 +282,6 @@ def swarming_bots_list(
 
     if query:
         # doseq=True because dimensions could be multiple.
-        # pylint: disable=redundant-keyword-arg
         method += '?' + urllib.parse.urlencode(query, doseq=True)
 
     bots = []

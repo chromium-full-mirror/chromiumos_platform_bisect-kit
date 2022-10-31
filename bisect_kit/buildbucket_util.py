@@ -14,7 +14,7 @@ import socket
 import ssl
 import tempfile
 
-# from third_party
+# pylint: disable=no-name-in-module
 from google.protobuf import json_format
 from google.protobuf.field_mask_pb2 import FieldMask
 from google.protobuf.message import DecodeError

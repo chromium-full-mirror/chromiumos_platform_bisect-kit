@@ -296,17 +296,17 @@ def evaluate_condition(condition, variables, referenced_variables=None):
     def _convert(node, allow_tuple=False):
         if isinstance(node, ast.Str):
             return node.s
-        elif isinstance(node, ast.Tuple) and allow_tuple:
+        if isinstance(node, ast.Tuple) and allow_tuple:
             return tuple(map(_convert, node.elts))
-        elif isinstance(node, ast.Name):
+        if isinstance(node, ast.Name):
             if node.id in referenced_variables:
                 raise ValueError(
                     'invalid cyclic reference to %r (inside %r)'
                     % (node.id, condition)
                 )
-            elif node.id in _allowed_names:
+            if node.id in _allowed_names:
                 return _allowed_names[node.id]
-            elif node.id in variables:
+            if node.id in variables:
                 value = variables[node.id]
 
                 # Allow using "native" types, without wrapping everything in strings.
@@ -320,17 +320,16 @@ def evaluate_condition(condition, variables, referenced_variables=None):
                     variables,
                     referenced_variables.union([node.id]),
                 )
-            else:
-                # Implicitly convert unrecognized names to strings.
-                # If we want to change this, we'll need to explicitly distinguish
-                # between arguments for GN to be passed verbatim, and ones to
-                # be evaluated.
-                return node.id
-        elif not sys.version_info[:2] < (3, 4) and isinstance(
+            # Implicitly convert unrecognized names to strings.
+            # If we want to change this, we'll need to explicitly distinguish
+            # between arguments for GN to be passed verbatim, and ones to
+            # be evaluated.
+            return node.id
+        if not sys.version_info[:2] < (3, 4) and isinstance(
             node, ast.NameConstant
         ):  # Since Python 3.4
             return node.value
-        elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
+        if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
             bool_values = []
             for value in node.values:
                 bool_values.append(_convert(value))
@@ -340,7 +339,7 @@ def evaluate_condition(condition, variables, referenced_variables=None):
                         % (bool_values[-1], condition)
                     )
             return any(bool_values)
-        elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.And):
+        if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.And):
             bool_values = []
             for value in node.values:
                 bool_values.append(_convert(value))
@@ -350,14 +349,14 @@ def evaluate_condition(condition, variables, referenced_variables=None):
                         % (bool_values[-1], condition)
                     )
             return all(bool_values)
-        elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
             value = _convert(node.operand)
             if not isinstance(value, bool):
                 raise ValueError(
                     'invalid "not" operand %r (inside %r)' % (value, condition)
                 )
             return not value
-        elif isinstance(node, ast.Compare):
+        if isinstance(node, ast.Compare):
             if len(node.ops) != 1:
                 raise ValueError(
                     'invalid compare: exactly 1 operator required (inside %r)'
@@ -385,11 +384,11 @@ def evaluate_condition(condition, variables, referenced_variables=None):
                 'unexpected operator: %s %s (inside %r)'
                 % (node.ops[0], ast.dump(node), condition)
             )
-        else:
-            raise ValueError(
-                'unexpected AST node: %s %s (inside %r)'
-                % (node, ast.dump(node), condition)
-            )
+
+        raise ValueError(
+            'unexpected AST node: %s %s (inside %r)'
+            % (node, ast.dump(node), condition)
+        )
 
     return _convert(main_node)
 

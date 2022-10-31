@@ -21,6 +21,95 @@ from bisect_kit import testing
 logger = logging.getLogger(__name__)
 
 
+def _gsutil_ls(*args, **_kwargs):
+    archive_base = 'gs://chromeos-image-archive/foo-release/'
+    snapshot_base = 'gs://chromeos-image-archive/foo-snapshot/'
+
+    gs_files = [
+        snapshot_base + 'R63-9996.0.0-30103-000/image.zip',
+        snapshot_base + 'R63-9997.0.0-30104-000/image.zip',
+        snapshot_base + 'R63-9998.0.0-30105-000/image.zip',
+        snapshot_base + 'R63-9999.0.0-30106-000/image.zip',
+        snapshot_base + 'R63-9996.0.0-30103-000/image.zip',
+        snapshot_base + 'R63-9996.0.0-30103-000/full_dev_part_KERN.bin.gz',
+        snapshot_base + 'R63-9997.0.0-30104-000/image.zip',
+        snapshot_base + 'R63-9998.0.0-30105-000/image.zip',
+        snapshot_base + 'R63-9999.0.0-30106-000/image.zip',
+        archive_base + 'R63-9995.0.0/image.zip',
+        archive_base + 'R63-9995.0.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-9997.0.0/image.zip',
+        archive_base + 'R63-9997.0.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-9999.0.0/image.zip',
+        archive_base + 'R63-9999.1.0/image.zip',
+        archive_base + 'R63-9998.0.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-9999.0.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-9999.1.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-10000.0.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R63-10001.0.0/chromiumos_test_image.tar.xz',
+    ]
+
+    assert len(args) == 1
+    result = []
+    for gs_path in gs_files:
+        if fnmatch.fnmatchcase(gs_path, args[0]):
+            result.append(gs_path)
+        elif fnmatch.fnmatchcase(gs_path, args[0] + '*/'):
+            result.append(gs_path)
+    return result
+
+
+def _gsutil_stat(*args, **_kwargs):
+    stat_14469_8 = [
+        'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml:',
+        '    Creation time:          Fri, 08 Apr 2022 17:31:36 GMT',
+        '    Update time:            Fri, 08 Apr 2022 17:32:14 GMT',
+        '    Storage class:          STANDARD',
+        '    Content-Length:         244194',
+        '    Content-Type:           text/xml; charset=utf-8',
+        '    Metadata:',
+        '        create_time_seconds:1643599521',
+        '    Hash (crc32c):          crc32_meow',
+        '    Hash (md5):             md5_woof==',
+        '    ETag:                   tagtag=',
+        '    Generation:             1649439096753030',
+        '    Metageneration:         2',
+    ]
+    # timestamp = 1649438944
+    stat_14469_7 = [
+        'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml:',
+        '    Creation time:          Fri, 08 Apr 2022 17:29:04 GMT',
+        '    Update time:            Fri, 08 Apr 2022 17:29:41 GMT',
+        '    Storage class:          STANDARD',
+        '    Content-Length:         244194',
+        '    Content-Type:           text/xml; charset=utf-8',
+        '    Hash (crc32c):          crc32_meow',
+        '    Hash (md5):             md5_woof==',
+        '    ETag:                   tagtag=',
+        '    Generation:             1649438944196998',
+        '    Metageneration:         2',
+    ]
+    files = {
+        'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml': stat_14469_8,
+        'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml': stat_14469_7,
+    }
+
+    result = ''
+    for arg in args:
+        if arg in files:
+            result += '\n'.join(files[arg]) + '\n'
+    return result
+
+
+def _query_milestone_by_version(_1, _2):
+    return '63'
+
+
+def _version_to_full(_board, version):
+    if version.startswith('R'):
+        return version
+    return 'R63-' + version
+
+
 class TestCrosUtil(unittest.TestCase):
     """Test cros_util functions."""
 
@@ -393,83 +482,6 @@ class TestCrosUtil(unittest.TestCase):
                     info[cros_util.VERSION_KEY_CROS_SHORT_VERSION], '13664.0.0'
                 )
 
-    def _gsutil_ls(*args, **_kwargs):
-        archive_base = 'gs://chromeos-image-archive/foo-release/'
-        snapshot_base = 'gs://chromeos-image-archive/foo-snapshot/'
-
-        gs_files = [
-            snapshot_base + 'R63-9996.0.0-30103-000/image.zip',
-            snapshot_base + 'R63-9997.0.0-30104-000/image.zip',
-            snapshot_base + 'R63-9998.0.0-30105-000/image.zip',
-            snapshot_base + 'R63-9999.0.0-30106-000/image.zip',
-            snapshot_base + 'R63-9996.0.0-30103-000/image.zip',
-            snapshot_base + 'R63-9996.0.0-30103-000/full_dev_part_KERN.bin.gz',
-            snapshot_base + 'R63-9997.0.0-30104-000/image.zip',
-            snapshot_base + 'R63-9998.0.0-30105-000/image.zip',
-            snapshot_base + 'R63-9999.0.0-30106-000/image.zip',
-            archive_base + 'R63-9995.0.0/image.zip',
-            archive_base + 'R63-9995.0.0/chromiumos_test_image.tar.xz',
-            archive_base + 'R63-9997.0.0/image.zip',
-            archive_base + 'R63-9997.0.0/chromiumos_test_image.tar.xz',
-            archive_base + 'R63-9999.0.0/image.zip',
-            archive_base + 'R63-9999.1.0/image.zip',
-            archive_base + 'R63-9998.0.0/chromiumos_test_image.tar.xz',
-            archive_base + 'R63-9999.0.0/chromiumos_test_image.tar.xz',
-            archive_base + 'R63-9999.1.0/chromiumos_test_image.tar.xz',
-            archive_base + 'R63-10000.0.0/chromiumos_test_image.tar.xz',
-            archive_base + 'R63-10001.0.0/chromiumos_test_image.tar.xz',
-        ]
-
-        assert len(args) == 1
-        result = []
-        for gs_path in gs_files:
-            if fnmatch.fnmatchcase(gs_path, args[0]):
-                result.append(gs_path)
-            elif fnmatch.fnmatchcase(gs_path, args[0] + '*/'):
-                result.append(gs_path)
-        return result
-
-    def _gsutil_stat(*args, **_kwargs):
-        stat_14469_8 = [
-            'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml:',
-            '    Creation time:          Fri, 08 Apr 2022 17:31:36 GMT',
-            '    Update time:            Fri, 08 Apr 2022 17:32:14 GMT',
-            '    Storage class:          STANDARD',
-            '    Content-Length:         244194',
-            '    Content-Type:           text/xml; charset=utf-8',
-            '    Metadata:',
-            '        create_time_seconds:1643599521',
-            '    Hash (crc32c):          crc32_meow',
-            '    Hash (md5):             md5_woof==',
-            '    ETag:                   tagtag=',
-            '    Generation:             1649439096753030',
-            '    Metageneration:         2',
-        ]
-        # timestamp = 1649438944
-        stat_14469_7 = [
-            'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml:',
-            '    Creation time:          Fri, 08 Apr 2022 17:29:04 GMT',
-            '    Update time:            Fri, 08 Apr 2022 17:29:41 GMT',
-            '    Storage class:          STANDARD',
-            '    Content-Length:         244194',
-            '    Content-Type:           text/xml; charset=utf-8',
-            '    Hash (crc32c):          crc32_meow',
-            '    Hash (md5):             md5_woof==',
-            '    ETag:                   tagtag=',
-            '    Generation:             1649438944196998',
-            '    Metageneration:         2',
-        ]
-        files = {
-            'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml': stat_14469_8,
-            'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml': stat_14469_7,
-        }
-
-        result = ''
-        for arg in args:
-            if arg in files:
-                result += '\n'.join(files[arg]) + '\n'
-        return result
-
     @mock.patch('bisect_kit.cros_util.gsutil', _gsutil_stat)
     def test_gsutil_stat(self):
         self.assertDictEqual(cros_util.gsutil_stat('nothing'), {})
@@ -506,14 +518,6 @@ class TestCrosUtil(unittest.TestCase):
             cros_util.gsutil_stat_max_creation_time(file7, file8),
             max(time7, time8),
         )
-
-    def _query_milestone_by_version(_1, _2):
-        return '63'
-
-    def _version_to_full(_board, version):
-        if version.startswith('R'):
-            return version
-        return 'R63-' + version
 
     @mock.patch('bisect_kit.cros_util.gsutil_ls', _gsutil_ls)
     @mock.patch('bisect_kit.cros_util.version_to_full', _version_to_full)
