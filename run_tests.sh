@@ -21,5 +21,12 @@ isort --check .
 # Check python format with black.
 black --check --diff .
 
+# Analyze python files with pylint.
+# We manually list all python files in the base folder because pylint only
+# support iterating python files over a valid package (a folder containing
+# __init__.py).
+PYTHONPATH="$(pwd):$(pwd)/third_party" \
+pylint *.py bisect_kit
+
 # Run test cases with pytest.
 pytest -v

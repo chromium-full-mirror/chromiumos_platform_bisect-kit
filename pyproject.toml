@@ -45,3 +45,37 @@ norecursedirs = [
     "internal",
     "venv",
 ]
+
+[tool.pylint.MASTER]
+ignore-patterns = [
+    ".*_pb2\\.py$",
+    ".*third_party\\/.*.py$",
+    ".*internal\\/.*.py$",
+    ".*venv\\/.*.py$",
+]
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "broad-except", # TODO(acewu): except them by comments if necessary
+    "consider-using-f-string",
+    "consider-using-with", # TODO(acewu): except them by comments if necessary
+    "duplicate-code",
+    "fixme",
+    "invalid-name",
+    "line-too-long", # let black handle it
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "no-member",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-lines",
+    "too-many-locals",
+    "too-many-public-methods",
+    "too-many-return-statements",
+    "too-many-statements",
+    "ungrouped-imports", # let isort handle it
+    "unspecified-encoding",
+    "wrong-import-order", # let isort handle it
+]

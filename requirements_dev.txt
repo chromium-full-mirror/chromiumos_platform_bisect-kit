@@ -1,4 +1,5 @@
 #black  # provided by depot_tool
 #isort  # provided by depot_tool
+pylint==2.15.3
 pytest
 pytest-xdist
