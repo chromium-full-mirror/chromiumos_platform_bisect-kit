@@ -2973,6 +2973,17 @@ class ChromeOSSpecManager(codechange.SpecManager):
                 )
         spec.revision = root.get('revision')
 
+        # (b/257863941) If the root tag is lack of revision information, try to
+        # get it from the manifest-internal project tag.
+        if spec.revision is None:
+            for subnode in root:
+                if (
+                    subnode.tag == 'project'
+                    and subnode.get('name') == 'chromeos/manifest-internal'
+                ):
+                    spec.revision = subnode.get('revision')
+                    break
+
     def sync_disk_state(self, rev):
         manifest_name = self.get_manifest_file(rev)
 
