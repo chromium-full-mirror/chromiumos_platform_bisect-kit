@@ -14,6 +14,7 @@ import socket
 import ssl
 import tempfile
 
+# pylint: disable=import-error
 # pylint: disable=no-name-in-module
 from google.protobuf import json_format
 from google.protobuf.field_mask_pb2 import FieldMask
@@ -22,6 +23,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from infra_libs.buildbucket.proto.build_pb2 import Build
 from infra_libs.buildbucket.proto.builder_pb2 import BuilderID
 from infra_libs.buildbucket.proto.builds_service_pb2 import BuildPredicate
+from infra_libs.buildbucket.proto.builds_service_pb2 import CancelBuildRequest
 from infra_libs.buildbucket.proto.builds_service_pb2 import GetBuildRequest
 from infra_libs.buildbucket.proto.builds_service_pb2 import ScheduleBuildRequest
 from infra_libs.buildbucket.proto.builds_service_pb2 import SearchBuildsRequest
@@ -351,6 +353,25 @@ class BuildbucketApi:
         request = ScheduleBuildRequest(builder=builder, tags=tags)
         request.properties.update(properties)
         return self._post('ScheduleBuild', request, Build)
+
+    def cancel_build(self, buildbucket_id: int, summary_markdown: str) -> Build:
+        """Cancel a build request.
+
+        Args:
+          buildbucket_id: An integer indicates buildbucket id.
+
+        Returns:
+          A build object if found.
+
+        Raises:
+          errors.ExternalError: If build not found, or permission denied.
+        """
+        assert isinstance(buildbucket_id, int)
+        request = CancelBuildRequest(
+            id=buildbucket_id, summary_markdown=summary_markdown
+        )
+        response = self._post("CancelBuild", request, Build, timeout=120)
+        return response
 
     def is_running(self, build):
         """Check if a build is in running or scheduled status.
