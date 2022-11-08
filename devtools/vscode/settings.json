@@ -1,0 +1,25 @@
+// Copy this file to ${PROJECT_ROOT}/.vscode/settings.json or your global setting file.
+// Please install depot_tools and requirements_dev.txt before applying this config.
+
+{
+  // Force use \n as EoL character.
+  "files.eol": "\n",
+
+  // Formatter
+  // uncomment python.formatting.blackPath if you see black is not installed.
+  "python.formatting.provider": "black",
+  // "python.formatting.blackPath": "~/depot_tools/black",
+
+  // Linter
+  // uncomment python.linting.pylintPath if you see pylint is not installed.
+  "python.linting.pylintEnabled": true,
+  // "python.linting.pylintPath": "~/.local/bin/pylint",
+
+  "[python]": {
+    "editor.tabSize": 4,
+    "editor.formatOnSave": true, // Set this to false if you want to disable auto format.
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true // Auto sort the import orders.
+    }
+  },
+}

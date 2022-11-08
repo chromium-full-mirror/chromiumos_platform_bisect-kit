@@ -48,6 +48,9 @@ venv/
 .dmypy.json
 dmypy.json
 
+# vscode
+.vscode/
+
 # Bisector
 *.log
 bisect.sessions/
