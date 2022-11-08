@@ -16,7 +16,7 @@ cd "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")"
 update_depot_tools
 
 # Format python files with isort.
-isort .
+isort --settings-file=pyproject.toml .
 
 # Format python files with black.
 black .

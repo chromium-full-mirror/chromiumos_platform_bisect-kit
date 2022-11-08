@@ -16,7 +16,7 @@ cd "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")"
 update_depot_tools
 
 # Check python format with isort.
-isort --check .
+isort --check --settings-file=pyproject.toml .
 
 # Check python format with black.
 black --check --diff .
