@@ -44,7 +44,6 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import core
-from bisect_kit import cr_util
 from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import locking
@@ -1789,24 +1788,6 @@ def query_android_build_id(board, rev):
 def query_android_branch(board, rev):
     info = version_info(board, rev)
     rev = info['android_branch']
-    return rev
-
-
-def guess_chrome_version(board, rev):
-    """Guess chrome version number.
-
-    Args:
-      board: chromeos board name
-      rev: chrome or chromeos version
-
-    Returns:
-      chrome version number
-    """
-    if is_cros_version(rev):
-        assert board, 'need to specify BOARD for cros version'
-        rev = query_chrome_version(board, rev)
-        assert cr_util.is_chrome_version(rev)
-
     return rev
 
 

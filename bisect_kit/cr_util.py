@@ -19,6 +19,7 @@ import urllib.request
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
+from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util
@@ -31,7 +32,6 @@ logger = logging.getLogger(__name__)
 RE_CHROME_VERSION = r'^\d+\.\d+\.\d+\.\d+$'
 
 CHROME_BINARIES = ['chrome']
-# nacl_helper is not available on arm64
 CHROME_BINARIES_OPTIONAL = ['nacl_helper']
 # This list is created manually by inspecting
 # src/third_party/chromiumos-overlay/chromeos-base/chrome-binary-tests/
@@ -318,7 +318,12 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
     return util.check_output(*cmd, cwd=chrome_src, env=env)
 
 
-def determine_targets_to_build(chrome_src, board, with_tests=True):
+def determine_targets_to_build(
+    chrome_src: str,
+    board: str,
+    with_tests: bool = True,
+    force_nacl: bool = False,
+):
     out_dir = os.path.join('out_%s' % board, 'Release')
     available_targets = simple_chrome_shell(
         chrome_src,
@@ -343,10 +348,32 @@ def determine_targets_to_build(chrome_src, board, with_tests=True):
         )
         result.append(binary)
     for binary in optional:
+        # b/258539287: nacl_helper is not shown in `gn ls`
+        if (
+            binary == 'nacl_helper'
+            and binary not in available_targets
+            and force_nacl
+        ):
+            result.append(binary)
+            logger.warning(
+                'nacl_helper not found in gn ls, force adding it in targets list'
+            )
+            continue
         if binary not in available_targets:
             continue
         result.append(binary)
     return result
+
+
+def workaround_missing_nacl(dut):
+    """Returns true if bisector should force adding nacl_helper in target list."""
+    # TODO(b/258539287): nacl_helper is not shown in `gn ls`, remove this if
+    # unnecessary.
+    major = cros_util.extract_major_version(
+        cros_util.query_dut_short_version(dut)
+    )
+    # From M108.
+    return int(major) >= 15120
 
 
 def build_and_deploy(
@@ -364,7 +391,10 @@ def build_and_deploy(
     """
     if not targets:
         targets = determine_targets_to_build(
-            chrome_src, board, with_tests=with_tests
+            chrome_src,
+            board,
+            with_tests=with_tests,
+            force_nacl=workaround_missing_nacl(dut),
         )
 
     logger.info('build %s', targets)
