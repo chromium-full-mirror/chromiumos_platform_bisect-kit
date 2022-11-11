@@ -12,6 +12,7 @@ import argparse
 import copy
 import logging
 import os
+import socket
 import sys
 import time
 import typing
@@ -364,7 +365,11 @@ def search_build_image(buildbucket_id):
 
 
 def schedule_build(opts) -> int:
-    build_tags = {'bisector_chromeos_version': opts.chromeos_rev}
+    build_tags = {
+        'bisector_chromeos_version': opts.chromeos_rev,
+        'bisector_session': opts.session,
+        'bisector_host': socket.gethostname(),
+    }
     api = buildbucket_util.BuildbucketApi()
 
     if opts.subcommand == 'bisect_chrome':

@@ -259,14 +259,14 @@ class BuildbucketApi:
 
     def schedule_build(
         self,
-        board,
-        manifest_xml,
-        recipe='build_postsubmit',
-        deps=None,
-        git_auth=True,
-        bucket='bisector',
-        force_rebuild=False,
-        build_tags=None,
+        board: str,
+        manifest_xml: str,
+        recipe: str = 'build_postsubmit',
+        deps: str | None = None,
+        git_auth: bool = True,
+        bucket: str = 'bisector',
+        force_rebuild: bool = False,
+        build_tags: dict[str, str] | None = None,
     ):
         """Schedule a build job in buildbucket.
 
@@ -552,6 +552,10 @@ class BuildbucketApi:
             build_src_ver = util.dict_get(
                 input_properties, '$chromeos/chrome', 'version'
             )
+            if build.status == Status.Value('SUCCESS') and (
+                not gs_bucket or not gs_path
+            ):
+                continue
             if (
                 build_manifest_hash == manifest_digest
                 and build_deps_hash == deps_digest
