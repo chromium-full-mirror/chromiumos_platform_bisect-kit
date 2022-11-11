@@ -206,6 +206,10 @@ def info(repo_dir, query):
         # printed. Ignore errors for such case.
         output = e.output
     for line in output.splitlines():
+        if ':' not in line:
+            continue
+        # remove ANSI Escape Sequences.
+        line = re.sub(r'(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]', '', line)
         key, value = line.split(':', 1)
         key, value = key.strip(), value.strip()
         if key == query:
