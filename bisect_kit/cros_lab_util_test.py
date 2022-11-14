@@ -32,6 +32,10 @@ class TestCrosLab(unittest.TestCase):
             cros_lab_util.is_lab_dut('chromeos8-foo-labstation1'), True
         )
         self.assertEqual(cros_lab_util.is_lab_dut('cre123'), True)
+        self.assertEqual(
+            cros_lab_util.is_lab_dut('satlab-dummy'),
+            True,
+        )
 
     def test_dut_host_name(self):
         with self.assertRaises(AssertionError):
@@ -60,6 +64,18 @@ class TestCrosLab(unittest.TestCase):
             'chromeos8-foo-labstation1',
         )
         self.assertEqual(cros_lab_util.dut_name_to_address('cre123'), 'cre123')
+
+    def test_convert_to_known_satlab_ip(self):
+        self.assertIsNotNone(
+            cros_lab_util.convert_to_known_satlab_ip(
+                'satlab-0wgatfqi22088077-dummy'
+            )
+        )
+
+        self.assertEqual(
+            cros_lab_util.convert_to_known_satlab_ip('satlab-unknown'),
+            None,
+        )
 
 
 if __name__ == '__main__':

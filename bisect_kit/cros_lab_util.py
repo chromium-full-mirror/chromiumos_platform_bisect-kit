@@ -24,11 +24,14 @@ import logging
 import os
 import queue
 import re
+import shutil
 import signal
 import subprocess
 import threading
 import time
 import urllib.parse
+
+import sshconf
 
 from bisect_kit import common
 from bisect_kit import cros_util
@@ -68,6 +71,18 @@ def normalize_sku_name(sku):
     return re.sub(r'\d+GB$', lambda m: m.group().upper(), sku, flags=re.I)
 
 
+def is_satlab_dut(dut_host: str) -> bool:
+    """Returns if the DUT is a satlab Dut.
+
+    Args:
+      dut_host: dut host
+
+    Returns:
+      True if the dut is under a satlab
+    """
+    return dut_host.startswith('satlab')
+
+
 def is_dut_needs_forwarded(dut: str) -> bool:
     """Returns if the DUT needs to be forwarded in the chroot.
 
@@ -80,6 +95,8 @@ def is_dut_needs_forwarded(dut: str) -> bool:
     for r in LAB_DUT_EXCEPTIONS:
         if re.match(r, dut):
             return True
+    if is_satlab_dut(dut):
+        return True
     return False
 
 
@@ -293,6 +310,45 @@ def swarming_bots_list(
     return bots
 
 
+KNOWN_SATLAB_PREFIX_TO_IP_LIST = {'satlab_prefix': 'satlab_ip'}
+
+
+def convert_to_known_satlab_ip(dut_name: str) -> str | None:
+    '''Get the IP of a known satlab dut
+
+    Args:
+        dut_name: satlab dut name
+
+    Returns:
+        ip if the dut is known, None for unknown dut
+    '''
+    # The KNOWN_SATLAB_PREFIX_TO_IP_LIST can be rewritten by internal config
+    for dut_prefix, satlab_ip in KNOWN_SATLAB_PREFIX_TO_IP_LIST.items():
+        if dut_name.startswith(dut_prefix):
+            return satlab_ip
+    return None
+
+
+def swarming_dut_satlab_ip(dut: str) -> str:
+    '''Get the satlab ip of a satlab dut
+
+    Args:
+        dut: satlab dut name
+
+    Returns:
+        The satlab IP of the dut
+    '''
+    assert is_satlab_dut(dut)
+    known_satlab_ip = convert_to_known_satlab_ip(dut)
+    if known_satlab_ip:
+        return known_satlab_ip
+
+    # TODO(njrafi): Change to a more reliable way to get the satlab IP
+    bots = swarming_bots_list(['dut_name:' + dut])
+    assert len(bots) == 1
+    return bots[0]['external_ip']
+
+
 def swarming_bot_tasks(bot_id, limit=None):
     """Lists recent tasks of given bot.
 
@@ -457,6 +513,9 @@ async def async_lease(dut_name, reason, duration=None):
             raise errors.InternalError(
                 'not found lease info; crosfleet output format changed?'
             )
+
+        if is_satlab_dut(dut_name):
+            write_satlab_ssh_config(dut_name)
 
         if not cros_util.is_good_dut(dut_name_to_address(dut_name)):
             logger.warning(
@@ -933,3 +992,33 @@ def repair(dut):
     # TODO(kcwu): support 'skylab repair'
     logger.warning('skylab repair is not implemented yet')
     return False
+
+
+def write_satlab_ssh_config(satlab_dut: str, satlab_ip: str = ''):
+    '''Write the required ssh config for sshing into a satlab dut
+
+    Args:
+        satlab_dut: The satlab dut host names
+        satlab_ip: The satlab ip if already known
+    '''
+    ssh_config_template_path = os.path.expanduser('~/.ssh/config_template')
+    ssh_config_path = os.path.expanduser('~/.ssh/config')
+    if os.path.isfile(ssh_config_template_path):
+        shutil.copy(ssh_config_template_path, ssh_config_path)
+        os.chmod(ssh_config_path, 0o600)
+
+    ssh_config = sshconf.read_ssh_config(ssh_config_path)
+
+    if 'satlab' not in ssh_config.hosts():
+        raise errors.InternalError(
+            "The ssh config for satlab is not deployed yet"
+        )
+
+    # Get the satlab ip if it is unknown
+    if satlab_ip == '':
+        satlab_ip = swarming_dut_satlab_ip(satlab_dut)
+    logger.info('Satlab ip: %s', satlab_ip)
+
+    ssh_config.set('satlab', Hostname=satlab_ip)
+
+    ssh_config.save()

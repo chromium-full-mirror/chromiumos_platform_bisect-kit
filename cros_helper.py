@@ -416,6 +416,8 @@ def do_allocate_dut(opts):
             lease_dut_parallelly(opts.duration, bots, reason, timeout)
         )
         if host:
+            if cros_lab_util.is_satlab_dut(host):
+                cros_lab_util.write_satlab_ssh_config(host)
             # Resolve what board we should build during bisection.
             board_to_build = None
             bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])

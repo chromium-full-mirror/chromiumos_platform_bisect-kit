@@ -6,3 +6,4 @@ protobuf==3.20.1
 psutil
 scipy
 setuptools
+sshconf==0.2.5
