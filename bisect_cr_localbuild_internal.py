@@ -18,6 +18,7 @@ from bisect_kit import codechange
 from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cr_util
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
@@ -106,6 +107,8 @@ class ChromeSrcDomain(core.BisectDomain):
             )
 
         if opts.dut:
+            if cros_lab_util.is_satlab_dut(opts.dut):
+                cros_lab_util.write_satlab_ssh_config(opts.dut)
             if not cros_util.is_dut(opts.dut):
                 raise errors.ArgumentError(
                     '--dut', 'invalid DUT or unable to connect'

@@ -27,6 +27,7 @@ from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cr_util
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import lacros_util
@@ -76,6 +77,8 @@ class LacrosVersionDomain(core.BisectDomain):
         if not opts.dut:
             raise errors.ArgumentError('--dut', 'is required')
 
+        if cros_lab_util.is_satlab_dut(opts.dut):
+            cros_lab_util.write_satlab_ssh_config(opts.dut)
         assert cros_util.is_dut(opts.dut)
 
         if not opts.board:

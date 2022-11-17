@@ -29,6 +29,7 @@ from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 
@@ -106,6 +107,8 @@ class ChromeOSVersionDomain(core.BisectDomain):
                 '%s is not ancestor of %s' % (opts.old, opts.new),
             )
         if opts.dut:
+            if cros_lab_util.is_satlab_dut(opts.dut):
+                cros_lab_util.write_satlab_ssh_config(opts.dut)
             assert cros_util.is_dut(opts.dut)
         if not opts.board:
             opts.board = cros_util.query_dut_board(opts.dut)

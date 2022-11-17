@@ -1123,6 +1123,15 @@ class DiagnoseCommandLineBase:
                 '%s is not ancestor of %s' % (opts.old, opts.new)
             )
 
+        if opts.satlab_ip:
+            if not cros_lab_util.is_satlab_dut(opts.dut):
+                raise errors.ArgumentError(
+                    '--satlab_ip', 'Should be only provided with a satlab dut'
+                )
+            cros_lab_util.write_satlab_ssh_config(opts.dut, opts.satlab_ip)
+        elif cros_lab_util.is_satlab_dut(opts.dut):
+            cros_lab_util.write_satlab_ssh_config(opts.dut)
+
         if opts.dut == cros_lab_util.LAB_DUT:
             if not opts.model and not opts.sku:
                 self.argument_parser.error(
@@ -1256,6 +1265,7 @@ class DiagnoseCommandLineBase:
             android_root=opts.android_root,
             android_mirror=opts.android_mirror,
             dut=opts.dut,
+            salatb_ip=opts.satlab_ip,
             pool=opts.pool,
             model=opts.model,
             sku=opts.sku,
@@ -1413,6 +1423,11 @@ class DiagnoseCommandLineBase:
             required=True,
             help='Address of DUT (Device Under Test). If "%s", DUT will be '
             'automatically allocated from the lab' % cros_lab_util.LAB_DUT,
+        )
+        group.add_argument(
+            '--satlab_ip',
+            help='Optional, required only if the dut is a satlab dut',
+            type=cli.argtype_re(r'\d+\.\d+\.\d+\.\d+', '172.30.251.188'),
         )
         group.add_argument(
             '--pool',

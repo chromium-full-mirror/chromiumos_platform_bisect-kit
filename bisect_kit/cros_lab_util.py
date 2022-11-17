@@ -310,7 +310,7 @@ def swarming_bots_list(
     return bots
 
 
-KNOWN_SATLAB_PREFIX_TO_IP_LIST = {'satlab_prefix': 'satlab_ip'}
+_known_satlab_prefix_to_ip_list = {'satlab_prefix': 'satlab_ip'}
 
 
 def convert_to_known_satlab_ip(dut_name: str) -> str | None:
@@ -322,11 +322,24 @@ def convert_to_known_satlab_ip(dut_name: str) -> str | None:
     Returns:
         ip if the dut is known, None for unknown dut
     '''
-    # The KNOWN_SATLAB_PREFIX_TO_IP_LIST can be rewritten by internal config
-    for dut_prefix, satlab_ip in KNOWN_SATLAB_PREFIX_TO_IP_LIST.items():
+    # The known_satlab_prefix_to_ip_list can be updated by internal config
+    for dut_prefix, satlab_ip in _known_satlab_prefix_to_ip_list.items():
         if dut_name.startswith(dut_prefix):
             return satlab_ip
     return None
+
+
+def store_known_satlab_prefix(satlab_prefix: str, satlab_ip: str):
+    '''Store known satlab prefix and ips in memory for quick retrieval
+
+    Args:
+        satlab_prefix: satlab DUT prefix
+        satlab_ip: satlab IP
+    '''
+    can_convert_satlab_prefix_to_ip = convert_to_known_satlab_ip(satlab_prefix)
+
+    if can_convert_satlab_prefix_to_ip is None:
+        _known_satlab_prefix_to_ip_list.update({satlab_prefix: satlab_ip})
 
 
 def swarming_dut_satlab_ip(dut: str) -> str:
@@ -337,6 +350,9 @@ def swarming_dut_satlab_ip(dut: str) -> str:
 
     Returns:
         The satlab IP of the dut
+
+    Raises:
+          errors.ExternalError: If Satlab IP query fails
     '''
     assert is_satlab_dut(dut)
     known_satlab_ip = convert_to_known_satlab_ip(dut)
@@ -344,9 +360,18 @@ def swarming_dut_satlab_ip(dut: str) -> str:
         return known_satlab_ip
 
     # TODO(njrafi): Change to a more reliable way to get the satlab IP
+    logger.debug("Querying IP for satlab DUT: %s", dut)
     bots = swarming_bots_list(['dut_name:' + dut])
-    assert len(bots) == 1
-    return bots[0]['external_ip']
+    if len(bots) != 1:
+        raise errors.ExternalError("Satlab IP query failed for DUT: %s" % dut)
+    satlab_ip = bots[0]['external_ip']
+    wrong_satlab_ip_prefix = '104'
+    if satlab_ip.startswith(wrong_satlab_ip_prefix):
+        raise errors.ExternalError(
+            "Swarming external IP query for DUT %s returned %s which is not the correct satlab IP. Please try again later."
+            % (dut, satlab_ip)
+        )
+    return satlab_ip
 
 
 def swarming_bot_tasks(bot_id, limit=None):
@@ -1006,6 +1031,10 @@ def write_satlab_ssh_config(satlab_dut: str, satlab_ip: str = ''):
     if os.path.isfile(ssh_config_template_path):
         shutil.copy(ssh_config_template_path, ssh_config_path)
         os.chmod(ssh_config_path, 0o600)
+    else:
+        raise errors.InternalError(
+            "~/.ssh/config_template file not found which is required for writing satlab ssh config"
+        )
 
     ssh_config = sshconf.read_ssh_config(ssh_config_path)
 
@@ -1017,7 +1046,9 @@ def write_satlab_ssh_config(satlab_dut: str, satlab_ip: str = ''):
     # Get the satlab ip if it is unknown
     if satlab_ip == '':
         satlab_ip = swarming_dut_satlab_ip(satlab_dut)
-    logger.info('Satlab ip: %s', satlab_ip)
+    logger.debug('Satlab ip: %s', satlab_ip)
+
+    store_known_satlab_prefix(satlab_dut, satlab_ip)
 
     ssh_config.set('satlab', Hostname=satlab_ip)
 

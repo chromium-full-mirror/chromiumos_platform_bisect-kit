@@ -74,6 +74,9 @@ def switch_main(args: typing.Optional[tuple[str]]):
     opts = parser.parse_args(args)
     common.config_logging(opts)
 
+    if cros_lab_util.is_satlab_dut(opts.dut):
+        cros_lab_util.write_satlab_ssh_config(opts.dut)
+
     if not cros_util.is_good_dut(opts.dut):
         logger.fatal('%r is not a good DUT', opts.dut)
         if not cros_lab_util.repair(opts.dut):

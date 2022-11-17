@@ -256,6 +256,14 @@ def do_allocate_dut(opts):
     if opts.duration is not None and opts.duration < 60:
         raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
 
+    if opts.satlab_ip:
+        if not cros_lab_util.is_satlab_dut(opts.dut_name):
+            raise errors.ArgumentError(
+                '--satlab_ip', 'Should be only provided with a satlab dut'
+            )
+
+        cros_lab_util.write_satlab_ssh_config(opts.dut_name, opts.satlab_ip)
+
     t0 = time.time()
     dimensions = ['dut_state:ready']
     if opts.dut_name:
@@ -573,6 +581,11 @@ def main():
     group.add_argument('--sku', help='allocation criteria; comma separated')
     group.add_argument(
         '--dut_name', help='allocation criteria; comma separated'
+    )
+    parser_allocate_dut.add_argument(
+        '--satlab_ip',
+        help='Optional, required only if the dut is a satlab dut',
+        type=cli.argtype_re(r'\d+\.\d+\.\d+\.\d+', '172.30.251.188'),
     )
     parser_allocate_dut.add_argument(
         '--version_hint', help='chromeos version; comma separated'

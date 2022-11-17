@@ -25,6 +25,7 @@ from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import util
 
@@ -112,6 +113,9 @@ def switch_main(args: typing.Optional[tuple[str]]):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)
+
+    if cros_lab_util.is_satlab_dut(opts.dut):
+        cros_lab_util.write_satlab_ssh_config(opts.dut)
 
     switch(opts, opts.board, opts.version, opts.dut)
 

@@ -26,7 +26,9 @@ from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import util
 
 
@@ -175,6 +177,12 @@ def switch_main(args: typing.Optional[tuple[str]]):
     autotest_dir = os.path.join(
         opts.chromeos_root, cros_util.prebuilt_autotest_dir
     )
+    if cros_lab_util.is_satlab_dut(opts.dut):
+        cros_lab_util.write_satlab_ssh_config(opts.dut)
+    if not cros_util.is_dut(opts.dut):
+        raise errors.BrokenDutException(
+            '%r is not a valid DUT address' % opts.dut
+        )
     switch(autotest_dir, opts.board, opts.version, opts.test_name, opts.dut)
 
     # Verify test control file exists.

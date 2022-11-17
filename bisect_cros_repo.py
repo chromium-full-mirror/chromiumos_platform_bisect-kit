@@ -30,6 +30,7 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import configure
 from bisect_kit import core
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import repo_util
@@ -91,6 +92,8 @@ class ChromeOSRepoDomain(core.BisectDomain):
             )
 
         if opts.dut:
+            if cros_lab_util.is_satlab_dut(opts.dut):
+                cros_lab_util.write_satlab_ssh_config(opts.dut)
             assert cros_util.is_dut(opts.dut)
         else:
             logger.info(

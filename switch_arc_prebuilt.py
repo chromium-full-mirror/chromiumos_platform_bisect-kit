@@ -71,6 +71,9 @@ def switch_main(args: typing.Optional[tuple[str]]):
     opts = parser.parse_args(args)
     common.config_logging(opts)
 
+    if cros_lab_util.is_satlab_dut(opts.dut):
+        cros_lab_util.write_satlab_ssh_config(opts.dut)
+
     if not opts.flavor:
         opts.flavor = arc_util.query_flavor(opts.dut)
         assert opts.flavor

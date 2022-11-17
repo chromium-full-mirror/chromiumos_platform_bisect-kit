@@ -31,6 +31,7 @@ from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cr_util
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
@@ -187,6 +188,13 @@ def switch_main(args: typing.Optional[tuple[str]]):
         if not opts.board:
             raise errors.ArgumentError(
                 '--board', 'board must be specified if no --dut'
+            )
+    else:
+        if cros_lab_util.is_satlab_dut(opts.dut):
+            cros_lab_util.write_satlab_ssh_config(opts.dut)
+        if not cros_util.is_dut(opts.dut):
+            raise errors.BrokenDutException(
+                '%r is not a valid DUT address' % opts.dut
             )
     if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)

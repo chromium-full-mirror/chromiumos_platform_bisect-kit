@@ -12,6 +12,7 @@ import sys
 
 from bisect_kit import cli
 from bisect_kit import common
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 import switch_cros_prebuilt
 
@@ -50,6 +51,9 @@ def main(args=None):
     common.init()
     opts = switch_cros_prebuilt.parse_args(args)
     common.config_logging(opts)
+
+    if cros_lab_util.is_satlab_dut(opts.dut):
+        cros_lab_util.write_satlab_ssh_config(opts.dut)
 
     try:
         logger.info('Starting evaluate')

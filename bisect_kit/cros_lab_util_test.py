@@ -67,9 +67,7 @@ class TestCrosLab(unittest.TestCase):
 
     def test_convert_to_known_satlab_ip(self):
         self.assertIsNotNone(
-            cros_lab_util.convert_to_known_satlab_ip(
-                'satlab-0wgatfqi22088077-dummy'
-            )
+            cros_lab_util.convert_to_known_satlab_ip('satlab_prefix-dummy')
         )
 
         self.assertEqual(

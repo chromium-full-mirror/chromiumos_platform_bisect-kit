@@ -506,6 +506,13 @@ def switch_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
             raise errors.ArgumentError(
                 '--board', 'board must be specified if no --dut'
             )
+    else:
+        if cros_lab_util.is_satlab_dut(opts.dut):
+            cros_lab_util.write_satlab_ssh_config(opts.dut)
+        if not cros_util.is_dut(opts.dut):
+            raise errors.BrokenDutException(
+                '%r is not a valid DUT address' % opts.dut
+            )
     if not opts.nodeploy:
         if not cros_util.is_good_dut(opts.dut):
             logger.fatal('%r is not a good DUT', opts.dut)
