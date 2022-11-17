@@ -2780,9 +2780,10 @@ class ChromeOSSpecManager(codechange.SpecManager):
         result = self.collect_release_specs(
             version_to_full(self.config['board'], old),
             version_to_full(self.config['board'], new),
+            trim_old=is_cros_snapshot_version(old),
         )
         if is_cros_snapshot_version(old):
-            result = self.collect_snapshot_specs(old, old) + result[1:]
+            result = self.collect_snapshot_specs(old, old) + result
         elif is_cros_snapshot_version(new):
             result += self.collect_snapshot_specs(new, new)
         return result
@@ -2850,7 +2851,20 @@ class ChromeOSSpecManager(codechange.SpecManager):
             '%s.xml' % full_version,
         )
 
-    def collect_release_specs(self, old, new):
+    def collect_release_specs(
+        self, old: str, new: str, trim_old: bool = False
+    ) -> list[codechange.Spec]:
+        """Collects the release buildspecs between two version.
+
+        Args:
+            old: old ChromeOS full version
+            new: new ChromeOS full version
+            trim_old: returns the manifest in semi-open range (old, new] and
+                tolerates if old doesn't exists.
+
+        Returns:
+            A list of codechange.Spec.
+        """
         assert is_cros_full_version(old)
         assert is_cros_full_version(new)
         old_milestone, old_short_version = version_split(old)
@@ -2890,7 +2904,10 @@ class ChromeOSSpecManager(codechange.SpecManager):
             return util.version_key_func(short_version)
 
         result.sort(key=version_key_func)
-        assert result[0].name == old
+        if trim_old and result[0].name == old:
+            result = result[1:]
+        if not trim_old:
+            assert result[0].name == old
         assert result[-1].name == new
         return result
 
