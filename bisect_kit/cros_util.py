@@ -1442,6 +1442,8 @@ def provision_image(
 ):
     # Try quick_provision first, but fallback to cros flash.
     # TODO(kcwu): only use quick_provision for DUTs in the lab
+    # TODO(b/260296269): Find out the reason it fails and enable again.
+    """
     try:
         if quick_provision(chromeos_root, host, image_info):
             verify_dut_version(host, board, version)
@@ -1449,6 +1451,7 @@ def provision_image(
         logger.debug('quick-provision is not supported; fallback to cros flash')
     except errors.ExternalError as e:
         logger.warning('quick-provision failed; fallback to cros flash: %s', e)
+    """
 
     if not cros_flash(
         chromeos_root,
