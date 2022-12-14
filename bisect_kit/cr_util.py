@@ -52,6 +52,7 @@ CHROME_TEST_BINARIES = [
     'ozone_integration_tests',
     'sandbox_linux_unittests',
     'v4l2_stateless_decoder',
+    'v4l2_unittest',
     'vaapi_unittest',
     'video_decode_accelerator_perf_tests',
     'video_decode_accelerator_tests',
