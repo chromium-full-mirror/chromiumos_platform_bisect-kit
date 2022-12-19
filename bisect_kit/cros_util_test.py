@@ -167,8 +167,11 @@ class TestCrosUtil(unittest.TestCase):
         self.assertFalse(
             cros_util.is_ancestor_version('12347.0.0', '12346.0.0')
         )
-        self.assertFalse(
+        self.assertTrue(
             cros_util.is_ancestor_version('R12-12345.0.0', 'R10-12346.0.0')
+        )
+        self.assertFalse(
+            cros_util.is_ancestor_version('R10-12346.0.0', 'R12-12345.0.0')
         )
         self.assertFalse(
             cros_util.is_ancestor_version(
@@ -702,10 +705,10 @@ class TestCrosUtil(unittest.TestCase):
         self.assertTrue(
             cros_util.is_cros_version_lesseq('R99-1.0.0', 'R99-1.0.1')
         )
-        self.assertFalse(
+        self.assertTrue(
             cros_util.is_cros_version_lesseq('R99-1.0.0', 'R98-1.1.0')
         )
-        self.assertFalse(
+        self.assertTrue(
             cros_util.is_cros_version_lesseq('R99-1.0.0', 'R98-1.0.1')
         )
         self.assertFalse(
@@ -719,6 +722,78 @@ class TestCrosUtil(unittest.TestCase):
         )
         self.assertFalse(
             cros_util.is_cros_version_lesseq('R99-1.0.0-124', 'R99-1.0.0-123')
+        )
+
+        # equal to
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('10000.0.0', '10000.0.0')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq(
+                'R100-10000.0.0-1000', 'R100-10000.0.0-1000'
+            )
+        )
+
+        # less than
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('10000.0.0', '20000.0.0')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('10000.0.0', '10000.2.0')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('10000.0.0', '10000.0.2')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('10000.0.0', 'R100-10000.0.0-1000')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq(
+                'R100-10000.0.0-1000', 'R100-10000.0.0-2000'
+            )
+        )
+
+        # greater than
+        self.assertFalse(
+            cros_util.is_cros_version_lesseq('20000.0.0', '10000.0.0')
+        )
+        self.assertFalse(
+            cros_util.is_cros_version_lesseq('10000.2.0', '10000.0.0')
+        )
+        self.assertFalse(
+            cros_util.is_cros_version_lesseq('10000.0.2', '10000.0.0')
+        )
+        self.assertFalse(
+            cros_util.is_cros_version_lesseq('R100-10000.0.0-1000', '10000.0.0')
+        )
+        self.assertFalse(
+            cros_util.is_cros_version_lesseq(
+                'R100-10000.0.0-2000', 'R100-10000.0.0-1000'
+            )
+        )
+
+        # milestone should be ignored
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('R100-10000.0.0', 'R100-10000.0.0')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('R100-10000.0.0', 'R200-10000.0.0')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('R200-10000.0.0', 'R100-10000.0.0')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq('R200-10000.0.0', 'R100-20000.0.0')
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq(
+                'R200-10000.0.0', 'R100-10000.0.0-1000'
+            )
+        )
+        self.assertTrue(
+            cros_util.is_cros_version_lesseq(
+                'R200-10000.0.0-1000', 'R100-10000.0.0-2000'
+            )
         )
 
     def test_is_buildbucket_buildable(self):

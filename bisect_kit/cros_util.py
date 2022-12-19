@@ -402,11 +402,9 @@ def is_cros_version_lesseq(ver1, ver2):
     assert is_cros_version(ver1) or is_cros_snapshot_version(ver1)
     assert is_cros_version(ver2) or is_cros_snapshot_version(ver2)
 
-    # Compare milestone if available.
-    m1 = re.match(r'R(\d+)', ver1)
-    m2 = re.match(r'R(\d+)', ver2)
-    if m1 and m2 and int(m1.group(1)) > int(m2.group(1)):
-        return False
+    # In rare cases, a later Chrome milestone number doesn't imply a later
+    # ChromeOS version. So we are not using the milestone numbers in the
+    # comparison to avoid the issue. Please see b/260532030.
 
     ver1 = [int(x) for x in re.split(r'[.-]', ver1) if not x.startswith('R')]
     ver2 = [int(x) for x in re.split(r'[.-]', ver2) if not x.startswith('R')]
@@ -426,8 +424,6 @@ def is_ancestor_version(ver1, ver2):
     if is_cros_version_lesseq(  # pylint: disable=arguments-out-of-order
         ver2, ver1
     ):
-        return False
-    if not is_cros_version_lesseq(ver1, ver2):
         return False
 
     if not util.is_direct_relative_version(
