@@ -438,6 +438,8 @@ def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
             '%r is not a valid DUT address' % opts.dut
         )
     dut_os_version = cros_util.query_dut_short_version(opts.dut)
+    if opts.test_name:
+        opts.test_name = cros_util.normalize_test_name(opts.test_name)
 
     if is_cts(opts):
         if opts.test_name or opts.metric or opts.args:

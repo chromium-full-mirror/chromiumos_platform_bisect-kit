@@ -3075,3 +3075,18 @@ def repair_dut(chromeos_root: str, dut: str, max_attempts=3) -> bool:
                 pass
         logger.info('Repair failed')
         return False
+
+
+def normalize_test_name(test_name: str) -> str:
+    """Normalizes test names
+
+    Some test names need to be modified before passing it to some scripts.(e.g. "tauto."
+    prefix needs to be removed from tauto tests in switch_autotest_prebuilt.py).
+
+    Args:
+      test_name: The test name
+
+    Returns:
+      The normalized test name
+    """
+    return test_name.removeprefix('tauto.')

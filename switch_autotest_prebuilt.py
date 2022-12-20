@@ -183,6 +183,9 @@ def switch_main(args: typing.Optional[tuple[str]]):
         raise errors.BrokenDutException(
             '%r is not a valid DUT address' % opts.dut
         )
+
+    if opts.test_name:
+        opts.test_name = cros_util.normalize_test_name(opts.test_name)
     switch(autotest_dir, opts.board, opts.version, opts.test_name, opts.dut)
 
     # Verify test control file exists.

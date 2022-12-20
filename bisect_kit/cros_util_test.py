@@ -907,6 +907,18 @@ class TestCrosUtil(unittest.TestCase):
             ):
                 self.assertTrue(cros_util.repair_dut('root', 'dut'))
 
+    def test_normalize_test_name(self):
+        self.assertEqual(
+            cros_util.normalize_test_name("dummy_test1"), "dummy_test1"
+        )
+        self.assertEqual(
+            cros_util.normalize_test_name("tast.dummy_test2"),
+            "tast.dummy_test2",
+        )
+        self.assertEqual(
+            cros_util.normalize_test_name("tauto.dummy_test3"), "dummy_test3"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
