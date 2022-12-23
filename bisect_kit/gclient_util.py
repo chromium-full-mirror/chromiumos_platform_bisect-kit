@@ -35,7 +35,7 @@ emitted_warnings = set()
 # If the dependency is not pinned in DEPS file, the default branch.
 # ref: gclient_scm.py GitWrapper.update default_rev
 # TODO(kcwu): follow gclient to change the default branch name
-DEFAULT_BRANCH_NAME = 'master'
+DEFAULT_BRANCH_NAME = 'main'
 
 
 def config(

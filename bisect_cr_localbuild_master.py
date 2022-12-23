@@ -203,7 +203,7 @@ class ChromeSrcMasterDomain(core.BisectDomain):
 
     def setenv(self, env, rev):
         env['CHROME_ROOT'] = self.config['chrome_root']
-        env['CHROME_BRANCH'] = 'master'
+        env['CHROME_BRANCH'] = gclient_util.DEFAULT_BRANCH_NAME
         env['GIT_REPO'] = self.config['chrome_src']
         env['REV'] = rev
 
