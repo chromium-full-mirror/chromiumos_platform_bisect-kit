@@ -1055,6 +1055,11 @@ def _find_files_from_image_archive(
 
     old_milestone = int(version_split(old)[0])
     new_milestone = int(version_split(new)[0])
+
+    # Sometimes older ChromeOS version has newer milestone number (b/260532030)
+    if old_milestone > new_milestone:
+        old_milestone, new_milestone = new_milestone, old_milestone
+
     version_prefixes = []
     if (
         old_milestone != new_milestone
@@ -2868,6 +2873,10 @@ class ChromeOSSpecManager(codechange.SpecManager):
         assert is_cros_full_version(new)
         old_milestone, old_short_version = version_split(old)
         new_milestone, new_short_version = version_split(new)
+
+        # Sometimes older ChromeOS version has newer milestone number (b/260532030)
+        if old_milestone > new_milestone:
+            old_milestone, new_milestone = new_milestone, old_milestone
 
         result = []
         for milestone in self.list_release_milestones():
