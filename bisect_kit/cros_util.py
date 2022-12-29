@@ -2107,20 +2107,6 @@ def build_packages(
       afdo_use: build chrome with AFDO optimization
     """
 
-    def has_build_package_argument(argument):
-        stderr_lines = []
-        try:
-            util.check_call(
-                'src/scripts/build_packages',
-                '--help',
-                cwd=chromeos_root,
-                stderr_callback=stderr_lines.append,
-            )
-        except subprocess.CalledProcessError:
-            pass
-        help_output = ''.join(stderr_lines)
-        return '--[no]%s' % argument in help_output
-
     common_env = {
         'USE': '-cros-debug chrome_internal',
         'FEATURES': 'separatedebug',
@@ -2145,22 +2131,17 @@ def build_packages(
                 '--board',
                 board,
                 '--withdev',
-                '--noworkon',
-                '--skip_chroot_upgrade',
-                '--accept_licenses=@CHROMEOS',
+                '--no-workon',
+                '--skip-chroot-upgrade',
+                '--accept-licenses=@CHROMEOS',
+                # `use_any_chrome` flag is default on and will force to use a
+                # chrome prebuilt even if the version doesn't match.
+                '--no-use-any-chrome',
             ]
-
-            # `use_any_chrome` flag is default on and will force to use a chrome
-            # prebuilt even if the version doesn't match.
-
-            # As this argument is landed in 12681, we should check if the argument
-            # exists before adding this.
-            if has_build_package_argument('use_any_chrome'):
-                cmd.append('--nouse_any_chrome')
 
             if goma_dir:
                 # Tell build_packages to start and stop goma
-                cmd.append('--run_goma')
+                cmd.append('--run-goma')
                 env['USE_GOMA'] = 'true'
             if afdo_use:
                 env['USE'] += ' afdo_use'
@@ -2201,7 +2182,7 @@ def build_image(chromeos_root, board):
                 './build_image',
                 '--board',
                 board,
-                '--noenable_rootfs_verification',
+                '--no-enable-rootfs-verification',
                 'test',
                 env={
                     'USE': '-cros-debug chrome_internal',
