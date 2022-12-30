@@ -184,17 +184,29 @@ class Popen:
         for proc in psutil.Process(self.p.pid).children(recursive=True):
             try:
                 proc.terminate()
-            except psutil.AccessDenied:
-                logger.warning('Unable to terminate pid=%d; ignore', proc.pid)
+            except (psutil.Error, OSError) as exception:
+                logger.warning(
+                    'Unable to terminate pid=%d because of exception=%s; ignore',
+                    proc.pid,
+                    exception,
+                )
         try:
             self.p.terminate()
-        except OSError:
-            logger.warning('Unable to terminate pid=%d; ignore', self.p.pid)
+        except (psutil.Error, OSError) as exception:
+            logger.warning(
+                'Unable to terminate pid=%d because of exception=%s; ignore',
+                self.p.pid,
+                exception,
+            )
         time.sleep(0.1)
         try:
             self.p.kill()
-        except OSError:
-            logger.warning('Unable to kill pid=%d; ignore', self.p.pid)
+        except (psutil.Error, OSError) as exception:
+            logger.warning(
+                'Unable to kill pid=%d because of exception=%s; ignore',
+                self.p.pid,
+                exception,
+            )
 
 
 def call(*args, timeout: float | None = None, **kwargs) -> int:
