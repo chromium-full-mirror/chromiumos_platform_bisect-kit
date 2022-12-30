@@ -1,9 +1,0 @@
-Incrementing VERSION to 64.0.3255.3
-
-TBR=dimu@chromium.org
-
-Change-Id: I14fa751064bd31abdc8d81ef3156671109b69add
-Reviewed-on: https://chromium-review.googlesource.com/749504
-Reviewed-by: chrome-release-bot@chromium.org <chrome-release-bot@chromium.org>
-Cr-Commit-Position: refs/branch-heads/3255@{#4}
-Cr-Branched-From: fc2679dfa73c1dc102d86832ef049359f433c314-refs/heads/master@{#513029}

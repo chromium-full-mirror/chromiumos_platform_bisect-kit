@@ -7,12 +7,8 @@
 from __future__ import print_function
 
 import unittest
-from unittest import mock
 
 from bisect_kit import cr_util
-from bisect_kit import errors
-from bisect_kit import git_util
-from bisect_kit import testing
 
 
 class TestCrUtil(unittest.TestCase):
@@ -51,51 +47,6 @@ class TestCrUtil(unittest.TestCase):
         self.assertEqual(
             cr_util.extract_milestone_from_version('59.0.3064.0'), '59'
         )
-
-    def test_query_commit_position(self):
-        chrome_src = 'dummy'
-        git_rev = '0000111122223333'
-
-        # master
-        with testing.mock_function_by_file(
-            git_util, 'get_commit_log', 'chrome_commit_log/e4940332'
-        ):
-            self.assertEqual(
-                cr_util.query_commit_position(chrome_src, git_rev),
-                ('master', '514085'),
-            )
-
-        # branch
-        with testing.mock_function_by_file(
-            git_util, 'get_commit_log', 'chrome_commit_log/27101da1'
-        ):
-            self.assertEqual(
-                cr_util.query_commit_position(chrome_src, git_rev),
-                ('3255', '4'),
-            )
-
-        # master (old)
-        with testing.mock_function_by_file(
-            git_util, 'get_commit_log', 'chrome_commit_log/44f159f6'
-        ):
-            self.assertEqual(
-                cr_util.query_commit_position(chrome_src, git_rev),
-                ('master', '284374'),
-            )
-
-        # branch (old)
-        with testing.mock_function_by_file(
-            git_util, 'get_commit_log', 'chrome_commit_log/3fe30a09'
-        ):
-            self.assertEqual(
-                cr_util.query_commit_position(chrome_src, git_rev),
-                ('2100', '284389'),
-            )
-
-        # fail
-        with mock.patch.object(git_util, 'get_commit_log', return_value='foo'):
-            with self.assertRaises(errors.InternalError):
-                cr_util.query_commit_position(chrome_src, git_rev)
 
     def test_get_ancestors(self):
         # Disabling protected member access cros lint error
