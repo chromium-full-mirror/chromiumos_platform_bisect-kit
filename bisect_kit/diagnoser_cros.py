@@ -722,20 +722,12 @@ class CrosDiagnoser:
                 lacros_old,
                 lacros_new,
             )
-        except errors.VerifyOldBehaviorFailed as e:
+        except errors.VerifyOldBehaviorFailed:
             self.make_decision(
-                'Expect old Lacros has old behavior (%s) but failed'
+                'Expect old Lacros has old behavior (%s) but failed. Unable to reproduce, the culprit is not in Lacros.'
                 % self.config['term_old']
             )
-            raise errors.DiagnoseContradiction(
-                '%s that old chrome os has old behavior (%s); '
-                'but it became new behavior (%s) after deploying Lacros'
-                % (
-                    self._verified_chromeos_prebuilt(),
-                    self.config['term_old'],
-                    self.config['term_new'],
-                )
-            ) from e
+            return False
         except errors.VerifyNewBehaviorFailed:
             self.make_decision(
                 'Unable to reproduce, the culprit is not in Lacros'
