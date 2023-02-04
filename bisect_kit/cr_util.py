@@ -61,6 +61,7 @@ CHROME_TEST_BINARIES = [
     'video_encode_accelerator_tests',
     'wayland_client_integration_tests',
     'wayland_client_perftests',
+    'wayland_hdr_client',
     # Removed binaries. Keep them here for users to bisect old versions.
     'video_decode_accelerator_unittest',
     'video_encode_accelerator_unittest',
