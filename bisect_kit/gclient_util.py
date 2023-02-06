@@ -2,6 +2,7 @@
 # Copyright 2018 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Gclient utility."""
 
 from __future__ import print_function
@@ -19,14 +20,14 @@ import sys
 import tempfile
 import urllib.parse
 
-# from third_party
-from depot_tools import gclient_eval
-
 from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import locking
 from bisect_kit import util
+
+# from third_party
+from depot_tools import gclient_eval
 
 
 logger = logging.getLogger(__name__)

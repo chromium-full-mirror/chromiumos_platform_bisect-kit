@@ -2,6 +2,7 @@
 # Copyright 2019 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Catapult utility.
 
 The main functionality of this module is parsing performance numbers from

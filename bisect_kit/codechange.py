@@ -2,6 +2,7 @@
 # Copyright 2018 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Model of source code organization and changes.
 
 This module modeled complex source code organization, i.e. nested git repos,

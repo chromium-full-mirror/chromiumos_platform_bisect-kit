@@ -2,6 +2,7 @@
 # Copyright 2018 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Android utility.
 
 Terminology used in this module:
@@ -20,17 +21,16 @@ import os
 import tempfile
 import urllib.request
 
-import google.oauth2.service_account
-import googleapiclient
-import googleapiclient.discovery
-import httplib2
-
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import repo_util
 from bisect_kit import util
+import google.oauth2.service_account
+import googleapiclient
+import googleapiclient.discovery
+import httplib2
 
 
 logger = logging.getLogger(__name__)

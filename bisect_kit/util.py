@@ -2,6 +2,7 @@
 # Copyright 2017 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Utility functions and classes."""
 
 from __future__ import annotations
@@ -19,9 +20,8 @@ import threading
 import time
 import typing
 
-import psutil
-
 from bisect_kit import errors
+import psutil
 
 
 logger = logging.getLogger(__name__)

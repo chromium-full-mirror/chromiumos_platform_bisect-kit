@@ -2,6 +2,7 @@
 # Copyright 2017 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """ChromeOS utility.
 
 Terminology used in this module.
@@ -37,8 +38,6 @@ import time
 import typing
 import urllib.parse
 
-from google.protobuf import json_format
-
 from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -49,6 +48,7 @@ from bisect_kit import git_util
 from bisect_kit import locking
 from bisect_kit import repo_util
 from bisect_kit import util
+from google.protobuf import json_format
 
 
 logger = logging.getLogger(__name__)

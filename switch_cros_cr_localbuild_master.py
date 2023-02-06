@@ -3,6 +3,7 @@
 # Copyright 2017 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Switcher for chrome on chromeos local build bisecting
 
 This script will sync the chrome source tree to the specified version, build,

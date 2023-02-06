@@ -15,8 +15,5 @@ cd "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")"
 # Update depot_tools
 update_depot_tools
 
-# Format python files with isort.
-isort --settings-file=pyproject.toml .
-
-# Format python files with black.
-black .
+# Format python files with `cros format` which include isort and black tools.
+cros format *.py bisect_kit/*.py

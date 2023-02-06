@@ -3,6 +3,7 @@
 # Copyright 2017 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """A simple bisector to bisect a list of arbitrary strings.
 
 The strings to bisect are read from stdin, one item at a line.

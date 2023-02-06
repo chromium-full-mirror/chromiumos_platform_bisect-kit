@@ -2,6 +2,7 @@
 # Copyright 2018 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Module to manipulate machines in chromeos test lab.
 
 Terminology to refer a DUT in bisect-kit:
@@ -31,12 +32,11 @@ import threading
 import time
 import urllib.parse
 
-import sshconf
-
 from bisect_kit import common
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import util
+import sshconf
 
 
 logger = logging.getLogger(__name__)

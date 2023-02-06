@@ -2,6 +2,7 @@
 # Copyright 2019 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Buildbucket api utility.
 """
 
@@ -13,6 +14,10 @@ import shutil
 import socket
 import ssl
 import tempfile
+
+from bisect_kit import errors
+from bisect_kit import gclient_util
+from bisect_kit import util
 
 # pylint: disable=import-error
 # pylint: disable=no-name-in-module
@@ -31,10 +36,6 @@ from infra_libs.buildbucket.proto.builds_service_pb2 import SearchBuildsResponse
 from infra_libs.buildbucket.proto.common_pb2 import Status
 from infra_libs.buildbucket.proto.common_pb2 import StringPair
 from infra_libs.buildbucket.proto.common_pb2 import TimeRange
-
-from bisect_kit import errors
-from bisect_kit import gclient_util
-from bisect_kit import util
 
 
 logger = logging.getLogger(__name__)

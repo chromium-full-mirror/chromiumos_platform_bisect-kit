@@ -2,6 +2,7 @@
 # Copyright 2017 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """The binary search algorithm."""
 
 from __future__ import print_function
@@ -11,10 +12,9 @@ import math
 import re
 import sys
 
-from scipy.stats import boschloo_exact
-
 from bisect_kit import errors
 from bisect_kit import math_util
+from scipy.stats import boschloo_exact
 
 
 logger = logging.getLogger(__name__)
