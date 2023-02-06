@@ -52,7 +52,7 @@ EXIT_CODE_MAP = {
 
 
 def create_argument_parser():
-    parents = [common.common_argument_parser, common.session_optional_parser]
+    parents = [common.create_session_optional_parser()]
     # exit_on_error=False: to capture invalid argument values
     parser = argparse.ArgumentParser(
         description=__doc__, parents=parents, exit_on_error=False

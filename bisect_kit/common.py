@@ -24,10 +24,6 @@ DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
 BISECT_KIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-common_argument_parser = None
-session_optional_parser = None
-session_required_parser = None
-
 
 def determine_session_dir(session):
     if not session:
@@ -120,16 +116,8 @@ def config_logging(opts):
     )
 
 
-def _setup_argument_parsers():
-    # pylint: disable=global-statement
-    global common_argument_parser
-    global session_optional_parser
-    global session_required_parser
-    if common_argument_parser:
-        return  # already done
+def create_common_argument_parser() -> argparse.ArgumentParser:
     common_argument_parser = argparse.ArgumentParser(add_help=False)
-    session_optional_parser = argparse.ArgumentParser(add_help=False)
-    session_required_parser = argparse.ArgumentParser(add_help=False)
     common_argument_parser.add_argument(
         '--log_file',
         metavar='LOG_FILE',
@@ -145,16 +133,29 @@ def _setup_argument_parsers():
         help='Specify config file to use. Otherwise searches default '
         'locations. Use "none" to suppress config file searching.',
     )
+    return common_argument_parser
 
+
+def create_session_optional_parser() -> argparse.ArgumentParser:
+    session_optional_parser = argparse.ArgumentParser(
+        add_help=False, parents=[create_common_argument_parser()]
+    )
     session_optional_parser.add_argument(
         '--session',
         default=DEFAULT_SESSION_NAME,
         help='Session name (default: %(default)r)',
     )
+    return session_optional_parser
 
+
+def create_session_required_parser() -> argparse.ArgumentParser:
+    session_required_parser = argparse.ArgumentParser(
+        add_help=False, parents=[create_common_argument_parser()]
+    )
     session_required_parser.add_argument(
         '--session', required=True, help='Session name'
     )
+    return session_required_parser
 
 
 def under_luci_context():
@@ -165,4 +166,3 @@ def under_luci_context():
 def init():
     configure.load_config()
     configure.root.load_plugins()
-    _setup_argument_parsers()

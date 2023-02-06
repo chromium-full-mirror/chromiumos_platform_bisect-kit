@@ -715,13 +715,11 @@ def create_parser():
         ' (default: %(default)s)',
     )
     parents_session_optional = [
-        common.common_argument_parser,
-        common.session_optional_parser,
+        common.create_session_optional_parser(),
         base_parser,
     ]
     parents_session_required = [
-        common.common_argument_parser,
-        common.session_required_parser,
+        common.create_session_required_parser(),
         base_parser,
     ]
 

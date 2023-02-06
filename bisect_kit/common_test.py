@@ -37,7 +37,7 @@ class TestCommon(unittest.TestCase):
     )
     def test_logging(self):
         common.init()
-        parents = [common.common_argument_parser]
+        parents = [common.create_common_argument_parser()]
         parser = argparse.ArgumentParser(parents=parents)
         opts = parser.parse_args(['--log_file', self.log_file])
         common.config_logging(opts)

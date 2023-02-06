@@ -1085,10 +1085,7 @@ class BisectorCommandLine:
     """
         )
 
-        parents = [
-            common.common_argument_parser,
-            common.session_optional_parser,
-        ]
+        parents = [common.create_session_optional_parser()]
         parser = argparse.ArgumentParser(
             prog=prog,
             formatter_class=argparse.RawDescriptionHelpFormatter,

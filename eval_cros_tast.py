@@ -46,7 +46,7 @@ EXIT_CODE_MAP = {
 
 
 def create_argument_parser():
-    parents = [common.common_argument_parser, common.session_optional_parser]
+    parents = [common.create_session_optional_parser()]
     parser = argparse.ArgumentParser(description=__doc__, parents=parents)
     cli.patching_argparser_exit(parser)
     parser.add_argument(

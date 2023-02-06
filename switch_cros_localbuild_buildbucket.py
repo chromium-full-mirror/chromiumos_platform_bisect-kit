@@ -122,8 +122,7 @@ def create_argument_parser():
     cli.patching_argparser_exit(parser)
 
     parents = [
-        common.common_argument_parser,
-        common.session_optional_parser,
+        common.create_session_optional_parser(),
         create_common_argument_parser(),
     ]
     # chromeos parser
