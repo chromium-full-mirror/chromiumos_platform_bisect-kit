@@ -706,6 +706,7 @@ class CrosDiagnoser:
                 term_new=self.config['term_new'],
                 recompute_init_values=self.config['recompute_init_values'],
                 noisy=self.noisy,
+                endpoint_verification=self.config['endpoint_verification'],
             )
             if extra_switch_cmd:
                 bisector.append_switch_command(extra_switch_cmd)
