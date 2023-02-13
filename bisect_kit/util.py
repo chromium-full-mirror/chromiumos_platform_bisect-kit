@@ -20,6 +20,7 @@ import threading
 import time
 import typing
 
+from bisect_kit import core
 from bisect_kit import errors
 import psutil
 
@@ -593,3 +594,19 @@ def forward_ssh(from_host: str, to_port: int):
         if p:
             p.terminate()
         assert not is_port_in_use(to_port)
+
+
+def get_test_crash_step_result(
+    test_crash_reason: str, fail_to_pass: bool | None
+) -> core.StepResult:
+    """Make core step result object for test crash
+
+    Args:
+        fail_to_pass: A flag indicating failure as old behavior
+        test_crash_reason: The reason for the crash
+    """
+    if fail_to_pass:
+        logger.info('failed')
+        return core.StepResult('old', test_crash_reason)
+    logger.info('failed')
+    return core.StepResult('new', test_crash_reason)

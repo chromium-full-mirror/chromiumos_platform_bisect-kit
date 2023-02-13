@@ -114,6 +114,11 @@ def create_argument_parser():
         'behavior is FAIL',
     )
     group.add_argument(
+        '--consider_test_crash_as_failure',
+        action='store_true',
+        help='Consider test crashes as failure instead of skip',
+    )
+    group.add_argument(
         '--metric',
         help='Metric name of performance test; example: '
         '"cheets_SystemRawImageSize"',
@@ -320,7 +325,8 @@ def parse_tauto_results(
         if re.match(r'ABORT|ERROR|FAIL|WARN|TEST_NA', content):
             reason = content
 
-    assert failed, 'test name not found in test_report.log'
+    if failed is None:
+        raise errors.ExternalError('test name not found in test_report.log')
     return False, reason
 
 
@@ -387,6 +393,12 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
                         full_path, opts.metric
                     )
                 except Exception as e:
+                    test_crash_reason = f'test failed to generate metric values, reason: {reason}'
+                    if opts.consider_test_crash_as_failure:
+                        return util.get_test_crash_step_result(
+                            test_crash_reason, opts.fail_to_pass
+                        )
+
                     if not passed:
                         raise errors.BisectionTemporaryError(
                             'test failed to generate metric values, reason: %s'

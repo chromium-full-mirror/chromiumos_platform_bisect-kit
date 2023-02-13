@@ -69,6 +69,8 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         for var in self.config['extra_test_variables']:
             common_eval_cmd.append('--args')
             common_eval_cmd.append(var)
+        if self.config['consider_test_crash_as_failure']:
+            common_eval_cmd.append('--consider_test_crash_as_failure')
 
         return common_switch_cmd, common_eval_cmd
 

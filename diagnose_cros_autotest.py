@@ -157,6 +157,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                     str(self.config[arg_name]),
                 ]
 
+        if self.config['consider_test_crash_as_failure']:
+            common_eval_cmd.append('--consider_test_crash_as_failure')
+
         return common_switch_cmd, common_eval_cmd
 
     def cmd_run(self, opts):

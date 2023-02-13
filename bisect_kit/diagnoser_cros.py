@@ -1298,6 +1298,7 @@ class DiagnoseCommandLineBase:
             enable_buildbucket_chrome=opts.enable_buildbucket_chrome,
             extra_test_variables=opts.extra_test_variables,
             endpoint_verification=opts.endpoint_verification,
+            consider_test_crash_as_failure=opts.consider_test_crash_as_failure,
         )
 
         self.states.init(config)
@@ -1587,6 +1588,11 @@ class DiagnoseCommandLineBase:
             '--endpoint_verification',
             action='store_true',
             help='Enable statistical method to verify endpoints',
+        )
+        group.add_argument(
+            '--consider_test_crash_as_failure',
+            action='store_true',
+            help='Consider test crashes as failure instead of skip',
         )
         parser_init.set_defaults(func=self.cmd_init)
 

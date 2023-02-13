@@ -112,6 +112,11 @@ def create_argument_parser():
         'behavior is FAIL',
     )
     group.add_argument(
+        '--consider_test_crash_as_failure',
+        action='store_true',
+        help='Consider test crashes as failure instead of skip',
+    )
+    group.add_argument(
         '--metric',
         help='Metric name of performance test; example: '
         '"cheets_SystemRawImageSize"',
@@ -275,6 +280,13 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
         try:
             values = catapult_util.get_benchmark_values(chart_path, opts.metric)
         except Exception as e:
+            if opts.consider_test_crash_as_failure:
+                test_crash_reason = (
+                    f'test failed to generate metric values, reason: {reason}'
+                )
+                return util.get_test_crash_step_result(
+                    test_crash_reason, opts.fail_to_pass
+                )
             if not passed:
                 raise errors.BisectionTemporaryError(
                     'test failed to generate metric values, reason: %s' % reason
@@ -359,9 +371,11 @@ def step_main(args: 'typing.Optional[tuple[str]]') -> core.StepResult:
     try:
         result_dir = run_test(opts, bundle)
     except subprocess.CalledProcessError as e:
-        raise errors.BisectionTemporaryError(
-            'failed to run tast; maybe build, ssh, or setup failures'
-        ) from e
+        reason = 'failed to run tast; maybe build, ssh, or setup failures'
+        # TODO(njrafi): Differentiate between ssh failure and test crash
+        if opts.consider_test_crash_as_failure:
+            return util.get_test_crash_step_result(reason, opts.fail_to_pass)
+        raise errors.BisectionTemporaryError(reason) from e
 
     return gather_test_result(opts, result_dir)
 
