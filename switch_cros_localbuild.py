@@ -346,7 +346,6 @@ def inner_main(opts):
 
 
 def switch_main(args: typing.Optional[tuple[str]]):
-    common.init()
     opts = parse_args(args)
     common.config_logging(opts)
     inner_main(opts)

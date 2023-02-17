@@ -32,7 +32,6 @@ class TestCommon(unittest.TestCase):
         'bisect_kit.common.config_logging.configured', False, create=True
     )
     def test_logging(self):
-        common.init()
         parents = [common.create_common_argument_parser()]
         parser = argparse.ArgumentParser(parents=parents)
         opts = parser.parse_args(['--log_file', self.log_file])

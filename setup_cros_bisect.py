@@ -826,7 +826,6 @@ def create_parser():
 
 
 def main():
-    common.init()
     parser = create_parser()
     opts = parser.parse_args()
     common.config_logging(opts)

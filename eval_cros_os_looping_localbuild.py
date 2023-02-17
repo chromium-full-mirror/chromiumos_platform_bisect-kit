@@ -46,7 +46,6 @@ def evaluate(opts):
 
 @cli.fatal_error_handler
 def main(args=None):
-    common.init()
     opts = switch_cros_localbuild.parse_args(args)
     common.config_logging(opts)
 

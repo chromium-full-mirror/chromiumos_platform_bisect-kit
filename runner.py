@@ -306,7 +306,6 @@ def criteria_is_met(ratio, counter, rest, want):
 
 
 def main(args=None):
-    common.init()
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)

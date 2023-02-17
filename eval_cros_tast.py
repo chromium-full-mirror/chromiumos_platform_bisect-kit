@@ -300,7 +300,6 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
 
 
 def step_main(args: 'typing.Optional[tuple[str]]') -> core.StepResult:
-    common.init()
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)

@@ -51,7 +51,6 @@ def create_argument_parser():
 
 @cli.fatal_error_handler
 def main(args=None):
-    common.init()
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)

@@ -645,7 +645,6 @@ def add_allocate_dut_arguments(
 
 @cli.fatal_error_handler
 def main():
-    common.init()
     parents = [common.create_session_optional_parser()]
     parser = argparse.ArgumentParser()
     cli.patching_argparser_exit(parser)

@@ -1470,7 +1470,6 @@ class BisectorCommandLine:
               'prog': Program name; optional.
             }
         """
-        common.init()
         parser = self.create_argument_parser(kwargs.get('prog'))
         opts = parser.parse_args(args or None)
         common.config_logging(opts)

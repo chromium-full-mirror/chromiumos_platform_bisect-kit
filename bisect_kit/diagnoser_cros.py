@@ -1038,7 +1038,6 @@ class DiagnoseCommandLineBase:
     """Diagnose command line interface."""
 
     def __init__(self):
-        common.init()
         self.argument_parser = self.create_argument_parser()
         self.states = None
 

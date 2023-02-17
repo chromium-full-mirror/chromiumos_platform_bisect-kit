@@ -148,8 +148,8 @@ def search_config_file(args: list[str]) -> PathLike | None:
             raise ValueError(f'Config file "{config}" not found')
         return config
 
-    for path in [pathlib.Path.cwd(), pathlib.Path(args[0]).parent]:
-        fullpath = path / DEFAULT_CONFIG_FILENAME
+    for search_path in [pathlib.Path.cwd(), pathlib.Path(args[0]).parent]:
+        fullpath = search_path / DEFAULT_CONFIG_FILENAME
         if fullpath.exists():
             return fullpath
 
@@ -173,8 +173,8 @@ def get(name, default=None):
     Returns:
       Configuration value.
     """
-    assert root
-    value = root.get_option(name)
+    config = load_config()
+    value = config.get_option(name)
     if value is not None:
         return value
 

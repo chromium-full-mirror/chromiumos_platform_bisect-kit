@@ -490,7 +490,6 @@ def switch(opts) -> core.StepResult:
 
 
 def switch_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
-    common.init()
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)

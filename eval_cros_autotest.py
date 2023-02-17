@@ -432,7 +432,6 @@ def is_cts(opts) -> bool:
 
 
 def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
-    common.init()
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)

@@ -162,8 +162,3 @@ def create_session_required_parser() -> argparse.ArgumentParser:
 def under_luci_context():
     """Returns True if current process is under a luci auth context."""
     return bool(os.getenv('LUCI_CONTEXT'))
-
-
-def init():
-    config = configure.load_config()
-    configure.load_plugins(config.iter_plugins())

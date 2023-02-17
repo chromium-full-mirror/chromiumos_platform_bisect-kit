@@ -8,7 +8,6 @@ import argparse
 import unittest
 from unittest import mock
 
-from bisect_kit import common
 from bisect_kit import configure
 import runner
 
@@ -106,7 +105,6 @@ class TestRunner(unittest.TestCase):
         )
 
     def test_run_once_returncode(self):
-        common.init()
         parser = runner.create_argument_parser()
         opts = parser.parse_args(['--new', '--returncode=0', 'true'])
         self.assertEqual(runner.run_once(opts), runner.NEW)
@@ -125,7 +123,6 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(runner.run_once(opts), runner.FATAL)
 
     def test_run_once_output(self):
-        common.init()
         parser = runner.create_argument_parser()
         opts = parser.parse_args(['--old', '--output', 'OLD', 'echo', 'OLD'])
         self.assertEqual(runner.run_once(opts), runner.OLD)
@@ -157,7 +154,6 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(runner.run_once(opts), runner.SKIP)
 
     def test_run_once_timeout(self):
-        common.init()
         parser = runner.create_argument_parser()
         opts = parser.parse_args(['--new', '--timeout=0.1', 'sleep', '0.11'])
         self.assertEqual(runner.run_once(opts), runner.NEW)
@@ -166,7 +162,6 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(runner.run_once(opts), runner.OLD)
 
     def test_run_once_terminate_output(self):
-        common.init()
         parser = runner.create_argument_parser()
         opts = parser.parse_args(
             [

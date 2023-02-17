@@ -11,7 +11,6 @@ from unittest import mock
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
-from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import errors
 from bisect_kit import testing
@@ -471,7 +470,6 @@ class TestBisectorCommandLine(unittest.TestCase):
             bisector.main('view')
 
     def test_current_status(self):
-        common.init()
         bisector = bisector_cli.BisectorCommandLine(DummyDomain)
         result = bisector.current_status()
         self.assertEqual(result.get('inited'), False)
