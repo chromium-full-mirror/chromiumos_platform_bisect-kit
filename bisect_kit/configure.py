@@ -14,15 +14,24 @@ import os
 import pathlib
 import re
 import sys
+import typing
 
-
-logger = logging.getLogger(__name__)
 
 SUPPRESS_CONFIG = 'none'
 DEFAULT_CONFIG_FILENAME = 'bisect_kit.json'
 CONFIG_ENV_NAME = 'BISECT_KIT_CONFIG'
 
+PathLike = os.PathLike | str
+
+logger = logging.getLogger(__name__)
 root = None
+
+
+def _make_absolute_path(path: PathLike, parent: PathLike) -> pathlib.Path:
+    path = pathlib.Path(path)
+    if path.is_absolute():
+        return path
+    return pathlib.Path(parent) / path
 
 
 def _parse_rc_argument(args: list[str]) -> str | None:
@@ -52,11 +61,17 @@ class ConfigStore:
       options: dict of option values.
     """
 
-    def __init__(self, path):
+    def __init__(self, path: PathLike | None):
         self.path = pathlib.Path(path) if path is not None else None
         self.children: list[ConfigStore] = []
-        self.plugins: list[str] = []
+        self.plugins: list[pathlib.Path] = []
         self.options = {}
+        self._parse_config()
+
+    def iter_plugins(self) -> typing.Iterator[pathlib.Path]:
+        yield from self.plugins
+        for child in self.children:
+            yield from child.iter_plugins()
 
     def get_option(self, key):
         if key in self.options:
@@ -69,7 +84,7 @@ class ConfigStore:
 
         return None
 
-    def load_config(self):
+    def _parse_config(self) -> None:
         """Load configure file recursively."""
         if not self.path:
             return
@@ -81,41 +96,35 @@ class ConfigStore:
 
         config = json.loads(content)
 
-        for path in config.get('include', []):
-            path = pathlib.Path(path)
-            if not path.is_absolute():
-                path = self.path.parent / path
-            child = ConfigStore(path)
-            child.load_config()
+        for include_path in config.get('include', []):
+            include_path = _make_absolute_path(include_path, self.path.parent)
+            child = ConfigStore(include_path)
             self.children.append(child)
 
-        self.plugins = config.get('plugins', [])
+        self.plugins = [
+            _make_absolute_path(plugin_path, self.path.parent)
+            for plugin_path in config.get('plugins', [])
+        ]
         self.options = config.get('options', {})
 
-    def load_plugins(self):
-        """Load plugins."""
-        for child in self.children:
-            child.load_plugins()
 
-        for path in self.plugins:
-            path = pathlib.Path(path)
-            if not path.is_absolute():
-                path = self.path.parent / path
-            if not path.exists():
-                raise ValueError(
-                    '%s plugin %r: file not found' % (self.path, path)
-                )
-            module = {}
-            with path.open() as f:
-                code = compile(f.read(), path, 'exec')
-                # pylint: disable=exec-used
-                exec(code, module)
-            loaded_func = module.get('loaded', None)
-            if loaded_func:
-                loaded_func()
+def load_plugins(plugin_list: typing.Iterable[PathLike]) -> None:
+    """Load plugins."""
+    for plugin_path in plugin_list:
+        plugin_path = pathlib.Path(plugin_path)
+        if not plugin_path.exists():
+            raise ValueError(f'Plugin file "{plugin_path}" not found')
+        module = {}
+        with plugin_path.open() as f:
+            code = compile(f.read(), plugin_path, 'exec')
+            # pylint: disable=exec-used
+            exec(code, module)
+        loaded_func = module.get('loaded', None)
+        if loaded_func:
+            loaded_func()
 
 
-def search_config_file(args: list[str]) -> pathlib.Path | None:
+def search_config_file(args: list[str]) -> PathLike | None:
     """Searches config file.
 
     The search order of config file is:
@@ -150,14 +159,11 @@ def search_config_file(args: list[str]) -> pathlib.Path | None:
     return None
 
 
-def load_config(args=None):
-    if args is None:
-        args = sys.argv
+def load_config() -> ConfigStore:
     global root  # pylint: disable=global-statement
     if not root:
-        root_config = search_config_file(args)
-        root = ConfigStore(root_config)
-        root.load_config()
+        root = ConfigStore(search_config_file(sys.argv))
+    return root
 
 
 def get(name, default=None):

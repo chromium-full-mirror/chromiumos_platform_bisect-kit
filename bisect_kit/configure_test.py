@@ -152,11 +152,11 @@ class TestConfigure(unittest.TestCase):
 
     def test_load_sample_config(self):
         filename = 'bisect_kit.json.sample'
-        path = pathlib.Path(bisect_kit.BISECT_KIT_ROOT) / filename
-        config = configure.ConfigStore(path)
+        path = bisect_kit.BISECT_KIT_ROOT / filename
 
         # Load succeeded, no exceptions.
-        config.load_config()
+        config = configure.ConfigStore(path)
+        self.assertIsNone(config.get_option('foo'))
 
     def test_include(self):
         subdir = self.progdir / 'subdir'
@@ -171,7 +171,6 @@ class TestConfigure(unittest.TestCase):
             """{"options": {"foo": "bar"}}""",
         ):
             config = configure.ConfigStore(path)
-            config.load_config()
             self.assertEqual(config.get_option('foo'), 'bar')
 
     def test_plugins(self):
@@ -210,8 +209,7 @@ class TestConfigure(unittest.TestCase):
             ),
         ):
             config = configure.ConfigStore(path)
-            config.load_config()
-            config.load_plugins()
+            configure.load_plugins(config.iter_plugins())
             self.assertEqual(globals().get('aaa'), 111)
             self.assertEqual(globals().get('bbb'), 222)
 

@@ -168,5 +168,5 @@ def under_luci_context():
 
 
 def init():
-    configure.load_config()
-    configure.root.load_plugins()
+    config = configure.load_config()
+    configure.load_plugins(config.iter_plugins())
