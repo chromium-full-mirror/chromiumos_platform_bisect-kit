@@ -86,6 +86,19 @@ class TestPopen(unittest.TestCase):
         self.assertEqual(util.dict_get(test_dict, 'a', 'c', 'd'), None)
         self.assertEqual(util.dict_get(None, 'a', 'c', 'd'), None)
 
+    def test_is_valid_ip(self):
+        self.assertEqual(util.is_valid_ip('127.0.0.1'), True)
+        self.assertEqual(
+            util.is_valid_ip('2001:0db8:75a2:0000:0000:8a2e:0340:9999'), True
+        )
+
+        self.assertEqual(util.is_valid_ip('abcd'), False)
+        self.assertEqual(util.is_valid_ip('127.0.1'), False)
+        self.assertEqual(util.is_valid_ip('127.0.0.999'), False)
+        self.assertEqual(
+            util.is_valid_ip('2001:0db8:75a2:0000:0000:8a2e:0340'), False
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

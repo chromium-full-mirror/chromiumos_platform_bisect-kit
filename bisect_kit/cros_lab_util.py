@@ -359,16 +359,23 @@ def swarming_dut_satlab_ip(dut: str) -> str:
     if known_satlab_ip:
         return known_satlab_ip
 
-    # TODO(njrafi): Change to a more reliable way to get the satlab IP
-    logger.debug("Querying IP for satlab DUT: %s", dut)
+    logger.debug('Querying IP for satlab DUT: %s', dut)
     bots = swarming_bots_list(['dut_name:' + dut])
     if len(bots) != 1:
-        raise errors.ExternalError("Satlab IP query failed for DUT: %s" % dut)
+        raise errors.ExternalError('Satlab IP query failed for DUT: %s' % dut)
+    satlab_ip = bots[0]['dimensions']['drone_server'][0]
+    if util.is_valid_ip(satlab_ip):
+        return satlab_ip
+
+    logger.debug(
+        'drone_server dimension in swarming is not valid. This satlab does not have latest update. Trying with external_ip dimension.'
+    )
+
     satlab_ip = bots[0]['external_ip']
     wrong_satlab_ip_prefix = '104'
     if satlab_ip.startswith(wrong_satlab_ip_prefix):
         raise errors.ExternalError(
-            "Swarming external IP query for DUT %s returned %s which is not the correct satlab IP. Please try again later."
+            'Swarming external IP query for DUT %s returned %s which is not the correct satlab IP. Please try again later.'
             % (dut, satlab_ip)
         )
     return satlab_ip

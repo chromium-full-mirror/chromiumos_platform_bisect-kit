@@ -10,6 +10,7 @@ from __future__ import print_function
 
 import contextlib
 import difflib
+import ipaddress
 import logging
 import os
 import queue
@@ -610,3 +611,19 @@ def get_test_crash_step_result(
         return core.StepResult('old', test_crash_reason)
     logger.info('failed')
     return core.StepResult('new', test_crash_reason)
+
+
+def is_valid_ip(ip: str) -> bool:
+    """Checks if an ip address is valid or not
+
+    Args:
+        ip: An ipv4 of ipv6 address
+
+    Returns:
+        True for valid ip address, False otherwise
+    """
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return True
