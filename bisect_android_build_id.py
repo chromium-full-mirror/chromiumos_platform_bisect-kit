@@ -80,9 +80,9 @@ class AndroidBuildIDDomain(core.BisectDomain):
 
     @staticmethod
     def init(opts):
-        if cros_lab_util.is_satlab_dut(opts.dut):
-            cros_lab_util.write_satlab_ssh_config(opts.dut)
         if opts.dut:
+            if cros_lab_util.is_satlab_dut(opts.dut):
+                cros_lab_util.write_satlab_ssh_config(opts.dut)
             assert cros_util.is_dut(opts.dut)
 
         if not opts.flavor:
