@@ -2006,6 +2006,7 @@ def prepare_chroot(chromeos_root):
     for name in ['testing_rsa', 'testing_rsa.pub']:
         possible_paths = [
             os.path.join(
+                chromeos_root,
                 'src',
                 'private-overlays',
                 'chromeos-overlay',
