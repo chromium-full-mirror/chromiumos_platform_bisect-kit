@@ -2031,7 +2031,7 @@ def prepare_chroot(chromeos_root):
         if os.path.isfile(to_file):
             os.remove(to_file)
 
-        assert any([os.path.exists(x) for x in possible_paths])
+        assert any(os.path.exists(x) for x in possible_paths)
         for path in possible_paths:
             if os.path.exists(path):
                 shutil.copy(path, to_folder)
