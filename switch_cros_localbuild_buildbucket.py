@@ -53,7 +53,7 @@ def add_build_and_deploy_arguments(parser_group):
 
 
 def create_common_argument_parser():
-    """Common arguments parser for both Chrome and Chrome OS builds"""
+    """Common arguments parser for both Chrome and ChromeOS builds"""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         '--rich_result',
@@ -127,7 +127,7 @@ def create_argument_parser():
     ]
     # chromeos parser
     parser_cros = subparsers.add_parser(
-        'bisect_chromeos', help='Bisect on Chrome OS versions', parents=parents
+        'bisect_chromeos', help='Bisect on ChromeOS versions', parents=parents
     )
     parser_cros.add_argument(
         'chromeos_rev',
@@ -281,7 +281,7 @@ def get_deps(opts):
 
 
 def get_release_manifest(opts):
-    """Get manifest of a release Chrome OS version or snapshot version"""
+    """Get manifest of a release ChromeOS version or snapshot version"""
     if opts.manifest:
         return read_file(opts.manifest)
     spec_manager = get_chromeos_spec_manager(opts)

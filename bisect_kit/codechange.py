@@ -552,7 +552,7 @@ class SpecManager:
         Args:
           old: old version
           new: new version
-          fixed_specs: fixed specs from collect_fixed_spec(old, new) for Chrome OS
+          fixed_specs: fixed specs from collect_fixed_spec(old, new) for ChromeOS
               or None for others
         """
         raise NotImplementedError

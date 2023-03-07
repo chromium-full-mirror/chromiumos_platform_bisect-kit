@@ -136,7 +136,7 @@ class CrosDiagnoser:
         cros_localbuild_eval_cmd: list[str] = None,
         cros_localbuild_extra_switch_cmd: list[str] = None,
     ):
-        # Step 1: Narrows down Chrome OS prebuilt.
+        # Step 1: Narrows down ChromeOS prebuilt.
         self.narrow_down_chromeos_prebuilt(
             self.config['cros_prebuilt_old'],
             self.config['cros_prebuilt_new'],
@@ -247,25 +247,19 @@ class CrosDiagnoser:
         """
         if self.config['bisect_chrome']:
             self.make_decision(
-                (
-                    'The Chrome OS prebuilt bisection is bypassed since --bisect_chrome'
-                    ' is on'
-                )
+                'The ChromeOS prebuilt bisection is bypassed since --bisect_chrome is on'
             )
             self.cros_old = self.cros_new = self.config['base_cros_version']
         elif self.config['bisect_android']:
             self.make_decision(
-                (
-                    'The Chrome OS prebuilt bisection is bypassed since --bisect_android'
-                    ' is on'
-                )
+                'The ChromeOS prebuilt bisection is bypassed since --bisect_android is on'
             )
             self.cros_old = self.cros_new = self.config['base_cros_version']
         elif self.config['bypass_chromeos_prebuilt']:
             self.make_decision(
-                'The bisection with Chrome OS prebuilt image is bypassed; '
-                'assume that old Chrome OS has old behavior and '
-                'new Chrome OS has new behavior'
+                'The bisection with ChromeOS prebuilt image is bypassed; '
+                'assume that old ChromeOS has old behavior and '
+                'new ChromeOS has new behavior'
             )
             self.cros_old = old
             self.cros_new = new
@@ -852,7 +846,7 @@ class CrosDiagnoser:
                 % self.config['term_old']
             )
             raise errors.DiagnoseContradiction(
-                '%s that old chrome os has old behavior (%s); '
+                '%s that old ChromeOS has old behavior (%s); '
                 'but it became new behavior (%s) after deployed chrome'
                 % (
                     self._verified_chromeos_prebuilt(),
@@ -879,17 +873,17 @@ class CrosDiagnoser:
         """
         if self.config['bisect_chrome']:
             self.make_decision(
-                'Bypass Chrome OS local build since --bisect_chrome is on'
+                'Bypass ChromeOS local build since --bisect_chrome is on'
             )
             return
         if self.config['bisect_android']:
             self.make_decision(
-                'Bypass Chrome OS local build since --bisect_android is on'
+                'Bypass ChromeOS local build since --bisect_android is on'
             )
             return
         if self.config['bypass_chromeos_build']:
             self.make_decision(
-                'The bisection with Chrome OS local build is bypassed'
+                'The bisection with ChromeOS local build is bypassed'
             )
             return
 

@@ -510,7 +510,7 @@ class BuildbucketApi:
         Args:
           board: ChromeOS board name.
           bucket: Bucket name in buildbucket.
-          manifest_digest: Cas hash for Chrome OS manifest.
+          manifest_digest: Cas hash for ChromeOS manifest.
           deps_digest: Cas hash for Chrome DEPS file, leave None if no
               special buildspec for Chrome.
           deps_src_ver: The src revision inside deps.

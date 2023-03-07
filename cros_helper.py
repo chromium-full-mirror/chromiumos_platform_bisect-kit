@@ -51,10 +51,10 @@ def cmd_query_dut_board(opts):
 def cmd_reboot(opts):
     if not cros_util.is_dut(opts.dut):
         if opts.force:
-            logger.warning('%s is not a Chrome OS device?', opts.dut)
+            logger.warning('%s is not a ChromeOS device?', opts.dut)
         else:
             raise errors.ArgumentError(
-                'dut', 'not a Chrome OS device (--force to continue)'
+                'dut', 'not a ChromeOS device (--force to continue)'
             )
 
     cros_util.reboot(
@@ -252,7 +252,7 @@ def do_allocate_dut(opts):
                 continue
             raise errors.ArgumentError(
                 '--version_hint',
-                'should be Chrome OS version numbers, separated by comma',
+                'should be ChromeOS version numbers, separated by comma',
             )
     if opts.duration is not None and opts.duration < 60:
         raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
@@ -619,7 +619,7 @@ def main():
         default=configure.get(
             'DEFAULT_CHROMEOS_ROOT', os.path.expanduser('~/chromiumos')
         ),
-        help='Chrome OS source tree, for overlay data (default: %(default)s)',
+        help='ChromeOS source tree, for overlay data (default: %(default)s)',
     )
     parser_allocate_dut.set_defaults(func=cmd_allocate_dut)
 

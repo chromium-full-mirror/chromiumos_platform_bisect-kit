@@ -35,7 +35,7 @@ def add_build_and_deploy_arguments(parser_group):
         '--goma_chromeos_dir',
         type=cli.argtype_dir_path,
         default=configure.get('GOMA_CHROMEOS_DIR'),
-        help='Goma-chromeos installed directory to mount into the Chrome OS '
+        help='Goma-chromeos installed directory to mount into the ChromeOS '
         'chroot',
     )
     parser_group.add_argument(

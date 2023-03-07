@@ -147,7 +147,7 @@ enable_ssh_tunnel_for_moblab: True
 
 
 class ImageType(enum.Enum):
-    """Chrome OS image type
+    """ChromeOS image type
 
     It describes the image format, not image location.
     """
@@ -178,8 +178,8 @@ class ImageType(enum.Enum):
 class ImageInfo(dict):
     """Image info (dict: image type -> path).
 
-    For a given Chrome OS version, there are several image formats available.
-    This class describes a collection of images for a certain Chrome OS version.
+    For a given ChromeOS version, there are several image formats available.
+    This class describes a collection of images for a certain ChromeOS version.
     cros_flash() or quick_provision() can resolve a compatible image from this
     object. `image type` is an ImageType enum. `path` could be a path on the
     local disk or a remote URI.
@@ -393,8 +393,8 @@ def is_cros_version_lesseq(ver1, ver2):
     """Determines if ver1 is less or equal to ver2.
 
     Args:
-      ver1: a Chrome OS version in short, full, or snapshot format.
-      ver2: a Chrome OS version in short, full, or snapshot format.
+      ver1: a ChromeOS version in short, full, or snapshot format.
+      ver2: a ChromeOS version in short, full, or snapshot format.
 
     Returns:
       True if ver1 is less or equal to ver2.
@@ -1155,7 +1155,7 @@ def list_prebuilt_from_image_archive(
 
     Returns:
       list of (version, image_info):
-        version: Chrome OS version in full format
+        version: ChromeOS version in full format
         image_info: ImageInfo object
     """
     assert is_cros_full_version(old) or is_cros_snapshot_version(old)
