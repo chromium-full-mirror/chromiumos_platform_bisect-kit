@@ -393,12 +393,6 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
                         full_path, opts.metric
                     )
                 except Exception as e:
-                    test_crash_reason = f'test failed to generate metric values, reason: {reason}'
-                    if opts.consider_test_crash_as_failure:
-                        return util.get_test_crash_step_result(
-                            test_crash_reason, opts.fail_to_pass
-                        )
-
                     if not passed:
                         raise errors.BisectionTemporaryError(
                             'test failed to generate metric values, reason: %s'

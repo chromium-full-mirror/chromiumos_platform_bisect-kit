@@ -280,13 +280,6 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
         try:
             values = catapult_util.get_benchmark_values(chart_path, opts.metric)
         except Exception as e:
-            if opts.consider_test_crash_as_failure:
-                test_crash_reason = (
-                    f'test failed to generate metric values, reason: {reason}'
-                )
-                return util.get_test_crash_step_result(
-                    test_crash_reason, opts.fail_to_pass
-                )
             if not passed:
                 raise errors.BisectionTemporaryError(
                     'test failed to generate metric values, reason: %s' % reason
