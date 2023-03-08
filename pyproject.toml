@@ -56,6 +56,7 @@ omit = [
     "third_party/*",
     "internal/*",
     "venv/*",
+    "*_test.py",
 ]
 
 [tool.pylint.MASTER]
