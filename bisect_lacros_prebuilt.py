@@ -86,7 +86,7 @@ class LacrosVersionDomain(core.BisectDomain):
             assert opts.dut
             opts.board = cros_util.query_dut_board(opts.dut)
 
-        lacros_folder_name = lacros_util.get_lacross_folder_name(opts.dut)
+        lacros_folder_name = lacros_util.get_lacros_folder_name(opts.dut)
 
         if not cr_util.is_direct_relative_version(opts.old, opts.new):
             logger.warning(

@@ -214,7 +214,7 @@ def is_prebuilt_version_available(lacros_version: str, dut_ip: str) -> bool:
       True if the lacros version is available to fetch.
       False if not available to fetch.
     """
-    lacros_folder_name = get_lacross_folder_name(dut_ip)
+    lacros_folder_name = get_lacros_folder_name(dut_ip)
     lacros_bucket_url = LACROS_ZIP_PATH.format(
         version=lacros_version, lacros_folder_name=lacros_folder_name
     )
@@ -242,7 +242,7 @@ def get_dut_cpu_architecture(dut_ip: str) -> str:
         raise
 
 
-def get_lacross_folder_name(dut_ip: str) -> str:
+def get_lacros_folder_name(dut_ip: str) -> str:
     """Get a lacros prebuilt to determine the folder name in the GS bucket.
 
     Currently there are 2 folder names: 'lacros-64' and 'lacros-arm32' depending
@@ -299,7 +299,7 @@ def fetch_lacros_prebuilt(lacros_version: str, dut_ip: str) -> str:
     """
 
     try:
-        lacros_folder_name = get_lacross_folder_name(dut_ip)
+        lacros_folder_name = get_lacros_folder_name(dut_ip)
         lacros_bucket_url = LACROS_ZIP_PATH.format(
             version=lacros_version, lacros_folder_name=lacros_folder_name
         )

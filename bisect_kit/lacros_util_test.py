@@ -36,7 +36,7 @@ class TestLacrosUtil(unittest.TestCase):
             lacros_util, 'get_dut_cpu_architecture', return_value='x86_64'
         ):
             self.assertEqual(
-                lacros_util.get_lacross_folder_name('x64_dut'),
+                lacros_util.get_lacros_folder_name('x64_dut'),
                 lacros_util.BOARD_ARCHITECTURES['x86_64']['lacros_dir'],
             )
 
@@ -44,7 +44,7 @@ class TestLacrosUtil(unittest.TestCase):
             lacros_util, 'get_dut_cpu_architecture', return_value='aarch64'
         ):
             self.assertEqual(
-                lacros_util.get_lacross_folder_name('arm_dut'),
+                lacros_util.get_lacros_folder_name('arm_dut'),
                 lacros_util.BOARD_ARCHITECTURES['aarch64']['lacros_dir'],
             )
 
@@ -54,7 +54,7 @@ class TestLacrosUtil(unittest.TestCase):
             return_value='unknown_architecture',
         ):
             with self.assertRaises(errors.InternalError):
-                lacros_util.get_lacross_folder_name('unknown_architecture_dut')
+                lacros_util.get_lacros_folder_name('unknown_architecture_dut')
 
     def test_get_device_architecture_arg_for_gn(self):
         # Disabling protected member access cros lint error
