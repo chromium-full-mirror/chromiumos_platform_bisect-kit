@@ -647,7 +647,7 @@ class CrosDiagnoser:
             )
             return False
 
-        if self.config['bypass_chrome_build']:
+        if self.config['bypass_lacros_prebuilt']:
             self.make_decision('The bisection with Lacros is bypassed')
             return False
 
@@ -1282,6 +1282,7 @@ class DiagnoseCommandLineBase:
             reboot_before_test=opts.reboot_before_test,
             bypass_chromeos_prebuilt=opts.bypass_chromeos_prebuilt,
             bypass_chromeos_build=opts.bypass_chromeos_build,
+            bypass_lacros_prebuilt=opts.bypass_lacros_prebuilt,
             bypass_chrome_build=opts.bypass_chrome_build,
             bypass_android_prebuilt=opts.bypass_android_prebuilt,
             bypass_android_build=opts.bypass_android_build,
@@ -1514,6 +1515,11 @@ class DiagnoseCommandLineBase:
             '--bypass_chromeos_build',
             action='store_true',
             help='Bypass chromeos local build bisect',
+        )
+        group.add_argument(
+            '--bypass_lacros_prebuilt',
+            action='store_true',
+            help='Bypass lacros prebuilt image bisect',
         )
         group.add_argument(
             '--bypass_chrome_build',
