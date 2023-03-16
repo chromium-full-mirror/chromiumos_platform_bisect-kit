@@ -10,6 +10,7 @@ from __future__ import print_function
 
 import argparse
 import asyncio
+import collections.abc
 import functools
 import json
 import logging
@@ -99,15 +100,37 @@ def _filter_dimensions_by_lab(
     return result
 
 
-def select_available_bots_randomly(
-    dimensions,
-    variants,
-    num=1,
-    is_dead=False,
-    quarantined=False,
-    is_busy=None,
-    filter_func=None,
-):
+def _sample_available_bots(
+    dimensions: list[str],
+    variants: list[str],
+    num: int = 1,
+    filter_func: collections.abc.Callable | None = None,
+    *,
+    is_dead: bool | None = False,
+    quarantined: bool | None = False,
+    is_busy: bool | None = None,
+    limit: int = 10,
+) -> list[str]:
+    """Query available bots by given constraints and randomly sample the result.
+
+    1. Collect available bots of each variant in `variants` with
+       the specified `dimensions`.
+    2. Filter collected bots by the `filter_func`.
+    3. Randomly sample (at most) `num` bots and return.
+
+    Args:
+        dimensions: a list of dimension constraints
+        variants: a list of variant constraints
+        num: sample (at most) `num` available bots
+        filter_func: a boolean filter function will be applied before
+            the sampling. Passing `None` means no filtering.
+
+        id_dead: see `cros_lab_util.swarming_bots_list()`
+        quarantined: see `cros_lab_util.swarming_bots_list()`
+        is_busy: see `cros_lab_util.swarming_bots_list()`
+        limit: see `cros_lab_util.swarming_bots_list()`
+    Returns: a list of available bots
+    """
     bots = []
     for variant in variants:
         # There might be thousand bots available, set 'limit' to reduce swarming
@@ -117,7 +140,7 @@ def select_available_bots_randomly(
             is_dead=is_dead,
             quarantined=quarantined,
             is_busy=is_busy,
-            limit=10,
+            limit=limit,
         )
 
     if filter_func:
@@ -125,7 +148,66 @@ def select_available_bots_randomly(
     return random.sample(bots, min(num, len(bots)))
 
 
-def _filter_dimensions_by_board(boards_with_prebuilt, dimensions, pool):
+def _sample_available_bots_with_retry(
+    dimensions: list[str],
+    variants: list[str],
+    num: int,
+    filter_func: collections.abc.Callable | None = None,
+    max_attempts: int = 5,
+) -> list[str]:
+    """Query bots using the _sample_available_bots() with retries.
+
+    In each attemption, the function will try to collect non-busy bots first.
+    If there is no available bots, then try to qeury without the non-busy
+    constraint.
+
+    Args:
+        dimensions: a list of dimension constraints
+        variants: a list of variant constraints
+        num: sample (at most) `num` available bots
+        filter_func: a boolean filter function will be applied before
+            the sampling. Passing `None` means no filtering.
+        max_attempts: Retry the query at most `max_attempts` times.
+    Returns: a list of available bots
+    """
+
+    sample_func = functools.partial(
+        _sample_available_bots,
+        dimensions,
+        variants,
+        num,
+        filter_func,
+    )
+
+    if max_attempts <= 0:
+        raise ValueError('max_attempts must be at least 1')
+
+    fail_count = 0
+    while True:
+        # Query bots that satisfy is_busy=False
+        if bots := sample_func(is_busy=False):
+            return bots
+        # If there is no idle bots, remove the is_busy filter and query again
+        if bots := sample_func(is_busy=None):
+            return bots
+
+        # log all the DUTs for debugging
+        sample_func(is_dead=None, quarantined=None, is_busy=None)
+
+        fail_count += 1
+        if fail_count >= max_attempts:
+            raise errors.NoDutAvailable(
+                'no bots satisfy constraints; all are in maintenance state?'
+            )
+        # sleep 2^fail_count minutes before next try
+        time.sleep(60 * (2**fail_count))
+
+
+def _filter_dimensions_by_board(
+    boards_with_prebuilt: list[str] | None,
+    dimensions: list[str],
+    pool: str | None,
+) -> list[str]:
     result = set()
     for dimension in dimensions:
         constraints = [dimension]
@@ -232,7 +314,10 @@ def do_allocate_dut(opts):
         host: leased host name
         board_to_build: board name for building image
     """
-    if not opts.dut_name and not opts.pool:
+    if opts.dut_name:
+        # If dut_name is specified, pool is ignored.
+        opts.pool = None
+    elif not opts.pool:
         raise errors.ArgumentError(
             '--pool', 'need to be specified if not --dut_name'
         )
@@ -258,17 +343,13 @@ def do_allocate_dut(opts):
         cros_lab_util.write_satlab_ssh_config(opts.dut_name, opts.satlab_ip)
 
     t0 = time.time()
-    dimensions = ['dut_state:ready']
-    if opts.dut_name:
-        # If dut_name is specified, pool is ignored.
-        opts.pool = None
-    else:
+    dimensions = [f'{key}:{value}' for key, value in opts.dimensions]
+    dimensions.append('dut_state:ready')
+    if opts.pool:
         dimensions.append('label-pool:' + opts.pool)
-    for key, value in opts.dimensions:
-        dimensions.append('%s:%s' % (key, value))
     dimensions = _filter_dimensions_by_lab(dimensions, raise_unknown=True)
 
-    variants = []
+    variants: list[str] = []
     if opts.board:
         for board in opts.board.split(','):
             variants.append(
@@ -368,45 +449,11 @@ def do_allocate_dut(opts):
         variants = filtered
 
     filter_func = functools.partial(_is_acceptable_bot, boards_with_prebuilt)
-    fail_count = 0
     while True:
         # Query every time because each iteration takes a few minutes
-        # Query bots that satisfy is_busy=False
-        bots = select_available_bots_randomly(
-            dimensions,
-            variants,
-            num=opts.parallel,
-            is_busy=False,
-            filter_func=filter_func,
+        bots = _sample_available_bots_with_retry(
+            dimensions, variants, opts.parallel, filter_func
         )
-        if not bots:
-            # If there is no idle bots, remove the is_busy filter and query again
-            bots = select_available_bots_randomly(
-                dimensions,
-                variants,
-                num=opts.parallel,
-                is_busy=None,
-                filter_func=filter_func,
-            )
-        if not bots:
-            fail_count += 1
-            # log all the DUTs for debugging
-            select_available_bots_randomly(
-                dimensions,
-                variants,
-                num=opts.parallel,
-                is_dead=None,
-                quarantined=None,
-                is_busy=None,
-                filter_func=filter_func,
-            )
-            if fail_count >= 5:
-                raise errors.NoDutAvailable(
-                    'no bots satisfy constraints; all are in maintenance state?'
-                )
-            # sleep 2^fail_count minutes before next try
-            time.sleep(60 * (2**fail_count))
-            continue
 
         remaining_time = opts.time_limit - (time.time() - t0)
         if remaining_time <= 0:
