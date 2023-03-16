@@ -62,13 +62,6 @@ def cmd_reboot(opts):
     )
 
 
-def _get_label_by_prefix(info, prefix):
-    for label in info['Labels']:
-        if label.startswith(prefix + ':'):
-            return label
-    return None
-
-
 def cmd_lease_dut(opts):
     if opts.duration is not None and opts.duration < 60:
         raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
@@ -87,7 +80,10 @@ def cmd_release_dut(opts):
     logger.info('%s released', host)
 
 
-def verify_dimensions_by_lab(dimensions, tolerate_unknown=False):
+def _filter_dimensions_by_lab(
+    dimensions: list[str],
+    raise_unknown: bool = False,
+) -> list[str]:
     dimensions = sorted(set(dimensions))
     result = []
     bots_dimensions = cros_lab_util.swarming_bots_dimensions()
@@ -95,17 +91,11 @@ def verify_dimensions_by_lab(dimensions, tolerate_unknown=False):
         key, value = dimension.split(':', 1)
         if value in bots_dimensions.get(key, []):
             result.append(dimension)
-        else:
-            if tolerate_unknown:
-                logger.warning(
-                    'dimension=%s is unknown in the lab, typo? ignored',
-                    dimension,
-                )
-            else:
-                raise Exception(
-                    'dimension=%s is unknown in the lab, typo? ignored'
-                    % dimension
-                )
+            continue
+        msg = f'dimension={dimension} is unknown in the lab, typo? ignored'
+        if raise_unknown:
+            raise Exception(msg)
+        logger.warning(msg)
     return result
 
 
@@ -135,7 +125,7 @@ def select_available_bots_randomly(
     return random.sample(bots, min(num, len(bots)))
 
 
-def filter_dimensions_by_board(boards_with_prebuilt, dimensions, pool):
+def _filter_dimensions_by_board(boards_with_prebuilt, dimensions, pool):
     result = set()
     for dimension in dimensions:
         constraints = [dimension]
@@ -160,7 +150,10 @@ def filter_dimensions_by_board(boards_with_prebuilt, dimensions, pool):
     return list(result)
 
 
-def is_acceptable_bot(boards_with_prebuilt, bot):
+def _is_acceptable_bot(
+    boards_with_prebuilt: list[str] | None,
+    bot: dict,
+) -> bool:
     model = bot['dimensions']['label-model'][0]
     if model in models_to_avoid:
         logger.warning(
@@ -168,19 +161,18 @@ def is_acceptable_bot(boards_with_prebuilt, bot):
         )
         return False
 
-    if boards_with_prebuilt is not None:
-        # Sometimes swarming database has inconsistent records. For example,
-        # label-model=kefka + label-board=strago are incorrect (should be
-        # label-board=kefka). It is probably human errors (strago is kefka's
-        # reference board).
-        board = bot['dimensions']['label-board'][0]
-        if board not in boards_with_prebuilt:
-            logger.warning(
-                '%s has unexpected board=%s, ignore',
-                bot['dimensions']['dut_name'][0],
-                board,
-            )
-            return False
+    if boards_with_prebuilt is None:
+        return True
+
+    # Sometimes swarming database has inconsistent records. For example,
+    # label-model=kefka + label-board=strago are incorrect (should be
+    # label-board=kefka). It is probably human errors (strago is kefka's
+    # reference board).
+    board = bot['dimensions']['label-board'][0]
+    if board not in boards_with_prebuilt:
+        dut_name = bot['dimensions']['dut_name'][0]
+        logger.warning('%s has unexpected board=%s, ignore', dut_name, board)
+        return False
 
     return True
 
@@ -274,7 +266,7 @@ def do_allocate_dut(opts):
         dimensions.append('label-pool:' + opts.pool)
     for key, value in opts.dimensions:
         dimensions.append('%s:%s' % (key, value))
-    dimensions = verify_dimensions_by_lab(dimensions)
+    dimensions = _filter_dimensions_by_lab(dimensions, raise_unknown=True)
 
     variants = []
     if opts.board:
@@ -282,7 +274,7 @@ def do_allocate_dut(opts):
             variants.append(
                 'label-board:' + normalize_board_name(opts.chromeos_root, board)
             )
-        variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
+        variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
                 'Invalid constraints: no board=%s in the lab' % opts.board
@@ -302,7 +294,7 @@ def do_allocate_dut(opts):
             raise errors.ArgumentError(
                 '--model', 'all specified models are not supported'
             )
-        variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
+        variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
                 'Invalid constraints: no model=%s in the lab' % opts.model
@@ -313,7 +305,7 @@ def do_allocate_dut(opts):
             variants.append(
                 'label-hwid_sku:' + cros_lab_util.normalize_sku_name(sku)
             )
-        variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
+        variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
                 'Invalid constraints: no sku=%s in the lab' % opts.sku
@@ -322,14 +314,14 @@ def do_allocate_dut(opts):
     if opts.dut_name:
         for dut_name in opts.dut_name.split(','):
             variants.append('dut_name:' + dut_name)
-        variants = verify_dimensions_by_lab(variants, tolerate_unknown=True)
+        variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
                 'Invalid constraints: no dut_name=%s in the lab' % opts.dut_name
             )
 
     # Filter variants by prebuilt images.
-    boards_with_prebuilt = None
+    boards_with_prebuilt: list[str] | None = None
     if opts.version_hint:
         if not opts.builder_hint:
             opts.builder_hint = opts.board
@@ -356,7 +348,7 @@ def do_allocate_dut(opts):
                 '--version_hint',
                 'given builders have no prebuilt for %s' % opts.version_hint,
             )
-        filtered = filter_dimensions_by_board(
+        filtered = _filter_dimensions_by_board(
             boards_with_prebuilt, variants, None
         )
         if not filtered:
@@ -365,7 +357,7 @@ def do_allocate_dut(opts):
                 'Wrong constraints or wrong version number?' % variants
             )
         variants = filtered
-        filtered = filter_dimensions_by_board(
+        filtered = _filter_dimensions_by_board(
             boards_with_prebuilt, variants, opts.pool
         )
         if not filtered:
@@ -375,7 +367,7 @@ def do_allocate_dut(opts):
             )
         variants = filtered
 
-    filter_func = functools.partial(is_acceptable_bot, boards_with_prebuilt)
+    filter_func = functools.partial(_is_acceptable_bot, boards_with_prebuilt)
     fail_count = 0
     while True:
         # Query every time because each iteration takes a few minutes
