@@ -3,14 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import os
+import pathlib
 import sys
 
 
+BISECT_KIT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 # grpc, buildbucket protobuf modules
-sys.path.append(
-    os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'third_party',
-    )
-)
+sys.path.append(str(BISECT_KIT_ROOT / 'third_party'))

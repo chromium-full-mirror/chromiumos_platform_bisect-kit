@@ -24,8 +24,6 @@ DEFAULT_SESSION_BASE = 'bisect.sessions'
 DEFAULT_SESSION_NAME = 'default'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
-BISECT_KIT_ROOT = str(pathlib.Path(__file__).resolve().parent.parent)
-
 
 def determine_session_dir(
     session_name: str | None = None,

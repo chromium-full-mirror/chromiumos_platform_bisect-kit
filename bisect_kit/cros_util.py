@@ -38,10 +38,10 @@ import time
 import typing
 import urllib.parse
 
+import bisect_kit
 from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import errors
 from bisect_kit import git_util
@@ -1987,7 +1987,9 @@ def prepare_chroot(chromeos_root):
     # chroot. For example, quick-provision may need special ssh config.
     assert os.environ.get('USER')
     _copy_template_files(
-        os.path.join(common.BISECT_KIT_ROOT, 'cros_template_files', 'at_home'),
+        os.path.join(
+            bisect_kit.BISECT_KIT_ROOT, 'cros_template_files', 'at_home'
+        ),
         os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER']),
     )
 
@@ -2258,13 +2260,14 @@ def workaround_b183567529(
         ):
             logger.info('applying b183567529 cbi patch for volteer')
             cbi_override = os.path.join(
-                common.BISECT_KIT_ROOT,
+                bisect_kit.BISECT_KIT_ROOT,
                 'patching/b183567529/volteer-cbi-override.conf',
             )
             util.scp_cmd(cbi_override, 'root@%s:/etc/init/' % host)
 
             patch_script = os.path.join(
-                common.BISECT_KIT_ROOT, 'patching/b183567529/test_cbi_script.sh'
+                bisect_kit.BISECT_KIT_ROOT,
+                'patching/b183567529/test_cbi_script.sh',
             )
             util.check_output(patch_script, host)
             reboot(host, force_reboot_callback)

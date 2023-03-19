@@ -15,7 +15,7 @@ import textwrap
 import unittest
 from unittest import mock
 
-from bisect_kit import common
+import bisect_kit
 from bisect_kit import configure
 
 
@@ -147,7 +147,7 @@ class TestConfigure(unittest.TestCase):
 
     def test_load_sample_config(self):
         filename = 'bisect_kit.json.sample'
-        path = os.path.join(common.BISECT_KIT_ROOT, filename)
+        path = os.path.join(bisect_kit.BISECT_KIT_ROOT, filename)
         config = configure.ConfigStore(path)
 
         # Load succeeded, no exceptions.

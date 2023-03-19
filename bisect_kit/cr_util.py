@@ -17,9 +17,9 @@ import textwrap
 import time
 import urllib.request
 
+import bisect_kit
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import common
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
@@ -366,7 +366,7 @@ def build_and_deploy(
     env['DUT'] = dut
 
     deploy_script = os.path.join(
-        common.BISECT_KIT_ROOT, 'deploy_chrome_helper.sh'
+        bisect_kit.BISECT_KIT_ROOT, 'deploy_chrome_helper.sh'
     )
     cmd = ['sh', '-ex', deploy_script] + targets
     simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)

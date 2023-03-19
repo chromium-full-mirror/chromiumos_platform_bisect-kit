@@ -26,6 +26,7 @@ import sys
 import typing
 
 import bisect_cr_localbuild_internal
+import bisect_kit
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
@@ -161,7 +162,7 @@ def _apply_additional_patch(root_dir, rev):
         '73.0.3669.0', base_rev
     ) and cr_util.is_version_lesseq(base_rev, '74.0.3699.0'):
         patch_file = os.path.join(
-            common.BISECT_KIT_ROOT, 'patching/0001-disable-assistant.patch'
+            bisect_kit.BISECT_KIT_ROOT, 'patching/0001-disable-assistant.patch'
         )
         path = os.path.join(root_dir, 'src')
         util.check_call('git', 'am', patch_file, cwd=path)
