@@ -92,3 +92,16 @@ disable = [
     "unspecified-encoding",
     "wrong-import-order", # let isort handle it
 ]
+
+[tool.pyright]
+exclude = [
+    "venv",
+]
+venvPath = "."
+venv = "venv"
+extraPaths = [
+    "third_party",
+]
+
+[tool.pyright.analysis]
+typeCheckingMode = "strict"
