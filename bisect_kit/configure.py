@@ -11,6 +11,7 @@ import argparse
 import json
 import logging
 import os
+import pathlib
 import re
 import sys
 
@@ -24,7 +25,7 @@ CONFIG_ENV_NAME = 'BISECT_KIT_CONFIG'
 root = None
 
 
-def _parse_config_file(args):
+def _parse_rc_argument(args: list[str]) -> str | None:
     """Parses --rc from command line arguments.
 
     The purpose of this function is parsing --rc argument before full argument
@@ -52,9 +53,9 @@ class ConfigStore:
     """
 
     def __init__(self, path):
-        self.path = path
-        self.children = []
-        self.plugins = []
+        self.path = pathlib.Path(path) if path is not None else None
+        self.children: list[ConfigStore] = []
+        self.plugins: list[str] = []
         self.options = {}
 
     def get_option(self, key):
@@ -73,7 +74,7 @@ class ConfigStore:
         if not self.path:
             return
 
-        with open(self.path) as f:
+        with self.path.open() as f:
             content = f.read()
         # strip comments as they are not allowed in standard json
         content = re.sub(r'^\s*//.*', '', content, 0, re.M)
@@ -81,8 +82,9 @@ class ConfigStore:
         config = json.loads(content)
 
         for path in config.get('include', []):
-            if not os.path.isabs(path):
-                path = os.path.join(os.path.dirname(self.path), path)
+            path = pathlib.Path(path)
+            if not path.is_absolute():
+                path = self.path.parent / path
             child = ConfigStore(path)
             child.load_config()
             self.children.append(child)
@@ -96,14 +98,15 @@ class ConfigStore:
             child.load_plugins()
 
         for path in self.plugins:
-            if not os.path.isabs(path):
-                path = os.path.join(os.path.dirname(self.path), path)
-            if not os.path.exists(path):
+            path = pathlib.Path(path)
+            if not path.is_absolute():
+                path = self.path.parent / path
+            if not path.exists():
                 raise ValueError(
                     '%s plugin %r: file not found' % (self.path, path)
                 )
             module = {}
-            with open(path) as f:
+            with path.open() as f:
                 code = compile(f.read(), path, 'exec')
                 # pylint: disable=exec-used
                 exec(code, module)
@@ -112,7 +115,7 @@ class ConfigStore:
                 loaded_func()
 
 
-def search_config_file(args):
+def search_config_file(args: list[str]) -> pathlib.Path | None:
     """Searches config file.
 
     The search order of config file is:
@@ -127,20 +130,21 @@ def search_config_file(args):
     Returns:
       Path to config file. None if not found or suppressed.
     """
-    config = _parse_config_file(args)
+    config = _parse_rc_argument(args)
     if not config:
         config = os.environ.get(CONFIG_ENV_NAME, None)
     if config == SUPPRESS_CONFIG:
         return None
 
     if config:
-        if not os.path.exists(config):
-            raise ValueError('Config file %r not found' % config)
+        config = pathlib.Path(config)
+        if not config.exists():
+            raise ValueError(f'Config file "{config}" not found')
         return config
 
-    for path in [os.getcwd(), os.path.dirname(args[0])]:
-        fullpath = os.path.join(path, DEFAULT_CONFIG_FILENAME)
-        if os.path.exists(fullpath):
+    for path in [pathlib.Path.cwd(), pathlib.Path(args[0]).parent]:
+        fullpath = path / DEFAULT_CONFIG_FILENAME
+        if fullpath.exists():
             return fullpath
 
     return None
