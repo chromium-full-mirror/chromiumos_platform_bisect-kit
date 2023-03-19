@@ -9,7 +9,7 @@ from __future__ import print_function
 
 import argparse
 import logging
-import os
+import pathlib
 import tempfile
 import unittest
 from unittest import mock
@@ -28,8 +28,7 @@ class TestCommon(unittest.TestCase):
         self.log_file = tempfile.mktemp()
 
     def tearDown(self):
-        if os.path.exists(self.log_file):
-            os.unlink(self.log_file)
+        pathlib.Path(self.log_file).unlink(missing_ok=True)
         configure.reset()
 
     @mock.patch(

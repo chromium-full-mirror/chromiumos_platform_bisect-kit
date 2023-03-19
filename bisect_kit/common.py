@@ -11,7 +11,9 @@ import argparse
 import logging
 import logging.config
 import os
+import pathlib
 import sys
+import typing
 
 from bisect_kit import configure
 
@@ -22,14 +24,18 @@ DEFAULT_SESSION_BASE = 'bisect.sessions'
 DEFAULT_SESSION_NAME = 'default'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
-BISECT_KIT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BISECT_KIT_ROOT = str(pathlib.Path(__file__).resolve().parent.parent)
 
 
-def determine_session_dir(session):
-    if not session:
-        session = DEFAULT_SESSION_NAME
-    session_dir = os.path.join(DEFAULT_SESSION_BASE, session)
-    return session_dir
+def determine_session_dir(
+    session_name: str | None = None,
+    session_base: str | None = None,
+) -> pathlib.Path:
+    if not session_name:
+        session_name = DEFAULT_SESSION_NAME
+    if not session_base:
+        session_base = DEFAULT_SESSION_BASE
+    return pathlib.Path(session_base) / session_name
 
 
 def config_logging(opts):
@@ -48,18 +54,18 @@ def config_logging(opts):
         return
     config_logging.configured = True
 
-    if opts.log_file is None:
-        if getattr(opts, 'session', None):
-            session_dir = determine_session_dir(opts.session)
-            opts.log_file = os.path.join(session_dir, DEFAULT_LOG_FILENAME)
-            if not os.path.exists(session_dir):
-                os.makedirs(session_dir)
-        else:
-            opts.log_file = DEFAULT_LOG_FILENAME
-    os.environ['LOG_FILE'] = opts.log_file
-    if os.path.dirname(opts.log_file):
-        os.makedirs(os.path.dirname(opts.log_file), exist_ok=True)
-    print('log file = %s' % opts.log_file, file=sys.stderr)
+    log_file: pathlib.Path
+    if opts.log_file is not None:
+        log_file = pathlib.Path(opts.log_file)
+    elif getattr(opts, 'session', None):
+        log_file = determine_session_dir(opts.session) / DEFAULT_LOG_FILENAME
+    else:
+        log_file = pathlib.Path(DEFAULT_LOG_FILENAME)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    print(f'log file = {log_file}', file=sys.stderr)
+    os.environ['LOG_FILE'] = str(log_file)
+    opts.log_file = str(log_file)
 
     if getattr(opts, 'debug'):
         os.environ['BISECT_KIT_CONSOLE_LOG_LEVEL'] = 'DEBUG'
@@ -70,7 +76,7 @@ def config_logging(opts):
     console_level = os.environ.get('BISECT_KIT_CONSOLE_LOG_LEVEL', 'INFO')
     os.environ['BISECT_KIT_CONSOLE_LOG_LEVEL'] = 'WARNING'
 
-    file_handler = {
+    file_handler: dict[str, typing.Any] = {
         'class': 'logging.FileHandler',
         'level': 'DEBUG',
         'formatter': 'verbose',
