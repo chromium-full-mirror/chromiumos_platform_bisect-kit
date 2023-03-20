@@ -25,3 +25,5 @@ grep -r -i 'chromium os' ${PYTHON_FILES} && \
     { echo "Please spell ChromiumOS without spaces"; exit 1; }
 grep -r -i 'chrome os' ${PYTHON_FILES} && \
     { echo "Please spell ChromeOS without spaces"; exit 1; }
+
+exit 0
