@@ -489,6 +489,46 @@ class TestBisectorCommandLine(unittest.TestCase):
         result = bisector.current_status()
         self.assertEqual(result.get('inited'), True)
 
+    def test_future_switch_versions(self):
+        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector.main('init', '--num=100', '--old=0', '--new=99')
+        bisector.main('view')  # init bisector.strategy
+
+        self.assertEqual(bisector.future_switch_versions(None, 0), ['99'])
+        self.assertEqual(bisector.future_switch_versions(None, 1), ['0', '99'])
+        self.assertEqual(
+            bisector.future_switch_versions(None, 2), ['0', '49', '99']
+        )
+        self.assertEqual(
+            bisector.future_switch_versions(None, 3),
+            ['0', '24', '49', '74', '99'],
+        )
+
+        # sample 1: 99 new
+        sample1 = {
+            'rev': '99',
+            'index': 99,
+            'status': 'new',
+        }
+        bisector.states.add_history('sample', **sample1)
+        bisector.strategy.add_sample(99, **sample1)
+        self.assertEqual(bisector.future_switch_versions('99', 0), ['0'])
+        self.assertEqual(bisector.future_switch_versions('99', 1), ['0', '49'])
+        self.assertEqual(
+            bisector.future_switch_versions('99', 2), ['0', '24', '49', '74']
+        )
+
+        # sample 2: 0 new (unrepro)
+        sample2 = {
+            'rev': '0',
+            'index': 0,
+            'status': 'new',
+        }
+        with self.assertRaises(errors.VerifyOldBehaviorFailed):
+            bisector.states.add_history('sample', **sample2)
+            bisector.strategy.add_sample(0, **sample2)
+            self.assertEqual(bisector.future_switch_versions('0', 0), [])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import copy
 import datetime
 import json
 import logging
@@ -274,6 +275,41 @@ def do_switch(
     return None
 
 
+def do_future_build(
+    future_build_cmd, domain: core.Domain, rev: str, log_file: str | None = None
+):
+    """Invokes future build command.
+
+    To support future build, switch script needs to pass these requirements:
+        1. Has command / argument to start an asynchronous job.
+        2. Has ability to seek for previous started asynchronous build jobs,
+            and fetch the result of previous jobs.
+
+    For example, switch_cros_localbuild_buildbucket.py can do:
+        1. Use --nodeploy to start a build job, the script exits immediately
+            after job starts.
+        2. When switch a version, the script will check if there's any existing
+            job and resue the artifacts.
+    """
+    env = os.environ.copy()
+    env['BISECT_REV'] = rev
+    domain.setenv(env, rev)
+
+    if log_file:
+        logger.debug('future_build log file = %s', log_file)
+        env['LOG_FILE'] = log_file
+
+    exec_opts = step_command_parser.parse_args(future_build_cmd)
+    if exec_opts.mode != 'bisectkit':
+        raise errors.InternalError('Unsupported mode %s' % exec_opts.mode)
+
+    result = _execute_bisectkit_step_command(exec_opts.command, env=env)
+    if log_file and os.path.exists(log_file):
+        with open(log_file, 'a') as f:
+            f.write(END_OF_LOG_FILE_MARKER)
+    assert result.data['status'] == 'skip'
+
+
 def step_main_wrapper(
     step_main: typing.Callable[..., core.StepResult],
     args: typing.Optional[tuple[str]],
@@ -358,6 +394,7 @@ class BisectorCommandLine:
         self.session_dir = None
         self.states = None
         self.strategy = None
+        self.future_build_depth = 1
 
         self.previous_strategy_state = None
 
@@ -375,6 +412,88 @@ class BisectorCommandLine:
         return core.RevInfo.format_result_counter(
             result_counter, self._get_term_map()
         )
+
+    def future_switch_versions(  # pylint: disable=dangerous-default-value
+        self,
+        prev_rev: str,
+        depth: int,
+        possible_status: list[str] = [
+            'old',
+            'new',
+        ],
+    ) -> list[str]:
+        """Returns a list of versions that may need to switch in the future.
+
+        Assume p = len(possible_status), the longest list length returned would be:
+        p^0 + p^1 + ... + p^depth.
+        """
+
+        def _enumerate_possible_statuses(
+            bisector_cli: BisectorCommandLine,
+            states: core.BisectStates,
+            bisector_strategy: strategy.NoisyBinarySearch,
+            prev_rev: str,
+            remain_depth: int,
+            possible_status: list[str],
+        ) -> typing.Interator[int]:
+            """Recursively enumerates all the possible test result combinations."""
+            if remain_depth < 0:
+                return
+            if bisector_strategy.is_done():
+                return
+
+            idx = bisector_strategy.next_idx(
+                bisector_cli.estimate_cost(prev_rev)
+            )
+            rev = states.idx2rev(idx)
+            yield idx
+
+            for status in possible_status:
+                # Dummy switch and eval time could be ignored here because the strategy
+                # algorithm will ignore empty time sample and calculate the average of
+                # other samples automatically.
+                sample = {
+                    'rev': rev,
+                    'index': states.rev2idx(rev),
+                    'status': status,
+                }
+                states_copy = copy.deepcopy(states)
+                strategy_copy = copy.deepcopy(bisector_strategy)
+
+                try:
+                    states_copy.add_history('sample', **sample)
+                    strategy_copy.check_verification_range()
+                    strategy_copy.add_sample(idx, **sample)
+                except (
+                    errors.VerifyNewBehaviorFailed,
+                    errors.VerifyOldBehaviorFailed,
+                    errors.VerifyInitialRangeFailed,
+                    errors.WrongAssumption,
+                ):
+                    # Ignore test verfication errors.
+                    continue
+                yield from _enumerate_possible_statuses(
+                    bisector_cli,
+                    states_copy,
+                    strategy_copy,
+                    rev,
+                    remain_depth - 1,
+                    possible_status,
+                )
+
+        dedup_indexes = sorted(
+            set(
+                _enumerate_possible_statuses(
+                    self,
+                    self.states,
+                    self.strategy,
+                    prev_rev,
+                    depth,
+                    possible_status,
+                )
+            )
+        )
+        return [self.states.idx2rev(x) for x in dedup_indexes]
 
     def cmd_reset(self, _opts):
         """Resets bisect session and clean up saved result."""
@@ -469,6 +588,20 @@ class BisectorCommandLine:
               switch_time: how much time in switch step
               eval_time: how much time in eval step
         """
+        # pre-build future revisions.
+        if self.config.get('future_build'):
+            revisions = self.future_switch_versions(
+                prev_rev, self.future_build_depth
+            )
+            for r in revisions:
+                future_build_log = self._step_log_path(r, 'future_build')
+                do_future_build(
+                    self.config['future_build'],
+                    self.domain,
+                    r,
+                    future_build_log,
+                )
+
         # We treat 'rev' as source of truth. 'index' is redundant and just
         # informative.
         sample = {'rev': rev, 'index': self.states.rev2idx(rev)}
@@ -534,7 +667,7 @@ class BisectorCommandLine:
 
         return 'eval', sample
 
-    def _estimate_cost(self, prev_rev):
+    def estimate_cost(self, prev_rev):
         avg_switch_time = math_util.Averager()
         avg_eval_time = math_util.Averager()
         avg_eval_time_by_status = collections.defaultdict(math_util.Averager)
@@ -588,7 +721,7 @@ class BisectorCommandLine:
                     break
         else:
             while force or not self.strategy.is_done():
-                idx = self.strategy.next_idx(self._estimate_cost(prev_rev))
+                idx = self.strategy.next_idx(self.estimate_cost(prev_rev))
                 rev = self.states.idx2rev(idx)
                 logger.info('try idx=%d rev=%s', idx, rev)
                 prev_rev = yield idx, rev
@@ -956,7 +1089,7 @@ class BisectorCommandLine:
             print('done')
             return
 
-        idx = self.strategy.next_idx(self._estimate_cost(opts.current_rev))
+        idx = self.strategy.next_idx(self.estimate_cost(opts.current_rev))
         rev = self.states.idx2rev(idx)
         print(rev)
 
@@ -965,7 +1098,7 @@ class BisectorCommandLine:
         assert self.config.get('switch')
 
         if opts.rev == 'next':
-            idx = self.strategy.next_idx(self._estimate_cost(opts.current_rev))
+            idx = self.strategy.next_idx(self.estimate_cost(opts.current_rev))
             rev = self.states.idx2rev(idx)
         else:
             rev = self.domain_cls.intra_revtype(opts.rev)
@@ -1027,7 +1160,7 @@ class BisectorCommandLine:
             print(self.states.config[opts.key])
             return
 
-        if opts.key in ['switch', 'eval']:
+        if opts.key in ['switch', 'eval', 'future_build']:
             exec_opts = step_command_parser.parse_args(opts.value)
             result = cli.check_executable(exec_opts.command[0])
             if result:
@@ -1187,6 +1320,7 @@ class BisectorCommandLine:
                 'noisy',
                 'term_old',
                 'term_new',
+                'future_build',
             ],
             metavar='key',
             help='What config to change. choices=[%(choices)s]',

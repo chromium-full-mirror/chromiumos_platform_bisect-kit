@@ -59,6 +59,7 @@ class BisectorWrapper:
         init_args,
         switch_cmd,
         eval_cmd,
+        future_build_cmd=None,
         old_value=None,
         new_value=None,
         term_old=None,
@@ -92,6 +93,10 @@ class BisectorWrapper:
         self.switch_cmds = [switch_cmd]
         self.call('config', 'switch', '--mode=bisectkit', *switch_cmd)
         self.call('config', 'eval', '--mode=bisectkit', *eval_cmd)
+        if future_build_cmd:
+            self.call(
+                'config', 'future_build', '--mode=bisectkit', *future_build_cmd
+            )
 
     def _set_switch_commands(self):
         cmdline = ' && '.join(

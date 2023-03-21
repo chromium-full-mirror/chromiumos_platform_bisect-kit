@@ -895,6 +895,7 @@ class CrosDiagnoser:
         bisector = wrapper.BisectorWrapper(
             'bisect_cros_repo', self.config['session']
         )
+        future_build_cmd = None
         if not buildbucket_build:
             switch_cmd = ['./switch_cros_localbuild.py', '--rich_result']
         else:
@@ -902,6 +903,12 @@ class CrosDiagnoser:
                 './switch_cros_localbuild_buildbucket.py',
                 'bisect_chromeos',
                 '--rich_result',
+            ]
+            future_build_cmd = [
+                './switch_cros_localbuild_buildbucket.py',
+                'bisect_chromeos',
+                '--rich_result',
+                '--nodeploy',
             ]
 
         if not self.config['disable_rootfs_verification']:
@@ -922,6 +929,7 @@ class CrosDiagnoser:
             ],
             switch_cmd=switch_cmd,
             eval_cmd=eval_cmd,
+            future_build_cmd=future_build_cmd,
             old_value=self.config['old_value'],
             new_value=self.config['new_value'],
             term_old=self.config['term_old'],
