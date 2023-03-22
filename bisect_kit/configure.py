@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 root = None
 
 
-def _make_absolute_path(path: PathLike, parent: PathLike) -> pathlib.Path:
+def _rebase_relative_path(path: PathLike, parent: PathLike) -> pathlib.Path:
     path = pathlib.Path(path)
     if path.is_absolute():
         return path
@@ -97,12 +97,12 @@ class ConfigStore:
         config = json.loads(content)
 
         for include_path in config.get('include', []):
-            include_path = _make_absolute_path(include_path, self.path.parent)
+            include_path = _rebase_relative_path(include_path, self.path.parent)
             child = ConfigStore(include_path)
             self.children.append(child)
 
         self.plugins = [
-            _make_absolute_path(plugin_path, self.path.parent)
+            _rebase_relative_path(plugin_path, self.path.parent)
             for plugin_path in config.get('plugins', [])
         ]
         self.options = config.get('options', {})
