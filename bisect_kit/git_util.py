@@ -747,9 +747,10 @@ def get_rev_by_time(
         '--before',
         str(timestamp),
         branch,
+        '--',
     ]
     if path:
-        cmd += ['--', path]
+        cmd += [path]
 
     result = util.check_output(*cmd, cwd=git_repo).strip()
     return result or None
@@ -768,6 +769,7 @@ def get_revlist_by_period(
         '--before',
         str(period.begin - 1),
         branch,
+        '--',
         cwd=git_repo,
     )
 
@@ -783,6 +785,7 @@ def get_revlist_by_period(
         '--before',
         str(period.end),
         branch,
+        '--',
         cwd=git_repo,
     )
 
