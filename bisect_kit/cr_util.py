@@ -43,6 +43,7 @@ CHROME_TEST_BINARIES = [
     'dawn_unittests',
     'decode_test',
     'fake_dmserver',
+    'libtest_trace_processor.so',
     'image_processor_test',
     'jpeg_decode_accelerator_unittest',
     'jpeg_encode_accelerator_unittest',
