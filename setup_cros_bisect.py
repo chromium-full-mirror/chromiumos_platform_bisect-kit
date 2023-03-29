@@ -275,6 +275,11 @@ def write_sync_time(repo_dir, sync_time):
 
 
 def write_extra_manifest_to_mirror(repo_dir, removed):
+    # project names that should be excluded in deleted-repos
+    exclude_repositories = [
+        'chromeos/overlays/overlay-goroh-private',  # removed in b/218319750
+        'chromeos/vendor/mtk-optee-os',  # removed in b/275630676
+    ]
     local_manifest_dir = os.path.join(repo_dir, repo_util.LOCAL_MANIFESTS_DIR)
     if not os.path.exists(local_manifest_dir):
         os.mkdir(local_manifest_dir)
@@ -287,6 +292,11 @@ def write_extra_manifest_to_mirror(repo_dir, removed):
             )[:3]
             assert remote_path[0] == '/'
             remote_path = remote_path[1:]
+            if (
+                remote_path in exclude_repositories
+            ):  # skip the removed repositories
+                continue
+
             if (scheme, netloc) not in remotes:
                 remote_name = 'remote_for_deleted_repo_%s' % (scheme + netloc)
                 remotes[scheme, netloc] = remote_name
