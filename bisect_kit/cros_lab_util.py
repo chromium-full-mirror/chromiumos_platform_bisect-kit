@@ -12,8 +12,8 @@ Terminology to refer a DUT in bisect-kit:
       "dut_name" is almost used only in this module. It needs conversion to
       "dut" for rest of bisect-kit code (dut_name_to_address).
 """
+
 from __future__ import annotations
-from __future__ import print_function
 
 import asyncio
 import calendar

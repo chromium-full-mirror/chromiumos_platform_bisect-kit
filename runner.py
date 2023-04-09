@@ -5,8 +5,6 @@
 
 """Helper script to report exit code according to execution result."""
 
-from __future__ import print_function
-
 import argparse
 import collections
 import logging

@@ -5,7 +5,6 @@
 """Bisector command line interface."""
 
 from __future__ import annotations
-from __future__ import print_function
 
 import argparse
 import collections

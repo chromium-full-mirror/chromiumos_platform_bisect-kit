@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 
 """Evaluate ChromeOS tast tests."""
+
 from __future__ import annotations
-from __future__ import print_function
 
 import argparse
 import json

@@ -4,8 +4,6 @@
 
 """Configure module."""
 
-from __future__ import print_function
-
 import contextlib
 import os
 import pathlib

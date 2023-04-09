@@ -12,8 +12,6 @@ Example:
   $ ./bisect_git.py run
 """
 
-from __future__ import print_function
-
 import logging
 
 from bisect_kit import bisector_cli

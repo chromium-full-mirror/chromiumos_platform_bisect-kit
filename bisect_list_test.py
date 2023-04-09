@@ -4,8 +4,6 @@
 
 """Test bisect_list script."""
 
-from __future__ import print_function
-
 import io
 import unittest
 from unittest import mock

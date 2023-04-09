@@ -19,8 +19,6 @@ will be set:
   DUT (e.g. samus-dut, if available).
 """
 
-from __future__ import print_function
-
 import logging
 
 from bisect_kit import android_util

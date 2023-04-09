@@ -4,8 +4,6 @@
 
 """Test strategy module."""
 
-from __future__ import print_function
-
 import collections
 import random
 import unittest

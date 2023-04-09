@@ -4,8 +4,6 @@
 
 """Test switch_git script."""
 
-from __future__ import print_function
-
 import unittest
 from unittest import mock
 

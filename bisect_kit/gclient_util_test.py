@@ -4,8 +4,6 @@
 
 """Test gclient_util module."""
 
-from __future__ import print_function
-
 import copy
 import os
 import shutil

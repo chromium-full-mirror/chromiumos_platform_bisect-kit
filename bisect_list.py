@@ -24,8 +24,6 @@ Example:
   p.s. seq(1) prints a sequence of numbers, one at a line.
 """
 
-from __future__ import print_function
-
 import logging
 import sys
 

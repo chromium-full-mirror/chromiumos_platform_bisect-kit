@@ -4,8 +4,6 @@
 
 """Test bisect_git script."""
 
-from __future__ import print_function
-
 import shutil
 import tempfile
 import unittest

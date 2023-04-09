@@ -28,7 +28,6 @@ will be set:
   DUT (e.g. samus-dut, if available).
 """
 # Note, this script only works for the main branch of chrome.
-from __future__ import print_function
 
 import logging
 import os

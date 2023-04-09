@@ -21,8 +21,6 @@ will be set:
   CHROMEOS_ROOT (e.g. ~/chromiumos).
 """
 
-from __future__ import print_function
-
 import logging
 
 from bisect_kit import bisector_cli

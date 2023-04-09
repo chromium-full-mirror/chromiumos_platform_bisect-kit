@@ -11,7 +11,6 @@ Later, you can run tests using "eval_cros_tast.py --prebuilt" or
 """
 
 from __future__ import annotations
-from __future__ import print_function
 
 import argparse
 import logging

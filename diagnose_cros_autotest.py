@@ -12,7 +12,6 @@ bisect, and hopefully output the culprit CL of regression.
 Sometimes the script failed to figure out the final CL for various reasons, it
 will cut down the search range as narrow as it can.
 """
-from __future__ import print_function
 
 import logging
 import os

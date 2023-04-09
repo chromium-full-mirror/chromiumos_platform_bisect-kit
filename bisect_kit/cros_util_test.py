@@ -4,8 +4,6 @@
 
 """Test cros_util module."""
 
-from __future__ import print_function
-
 import fnmatch
 import logging
 import os

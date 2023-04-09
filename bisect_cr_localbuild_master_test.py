@@ -4,8 +4,6 @@
 
 """Test bisect_cr_localbuild_master script."""
 
-from __future__ import print_function
-
 import os
 import shutil
 import tempfile

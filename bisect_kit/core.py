@@ -5,7 +5,6 @@
 """Bisection core module."""
 
 from __future__ import annotations
-from __future__ import print_function
 
 import json
 import logging

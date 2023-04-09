@@ -8,8 +8,6 @@ This module provides wrapper for "repo" (a Google-built repository management
 tool that runs on top of git) and related utility functions.
 """
 
-from __future__ import print_function
-
 import logging
 import multiprocessing
 import os

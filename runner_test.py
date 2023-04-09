@@ -4,8 +4,6 @@
 
 """Test runner.py script"""
 
-from __future__ import print_function
-
 import argparse
 import unittest
 from unittest import mock

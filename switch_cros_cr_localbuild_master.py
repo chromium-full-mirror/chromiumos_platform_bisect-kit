@@ -15,8 +15,8 @@ Typical usage companion with bisect_cr_localbuild_master:
 By default, it will build and deploy chrome. You can specify --target for
 alternative binaries.
 """
+
 from __future__ import annotations
-from __future__ import print_function
 
 import argparse
 import logging

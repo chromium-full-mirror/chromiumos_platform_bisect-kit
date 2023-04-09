@@ -5,8 +5,6 @@
 
 """Eval for ChromeOS localbuild to handle bad images"""
 
-from __future__ import print_function
-
 import logging
 import sys
 

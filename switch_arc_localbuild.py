@@ -6,7 +6,6 @@
 """Switcher for Android container localbuild for ChromeOS bisecting."""
 
 from __future__ import annotations
-from __future__ import print_function
 
 import argparse
 import logging

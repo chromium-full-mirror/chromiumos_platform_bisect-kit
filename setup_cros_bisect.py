@@ -21,7 +21,6 @@ Typical usage:
   After bisection finished, delete trees
     $ %(prog)s delete --session=12345
 """
-from __future__ import print_function
 
 import argparse
 import glob

@@ -4,8 +4,6 @@
 
 """Test bisector_cli module."""
 
-from __future__ import print_function
-
 import io
 import unittest
 from unittest import mock

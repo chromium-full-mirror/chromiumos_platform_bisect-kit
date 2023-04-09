@@ -13,7 +13,6 @@ This is actually equivalent to
 (Note, use single quotes instead of double quotes because the variables need to
 be expanded at switch time, not now.)
 """
-from __future__ import print_function
 
 import argparse
 import logging

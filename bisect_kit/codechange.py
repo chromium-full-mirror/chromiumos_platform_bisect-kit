@@ -10,8 +10,6 @@ words, it's abstraction of chrome's gclient DEPS, and chromeos and Android's
 repo manifest.
 """
 
-from __future__ import print_function
-
 import collections
 import copy
 import json

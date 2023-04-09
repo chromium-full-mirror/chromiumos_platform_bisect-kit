@@ -4,8 +4,6 @@
 
 """Utility functions and classes."""
 
-from __future__ import print_function
-
 import argparse
 import json
 import logging

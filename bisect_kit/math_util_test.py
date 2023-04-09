@@ -4,8 +4,6 @@
 
 """Test math module."""
 
-from __future__ import print_function
-
 import math
 import sys
 import unittest

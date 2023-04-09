@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 """Wrapper of bisector scripts"""
-from __future__ import print_function
 
 import importlib
 import io

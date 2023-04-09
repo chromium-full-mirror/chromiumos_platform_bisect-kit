@@ -10,8 +10,8 @@ if the package checksum mismatch. If you want to override content of autotest
 package, e.g. chrome's test binary, please make sure the autotest version
 matches. Otherwise your test binary will be overwritten.
 """
+
 from __future__ import annotations
-from __future__ import print_function
 
 import argparse
 import glob
