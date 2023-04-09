@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -2340,7 +2339,6 @@ def enumerate_autotest_control_files(autotest_dir):
     for subpath in subpaths:
         path = os.path.join(autotest_dir, subpath)
         for root, dirs, files in os.walk(path):
-
             for deny in denylist:
                 if deny in dirs:
                     dirs.remove(deny)

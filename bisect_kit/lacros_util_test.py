@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2022 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -106,7 +105,6 @@ class TestLacrosUtil(unittest.TestCase):
             )
 
     def test_get_lacros_prebuilt_versions_between(self):
-
         dummy_gs_paths = [
             'gs://chrome-unsigned/desktop-5c0tCh/0.0.1.0/lacros64/lacros.zip',
             'gs://chrome-unsigned/desktop-5c0tCh/0.0.1.1/lacros64/lacros.zip',
