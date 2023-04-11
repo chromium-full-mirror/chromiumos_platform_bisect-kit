@@ -4,8 +4,8 @@
 
 """Wrapper of bisector scripts"""
 
+import contextlib
 import importlib
-import io
 import logging
 import subprocess
 import sys
@@ -33,20 +33,12 @@ class BisectorWrapper:
                 break
         assert self.domain_cls
 
-    def call(self, cmd, *args, **kwargs):
+    def call(self, cmd, *args, stdout=sys.stdout):
         bisector = bisector_cli.BisectorCommandLine(self.domain_cls)
         full_args = [cmd, '--session', self.session] + list(args)
         logger.debug('call %s: %s', self.name, full_args)
-        stdout_bak = sys.stdout
-        try:
-            if kwargs.get('capture_output'):
-                sys.stdout = fake_stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
             bisector.main(*full_args, prog=self.name)
-        finally:
-            sys.stdout = stdout_bak
-        if kwargs.get('capture_output'):
-            return fake_stdout.getvalue()
-        return None
 
     def current_status(self):
         bisector = bisector_cli.BisectorCommandLine(self.domain_cls)

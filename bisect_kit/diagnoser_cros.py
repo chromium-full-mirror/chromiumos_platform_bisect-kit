@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import datetime
+import io
 import json
 import logging
 import os
@@ -975,8 +976,9 @@ class CrosDiagnoser:
 
                     if json_output:
                         cmd.append('--json')
-                        output = bisector.call(*cmd, capture_output=True)
-                        entry['log'] = json.loads(output)
+                        stdout = io.StringIO()
+                        bisector.call(*cmd, stdout=stdout)
+                        entry['log'] = json.loads(stdout.getvalue())
                     else:
                         bisector.call(*cmd)
                 except errors.Uninitialized:
@@ -1012,11 +1014,12 @@ class CrosDiagnoser:
                     cmd.append('--verbose')
                 if json_output:
                     cmd.append('--json')
-                    output = bisector.call(*cmd, capture_output=True)
+                    stdout = io.StringIO()
+                    bisector.call(*cmd, stdout=stdout)
                     result.append(
                         {
                             'bisector': entry['bisector'],
-                            'view': json.loads(output),
+                            'view': json.loads(stdout.getvalue()),
                         }
                     )
                 else:
