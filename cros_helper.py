@@ -35,7 +35,9 @@ models_to_avoid: dict[str, str] = {
 
 
 def cmd_version_info(opts):
-    info = cros_util.version_info(opts.board, opts.version)
+    info = dataclasses.asdict(
+        cros_util.query_version_info(opts.board, opts.version)
+    )
     if opts.name:
         if opts.name not in info:
             logger.error('unknown name=%s', opts.name)

@@ -17,6 +17,7 @@ from __future__ import annotations
 import ast
 import calendar
 import contextlib
+import dataclasses
 import datetime
 import enum
 import errno
@@ -124,14 +125,6 @@ test_image_filename = 'chromiumos_test_image.bin'
 test_image_zip_filename = 'image.zip'
 sample_partition_filename = 'full_dev_part_KERN.bin.gz'
 
-VERSION_KEY_BUILDBUCKET_ID = 'buildbucket_id'
-VERSION_KEY_CROS_SHORT_VERSION = 'cros_short_version'
-VERSION_KEY_CROS_FULL_VERSION = 'cros_full_version'
-VERSION_KEY_MILESTONE = 'milestone'
-VERSION_KEY_CR_VERSION = 'cr_version'
-VERSION_KEY_ANDROID_BUILD_ID = 'android_build_id'
-VERSION_KEY_ANDROID_BRANCH = 'android_branch'
-VERSION_KEY_ANDROID_TARGET = 'android_target'
 CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
 FORWARDED_DUT_HOST = 'localhost'
 FORWARDED_DUT_PORT = 2222
@@ -144,6 +137,39 @@ enable_ssh_tunnel_for_chameleon: True
 enable_ssh_connection_for_devserver: True
 enable_ssh_tunnel_for_moblab: True
 """
+
+
+@dataclasses.dataclass
+class VersionInfo:
+    """A data class represents version info."""
+
+    cros_short_version: str | None = None
+    cros_full_version: str | None = None
+    milestone: str | None = None
+    cr_version: str | None = None
+    android_build_id: str | None = None
+    android_branch: str | None = None  # in format like 'git_nyc-mr1-arc'
+    android_target: str | None = None
+    buildbucket_id: int | None = None
+
+    def has_conflict(self, other) -> bool:
+        for field in dataclasses.fields(other):
+            my_value = getattr(self, field.name)
+            other_value = getattr(other, field.name)
+            if (
+                my_value is not None
+                and other_value is not None
+                and my_value != other_value
+            ):
+                return False
+        return True
+
+    def update(self, other):
+        for field in dataclasses.fields(other):
+            other_value = getattr(other, field.name)
+            if other_value:
+                setattr(self, field.name, other_value)
+        return self
 
 
 class ImageType(enum.Enum):
@@ -265,15 +291,19 @@ class SnapshotStore:
     @classmethod
     def query_snapshot_buildbucket_id(
         cls, board: str, snapshot_version: str
-    ) -> typing.Optional[str]:
+    ) -> int | None:
         """Query buildbucket id of a snapshot"""
-        assert is_cros_snapshot_version(snapshot_version)
+        if not is_cros_snapshot_version(snapshot_version):
+            return None
         path = cls.query_snapshot_image(board, snapshot_version)
         if not path:
             raise errors.ExternalError(
                 'board=%s snapshot=%s not found' % (board, snapshot_version)
             )
-        return cls.parse_snapshot_path(path).get('buildbucket_id')
+        buildbucket_id = cls.parse_snapshot_path(path).get('buildbucket_id')
+        if buildbucket_id is None:
+            return None
+        return int(buildbucket_id)
 
     @classmethod
     def query_snapshot_version_by_id(
@@ -1647,7 +1677,7 @@ def provision_image_with_retry(
             raise
 
 
-def fetch_metadata_version_info(board: str, cros_version: str) -> dict:
+def fetch_metadata_version_info(board: str, cros_version: str) -> VersionInfo:
     """Query version info of given version of ChromeOS from metadata
 
     Args:
@@ -1671,7 +1701,7 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> dict:
     # e.g. caroline R60-9462.0.0
     # Let's try both.
     metadata_filenames = ['metadata.json', 'partial-metadata.json']
-    info = {}
+    info = VersionInfo()
     for gs_path in _iter_valid_prebuilt_gs_path(board, cros_version):
         for metadata_filename in metadata_filenames:
             metadata_str = gsutil(
@@ -1682,28 +1712,22 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> dict:
             metadata = json.loads(metadata_str)
             v = metadata['version']
             board_metadata = metadata['board-metadata'].get(board, {})
-            info.update(
-                {
-                    VERSION_KEY_CROS_SHORT_VERSION: v['platform'],
-                    VERSION_KEY_CROS_FULL_VERSION: v['full'],
-                    VERSION_KEY_MILESTONE: v['milestone'],
-                }
-            )
+            info.cros_short_version = v['platform']
+            info.cros_full_version = v['full']
+            info.milestone = v['milestone']
 
-            if 'buildbucket_id' in metadata:
-                info[VERSION_KEY_BUILDBUCKET_ID] = int(
-                    metadata['buildbucket_id']
-                )
+            if metadata.get('buildbucket_id'):
+                info.buildbucket_id = int(metadata['buildbucket_id'])
             if 'chrome' in v:
-                info[VERSION_KEY_CR_VERSION] = v['chrome']
+                info.cr_version = v['chrome']
             if 'android' in v:
-                info[VERSION_KEY_ANDROID_BUILD_ID] = v['android']
+                info.android_build_id = v['android']
             if 'android-target' in v:
-                info[VERSION_KEY_ANDROID_TARGET] = v['android-target']
+                info.android_target = v['android-target']
             if 'android-branch' in v:  # this appears since R58-9317.0.0
-                info[VERSION_KEY_ANDROID_BRANCH] = v['android-branch']
+                info.android_branch = v['android-branch']
             elif 'android-container-branch' in board_metadata:
-                info[VERSION_KEY_ANDROID_BRANCH] = v['android-container-branch']
+                info.android_branch = v['android-container-branch']
         metadata_str = gsutil(
             'cat', f'{gs_path}/build_report.json', ignore_errors=True
         )
@@ -1712,17 +1736,17 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> dict:
         config = json.loads(metadata_str).get('config', {})
         branch = config.get('androidContainerBranch', {}).get('name')
         if branch:
-            info[VERSION_KEY_ANDROID_BRANCH] = branch
+            info.android_branch = branch
         target = config.get('androidContainerTarget', {}).get('name')
         if target:
-            info[VERSION_KEY_ANDROID_TARGET] = target
+            info.android_target = target
 
     return info
 
 
 def fetch_buildbucket_version_info(
     buildbucket_id: int, cros_version: str
-) -> dict:
+) -> VersionInfo:
     """Query version info of given version of ChromeOS from buildbucket
 
     Args:
@@ -1744,24 +1768,25 @@ def fetch_buildbucket_version_info(
     api = buildbucket_util.BuildbucketApi()
     milestone, short_version = version_split(cros_version)
     data = api.get_build(int(buildbucket_id)).output.properties
-    target_versions = (
-        json_format.MessageToDict(data['target_versions'])
-        if 'target_versions' in data
-        else {}
+    info = VersionInfo(
+        milestone=milestone,
+        cros_full_version=cros_version,
+        cros_short_version=short_version,
     )
-    result = {
-        VERSION_KEY_MILESTONE: milestone,
-        VERSION_KEY_CROS_FULL_VERSION: cros_version,
-        VERSION_KEY_CROS_SHORT_VERSION: short_version,
-        VERSION_KEY_CR_VERSION: target_versions.get('chromeVersion'),
-        VERSION_KEY_ANDROID_BUILD_ID: target_versions.get('androidVersion'),
-        VERSION_KEY_ANDROID_BRANCH: target_versions.get('androidBranchVersion'),
-        VERSION_KEY_ANDROID_TARGET: target_versions.get('androidTargetVersion'),
-    }
-    return {k: v for k, v in result.items() if v is not None}
+    if 'target_versions' in data:
+        target_versions = json_format.MessageToDict(data['target_versions'])
+        if target_versions.get('chromeVersion'):
+            info.cr_version = target_versions['chromeVersion']
+        if target_versions.get('androidVersion'):
+            info.android_build_id = target_versions['androidVersion']
+        if target_versions.get('androidBranchVersion'):
+            info.android_branch = target_versions['androidBranchVersion']
+        if target_versions.get('androidTargetVersion'):
+            info.android_target = target_versions['androidTargetVersion']
+    return info
 
 
-def version_info(board, cros_version) -> dict:
+def query_version_info(board: str, cros_version: str) -> VersionInfo:
     """Query subcomponents version info of given version of ChromeOS
 
     Args:
@@ -1780,56 +1805,46 @@ def version_info(board, cros_version) -> dict:
     """
     if is_cros_short_version(cros_version):
         cros_version = version_to_full(board, cros_version)
-    result = fetch_metadata_version_info(board, cros_version)
-    buildbucket_id = None
-    if 'buildbucket_id' in result:
-        buildbucket_id = int(result.get('buildbucket_id'))
-    elif is_cros_snapshot_version(cros_version):
-        buildbucket_id = int(
-            SnapshotStore.query_snapshot_buildbucket_id(board, cros_version)
+    info = fetch_metadata_version_info(board, cros_version)
+    buildbucket_id = (
+        info.buildbucket_id
+        or SnapshotStore.query_snapshot_buildbucket_id(board, cros_version)
+    )
+
+    if buildbucket_id is None:
+        return info
+
+    buildbucket_version_info = fetch_buildbucket_version_info(
+        buildbucket_id, cros_version
+    )
+    if info.has_conflict(buildbucket_version_info):
+        logger.warning(
+            'Version data has conflict:\n  metadata: %s\n  buildbucket: %s',
+            info,
+            buildbucket_version_info,
         )
-
-    if buildbucket_id:
-        buildbucket_version_info = fetch_buildbucket_version_info(
-            buildbucket_id, cros_version
-        )
-        if any(
-            result[k] != buildbucket_version_info[k]
-            for k in result.keys() & buildbucket_version_info.keys()
-        ):
-            logger.warning(
-                'Version data has conflict:\n  metadata: %s\n  buildbucket: %s',
-                result,
-                buildbucket_version_info,
-            )
-        result = result | buildbucket_version_info
-    return result
+    return VersionInfo().update(info).update(buildbucket_version_info)
 
 
-def query_chrome_version(board, version):
+def query_chrome_version(board, cros_version) -> str | None:
     """Queries chrome version of chromeos build.
 
     Args:
       board: ChromeOS board name
-      version: ChromeOS version number in short or full format
+      cros_version: ChromeOS version number in short or full format
 
     Returns:
       Chrome version number
     """
-    info = version_info(board, version)
-    return info['cr_version']
+    return query_version_info(board, cros_version).cr_version
 
 
-def query_android_build_id(board, rev):
-    info = version_info(board, rev)
-    rev = info['android_build_id']
-    return rev
+def query_android_build_id(board, cros_version) -> str | None:
+    return query_version_info(board, cros_version).android_build_id
 
 
-def query_android_branch(board, rev):
-    info = version_info(board, rev)
-    rev = info['android_branch']
-    return rev
+def query_android_branch(board, cros_version) -> str | None:
+    return query_version_info(board, cros_version).android_branch
 
 
 def is_inside_chroot():

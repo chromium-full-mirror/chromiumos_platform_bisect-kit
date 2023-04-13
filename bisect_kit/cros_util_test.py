@@ -471,7 +471,7 @@ class TestCrosUtil(unittest.TestCase):
             )
 
     @mock.patch('bisect_kit.cros_util.gsutil_ls')
-    def test_version_info(self, mock_gsutil_ls):
+    def test_query_version_info(self, mock_gsutil_ls):
         mock_gsutil_ls.return_value = ['fake_path']
 
         def gen_mock_gsutil(metadata, partial_metadata, build_report):
@@ -499,20 +499,22 @@ class TestCrosUtil(unittest.TestCase):
             side_effect=gen_mock_gsutil('', partial_metadata, ''),
         ):
             with mock.patch.object(
-                cros_util, 'fetch_buildbucket_version_info', return_value={}
+                cros_util,
+                'fetch_buildbucket_version_info',
+                return_value=cros_util.VersionInfo(),
             ):
-                info = cros_util.version_info('caroline', 'R89-13664.0.0')
+                info = cros_util.query_version_info('caroline', 'R89-13664.0.0')
                 self.assertEqual(
-                    {
-                        cros_util.VERSION_KEY_BUILDBUCKET_ID: 8860981718532549296,
-                        cros_util.VERSION_KEY_CROS_SHORT_VERSION: '13664.0.0',
-                        cros_util.VERSION_KEY_CROS_FULL_VERSION: 'R89-13664.0.0',
-                        cros_util.VERSION_KEY_MILESTONE: '89',
-                        cros_util.VERSION_KEY_CR_VERSION: '89.0.4351.0',
-                        cros_util.VERSION_KEY_ANDROID_BUILD_ID: '7026951',
-                        cros_util.VERSION_KEY_ANDROID_BRANCH: 'git_pi-arc',
-                        cros_util.VERSION_KEY_ANDROID_TARGET: 'cheets',
-                    },
+                    cros_util.VersionInfo(
+                        buildbucket_id=8860981718532549296,
+                        cros_short_version='13664.0.0',
+                        cros_full_version='R89-13664.0.0',
+                        milestone='89',
+                        cr_version='89.0.4351.0',
+                        android_build_id='7026951',
+                        android_branch='git_pi-arc',
+                        android_target='cheets',
+                    ),
                     info,
                 )
 
@@ -539,20 +541,24 @@ class TestCrosUtil(unittest.TestCase):
             ),
         ):
             with mock.patch.object(
-                cros_util, 'fetch_buildbucket_version_info', return_value={}
+                cros_util,
+                'fetch_buildbucket_version_info',
+                return_value=cros_util.VersionInfo(),
             ):
-                info = cros_util.version_info('stronbad', 'R115-15452.0.0')
+                info = cros_util.query_version_info(
+                    'stronbad', 'R115-15452.0.0'
+                )
                 self.assertEqual(
-                    {
-                        cros_util.VERSION_KEY_BUILDBUCKET_ID: 8781974877551968897,
-                        cros_util.VERSION_KEY_CROS_SHORT_VERSION: '15452.0.0',
-                        cros_util.VERSION_KEY_CROS_FULL_VERSION: 'R115-15452.0.0',
-                        cros_util.VERSION_KEY_MILESTONE: '115',
-                        cros_util.VERSION_KEY_CR_VERSION: '115.0.5751.0',
-                        # cros_util.VERSION_KEY_ANDROID_BRANCH is missied
-                        cros_util.VERSION_KEY_ANDROID_BRANCH: "git_rvc-arc",
-                        cros_util.VERSION_KEY_ANDROID_TARGET: 'bertha',
-                    },
+                    cros_util.VersionInfo(
+                        buildbucket_id=8781974877551968897,
+                        cros_short_version='15452.0.0',
+                        cros_full_version='R115-15452.0.0',
+                        milestone='115',
+                        cr_version='115.0.5751.0',
+                        # android_branch is missied
+                        android_branch='git_rvc-arc',
+                        android_target='bertha',
+                    ),
                     info,
                 )
 
@@ -1055,14 +1061,14 @@ class TestCrosUtil(unittest.TestCase):
 
     def test_normalize_test_name(self):
         self.assertEqual(
-            cros_util.normalize_test_name("dummy_test1"), "dummy_test1"
+            cros_util.normalize_test_name('dummy_test1'), 'dummy_test1'
         )
         self.assertEqual(
-            cros_util.normalize_test_name("tast.dummy_test2"),
-            "tast.dummy_test2",
+            cros_util.normalize_test_name('tast.dummy_test2'),
+            'tast.dummy_test2',
         )
         self.assertEqual(
-            cros_util.normalize_test_name("tauto.dummy_test3"), "dummy_test3"
+            cros_util.normalize_test_name('tauto.dummy_test3'), 'dummy_test3'
         )
 
 

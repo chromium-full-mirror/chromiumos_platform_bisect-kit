@@ -95,10 +95,10 @@ class CrosDiagnoser:
         self.noisy = config['noisy']
         self.dut = dut
 
-        self.cros_old = None
-        self.cros_new = None
-        self.old_info = None
-        self.new_info = None
+        self.cros_old: str = ''
+        self.cros_new: str = ''
+        self.old_info: cros_util.VersionInfo = cros_util.VersionInfo()
+        self.new_info: cros_util.VersionInfo = cros_util.VersionInfo()
 
     def _verified_chromeos_prebuilt(self):
         if self.config['bypass_chromeos_prebuilt']:
@@ -313,41 +313,45 @@ class CrosDiagnoser:
 
         # If old and new chrome version not specified, fetches info from metadata.
         if self.config['bisect_chrome']:
-            self.old_info = {'cr_version': self.config['chrome_localbuild_old']}
-            self.new_info = {'cr_version': self.config['chrome_localbuild_new']}
+            self.old_info = cros_util.VersionInfo(
+                cr_version=self.config['chrome_localbuild_old']
+            )
+            self.new_info = cros_util.VersionInfo(
+                cr_version=self.config['chrome_localbuild_new']
+            )
         elif self.config['bisect_android']:
             base_cros_info = cros_util.version_info(
                 self.config['board'], self.config['base_cros_version']
             )
-            self.old_info = {
-                'android_build_id': self.config['android_prebuilt_old'],
-                'android_branch': base_cros_info.get('android_branch'),
-                'android_target': base_cros_info.get('android_target'),
-            }
-            self.new_info = {
-                'android_build_id': self.config['android_prebuilt_new'],
-                'android_branch': base_cros_info.get('android_branch'),
-                'android_target': base_cros_info.get('android_target'),
-            }
+            self.old_info = cros_util.VersionInfo(
+                android_build_id=self.config['android_prebuilt_old'],
+                android_branch=base_cros_info.get('android_branch'),
+                android_target=base_cros_info.get('android_target'),
+            )
+            self.new_info = cros_util.VersionInfo(
+                android_build_id=self.config['android_prebuilt_new'],
+                android_branch=base_cros_info.get('android_branch'),
+                android_target=base_cros_info.get('android_target'),
+            )
         else:
-            self.old_info = cros_util.version_info(
+            self.old_info = cros_util.query_version_info(
                 self.config['board'], self.cros_old
             )
-            self.new_info = cros_util.version_info(
+            self.new_info = cros_util.query_version_info(
                 self.config['board'], self.cros_new
             )
 
         logger.info(
             'old: cros %s, chrome %s, android %s',
-            self.old_info.get('cros_full_version'),
-            self.old_info.get('cr_version'),
-            self.old_info.get('android_build_id'),
+            self.old_info.cros_full_version,
+            self.old_info.cr_version,
+            self.old_info.android_build_id,
         )
         logger.info(
             'new: cros %s, chrome %s, android %s',
-            self.new_info.get('cros_full_version'),
-            self.new_info.get('cr_version'),
-            self.new_info.get('android_build_id'),
+            self.new_info.cros_full_version,
+            self.new_info.cr_version,
+            self.new_info.android_build_id,
         )
 
     def switch_chromeos_to_old(self, force=False):
@@ -391,12 +395,14 @@ class CrosDiagnoser:
             cmd.append('--no_disable_rootfs_verification')
         util.check_call(*cmd)
 
-    def _need_android_bisect(self, old_info, new_info):
+    def _need_android_bisect(
+        self, old_info: cros_util.VersionInfo, new_info: cros_util.VersionInfo
+    ) -> bool:
         """Determine whether to do android bisect or not for given two versions.
 
         Args:
-          old_info: old version info from cros_util.version_info()
-          new_info: new version info from cros_util.version_info()
+          old_info: old version info from cros_util.query_version_info()
+          new_info: new version info from cros_util.query_version_info()
 
         Returns:
           True if android bisect is necessary (ex. version not equal) and possible
@@ -412,37 +418,31 @@ class CrosDiagnoser:
             return False
 
         if (
-            old_info.get('android_build_id') is None
-            or new_info.get('android_build_id') is None
+            old_info.android_build_id is None
+            or new_info.android_build_id is None
         ):
             self.make_decision(
                 'At least one version has no Android. skip Android bisect'
             )
             return False
 
-        if (
-            old_info.get('android_branch') is None
-            or new_info.get('android_branch') is None
-        ):
+        if old_info.android_branch is None or new_info.android_branch is None:
             self.make_decision(
                 'At least one chromeOS version has no Android branch '
                 'information in the metadata. skip Android bisect'
             )
             return False
 
-        if old_info['android_build_id'] == new_info['android_build_id']:
+        if old_info.android_build_id == new_info.android_build_id:
             self.make_decision(
                 'The Android version is identical, no need to bisect Android'
             )
             return False
 
-        if old_info.get('android_branch') != new_info.get('android_branch'):
+        if old_info.android_branch != new_info.android_branch:
             self.make_decision(
                 'Android branch mismatch: %s vs %s; unable to bisect Android'
-                % (
-                    old_info.get('android_branch'),
-                    new_info.get('android_branch'),
-                )
+                % (old_info.android_branch, new_info.android_branch)
             )
             return False
 
@@ -491,8 +491,8 @@ class CrosDiagnoser:
             self.make_decision(
                 'The bisection with Android prebuilt is bypassed'
             )
-            android_old = self.old_info['android_build_id']
-            android_new = self.new_info['android_build_id']
+            android_old = self.old_info.android_build_id
+            android_new = self.new_info.android_build_id
         else:
             logger.info('bisect android prebuilt')
             self.states.add_history(
@@ -506,13 +506,13 @@ class CrosDiagnoser:
             )
             try:
                 bisector.init_if_necessary(
-                    self.old_info['android_build_id'],
-                    self.new_info['android_build_id'],
+                    self.old_info.android_build_id,
+                    self.new_info.android_build_id,
                     init_args=[
                         '--dut',
                         self.dut,
                         '--branch',
-                        self.old_info['android_branch'],
+                        self.old_info.android_branch,
                         '--flavor',
                         android_flavor,
                     ],
@@ -559,8 +559,8 @@ class CrosDiagnoser:
             return verified
 
         # TODO(kcwu): what if the branch name does not have 'git_' prefix
-        assert self.old_info['android_branch'].startswith('git_')
-        git_branch = self.old_info['android_branch'][4:]
+        assert self.old_info.android_branch.startswith('git_')
+        git_branch = self.old_info.android_branch[4:]
         android_mirror = self.config['android_mirror']
         if not android_mirror:
             android_mirror = self.path_factory.get_android_mirror(git_branch)
@@ -676,7 +676,7 @@ class CrosDiagnoser:
             self.make_decision('The bisection with Lacros is bypassed')
             return False
 
-        if self.old_info['cr_version'] == self.new_info['cr_version']:
+        if self.old_info.cr_version == self.new_info.cr_version:
             self.make_decision(
                 'The Lacros version is identical, no need to bisect Lacros'
             )
@@ -716,8 +716,8 @@ class CrosDiagnoser:
 
         try:
             bisector.init_if_necessary(
-                self.old_info['cr_version'],
-                self.new_info['cr_version'],
+                self.old_info.cr_version,
+                self.new_info.cr_version,
                 init_args=init_args,
                 switch_cmd=switch_cmd,
                 eval_cmd=eval_cmd,
@@ -736,8 +736,8 @@ class CrosDiagnoser:
 
             # If lacros prebuilt successfully narrow down to a range,
             # Run chrome bisection from that range
-            self.old_info['cr_version'] = lacros_old
-            self.new_info['cr_version'] = lacros_new
+            self.old_info.cr_version = lacros_old
+            self.new_info.cr_version = lacros_new
             logger.info(
                 'Lacros prebuilt narrowerd down to %s -> %s',
                 lacros_old,
@@ -793,7 +793,7 @@ class CrosDiagnoser:
             )
             return False
 
-        if self.old_info['cr_version'] == self.new_info['cr_version']:
+        if self.old_info.cr_version == self.new_info.cr_version:
             self.make_decision(
                 'The Chrome version is identical, no need to bisect Chrome'
             )
@@ -849,8 +849,8 @@ class CrosDiagnoser:
         )
         try:
             bisector.init_if_necessary(
-                self.old_info['cr_version'],
-                self.new_info['cr_version'],
+                self.old_info.cr_version,
+                self.new_info.cr_version,
                 init_args=[
                     '--chrome_root',
                     self.config['chrome_root'],
