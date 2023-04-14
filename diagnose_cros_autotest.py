@@ -21,6 +21,7 @@ from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import errors
 from bisect_kit import util
+import cros_helper
 import setup_cros_bisect
 
 
@@ -91,6 +92,11 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cts_test=opts.cts_test,
             cts_timeout=opts.cts_timeout,
         )
+
+        if opts.dut == cros_lab_util.LAB_DUT:
+            raise NotImplementedError(
+                f'dut "{cros_lab_util.LAB_DUT}" is not supported  yet'
+            )
 
         # Unpack old autotest prebuilt, assume following information don't change
         # between versions:
@@ -179,7 +185,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             with cros_lab_util.dut_manager(
                 self.config['dut'],
                 lease_reason,
-                lambda: diagnoser_cros.grab_dut(self.config),
+                lambda: cros_helper.allocate_dut(self.config),
             ) as dut:
                 if not dut:
                     raise errors.NoDutAvailable('unable to allocate DUT')

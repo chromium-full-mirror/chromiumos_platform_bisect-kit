@@ -19,6 +19,7 @@ from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import errors
+import cros_helper
 import setup_cros_bisect
 
 
@@ -91,7 +92,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             with cros_lab_util.dut_manager(
                 self.config['dut'],
                 lease_reason,
-                lambda: diagnoser_cros.grab_dut(self.config),
+                lambda: cros_helper.allocate_dut(self.config),
             ) as dut:
                 if not dut:
                     raise errors.NoDutAvailable('unable to allocate DUT')

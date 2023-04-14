@@ -11,7 +11,6 @@ import datetime
 import json
 import logging
 import os
-import random
 import sys
 import time
 
@@ -33,43 +32,16 @@ import setup_cros_bisect
 logger = logging.getLogger(__name__)
 
 
-def grab_dut(config):
-    reason = cros_lab_util.make_lease_reason(config['session'])
-    if config.get('allocated_dut'):
-        host_name = cros_lab_util.dut_host_name(config['allocated_dut'])
-        logger.info('try to lease the same host (%s) as last run', host_name)
-        status = cros_lab_util.crosfleet_lease_dut(host_name, reason)
-        if not status:
-            return None
-        return host_name
+# TODO(b/278835654): Use dataclass instead of this hack.
+class AttrDict(dict):
+    """A util class whose members can be accessed as dict or properties.
 
-    # TODO(kcwu): support test-specific dependency labels
-    dimensions = ['dut_state:ready']
-    if config['model']:
-        dimensions.append('label-model:' + config['model'])
-    if config['sku']:
-        dimensions.append(
-            'label-hwid_sku:' + cros_lab_util.normalize_sku_name(config['sku'])
-        )
-    if config['pool']:
-        dimensions.append('label-pool:' + config['pool'])
+    Caveat: the keys must be valid identifier names.
+    """
 
-    bots = cros_lab_util.swarming_bots_list(dimensions, is_busy=False)
-    if not bots:
-        bots = cros_lab_util.swarming_bots_list(dimensions)
-    if not bots:
-        raise errors.NoDutAvailable(
-            'no bots satisfy constraints; incorrect model/sku? %s' % dimensions
-        )
-    bot = random.choice(bots)
-    host = bot['dimensions']['dut_name'][0]
-    logger.info('trying to lease %s', host)
-    if not cros_lab_util.crosfleet_lease_dut(host, reason):
-        logger.error('all DUTs are busy')
-        return None
-
-    logger.info('leased %s (bot_id=%s)', host, bot['bot_id'])
-    return host
+    def __init__(self, d):
+        super().__init__(**d)
+        self.__dict__ = d
 
 
 class DiagnoseStates(core.States):
@@ -80,8 +52,8 @@ class DiagnoseStates(core.States):
         self.init_done()
 
     @property
-    def config(self):
-        return self.data['config']
+    def config(self) -> AttrDict:
+        return AttrDict(self.data['config'])
 
     def add_history(self, event, **kwargs):
         entry = dict(timestamp=time.time(), event=event, **kwargs)
@@ -1046,7 +1018,7 @@ class DiagnoseCommandLineBase:
         self.states = None
 
     @property
-    def config(self):
+    def config(self) -> AttrDict:
         return self.states.config
 
     def check_cros_image_exists(
@@ -1118,19 +1090,29 @@ class DiagnoseCommandLineBase:
                 '%s is not ancestor of %s' % (opts.old, opts.new)
             )
 
-        if opts.satlab_ip:
+        if opts.allocate_dut_satlab_ip:
             if not cros_lab_util.is_satlab_dut(opts.dut):
                 raise errors.ArgumentError(
-                    '--satlab_ip', 'Should be only provided with a satlab dut'
+                    '--allocate_dut_satlab_ip',
+                    'Should be only provided with a satlab dut',
                 )
-            cros_lab_util.write_satlab_ssh_config(opts.dut, opts.satlab_ip)
+            cros_lab_util.write_satlab_ssh_config(
+                opts.dut, opts.allocate_dut_satlab_ip
+            )
         elif cros_lab_util.is_satlab_dut(opts.dut):
             cros_lab_util.write_satlab_ssh_config(opts.dut)
 
         if opts.dut == cros_lab_util.LAB_DUT:
-            if not opts.model and not opts.sku:
+            if (
+                not opts.allocate_dut_board
+                and not opts.allocate_dut_model
+                and not opts.allocate_dut_sku
+                and not opts.allocate_dut_name
+            ):
                 self.argument_parser.error(
-                    'either --model or --sku need to be specified if DUT is "%s"'
+                    'either --allocate_dut_board, --allocate_dut_model, '
+                    '--allocate_dut_sku, or --allocate_dut_name'
+                    'need to be specified if DUT is "%s"'
                     % cros_lab_util.LAB_DUT
                 )
             # Board name cannot be deduced from auto allocated devices because they
@@ -1249,58 +1231,18 @@ class DiagnoseCommandLineBase:
         else:
             cros_prebuilt_old, cros_prebuilt_new = opts.old, opts.new
 
-        config = dict(
-            session=opts.session,
-            mirror_base=opts.mirror_base,
-            work_base=opts.work_base,
-            chromeos_root=opts.chromeos_root,
-            chromeos_mirror=opts.chromeos_mirror,
-            chrome_root=opts.chrome_root,
-            chrome_mirror=opts.chrome_mirror,
-            android_root=opts.android_root,
-            android_mirror=opts.android_mirror,
-            dut=opts.dut,
-            salatb_ip=opts.satlab_ip,
-            pool=opts.pool,
-            model=opts.model,
-            sku=opts.sku,
-            board=opts.board,
-            old=opts.old,  # TODO(zjchang): Remove ambiguous term old and new
-            new=opts.new,
-            bisect_chrome=opts.bisect_chrome,
-            bisect_android=opts.bisect_android,
-            base_cros_version=opts.base_cros_version,
+        opts_to_save = vars(opts)
+        # Remove opts not to save.
+        for k in ['command', 'log_file', 'debug', 'rc', 'func']:
+            opts_to_save.pop(k)
+
+        config = opts_to_save | dict(
             cros_prebuilt_old=cros_prebuilt_old,
             cros_prebuilt_new=cros_prebuilt_new,
             chrome_localbuild_old=chrome_localbuild_old,
             chrome_localbuild_new=chrome_localbuild_new,
             android_prebuilt_old=android_prebuilt_old,
             android_prebuilt_new=android_prebuilt_new,
-            term_old=opts.term_old,
-            term_new=opts.term_new,
-            test_name=opts.test_name,
-            fail_to_pass=opts.fail_to_pass,
-            metric=opts.metric,
-            old_value=opts.old_value,
-            new_value=opts.new_value,
-            recompute_init_values=opts.recompute_init_values,
-            noisy=opts.noisy,
-            always_reflash=opts.always_reflash,
-            reboot_before_test=opts.reboot_before_test,
-            bypass_chromeos_prebuilt=opts.bypass_chromeos_prebuilt,
-            bypass_chromeos_build=opts.bypass_chromeos_build,
-            bypass_lacros_prebuilt=opts.bypass_lacros_prebuilt,
-            bypass_chrome_build=opts.bypass_chrome_build,
-            bypass_android_prebuilt=opts.bypass_android_prebuilt,
-            bypass_android_build=opts.bypass_android_build,
-            disable_rootfs_verification=opts.disable_rootfs_verification,
-            chrome_deploy_image=opts.chrome_deploy_image,
-            disable_snapshot=opts.disable_snapshot,
-            disable_buildbucket_chromeos=opts.disable_buildbucket_chromeos,
-            enable_buildbucket_chrome=opts.enable_buildbucket_chrome,
-            extra_test_variables=opts.extra_test_variables,
-            endpoint_verification=opts.endpoint_verification,
-            consider_test_crash_as_failure=opts.consider_test_crash_as_failure,
         )
 
         self.states.init(config)
@@ -1411,33 +1353,22 @@ class DiagnoseCommandLineBase:
         )
 
         group = parser_init.add_argument_group(title='DUT allocation options')
+        # Either a specific dut or a set of auto DUT selection options must be
+        # given.
         group.add_argument(
             '--dut',
             metavar='DUT',
-            required=True,
-            help='Address of DUT (Device Under Test). If "%s", DUT will be '
-            'automatically allocated from the lab' % cros_lab_util.LAB_DUT,
+            default=cros_lab_util.LAB_DUT,
+            help=(
+                'Address of DUT (Device Under Test). If omitted, DUT will be '
+                'automatically allocated from the lab. If present, all other'
+                'options in the argument gruop are ignored.'
+            ),
         )
-        group.add_argument(
-            '--satlab_ip',
-            help='Optional, required only if the dut is a satlab dut',
-            type=cli.argtype_re(r'\d+\.\d+\.\d+\.\d+', '172.30.251.188'),
-        )
-        group.add_argument(
-            '--pool',
-            type=cli.argtype_notempty,
-            default=cros_helper.DEFAULT_DUT_POOL,
-            help='Desired pools (default: %(default)s)',
-        )
-        group.add_argument(
-            '--model',
-            metavar='MODEL',
-            help='"model" criteria if DUT is auto allocated from the lab',
-        )
-        group.add_argument(
-            '--sku',
-            metavar='SKU',
-            help='"sku" criteria if DUT is auto allocated from the lab',
+        cros_helper.add_allocate_dut_arguments(
+            group,
+            allow_required=False,
+            prepend_flags_prefix=True,
         )
 
         group = parser_init.add_argument_group(title='Essential options')

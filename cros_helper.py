@@ -313,15 +313,15 @@ def do_allocate_dut(opts):
         host: leased host name
         board_to_build: board name for building image
     """
-    if opts.dut_name:
+    if opts.allocate_dut_dut_name:
         # If dut_name is specified, pool is ignored.
-        opts.pool = None
-    elif not opts.pool:
+        opts.allocate_dut_pool = None
+    elif not opts.allocate_dut_pool:
         raise errors.ArgumentError(
             '--pool', 'need to be specified if not --dut_name'
         )
-    if opts.version_hint:
-        for v in opts.version_hint.split(','):
+    if opts.allocate_dut_version_hint:
+        for v in opts.allocate_dut_version_hint.split(','):
             if cros_util.is_cros_version(
                 v
             ) or cros_util.is_cros_snapshot_version(v):
@@ -330,38 +330,49 @@ def do_allocate_dut(opts):
                 '--version_hint',
                 'should be ChromeOS version numbers, separated by comma',
             )
-    if opts.duration is not None and opts.duration < 60:
+    if (
+        opts.allocate_dut_duration is not None
+        and opts.allocate_dut_duration < 60
+    ):
         raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
 
-    if opts.satlab_ip:
-        if not cros_lab_util.is_satlab_dut(opts.dut_name):
+    if opts.allocate_dut_satlab_ip:
+        if not cros_lab_util.is_satlab_dut(opts.allocate_dut_dut_name):
             raise errors.ArgumentError(
                 '--satlab_ip', 'Should be only provided with a satlab dut'
             )
 
-        cros_lab_util.write_satlab_ssh_config(opts.dut_name, opts.satlab_ip)
+        cros_lab_util.write_satlab_ssh_config(
+            opts.allocate_dut_dut_name, opts.allocate_dut_satlab_ip
+        )
 
     t0 = time.time()
-    dimensions = [f'{key}:{value}' for key, value in opts.dimensions]
+    dimensions = [
+        f'{key}:{value}' for key, value in opts.allocate_dut_dimensions
+    ]
     dimensions.append('dut_state:ready')
-    if opts.pool:
-        dimensions.append('label-pool:' + opts.pool)
+    if opts.allocate_dut_pool:
+        dimensions.append('label-pool:' + opts.allocate_dut_pool)
     dimensions = _filter_dimensions_by_lab(dimensions, raise_unknown=True)
 
+    # Note: allocate_dut_board, allocate_dut_model, allocate_dut_sku,
+    # and allocate_dut_dut_name are mutual exclusive so at most one of
+    # them is present.
     variants: list[str] = []
-    if opts.board:
-        for board in opts.board.split(','):
+    if opts.allocate_dut_board:
+        for board in opts.allocate_dut_board.split(','):
             variants.append(
                 'label-board:' + normalize_board_name(opts.chromeos_root, board)
             )
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
-                'Invalid constraints: no board=%s in the lab' % opts.board
+                'Invalid constraints: no board=%s in the lab'
+                % opts.allocate_dut_board
             )
 
-    if opts.model:
-        for model in opts.model.split(','):
+    if opts.allocate_dut_model:
+        for model in opts.allocate_dut_model.split(','):
             if model in models_to_avoid:
                 logger.warning(
                     'model=%s is bad (reason:%s), ignore',
@@ -377,46 +388,49 @@ def do_allocate_dut(opts):
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
-                'Invalid constraints: no model=%s in the lab' % opts.model
+                'Invalid constraints: no model=%s in the lab'
+                % opts.allocate_dut_model
             )
 
-    if opts.sku:
-        for sku in opts.sku.split(','):
+    if opts.allocate_dut_sku:
+        for sku in opts.allocate_dut_sku.split(','):
             variants.append(
                 'label-hwid_sku:' + cros_lab_util.normalize_sku_name(sku)
             )
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
-                'Invalid constraints: no sku=%s in the lab' % opts.sku
+                'Invalid constraints: no sku=%s in the lab'
+                % opts.allocate_dut_sku
             )
 
-    if opts.dut_name:
-        for dut_name in opts.dut_name.split(','):
+    if opts.allocate_dut_dut_name:
+        for dut_name in opts.allocate_dut_dut_name.split(','):
             variants.append('dut_name:' + dut_name)
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
-                'Invalid constraints: no dut_name=%s in the lab' % opts.dut_name
+                'Invalid constraints: no dut_name=%s in the lab'
+                % opts.allocate_dut_dut_name
             )
 
     # Filter variants by prebuilt images.
     boards_with_prebuilt: list[str] | None = None
-    if opts.version_hint:
-        if not opts.builder_hint:
-            opts.builder_hint = opts.board
-        if not opts.builder_hint:
+    if opts.allocate_dut_version_hint:
+        if not opts.allocate_dut_builder_hint:
+            opts.allocate_dut_builder_hint = opts.allocate_dut_board
+        if not opts.allocate_dut_builder_hint:
             raise errors.ArgumentError(
                 '--builder_hint', 'must be specified along with --version_hint'
             )
         boards_with_prebuilt = []
-        versions = opts.version_hint.split(',')
-        for builder in opts.builder_hint.split(','):
+        versions = opts.allocate_dut_version_hint.split(',')
+        for builder in opts.allocate_dut_builder_hint.split(','):
             if not all(cros_util.has_test_image(builder, v) for v in versions):
                 logger.warning(
                     'builder=%s does not have prebuilt test image for %s, ignore',
                     builder,
-                    opts.version_hint,
+                    opts.allocate_dut_version_hint,
                 )
                 continue
             boards_with_prebuilt.append(
@@ -426,7 +440,8 @@ def do_allocate_dut(opts):
         if not boards_with_prebuilt:
             raise errors.ArgumentError(
                 '--version_hint',
-                'given builders have no prebuilt for %s' % opts.version_hint,
+                'given builders have no prebuilt for %s'
+                % opts.allocate_dut_version_hint,
             )
         filtered = _filter_dimensions_by_board(
             boards_with_prebuilt, variants, None
@@ -438,12 +453,12 @@ def do_allocate_dut(opts):
             )
         variants = filtered
         filtered = _filter_dimensions_by_board(
-            boards_with_prebuilt, variants, opts.pool
+            boards_with_prebuilt, variants, opts.allocate_dut_pool
         )
         if not filtered:
             raise errors.NoDutAvailable(
                 'The lab has %s devices; but there are no such devices in pool=%s'
-                % (variants, opts.pool)
+                % (variants, opts.allocate_dut_pool)
             )
         variants = filtered
 
@@ -451,16 +466,18 @@ def do_allocate_dut(opts):
     while True:
         # Query every time because each iteration takes a few minutes
         bots = _sample_available_bots_with_retry(
-            dimensions, variants, opts.parallel, filter_func
+            dimensions, variants, opts.allocate_dut_parallel, filter_func
         )
 
-        remaining_time = opts.time_limit - (time.time() - t0)
+        remaining_time = opts.allocate_dut_time_limit - (time.time() - t0)
         if remaining_time <= 0:
             break
         timeout = min(120, remaining_time)
         reason = cros_lab_util.make_lease_reason(opts.session)
         host = asyncio.run(
-            lease_dut_parallelly(opts.duration, bots, reason, timeout)
+            lease_dut_parallelly(
+                opts.allocate_dut_duration, bots, reason, timeout
+            )
         )
         if host:
             if cros_lab_util.is_satlab_dut(host):
@@ -469,8 +486,8 @@ def do_allocate_dut(opts):
             board_to_build = None
             bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])
             host_board = bots[0]['dimensions']['label-board'][0]
-            if opts.builder_hint:
-                for builder in opts.builder_hint.split(','):
+            if opts.allocate_dut_builder_hint:
+                for builder in opts.allocate_dut_builder_hint.split(','):
                     if (
                         normalize_board_name(opts.chromeos_root, builder)
                         == host_board
@@ -491,7 +508,7 @@ def do_allocate_dut(opts):
     return 'wait', None, None
 
 
-def cmd_allocate_dut(opts):
+def allocate_dut(opts):
     leased_dut = None
     try:
         todo, host, board = do_allocate_dut(opts)
@@ -507,10 +524,140 @@ def cmd_allocate_dut(opts):
             'text': str(e),
         }
         print(json.dumps(result))
+    if not leased_dut:
+        return None
+    return cros_lab_util.dut_host_name(leased_dut)
+
+
+def cmd_allocate_dut(opts):
+    allocate_dut(opts)  # Ignore the return value.
 
 
 def cmd_repair_dut(opts):
     cros_lab_util.repair(opts.dut)
+
+
+_ALLOCAET_DUT_FLAGS_RPEFIX = 'allocate_dut_'
+
+
+def add_allocate_dut_arguments(
+    parser, allow_required: bool, prepend_flags_prefix: bool = True
+):
+    """Add DUT allocate related argument to |parser|.
+
+    Args:
+      parser: an argparse object which supports add_argument(), etc.
+        It can be an argument parser, an argument group, or others alike.
+      allow_required: whether any of the argument are allowed to be set as required.
+        When it's False, all arguments should be optional.
+      prepend_flags_prefix: whether the argument name should be prefixed to
+        avoid possible name collision with other arguments.
+    """
+
+    # If prepend_flags_prefix=True, all flags below are prepended with a prefix
+    # to avoid name collision with other flags. Also make the flag names more
+    # self-explanatory.
+    def flag_name(name):
+        return '--%s' % (
+            _ALLOCAET_DUT_FLAGS_RPEFIX + name if prepend_flags_prefix else name
+        )
+
+    # attr_name is used to access the parsed flag value in the result namespace.
+    # It is always prefixed to avoid name collision.
+    def attr_name(name):
+        return _ALLOCAET_DUT_FLAGS_RPEFIX + name
+
+    parser.add_argument(
+        flag_name('pool'),
+        # TODO(cylee): for possible backward compatibility, remove it after
+        # ensuring no caller is using it.
+        '--pool',
+        dest=attr_name('pool'),
+        help='Pool to search DUT (default: %(default)s)',
+        default=DEFAULT_DUT_POOL,
+    )
+    parser.add_argument(
+        flag_name('dimensions'),
+        dest=attr_name('dimensions'),
+        help='Dimension filters used for searching DUTs, in format '
+        'key1=val1 key2=val2 ...',
+        type=cli.argtype_key_value,
+        nargs='+',
+        default=[],
+    )
+
+    group = parser.add_mutually_exclusive_group(required=allow_required)
+    group.add_argument(
+        flag_name('board'),
+        dest=attr_name('board'),
+        help='allocation criteria; comma separated',
+    )
+    group.add_argument(
+        flag_name('model'),
+        # TODO(cylee): for possible backward compatibility, remove it after
+        # ensuring no caller is using it.
+        '--model',
+        dest=attr_name('model'),
+        help='allocation criteria; comma separated',
+    )
+    group.add_argument(
+        flag_name('sku'),
+        # TODO(cylee): for possible backward compatibility, remove it after
+        # ensuring no caller is using it.
+        '--sku',
+        dest=attr_name('sku'),
+        help='allocation criteria; comma separated',
+    )
+    group.add_argument(
+        flag_name('dut_name'),
+        dest=attr_name('dut_name'),
+        help='allocation criteria; comma separated',
+    )
+
+    parser.add_argument(
+        flag_name('satlab_ip'),
+        # TODO(cylee): for possible backward compatibility, remove it after
+        # ensuring no caller is using it.
+        '--satlab_ip',
+        dest=attr_name('satlab_ip'),
+        help='Optional, required only if the dut is a satlab dut',
+        type=cli.argtype_re(r'\d+\.\d+\.\d+\.\d+', '172.30.251.188'),
+    )
+    parser.add_argument(
+        flag_name('version_hint'),
+        dest=attr_name('version_hint'),
+        help='chromeos version; comma separated',
+    )
+    parser.add_argument(
+        flag_name('builder_hint'),
+        dest=attr_name('builder_hint'),
+        help='chromeos builder; comma separated',
+    )
+    # Pubsub ack deadline is 10 minutes (b/143663659). Default 9 minutes with 1
+    # minute buffer.
+    parser.add_argument(
+        flag_name('time_limit'),
+        dest=attr_name('time_limit'),
+        type=int,
+        default=9 * 60,
+        help='Time limit to attempt lease in seconds (default: %(default)s)',
+    )
+    parser.add_argument(
+        flag_name('duration'),
+        dest=attr_name('duration'),
+        type=float,
+        help='lease duration in seconds; will be round to minutes',
+    )
+    parser.add_argument(
+        flag_name('parallel'),
+        dest=attr_name('parallel'),
+        type=int,
+        default=1,
+        help=(
+            'The number of multiple lease tasks to speed up '
+            '(default: %(default)d)'
+        ),
+    )
 
 
 @cli.fatal_error_handler
@@ -593,65 +740,21 @@ def main():
     parser_allocate_dut = subparsers.add_parser(
         'allocate_dut',
         help='Allocate a DUT in the lab',
-        parents=[common.create_common_argument_parser()],
+        parents=[common.create_session_optional_parser()],
         description='Allocate a DUT in the lab. It will lease a DUT in the lab '
         'for bisecting. The caller (bisect-kit runner) of this command should '
         'retry this command again later if no DUT available now.',
     )
-    parser_allocate_dut.add_argument(
-        '--session', required=True, help='session name'
+    add_allocate_dut_arguments(
+        parser_allocate_dut,
+        allow_required=True,
+        prepend_flags_prefix=False,
     )
-    parser_allocate_dut.add_argument(
-        '--pool',
-        help='Pool to search DUT (default: %(default)s)',
-        default=DEFAULT_DUT_POOL,
-    )
-    parser_allocate_dut.add_argument(
-        '--dimensions',
-        help='Dimension filters used for searching DUTs, in format '
-        'key1=val1 key2=val2 ...',
-        type=cli.argtype_key_value,
-        nargs='+',
-        default=[],
-    )
-    group = parser_allocate_dut.add_mutually_exclusive_group(required=True)
-    group.add_argument('--board', help='allocation criteria; comma separated')
-    group.add_argument('--model', help='allocation criteria; comma separated')
-    group.add_argument('--sku', help='allocation criteria; comma separated')
-    group.add_argument(
-        '--dut_name', help='allocation criteria; comma separated'
-    )
-    parser_allocate_dut.add_argument(
-        '--satlab_ip',
-        help='Optional, required only if the dut is a satlab dut',
-        type=cli.argtype_re(r'\d+\.\d+\.\d+\.\d+', '172.30.251.188'),
-    )
-    parser_allocate_dut.add_argument(
-        '--version_hint', help='chromeos version; comma separated'
-    )
-    parser_allocate_dut.add_argument(
-        '--builder_hint', help='chromeos builder; comma separated'
-    )
-    # Pubsub ack deadline is 10 minutes (b/143663659). Default 9 minutes with 1
-    # minute buffer.
-    parser_allocate_dut.add_argument(
-        '--time_limit',
-        type=int,
-        default=9 * 60,
-        help='Time limit to attempt lease in seconds (default: %(default)s)',
-    )
-    parser_allocate_dut.add_argument(
-        '--duration',
-        type=float,
-        help='lease duration in seconds; will be round to minutes',
-    )
-    parser_allocate_dut.add_argument(
-        '--parallel',
-        type=int,
-        default=1,
-        help='Submit multiple lease tasks to speed up (default: %(default)d)',
-    )
-    parser_allocate_dut.add_argument(
+    # add_allocate_dut_arguments() is shared by both
+    # "cros_helper.py allocate_dut" and "diagnose_cros_*.py init".
+    # --chromeos_root is already an argument of the latter in another
+    # argument group, so it is left out here.
+    parser.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
         default=configure.get(
