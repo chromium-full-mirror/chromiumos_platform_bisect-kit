@@ -2144,7 +2144,7 @@ def build_packages(
 
             env = common_env.copy()
             cmd = [
-                './build_packages',
+                'build_packages',
                 '--board',
                 board,
                 '--withdev',
