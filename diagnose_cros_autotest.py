@@ -19,7 +19,6 @@ import os
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
-from bisect_kit import errors
 from bisect_kit import util
 import cros_helper
 import setup_cros_bisect
@@ -166,92 +165,86 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         return common_switch_cmd, common_eval_cmd
 
+    def do_run(self, dut):
+        if (
+            dut != cros_lab_util.LAB_DUT
+            and self.config['dut'] == cros_lab_util.LAB_DUT
+        ):
+            self.config['allocated_dut'] = dut
+            self.states.save()
+
+        util.check_call(
+            './switch_cros_localbuild.py',
+            '--nobuild',
+            '--chromeos_root',
+            self.config['chromeos_root'],
+            '--chromeos_mirror',
+            self.config['chromeos_mirror'],
+            '--board',
+            self.config['board'],
+            self.config['cros_prebuilt_new'],
+        )
+
+        path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+            self.config['mirror_base'],
+            self.config['work_base'],
+            self.config['session'],
+        )
+        diagnoser = diagnoser_cros.CrosDiagnoser(
+            self.states, path_factory, self.config, dut
+        )
+
+        common_switch_cmd, common_eval_cmd = self._build_cmds()
+        common_eval_cmd.append(dut)
+
+        # Do not specify version for autotest prebuilt switching here. The trick
+        # is that version number is obtained via bisector's environment variable
+        # CROS_VERSION.
+        cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
+        cros_prebuilt_extra_switch_cmd = common_switch_cmd
+        android_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
+        lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
+        chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
+        chrome_with_tests = bool(self.config['test_name'])  # not CTS/GTS
+        cros_buildbucket_build = (
+            cros_util.is_buildbucket_buildable(self.config['cros_prebuilt_old'])
+            and not self.config['disable_buildbucket_chromeos']
+        )
+        if not cros_buildbucket_build:
+            cros_localbuild_eval_cmd = common_eval_cmd
+            cros_localbuild_extra_switch_cmd = None
+        else:
+            cros_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
+            cros_localbuild_extra_switch_cmd = common_switch_cmd
+
+        diagnoser.diagnose(
+            autotest=True,
+            common_switch_cmd=common_switch_cmd,
+            cros_prebuilt_extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
+            cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
+            android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
+            lacros_prebuilt_eval_cmd=lacros_prebuilt_eval_cmd,
+            chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
+            chrome_localbuild_with_tests=chrome_with_tests,
+            cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,
+            cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd,
+        )
+
     def cmd_run(self, opts):
         del opts  # unused
 
         self.states.load_states()
 
         try:
-            path_factory = setup_cros_bisect.DefaultProjectPathFactory(
-                self.config['mirror_base'],
-                self.config['work_base'],
-                self.config['session'],
-            )
-            common_switch_cmd, common_eval_cmd = self._build_cmds()
+            reason = cros_lab_util.make_lease_reason(self.config['session'])
 
-            lease_reason = cros_lab_util.make_lease_reason(
-                self.config['session']
-            )
+            def allocator():
+                return cros_helper.allocate_dut(self.config)
+
             with cros_lab_util.dut_manager(
-                self.config['dut'],
-                lease_reason,
-                lambda: cros_helper.allocate_dut(self.config),
+                self.config['dut'], reason, allocator
             ) as dut:
-                if not dut:
-                    raise errors.NoDutAvailable('unable to allocate DUT')
-
-                if not cros_util.is_good_dut(dut):
-                    if not cros_lab_util.repair(dut):
-                        raise errors.ExternalError(
-                            'Not a good DUT and unable to repair'
-                        )
-                if self.config['dut'] == cros_lab_util.LAB_DUT:
-                    self.config['allocated_dut'] = dut
-                    self.states.save()
-                common_eval_cmd.append(dut)
-
-                util.check_call(
-                    './switch_cros_localbuild.py',
-                    '--nobuild',
-                    '--chromeos_root',
-                    self.config['chromeos_root'],
-                    '--chromeos_mirror',
-                    self.config['chromeos_mirror'],
-                    '--board',
-                    self.config['board'],
-                    self.config['cros_prebuilt_new'],
-                )
-
-                diagnoser = diagnoser_cros.CrosDiagnoser(
-                    self.states, path_factory, self.config, dut
-                )
-
-                # Do not specify version for autotest prebuilt switching here. The trick
-                # is that version number is obtained via bisector's environment variable
-                # CROS_VERSION.
-                cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
-                cros_prebuilt_extra_switch_cmd = common_switch_cmd
-                android_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
-                lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
-                chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
-                chrome_with_tests = bool(
-                    self.config['test_name']
-                )  # not CTS/GTS
-                cros_buildbucket_build = (
-                    cros_util.is_buildbucket_buildable(
-                        self.config['cros_prebuilt_old']
-                    )
-                    and not self.config['disable_buildbucket_chromeos']
-                )
-                if not cros_buildbucket_build:
-                    cros_localbuild_eval_cmd = common_eval_cmd
-                    cros_localbuild_extra_switch_cmd = None
-                else:
-                    cros_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
-                    cros_localbuild_extra_switch_cmd = common_switch_cmd
-
-                diagnoser.diagnose(
-                    autotest=True,
-                    common_switch_cmd=common_switch_cmd,
-                    cros_prebuilt_extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
-                    cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
-                    android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
-                    lacros_prebuilt_eval_cmd=lacros_prebuilt_eval_cmd,
-                    chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
-                    chrome_localbuild_with_tests=chrome_with_tests,
-                    cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,
-                    cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd,
-                )
+                self.do_run(dut)
                 logger.info('%s done', __file__)
         except Exception as e:
             logger.exception('got exception; stop')

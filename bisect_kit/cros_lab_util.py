@@ -939,16 +939,24 @@ def dut_manager(dut, reason, allocator):
     Args:
       dut: dut address
       reason: lease reason
-      allocator: host allocation callback function
+      allocator: host allocation callback function.
+        If None, defer dut allocation.
 
-    Returns:
-      context manager, which lease and release host if necessary
+    Raise:
+      errors.NoDutAvailable() if failed to allocate a DUT.
+
+    Yields:
+      The allocated DUT or ":lab:" if defer allocation.
     """
     if dut == LAB_DUT:
+        # Defer allocation.
+        if not allocator:
+            yield LAB_DUT
+            return
+
         host = allocator()
         if not host:
-            yield None
-            return
+            raise errors.NoDutAvailable('unable to allocate DUT')
 
         try:
             # Append (partial) domain name of the lab
