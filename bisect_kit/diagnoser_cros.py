@@ -141,7 +141,8 @@ class CrosDiagnoser:
         ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
         # Step 3: Narrows down Lacros prebuilt. If the error can be reproduced,
-        # returns the result and skips other steps.
+        # Run the Chrome local build step with the narrowed down range.
+        # In case of failure, run the Chrome local build step with the previous range.
         try:
             self.narrow_down_lacros_prebuilt(lacros_prebuilt_eval_cmd)
         except errors.DiagnoseContradiction:
