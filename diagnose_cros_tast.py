@@ -77,8 +77,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             dut != cros_lab_util.LAB_DUT
             and self.config['dut'] == cros_lab_util.LAB_DUT
         ):
-            self.config['allocated_dut'] = dut
-            self.states.save()
+            self.update_dut_alloc_spec(dut)
 
         path_factory = setup_cros_bisect.DefaultProjectPathFactory(
             self.config['mirror_base'],
@@ -151,7 +150,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             reason = cros_lab_util.make_lease_reason(self.config['session'])
 
             def allocator():
-                return cros_helper.allocate_dut(self.config)
+                return cros_helper.allocate_dut(self.dut_allocate_spec)
 
             with cros_lab_util.dut_manager(
                 self.config['dut'], reason, allocator

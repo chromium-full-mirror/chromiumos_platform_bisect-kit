@@ -266,6 +266,13 @@ def swarming_bots_dimensions():
     return _simplify_bot_dimensions(bots_dimensions)
 
 
+def swarming_bot_info(bot_id, verbose_log=True):
+    method = f'bot/{bot_id}/get'
+    bot = swarming_query(method, limit=1, verbose_log=verbose_log)
+    bot['dimensions'] = _simplify_bot_dimensions(bot['dimensions'])
+    return bot
+
+
 def swarming_bots_list(
     dimensions,
     is_dead=False,

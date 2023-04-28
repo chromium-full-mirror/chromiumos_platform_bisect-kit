@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import datetime
 import json
 import logging
@@ -32,28 +33,48 @@ import setup_cros_bisect
 logger = logging.getLogger(__name__)
 
 
-# TODO(b/278835654): Use dataclass instead of this hack.
-class AttrDict(dict):
-    """A util class whose members can be accessed as dict or properties.
-
-    Caveat: the keys must be valid identifier names.
-    """
-
-    def __init__(self, d):
-        super().__init__(**d)
-        self.__dict__ = d
-
-
 class DiagnoseStates(core.States):
     """Diagnose states."""
 
-    def init(self, config):
-        self.data = dict(config=config, history=[])
+    def __init__(self, session_file: str):
+        super().__init__(session_file)
+        # Initialized in init_done().
+        self._dut_allocate_spec: cros_helper.DutAllocateSpec = None
+
+    def init(self, config: dict, dut_allocate_spec_dict: dict):
+        self.data = dict(
+            config=config, history=[], dut_allocate_spec=dut_allocate_spec_dict
+        )
         self.init_done()
 
+    def init_done(self):
+        """Post process after loading the data json.
+
+        Keep a mutable member dataclass for dut_allocate_spec, so it's easier
+        and safer for clients to access the attributes.
+        """
+        self._dut_allocate_spec = cros_helper.DutAllocateSpec(
+            **self.data['dut_allocate_spec']
+        )
+        super().init_done()
+
+    def save(self):
+        """Save the object back to the json file.
+
+        If _dut_allocate_spec is modified, the content is saved.
+        """
+        self.data['dut_allocate_spec'] = dataclasses.asdict(
+            self._dut_allocate_spec
+        )
+        super().save()
+
     @property
-    def config(self) -> AttrDict:
-        return AttrDict(self.data['config'])
+    def config(self):
+        return self.data['config']
+
+    @property
+    def dut_allocate_spec(self) -> cros_helper.DutAllocateSpec:
+        return self._dut_allocate_spec
 
     def add_history(self, event, **kwargs):
         entry = dict(timestamp=time.time(), event=event, **kwargs)
@@ -1019,8 +1040,12 @@ class DiagnoseCommandLineBase:
         self.states = None
 
     @property
-    def config(self) -> AttrDict:
+    def config(self):
         return self.states.config
+
+    @property
+    def dut_allocate_spec(self):
+        return self.states.dut_allocate_spec
 
     def check_cros_image_exists(
         self, argument_key: str, board: str, cros_version: str
@@ -1207,6 +1232,99 @@ class DiagnoseCommandLineBase:
     def init_hook(self, opts):
         pass  # implemented by subclass if necessary
 
+    @staticmethod
+    def _dut_allocate_spec_dict(opts):
+        """Extracts dut allocation related parameters into a dict."""
+        return {
+            'pool': opts.allocate_dut_pool,
+            'dimensions': opts.allocate_dut_dimensions,
+            'board': opts.allocate_dut_board,
+            'model': opts.allocate_dut_model,
+            'sku': opts.allocate_dut_sku,
+            'dut_name': opts.allocate_dut_dut_name,
+            'satlab_ip': opts.allocate_dut_satlab_ip,
+            'version_hint': opts.allocate_dut_version_hint,
+            'builder_hint': opts.allocate_dut_builder_hint,
+            'time_limit': opts.allocate_dut_time_limit,
+            'duration': opts.allocate_dut_duration,
+            'parallel': opts.allocate_dut_parallel,
+            'chromeos_root': opts.chromeos_root,
+            'session': opts.session,
+        }
+
+    def update_dut_alloc_spec(self, dut):
+        """Update dut allocate spec by the actual leased dut.
+
+        In stateless bisection, we must guarantee that the DUTs leased in
+        different rounds are compatible.
+        - For functional bisection, we stick to DUTs with the same model in
+          subsequence leases.
+        - For perf bisection, we stick to DUTs with the same sku in
+          subsequence leases.
+
+        Args:
+          dut: dut address
+        """
+        host = cros_lab_util.dut_host_name(dut)
+
+        # Query the bot id by dut name first.
+        bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])
+        if len(bots) != 1:
+            raise errors.ExternalError(
+                'Expect 1 DUT with name %s but %s returned' % (host, len(bots))
+            )
+        bot_id = bots[0]['bot_id']
+
+        # Query DUT labels by bot id.
+        bot_info = cros_lab_util.swarming_bot_info(bot_id)
+        logger.info('bot_info: %s', bot_info)
+
+        dimensions = bot_info['dimensions']
+
+        def get_first_element_at_key(d, k):
+            """Expect d[k] to be a list and returns the first element.
+
+            Args:
+              d: A dictionary.
+              k: The key.
+            Raises:
+              errors.ExternalError if d[k] doesn't exist or is empty.
+            Returns:
+              d[k][0]
+            """
+            if not k in d or not d[k]:
+                raise errors.ExternalError(
+                    'Can not get first element at key %s' % k
+                )
+            return d[k][0]
+
+        if self.config['metric']:
+            self.dut_allocate_spec.board = None
+            self.dut_allocate_spec.model = None
+            self.dut_allocate_spec.sku = get_first_element_at_key(
+                dimensions, 'label-hwid_sku'
+            )
+            self.dut_allocate_spec.dut_name = None
+            logger.info(
+                'Perf bisection, set dut allocation spec to sku: %s',
+                self.dut_allocate_spec.sku,
+            )
+        else:
+            self.dut_allocate_spec.board = None
+            self.dut_allocate_spec.model = get_first_element_at_key(
+                dimensions, 'label-model'
+            )
+            self.dut_allocate_spec.sku = None
+            self.dut_allocate_spec.dut_name = None
+            logger.info(
+                'Funtional bisection, set dut allocation spec to model: %s',
+                self.dut_allocate_spec.model,
+            )
+
+        # TODO(cylee): Not sure if this is needed. Remove if not used.
+        self.config['allocated_dut'] = host
+        self.states.save()
+
     def cmd_init(self, opts):
         path_factory = setup_cros_bisect.DefaultProjectPathFactory(
             opts.mirror_base, opts.work_base, opts.session
@@ -1232,21 +1350,57 @@ class DiagnoseCommandLineBase:
         else:
             cros_prebuilt_old, cros_prebuilt_new = opts.old, opts.new
 
-        opts_to_save = vars(opts)
-        # Remove opts not to save.
-        for k in ['command', 'log_file', 'debug', 'rc', 'func']:
-            opts_to_save.pop(k)
-
-        config = opts_to_save | dict(
+        config = dict(
+            session=opts.session,
+            mirror_base=opts.mirror_base,
+            work_base=opts.work_base,
+            chromeos_root=opts.chromeos_root,
+            chromeos_mirror=opts.chromeos_mirror,
+            chrome_root=opts.chrome_root,
+            chrome_mirror=opts.chrome_mirror,
+            android_root=opts.android_root,
+            android_mirror=opts.android_mirror,
+            dut=opts.dut,
+            board=opts.board,
+            old=opts.old,  # TODO(zjchang): Remove ambiguous term old and new
+            new=opts.new,
+            bisect_chrome=opts.bisect_chrome,
+            bisect_android=opts.bisect_android,
+            base_cros_version=opts.base_cros_version,
             cros_prebuilt_old=cros_prebuilt_old,
             cros_prebuilt_new=cros_prebuilt_new,
             chrome_localbuild_old=chrome_localbuild_old,
             chrome_localbuild_new=chrome_localbuild_new,
             android_prebuilt_old=android_prebuilt_old,
             android_prebuilt_new=android_prebuilt_new,
+            term_old=opts.term_old,
+            term_new=opts.term_new,
+            test_name=opts.test_name,
+            fail_to_pass=opts.fail_to_pass,
+            metric=opts.metric,
+            old_value=opts.old_value,
+            new_value=opts.new_value,
+            recompute_init_values=opts.recompute_init_values,
+            noisy=opts.noisy,
+            always_reflash=opts.always_reflash,
+            reboot_before_test=opts.reboot_before_test,
+            bypass_chromeos_prebuilt=opts.bypass_chromeos_prebuilt,
+            bypass_chromeos_build=opts.bypass_chromeos_build,
+            bypass_lacros_prebuilt=opts.bypass_lacros_prebuilt,
+            bypass_chrome_build=opts.bypass_chrome_build,
+            bypass_android_prebuilt=opts.bypass_android_prebuilt,
+            bypass_android_build=opts.bypass_android_build,
+            disable_rootfs_verification=opts.disable_rootfs_verification,
+            chrome_deploy_image=opts.chrome_deploy_image,
+            disable_snapshot=opts.disable_snapshot,
+            disable_buildbucket_chromeos=opts.disable_buildbucket_chromeos,
+            enable_buildbucket_chrome=opts.enable_buildbucket_chrome,
+            extra_test_variables=opts.extra_test_variables,
+            endpoint_verification=opts.endpoint_verification,
+            consider_test_crash_as_failure=opts.consider_test_crash_as_failure,
         )
 
-        self.states.init(config)
+        self.states.init(config, self._dut_allocate_spec_dict(opts))
         self.init_hook(opts)
         self.states.save()
 
@@ -1369,7 +1523,7 @@ class DiagnoseCommandLineBase:
         cros_helper.add_allocate_dut_arguments(
             group,
             allow_required=False,
-            prepend_flags_prefix=True,
+            flags_prefix='allocate_dut',
         )
 
         group = parser_init.add_argument_group(title='Essential options')
