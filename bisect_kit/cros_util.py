@@ -1547,14 +1547,23 @@ def search_prebuilt_image(board, version) -> ImageInfo:
     return image_info
 
 
-def search_image(board, version) -> ImageInfo:
+def _search_image(board, version) -> ImageInfo:
+    """Search the ChromeOS snapshot or prebuilt image of the given version.
+
+    Args:
+      board: ChromeOS board name
+      version: ChromeOS version number in short, full, or snapshot format
+
+    Returns:
+      ImageInfo object
+    """
     if is_cros_snapshot_version(version):
         return SnapshotStore.search_snapshot_image(board, version)
     return search_prebuilt_image(board, version)
 
 
 def has_test_image(board, version) -> bool:
-    return bool(search_image(board, version))
+    return bool(_search_image(board, version))
 
 
 def cros_flash(
@@ -1635,13 +1644,18 @@ def provision_image_with_retry(
     chromeos_root,
     host,
     board,
-    image_info,
-    version=None,
+    version,
     clobber_stateful=False,
     disable_rootfs_verification=True,
     repair_callback=None,
     force_reboot_callback=None,
 ):
+    image_info = _search_image(board, version)
+    if not image_info:
+        raise errors.ExecutionFatalError(
+            f'no images available for {board} {version}'
+        )
+
     # 'cros flash' is not 100% reliable, retry if necessary.
     retry = 2
     for attempt in range(retry):
@@ -1650,6 +1664,7 @@ def provision_image_with_retry(
             time.sleep(60)
 
         try:
+            # TODO(kcwu): clear cache of cros flash
             provision_image(
                 chromeos_root,
                 host,
