@@ -49,7 +49,7 @@ def get_lacros_gs_path_list(
 ) -> list[str]:
     """Get all the lacros gs paths from bucket between 2 milestones.
 
-    For every milestone the gsutill is called in a seperate worker process.
+    For every milestone the gsutil is called in a seperate worker process.
     Without mutli process the query takes around 8 minutes for 88 to 106
       milestones.
     With multi process it takes less than 20 seconds.

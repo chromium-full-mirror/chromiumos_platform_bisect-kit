@@ -811,7 +811,7 @@ def gsutil_stat_max_creation_time(*args, **kwargs):
     return max(timestamps)
 
 
-def gsutil_stat(*args, **kwargs) -> dict[str, dict[str], any]:
+def gsutil_stat(*args, **kwargs) -> dict[str, dict[str, typing.Any]]:
     """Returns a key-value dict for each file in gsutil stat.
 
     Note that it only supports a small set of field names.
