@@ -316,10 +316,12 @@ class CrosDiagnoser:
             self.old_info = {
                 'android_build_id': self.config['android_prebuilt_old'],
                 'android_branch': base_cros_info.get('android_branch'),
+                'android_target': base_cros_info.get('android_target'),
             }
             self.new_info = {
                 'android_build_id': self.config['android_prebuilt_new'],
                 'android_branch': base_cros_info.get('android_branch'),
+                'android_target': base_cros_info.get('android_target'),
             }
         else:
             self.old_info = cros_util.version_info(
@@ -438,6 +440,16 @@ class CrosDiagnoser:
             )
             return False
 
+        if old_info.get('android_target') != new_info.get('android_target'):
+            self.make_decision(
+                'Android target mismatch: %s vs %s; unable to bisect Android'
+                % (
+                    old_info.get('android_target'),
+                    new_info.get('android_target'),
+                )
+            )
+            return False
+
         return True
 
     def narrow_down_android(self, eval_cmd, extra_switch_cmd=None):
@@ -456,6 +468,12 @@ class CrosDiagnoser:
         verified = False
         if not self._need_android_bisect(self.old_info, self.new_info):
             return verified
+
+        cpu_arch = cros_util.query_dut_cpu_arch(self.dut)
+        android_flavor = '%s_%s-user' % (
+            self.old_info['android_target'],
+            cpu_arch,
+        )
 
         if (
             self.config['bypass_android_prebuilt']
@@ -490,6 +508,8 @@ class CrosDiagnoser:
                         self.dut,
                         '--branch',
                         self.old_info['android_branch'],
+                        '--flavor',
+                        android_flavor,
                     ],
                     switch_cmd=['./switch_arc_prebuilt.py', '--rich_result'],
                     eval_cmd=eval_cmd,
@@ -577,6 +597,12 @@ class CrosDiagnoser:
                     android_root,
                     '--android_mirror',
                     android_mirror,
+                    '--branch',
+                    self.old_info['android_branch'],
+                    '--flavor',
+                    android_flavor,
+                    '--board',
+                    self.config['board'],
                 ],
                 switch_cmd=['./switch_arc_localbuild.py', '--rich_result'],
                 eval_cmd=eval_cmd,

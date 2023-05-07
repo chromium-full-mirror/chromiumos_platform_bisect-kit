@@ -6,7 +6,8 @@
 """Android bisector to bisect a range of android build id.
 
 Example:
-  $ ./bisect_android_build_id.py init --old rev1 --new rev2 --dut DUT
+  $ ./bisect_android_build_id.py init --old rev1 --new rev2 --branch BRANCH \\
+      --flavor FLAVOR
   $ ./bisect_android_build_id.py config switch ./switch_arc_prebuilt.py
   $ ./bisect_android_build_id.py config eval ./eval-manually.sh
   $ ./bisect_android_build_id.py run
@@ -22,13 +23,10 @@ will be set:
 import logging
 
 from bisect_kit import android_util
-from bisect_kit import arc_util
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
-from bisect_kit import cros_lab_util
-from bisect_kit import cros_util
 
 
 logger = logging.getLogger(__name__)
@@ -49,14 +47,16 @@ class AndroidBuildIDDomain(core.BisectDomain):
     def add_init_arguments(parser):
         parser.add_argument(
             '--branch',
+            type=cli.argtype_notempty,
             metavar='ANDROID_BRANCH',
-            default=configure.get('ANDROID_BRANCH'),
+            default=configure.get('ANDROID_BRANCH', ''),
             help='git branch like "git_mnc-dr-arc-dev"',
         )
         parser.add_argument(
             '--flavor',
+            type=cli.argtype_notempty,
             metavar='ANDROID_FLAVOR',
-            default=configure.get('ANDROID_FLAVOR'),
+            default=configure.get('ANDROID_FLAVOR', ''),
             help='example: cheets_x86-user',
         )
         parser.add_argument(
@@ -77,22 +77,6 @@ class AndroidBuildIDDomain(core.BisectDomain):
 
     @staticmethod
     def init(opts):
-        if opts.dut:
-            if cros_lab_util.is_satlab_dut(opts.dut):
-                cros_lab_util.write_satlab_ssh_config(opts.dut)
-            assert cros_util.is_dut(opts.dut)
-
-        if not opts.flavor:
-            assert opts.dut
-            opts.flavor = arc_util.query_flavor(opts.dut)
-
-        if not opts.branch:
-            assert opts.dut
-            board = cros_util.query_dut_board(opts.dut)
-            version = cros_util.query_dut_short_version(opts.dut)
-            opts.branch = cros_util.query_android_branch(board, version)
-            assert opts.branch
-
         config = dict(branch=opts.branch, flavor=opts.flavor)
         if opts.dut:
             config['dut'] = opts.dut

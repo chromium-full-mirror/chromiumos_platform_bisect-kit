@@ -45,7 +45,8 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT', ''),
+        default=configure.get('DUT'),
+        help='DUT address',
     )
     parser.add_argument(
         'build_id',
@@ -56,10 +57,12 @@ def create_argument_parser():
     )
     parser.add_argument(
         '--flavor',
+        type=cli.argtype_notempty,
         metavar='ANDROID_FLAVOR',
-        default=configure.get('ANDROID_FLAVOR'),
+        default=configure.get('ANDROID_FLAVOR', ''),
         help='example: cheets_x86-user',
     )
+    parser.add_argument('--nodeploy', action='store_true', help='Do not deploy')
 
     return parser
 
@@ -69,19 +72,21 @@ def switch_main(args: typing.Optional[tuple[str]]):
     opts = parser.parse_args(args)
     common.config_logging(opts)
 
+    if opts.nodeploy:
+        return
+
+    if not opts.dut:
+        raise errors.ArgumentError(
+            '--dut', 'DUT can be omitted only if --nodeploy'
+        )
     if cros_lab_util.is_satlab_dut(opts.dut):
         cros_lab_util.write_satlab_ssh_config(opts.dut)
-
-    if not opts.flavor:
-        opts.flavor = arc_util.query_flavor(opts.dut)
-        assert opts.flavor
-    logger.info('use flavor=%s', opts.flavor)
-
     if not cros_util.is_good_dut(opts.dut):
         logger.fatal('%r is not a good DUT', opts.dut)
         if not cros_lab_util.repair(opts.dut):
             raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
 
+    logger.info('use flavor=%s', opts.flavor)
     arc_util.push_prebuilt_to_device(opts.dut, opts.flavor, opts.build_id)
 
     arc_version = cros_util.query_dut_lsb_release(opts.dut).get(

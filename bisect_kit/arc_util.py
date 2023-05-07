@@ -6,7 +6,6 @@
 
 import logging
 import os
-import re
 import shutil
 import subprocess
 import tempfile
@@ -143,45 +142,3 @@ def push_localbuild_to_device(android_root, dut, flavor):
         )
 
     _push_to_device(dut, push_script, ['--force', dut], flavor)
-
-
-def get_build_prop(host):
-    """Get build property of a host.
-
-    Args:
-      host: host address
-
-    Returns:
-      dict of property
-    """
-    data = util.ssh_cmd(
-        host,
-        'cat',
-        # Use wildcard to match 'arc', 'arcvm', or future variants.
-        '/usr/share/arc*/properties/build.prop',
-        allow_retry=True,
-    )
-    if not data:
-        return None
-    result = {}
-    for k, v in re.findall(r'^([^#=]+)=(.*)$', data, re.M):
-        result[k] = v
-    return result
-
-
-def query_variant(host):
-    """Queries DUT's build variant (ro.build.type)."""
-    prop = get_build_prop(host)
-    return prop and prop.get('ro.build.type')
-
-
-def query_product(host):
-    """Queries DUT's build product (ro.build.product)."""
-    prop = get_build_prop(host)
-    return prop and prop.get('ro.build.product')
-
-
-def query_flavor(host):
-    """Queries DUT's build flavor (ro.build.flavor)."""
-    prop = get_build_prop(host)
-    return prop and prop.get('ro.build.flavor')

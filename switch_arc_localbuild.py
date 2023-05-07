@@ -68,8 +68,9 @@ def create_argument_parser():
     )
     parser.add_argument(
         '--flavor',
+        type=cli.argtype_notempty,
         metavar='ANDROID_FLAVOR',
-        default=configure.get('ANDROID_FLAVOR'),
+        default=configure.get('ANDROID_FLAVOR', ''),
         help='example: cheets_x86-user',
     )
     parser.add_argument(
@@ -123,10 +124,6 @@ def switch_main(args: typing.Optional[tuple[str]]):
             raise errors.ArgumentError(
                 '--dut', 'DUT can be omitted only if --nodeploy'
             )
-        if not opts.flavor:
-            raise errors.ArgumentError(
-                '--flavor', 'flavor must be specified if no --dut'
-            )
     else:
         if cros_lab_util.is_satlab_dut(opts.dut):
             cros_lab_util.write_satlab_ssh_config(opts.dut)
@@ -135,11 +132,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
                 '%r is not a valid DUT address' % opts.dut
             )
 
-    if not opts.flavor:
-        opts.flavor = arc_util.query_flavor(opts.dut)
-        assert opts.flavor
     logger.info('use flavor=%s', opts.flavor)
-
     switch(opts)
 
 

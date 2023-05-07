@@ -1,0 +1,45 @@
+{
+    "board-metadata": {}, 
+    "boards": [
+        "strongbad"
+    ], 
+    "bot-config": "strongbad-release-main", 
+    "bot-hostname": "chromeos-release-builder-us-east1-d-x32-11-1ckt", 
+    "branch": "main", 
+    "build-number": 0, 
+    "build_id": 0, 
+    "buildbucket_id": 8781974877551968897, 
+    "builder-name": "strongbad-release-main", 
+    "builder_type": "release", 
+    "child-configs": [], 
+    "master_build_id": 0, 
+    "metadata-version": "2", 
+    "results": [
+        {
+            "board": "", 
+            "description": "", 
+            "duration": "00:00:00", 
+            "log": "", 
+            "name": "DebugSymbols", 
+            "status": "pass", 
+            "summary": "stage was successful"
+        }
+    ], 
+    "status": {
+        "current-time": "Fri, 05 May 2023 04:57:37 -0700 (PDT)", 
+        "status": "pass", 
+        "summary": ""
+    }, 
+    "time": {
+        "duration": "9:38:11", 
+        "finish": "Fri, 05 May 2023 04:57:37 -0700 (PDT)", 
+        "start": "Thu, 04 May 2023 19:19:26 -0700 (PDT)"
+    }, 
+    "unibuild": true, 
+    "version": {
+        "chrome": "115.0.5751.0", 
+        "full": "R115-15452.0.0", 
+        "milestone": "115", 
+        "platform": "15452.0.0"
+    }
+}

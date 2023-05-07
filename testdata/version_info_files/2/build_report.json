@@ -1,0 +1,1605 @@
+{
+  "buildbucketId": "8781974877551968897",
+  "type": "BUILD_TYPE_RELEASE",
+  "config": {
+    "branch": {
+      "name": "snapshot"
+    },
+    "androidContainerBranch": {
+      "name": "git_rvc-arc"
+    },
+    "target": {
+      "name": "strongbad"
+    },
+    "androidContainerTarget": {
+      "name": "bertha"
+    },
+    "versions": [
+      {
+        "kind": "VERSION_KIND_ASH_CHROME",
+        "value": "115.0.5751.0"
+      },
+      {
+        "kind": "VERSION_KIND_CHROME",
+        "value": "115.0.5751.0"
+      },
+      {
+        "kind": "VERSION_KIND_MILESTONE",
+        "value": "115"
+      },
+      {
+        "kind": "VERSION_KIND_PLATFORM",
+        "value": "15452.0.0"
+      },
+      {
+        "kind": "VERSION_KIND_ARC",
+        "value": "10053801"
+      },
+      {
+        "kind": "VERSION_KIND_ANDROID_CONTAINER",
+        "value": "10053801"
+      },
+      {
+        "kind": "VERSION_KIND_EC_FIRMWARE",
+        "value": "coachz_v2.0.6581-c1b01265e4"
+      },
+      {
+        "kind": "VERSION_KIND_KERNEL",
+        "value": "5.15.110-r1852"
+      },
+      {
+        "kind": "VERSION_KIND_MAIN_FIRMWARE",
+        "value": "Google_Coachz.13577.702.0"
+      },
+      {
+        "kind": "VERSION_KIND_FINGERPRINT",
+        "value": "google/strongbad/strongbad_cheets:11/R115-15452.0.0/10053801:user/release-keys"
+      }
+    ],
+    "arcUseSet": true,
+    "models": [
+      {
+        "name": "coachz",
+        "firmwareKeyId": "STRONGBADA",
+        "versions": [
+          {
+            "kind": "MODEL_VERSION_KIND_EC_FIRMWARE",
+            "value": "coachz_v2.0.6581-c1b01265e4"
+          },
+          {
+            "kind": "MODEL_VERSION_KIND_MAIN_READWRITE_FIRMWARE",
+            "value": "Google_Coachz.13577.702.0"
+          },
+          {
+            "kind": "MODEL_VERSION_KIND_MAIN_READONLY_FIRMWARE",
+            "value": "Google_Coachz.13577.459.0"
+          }
+        ]
+      },
+      {
+        "name": "homestar",
+        "firmwareKeyId": "STRONGBADB",
+        "versions": [
+          {
+            "kind": "MODEL_VERSION_KIND_EC_FIRMWARE",
+            "value": "homestar_v2.0.6581-c1b01265e4"
+          },
+          {
+            "kind": "MODEL_VERSION_KIND_MAIN_READWRITE_FIRMWARE",
+            "value": "Google_Homestar.13577.702.0"
+          },
+          {
+            "kind": "MODEL_VERSION_KIND_MAIN_READONLY_FIRMWARE",
+            "value": "Google_Homestar.13577.508.0"
+          }
+        ]
+      },
+      {
+        "name": "quackingstick",
+        "firmwareKeyId": "STRONGBADD",
+        "versions": [
+          {
+            "kind": "MODEL_VERSION_KIND_EC_FIRMWARE",
+            "value": "quackingstick_v2.0.6581-c1b0126"
+          },
+          {
+            "kind": "MODEL_VERSION_KIND_MAIN_READWRITE_FIRMWARE",
+            "value": "Google_Quackingstick.13577.702.0"
+          },
+          {
+            "kind": "MODEL_VERSION_KIND_MAIN_READONLY_FIRMWARE",
+            "value": "Google_Quackingstick.13577.596.0"
+          }
+        ]
+      },
+      {
+        "name": "wormdingler",
+        "firmwareKeyId": "STRONGBADB",
+        "versions": [
+          {
+            "kind": "MODEL_VERSION_KIND_EC_FIRMWARE",
+            "value": "wormdingler_v2.0.6581-c1b01265e"
+          },
+          {
+            "kind": "MODEL_VERSION_KIND_MAIN_READWRITE_FIRMWARE",
+            "value": "Google_Wormdingler.13577.702.0"
+          },
+          {
+            "kind": "MODEL_VERSION_KIND_MAIN_READONLY_FIRMWARE",
+            "value": "Google_Wormdingler.13577.508.0"
+          }
+        ]
+      }
+    ]
+  },
+  "steps": {
+    "info": {
+      "STEP_DEBUG_SYMBOLS": {
+        "order": 2,
+        "status": "STATUS_SUCCESS",
+        "runtime": {
+          "begin": "2023-05-05T09:29:04.502207Z",
+          "end": "2023-05-05T09:33:50.313820Z"
+        }
+      },
+      "STEP_UNIT_TESTS": {
+        "order": 3,
+        "status": "STATUS_SUCCESS",
+        "runtime": {
+          "begin": "2023-05-05T09:33:50.705575Z",
+          "end": "2023-05-05T11:01:00.016856Z"
+        }
+      },
+      "STEP_OVERALL": {
+        "order": 1,
+        "status": "STATUS_SUCCESS",
+        "runtime": {
+          "begin": "2023-05-05T02:19:51.109086Z",
+          "end": "2023-05-05T12:02:25.236591Z"
+        }
+      }
+    }
+  },
+  "signedBuilds": [
+    {
+      "releaseDirectory": "canary-channel/strongbad/15452.0.0",
+      "status": "SIGNING_STATUS_PASSED",
+      "board": "strongbad",
+      "type": "IMAGE_TYPE_RECOVERY",
+      "channel": "CHANNEL_CANARY",
+      "keyset": "strongbad-mp-v7",
+      "keysetIsMp": true,
+      "files": [
+        {
+          "filename": "chromeos_15452.0.0_strongbad_recovery_canary-channel_mp-v7.bin",
+          "md5": "9d89bd87c579e167a1bcc850d45fbd55",
+          "sha1": "47f42b5f4a181f4dbee310981aa676f2d1663709",
+          "sha256": "c2c2a630bb3502115651525f06df351f94a717ea574cdc98ffbf13d1460e327a",
+          "size": "4962887168"
+        },
+        {
+          "filename": "chromeos_15452.0.0_strongbad_recovery_canary-channel_mp-v7.bin.zip",
+          "md5": "3a0382d8819d170b5f312115367ddc27",
+          "sha1": "d193d0f4d21fd2db7286fd992c1f21c7d97daf7d",
+          "sha256": "3f8846c532b67abbbde9785ef2fbf473db9a0b8c9decb647cb4824f818dd0027",
+          "size": "1552430814"
+        }
+      ],
+      "versions": [
+        {
+          "kind": "VERSION_KIND_PLATFORM",
+          "value": "15452.0.0"
+        },
+        {
+          "kind": "VERSION_KIND_MILESTONE",
+          "value": "115"
+        },
+        {
+          "kind": "VERSION_KIND_KEY_FIRMWARE_KEY",
+          "value": "1"
+        },
+        {
+          "kind": "VERSION_KIND_KEY_FIRMWARE",
+          "value": "1"
+        },
+        {
+          "kind": "VERSION_KIND_KEY_KERNEL_KEY",
+          "value": "1"
+        },
+        {
+          "kind": "VERSION_KIND_KEY_KERNEL",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "releaseDirectory": "dev-channel/strongbad/15452.0.0",
+      "status": "SIGNING_STATUS_PASSED",
+      "board": "strongbad",
+      "type": "IMAGE_TYPE_RECOVERY",
+      "channel": "CHANNEL_DEV",
+      "keyset": "strongbad-mp-v7",
+      "keysetIsMp": true,
+      "files": [
+        {
+          "filename": "chromeos_15452.0.0_strongbad_recovery_dev-channel_mp-v7.bin",
+          "md5": "dad28cdcaaf319a29489331b03513c82",
+          "sha1": "92704dee2271c6ad1e9530c6a8cd183f4e0303b0",
+          "sha256": "7985b90d2c72f63be69597a77b6678b6a9e63976708b4fa9f2e43aaab7d3f65e",
+          "size": "4962887168"
+        },
+        {
+          "filename": "chromeos_15452.0.0_strongbad_recovery_dev-channel_mp-v7.bin.zip",
+          "md5": "23a35c323ecd3aa42f60207077122ad3",
+          "sha1": "0677be62944de416d3480eb370d6a3d2aea9e48c",
+          "sha256": "0ec7dceb0ab01805f423c40794ffc2cb3659b28a54199a0406c21d9aa99109e0",
+          "size": "1552439439"
+        }
+      ],
+      "versions": [
+        {
+          "kind": "VERSION_KIND_PLATFORM",
+          "value": "15452.0.0"
+        },
+        {
+          "kind": "VERSION_KIND_MILESTONE",
+          "value": "115"
+        },
+        {
+          "kind": "VERSION_KIND_KEY_FIRMWARE_KEY",
+          "value": "1"
+        },
+        {
+          "kind": "VERSION_KIND_KEY_FIRMWARE",
+          "value": "1"
+        },
+        {
+          "kind": "VERSION_KIND_KEY_KERNEL_KEY",
+          "value": "1"
+        },
+        {
+          "kind": "VERSION_KIND_KEY_KERNEL",
+          "value": "2"
+        }
+      ]
+    }
+  ],
+  "count": "13",
+  "parent": {
+    "buildbucketId": "8781976049912825633"
+  },
+  "payloads": [
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15411.0.0-15452.0.0_strongbad_canary-channel_delta_test.bin-gy2dkndfguzgfngdt3iiyoq6cdtzmagk"
+        },
+        "sha256": "ukcNAFShhrnTDQBEe5+U2CO5aFH8VK2E0StddG0Kxok="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "h1iZnOgSAjUw6YG2htqtxHms9wGo3QCmgic1JiU1xffO9CLjB82LqBAtfcMjShY51rmqURe81oYVzIpn/yIeBH4lRu5WuKJ+StoOXJYYXk6EcIpPj3cA8KkjwQQphTVX7k5hUn8p9zpmbUJ396rEmn95w44yevbitYBatH2m1ZcCUXw3VAO82aKArNgDg+2Vt+OxEElXc+C07jbapJqtkkUeh5IKDpE913hs5SZlmQ51dYN9vnzEuyE9APyh/jOxKjxjUN1WSIEL05ZNlW2Msam9E27dEhSeRW5PtFqBx3XL8PRcky5U93SL7DXn6DhYDWja+egIgTq1dvqOT/ffuw==",
+      "metadataSize": "771976",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "778875098",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15411.0.0-15452.0.0_strongbad_canary-channel_delta_mp-v7.bin-gy2dkndfgrrwj7vubmajrzh775l5qgwn.signed"
+        },
+        "sha256": "EhbxWx8HdD29sUse/0vQ2NP9qFdUdrUU+bVAoECnUmk="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{90F229CE-83E2-4FAF-8479-E368A34938B1}",
+      "metadataSignature": "qaB5pr8D1WQiwiEHuJUtSBnL0ayFxOnxRNFH8Q//fYmKGXXA7Fm8EfVZeQUve8d+TIS27ZzpmiFF4351XLxj/Iv+aBzYVTcRTc1U6/0KhND4r/FVGjfTLhu9mskLNaOQ7QL8iYJK0FK/Fv8gDXjqHcHT5xNxiBQrn6gKx5Q/JYg3dmfzqJLglMRHfgFhGkHZ5vUCy1U7UeOUaOk+OQeuGn8tBJv7P9lzPniUrD9CUE+SyKuXTvJGKe26HZ8aPFVtVEpSFQRUQeDA4uR4toDsv6pYwh2j7CW9T0CMjIc8cXtmyA94grpxKkJ+EYngTQBaNhwFI6YNUIsvVa7Zqok/Gg==",
+      "metadataSize": "769480",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "778408221",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15446.0.0-15452.0.0_strongbad_canary-channel_delta_test.bin-gy2dkndfgvste5xy32qwyl57vxcjki7m"
+        },
+        "sha256": "y1zXxYljemTyV71wd7bGOgC3FpSzPMJN/GVaGSiHVWA="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "Nm4VtGxDrQ20MiS7GhGQwwFyd6o8pGw/g9tBcyY/Zfsk4Hu9yEvcra0r9YbUgAcdeD0xQXaw2NnEmCxp942EE23RYKUptIvR9MMpOglN/SlK8qRfDJG3HLxujaln5Vfb5+5ndmCKFif2DWJKd04IboUmnLbm10Scf82z0XKG3TnOAuLA/D15CLd5G38Mkzw4Ok8SuaY5E9ZpGij9brmL6dnt+y9wScU+kQyLRMqOBEYSjPXKihz+t2kq8Ra9G/Ex0Q8rGjOgue7htkgb2y/H/t5wQ6oN/SMHE7OvUBGDfg3dvZ68JgmLWZdx0IspLy8VIfwf/2n2p9MIgpITdJ0FOQ==",
+      "metadataSize": "885954",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "222702189",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15446.0.0-15452.0.0_strongbad_canary-channel_delta_mp-v7.bin-gy2dkndfguyth4l3cb63nqszznosjyf7.signed"
+        },
+        "sha256": "PrL/nkSUNalj1x9JpzM/CdJTVofMOPGYCAHaQCvCo/k="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{90F229CE-83E2-4FAF-8479-E368A34938B1}",
+      "metadataSignature": "ftM8TsSALbldcSMegAzcc9z0i0W59E0NadMVAzGqYKId1sV8CaunyiK6MGQPO/YCKwd9Kvu0OgHo1m5fQgx9eLLtDF0K4tRr9Lpglyco40DL0CtaM2n/QdgF3q6i8yimezGDty9uB1yUb/tIQ1gaO3aqZ3eqZ5+clY8IPzjBEjO7uDDXnrrJ0tjQ+hWBBK2YMMXPbJWVKMeSONmPXb4Ge9JYSsLql0mHZ21fTCjfZT1j/97lxaS+OuiMfvRiCPK8/gg1yXc+ySpbd3rxIsPsDDSBtZxjUjrOJyezQL3hHQtC3pur0+rzpHwFlyzzCvbLQEQbQXDgTtAHfx38Z0CHyw==",
+      "metadataSize": "883596",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "222614366",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15449.0.0-15452.0.0_strongbad_canary-channel_delta_test.bin-gy2dkndfguzgjxc4h3qceuglixsv7fmj"
+        },
+        "sha256": "aLSNzOLIUiPn03MZtwwLkxMwGe+QXjHyLa50nAiwcmk="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "XLRMfPnzOVLEQSvWalwiA+yMN5ZpsQoeSvKItDIs5lipXX04fivnGqW8ESLFtRJyIx8vm+5N3Qjp/x+Je8KlaID2mxyaFmpepFfIipvmaadfxzuQ00YahgslnMRoQM8eCfLstCWUQv02Tw242nHonQIgsJP0fTnukK8+kMCV8i4Env7+rcvwI/2SiFfOj2QxyCmWytXN71atPKsWh0ATvojgcSc6glNCf42OMrFdRU2q5RHrCVWU7rJRTSdYq8wI2P5pGCvRpnSgdjQrVpBWvcqL9qRjlQIy4xTSMUqCDDYWdQH9TwHrGi/7NPRArGFaj1ME7rOvFlkaR5xaEJJ3qA==",
+      "metadataSize": "597170",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "199089223",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15449.0.0-15452.0.0_strongbad_canary-channel_delta_mp-v7.bin-gy2dkndfgrrthbzqfxl37o5vvrnv6yfy.signed"
+        },
+        "sha256": "6Ny7DXq3Qm0zcWLdRRGkLUwlsLsaXpjxwRLRoM/euC0="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{90F229CE-83E2-4FAF-8479-E368A34938B1}",
+      "metadataSignature": "sMQg0QslkNFnYtVP/2MCbu/2faLFT2Ymvb33rFidNC9Y4Ej49oe6O4WCkzK6lXK7ztvQ1exm5HK4376d2+WhmEhgEe9ascizIvDYOt4glYgQYffb8I9L+wDRGhqezVwG5i/EqoYCMXOQLVauZYLrClr2jvKY4BlfNQHqdJaHZP4zwjGjAvvsYaLUPOWKmOfbEiIJZ9M1CitVcE/R/8bn4v7aPJlqKmCRd5/RQx1gEdNPHM7G6q8VQAvljEVYr7S6RwPhHNUgvj7+Fh1vpNbjAqVfNTqnvHKy6RIoiEGeQjRXbuvezJ1/++rEMkl0b8BelfaAQeox5GjYM0WsFw+kmg==",
+      "metadataSize": "594040",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "199138575",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/chromeos_15437.8.0-15452.0.0_strongbad_dev-channel_delta_test.bin-gy2dkndfgu3de7lwcfvwvbynrqihli7o"
+        },
+        "sha256": "nbLSwcRJVFqdJ6bVeBLWp8C33ct+9+uJPOZQHafWSpI="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "ycuWggdVH0aafRO1ayCAZVMCfGFoslfPVnxQbRZoq26MzBF/2xwV/C5uy4fQ2vrgpRl+kinooM+Y1P8sH9JNpqs+8rfwHmRm8XUoSpMFgkfP3eSZNEnMHR/j2ks0EDPxpiWpaImtz5KeSC2DfUrYHuSYurX5HYTN0QJ8VJL96tlt1+A6mNeEcFWyFNPa20ZobsowZp/aM9MJm83SdgPCLJzKZags2YLQNYriTJY5gedRBPIrYjX75FNp1vgRgnJAFARgYhDhIUFjuQOaDsSTcXx4lNOX2rFs1M5PKwVhY8KMN1xm/V5SXxLKpCMRXrvcUv6VLsOq4oPfaGEVBCRFyA==",
+      "metadataSize": "875450",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "242998579",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/chromeos_15437.8.0-15452.0.0_strongbad_dev-channel_delta_mp-v7.bin-gy2dkndfguytklcxrtqcelq6nuehddnz.signed"
+        },
+        "sha256": "1IYljHxbyRMiOVQ1rCSmBPZACyEhjgf9oZ8SSQdKaeQ="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "W+RrNZVvq29ZzzYXTiXTHzJDNbQUaTk/s5aLV/sOaMI4l201RIAEyjHGBtQzLqGDnCzhi23/ryN7nvrUW7f02X69OdP9MVhV8UjGm+snSTA0pCstq9zGpPLR6gzsimyqmGZJmWNJj8rHWl87Md9tyGqbQePJvS+5wUpN/FsI7NZQzIPOZbz4HA/6hwVDy2QxkO4CYVpyFUn+owdDTYTU9Vc4A/crz8/0TMGfmzd6H912o6zeIsFIuHKKoPBSbu1PDKQipKnXzvAHpLDn2Pob0fiWYmHSsmAkREfC2eolyH1R4i1qqMKB5mu1niMs6e9CTO0x9j+M5ODZS7AU7A1Iag==",
+      "metadataSize": "872953",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "242846864",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15452.0.0_strongbad_canary-channel_full_mp-v7.bin-gy2dkndfgvrwisrg5d3ktavoprmeiiz3.signed"
+        },
+        "sha256": "tIuZvSPPEXu5GrBpEMpo4eo7UbGpNWIklJpOvgmiYGM="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{90F229CE-83E2-4FAF-8479-E368A34938B1}",
+      "metadataSignature": "pNIvlEiEdzwsVRU183cB5Chx9oB/tpIeiknWkHHVeo08DWVrLifdSvIPg8PrGUK4ymlpbZNoe8vfnwsVm9SnCSp2e6B0pRgbIjwZDbeuozYtOftVP9xBhrR1ALs1OnP4aJMU4CzzA1sGNaUgVjeH5IhjruGw9DRIqQmJyVm3bkM1CqRqDAd0AA9AzPjaoNx5naluCVRIw/CYVq4brLa+ANcXWLPCIbdpr2UunsuO41QF4FBDmYi1k4bYQUiYwO8b5WC/wv/QahSzVRrBWJlqECznHOs5LIZNSiR4WkP4vuWAo2MBrO5kv8hJIuO4Ob/NsTGz3SvbyLdy+3jjq53D6g==",
+      "metadataSize": "74779",
+      "targetVersion": "15452.0.0",
+      "size": "1314167489",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/chromeos_15452.0.0_strongbad_dev-channel_full_mp-v7.bin-gy2dkndfgu3wfuexm2p3mectdgdiznua.signed"
+        },
+        "sha256": "dzRdeXocIR6IUTyD0+T5iHEgYiJmZ1A++4D5rnOPvB4="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "0/zSeVBw6e2rw3JrYevoSD17fU3Zpsl7ypjx4zkaXphDg2okY60xI6t2S7V0ynASpiAFjj9f5QRr6kCHwg9SUyPYOGm2kJJWbW6I+7TZhAIgdpjRzpL8xb7gaaroiDNEX63ZFLOnArwYX5xUf1F9lbx+zGlV4YQobwziHguIr+klEwgYcXSlIVCt13D/SNVI1FbvlMLmm8t0WIEmau0QEnPmsGwf+58z2L1eqYzgpQ6OWWTHbb2vgnSupZdlYoTO9NKg5m1xPXUSZka08kM1HlABGXkuiLOKlj4Sg4pAb/8pxYbIWRmwZsTvy5J02tZGVYbMa8ywr2Sy+yJtYSDMKQ==",
+      "metadataSize": "74777",
+      "targetVersion": "15452.0.0",
+      "size": "1314336275",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15452.0.0_strongbad_canary-channel_full_test.bin-gy2dkndfgq4wjhkl7f2g5o5hm46q63w7"
+        },
+        "sha256": "BcqSQNtVGbSA9Q+MHvOn6Pj5z9FCKIF7lDTWoKdl+m8="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "I0RyLECEDsyRzdDGVtV2T3diTPbVJK02S6OV7Jdml1r30i3yb83fJniTQdI7fvCMMeMMpY12XnCu9dvlGc0rQlIslJjfDOPu+MDro4EX+764uqm+4P4+Cvd4zzcz2BhusiYAcKcmTJ5k96K6jANnvJWGCMFu0t2t5ZxbHyaNjPPRHgXTYrlEhtLHXowfj3CeSft2juXU+GheiPDUe6JJdXlWW0eVs3NwePVW5v1WJeJcwqBUyPQ27Gj6sWvXdqx/PszTTKu7JheOfoXyiM8BGZ7QUigc0s/XzCPkWiRKrwGUmWGh/P0jy9y91wh8y6ZDQYu/ekUnwdFI47QPikk2NA==",
+      "metadataSize": "74797",
+      "targetVersion": "15452.0.0",
+      "size": "1315249157",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/chromeos_15452.0.0-15452.0.0_strongbad_canary-channel_delta_test.bin-gy2dkndfgq4wiiss5mqa6cfe62vnvuci"
+        },
+        "sha256": "aGygsNfy2npGE62cKgLV0ZiSoTYT1uIuPJXIi54Tq3Q="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "g6P/XX+crX60a1YmFNxti2Byu11xYRtBHuc2tAi2lD17oXiqmXyKLKpkJ9oeg+cNSolWpM691j+YUNbAOKetSby0kArGNYoyzyRywC39idOlKB1luNhpVDpE0ezK43X0wlJvxr4j0X7QAyaX55j9cwqoA1IwEyEeWWb1T8snUxKS6hdl6cmsWYuXM2vQnSdoGACreM4WVmajXUn//ztvR6+rbK1MGj1BidfN1kZs9DJqXg4+wWbMaYc6a5frDS81sMk3aOA0pofVxS3fuFXksF9cjaSDByo+4IEEcd4lBW4BIbkIUE7HAsWZLfH1wpLQDLyQPF81EJs4Uqn/jTm86g==",
+      "metadataSize": "243115",
+      "sourceVersion": "15452.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "243649",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/chromeos_15452.0.0_strongbad_dev-channel_full_test.bin-gy2dkndfguygd7qizv75az3kwfobaifj"
+        },
+        "sha256": "BcqSQNtVGbSA9Q+MHvOn6Pj5z9FCKIF7lDTWoKdl+m8="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "I0RyLECEDsyRzdDGVtV2T3diTPbVJK02S6OV7Jdml1r30i3yb83fJniTQdI7fvCMMeMMpY12XnCu9dvlGc0rQlIslJjfDOPu+MDro4EX+764uqm+4P4+Cvd4zzcz2BhusiYAcKcmTJ5k96K6jANnvJWGCMFu0t2t5ZxbHyaNjPPRHgXTYrlEhtLHXowfj3CeSft2juXU+GheiPDUe6JJdXlWW0eVs3NwePVW5v1WJeJcwqBUyPQ27Gj6sWvXdqx/PszTTKu7JheOfoXyiM8BGZ7QUigc0s/XzCPkWiRKrwGUmWGh/P0jy9y91wh8y6ZDQYu/ekUnwdFI47QPikk2NA==",
+      "metadataSize": "74797",
+      "targetVersion": "15452.0.0",
+      "size": "1315249157",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/chromeos_15452.0.0-15452.0.0_strongbad_dev-channel_delta_test.bin-gy2dkndfguygdktpbceo6ch5swssmppk"
+        },
+        "sha256": "aGygsNfy2npGE62cKgLV0ZiSoTYT1uIuPJXIi54Tq3Q="
+      },
+      "payloadType": "PAYLOAD_TYPE_STANDARD",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}",
+      "metadataSignature": "g6P/XX+crX60a1YmFNxti2Byu11xYRtBHuc2tAi2lD17oXiqmXyKLKpkJ9oeg+cNSolWpM691j+YUNbAOKetSby0kArGNYoyzyRywC39idOlKB1luNhpVDpE0ezK43X0wlJvxr4j0X7QAyaX55j9cwqoA1IwEyEeWWb1T8snUxKS6hdl6cmsWYuXM2vQnSdoGACreM4WVmajXUn//ztvR6+rbK1MGj1BidfN1kZs9DJqXg4+wWbMaYc6a5frDS81sMk3aOA0pofVxS3fuFXksF9cjaSDByo+4IEEcd4lBW4BIbkIUE7HAsWZLfH1wpLQDLyQPF81EJs4Uqn/jTm86g==",
+      "metadataSize": "243115",
+      "sourceVersion": "15452.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "243649",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/termina-dlc/package/dlc_termina-dlc_package_15449.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfhaywfqhzy77e3wpjkjsbnxll.signed"
+        },
+        "sha256": "WtzwQXmLbrEZhn+xYkucbU6aRtc64Veq+b0w6eee6Sg="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-dlc",
+      "metadataSignature": "GqBZ/mqDo44LnxxXQ0GGUkS9Dr7tZgjsZk2mUE0MUjBLBJ3F0FrQMPIjGwZHpFCBvnbFFWWco9jkcSrBKdl8Zqs4m4/AKc21PLanmShKxDKH+lA4H3OOvIoKl8tD20+mmuHWLWY7faDc3rEOyzMesOKbJKJfwWYmOFApoWBnG0jZThOaPtn7A1bFKemr6b8hREu1QeaHeUf2lbQUNoXp54CNaQPBRh+/ohV8WrTWHHQUbXOJqJL6kAzWMZatipkLl1U0U7jVnUXEAEy3LLtsSq8xbho9ZtAKuq/AwzrkW3Jl3xiojQcARg22aKzjfdxLkHKnXQESGnoROCsUM6FrTQ==",
+      "metadataSize": "590",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "49054876",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/libsoda-model-en-us/package/dlc_libsoda-model-en-us_package_15411.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguzgn6tz3ivefyez3gzsslg3.signed"
+        },
+        "sha256": "IMOny7LHROcaRv+Qdx6wrTZoMWFrLEadYzDs/kteb7E="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda-model-en-us",
+      "metadataSignature": "uq7hcGS39prhwC2+hE4p5M3Jq9kLY/ZAAMgwHnaDJOSQefcfA+BlfUqwJlyUTixpsUNFaoKk+TySyyvnUVSQ1VT6b6wl4H+qe1EAFCmjX/WL3WmqplV6lBbJ8AIwaqZDyR9h0L0p9n73zP+MkrQTYc5agRh+LD4AO/Clm2v2BGMIiqjEqat44HReuzqXJZcljxdU8c08MBUSIcJk19lvTo1S4fiGwbztEgdDWuzfEp9EysUQgStbsn38Nc4qzl1GO3HCZKhZTQ5F9sUnFmV/v+luEJ7FxH1jwSrt/AK0i3EGWj9zqhGRRH4E4GTgqevpv8lc0+Taav3Qxzi8j1DaNg==",
+      "metadataSize": "1792",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "447891",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/libsoda/package/dlc_libsoda_package_15411.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguztipgg2uldssyf3iortlle.signed"
+        },
+        "sha256": "yhqg6A6POK2lnwa2TIFv8r9y9rVplC0d+/MDeiJ2y78="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda",
+      "metadataSignature": "XqsQk2sSWm8aq8y6KqmP7aA9qNcmGJCuA6EsUL+ezY0EUgciG3Q2ramrUp0vElWIL2H8soLehCisIcIAQNRczdOQTjY2T3h2rZaig43eYabQNNJm9Ota1w/vH6rvj0hD3gPrHvPX2Xk3CT62fI4v1KkPkpXHMaUnId5ruSJtzG4Fld1uAJuiYAkqgGEb2W1Q4/vKPVXPsfGGkN1KvDA9BmJfD+0FYFjH+IPdqY/ZEkJEzuOrlztgCb64Zxht30xNM4Kqhp84rNmNAtkdRfIHREB7OqDHWa2QWCL/JBbNraIKhYh8chkwSov76gUYjzPqiyUAlxQTZMGgDplC4NWXOA==",
+      "metadataSize": "658",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "100623",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/pumpkin/package/dlc_pumpkin_package_15411.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguzgn5qztusvhqhmwirltdzo.signed"
+        },
+        "sha256": "hgPmMtVvukODsWFMI6lZ4VEXwGThPbdYK/g06c8rqJc="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_pumpkin",
+      "metadataSignature": "l5xCwnatxZiJU4ErqH6wAMnto5x4Em0bh7JYaXJheL5RL0Koj941EGok0RugzbElFcsZm4T5T/UN5Se3jGKiaKNerei7PVxvNLY3HxJLJdpi5O8eB2zaw6cZ3x12dHBCms5PgVUDPW/e98dSgtvTlJeDKfVtZzLwPGtqbrpiXi3Y1+QtCCdBU2v8YBZ/+X9+bHmD4ZI1yFGroGkAMM2oy5WeplWuDSi35Kgcoub42V9Tqqpragah1Fhrpr5n4AE2ouomuRzwJSxhYqMrUtX8CAqO8UFvq38wi5d5CCJ18LTPHfpWsyhcU62+hXZXyRU+j3NkvCT8i0sh+VS1pjElCA==",
+      "metadataSize": "332",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "9799",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/sample-dlc/package/dlc_sample-dlc_package_15411.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguztbjpjmm3rzoddmt34c7wi.signed"
+        },
+        "sha256": "UCb8/JR6QsDt57Uu1+E++0Mp7FKnqMcjezyG670cv9Y="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sample-dlc",
+      "metadataSignature": "H7HyAtt2Q18WWbcm0OfmjchBvhMKCfPRli+msUl0yw3CKecxsUyRQ4+rEQfqOjsy3b4O1OkiYntKdApj8lGMwsWr+yYhVO+mg1mTl6blFTN+rCmg1L8G856VkNorgmmkrG9eqh0uRMqDnFUnXr5udw7GMs4t5Yy8FAoXKDEW7FwNlSC7YdfrupYWA0AhXDpC6856hafEQhHX9ohCgnWnedbS0hjmfSdZbDcm+DlwT5GOo8dFQsQSTcwdAzE9JCBrGNM7rjzmHrNU7+3NpL5fmJbSyrsZqB4bx9lYKGu9NJQLMw+AvvSfZCc2CZqesphEut0TFQ9DQ8UntjPo09DZLg==",
+      "metadataSize": "333",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "6341",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/sr-bt-dlc/package/dlc_sr-bt-dlc_package_15411.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguzgmip4tfqfomml4zvf3hng.signed"
+        },
+        "sha256": "hXxD5uOmBefhz/jYMxsml2RRWiYBJL/j/MQXhpWz2Qc="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sr-bt-dlc",
+      "metadataSignature": "QhGYrKZHQQ4J8QJWGZpKl4EUWA0Oo6rRlTIRCClFtt4HJ+MmLNrn9tYs8jXW3MXUmCqIkB97lNcLytQGaMkQFmrtvwVFd8qXH6JZakj5pLvAvmjyKd3uvot8QiBGzYzhScDDVEMp33u5z1T472PWjo7Qkbskla0XWss/rnMcWccZVVMhqHQXQLA9WT9hVqdL8ApCflaA5esxYok6GjJPh8usCi+8R0YZriPYIpGPsQFS2PdxtfmUlDsFFcdqKg1YB7hbTS+G/vE2i499GTcZAVhx5dIQ3PZkWWEYORHiVbGl0bEFI0KyQyoLIJad9sh/wpnmx5QW3J6niepn1837yg==",
+      "metadataSize": "446",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "46578",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/termina-dlc/package/dlc_termina-dlc_package_15411.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguztb7jwi5az3aepsguh3pjy.signed"
+        },
+        "sha256": "eac/ohnTsGwjgKWBX+IWLkGpfmVPI8zYP3mJ47ujTjM="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-dlc",
+      "metadataSignature": "gyaQxu1McodM2d7cmjUsGieLdHsrrzii5hzD3wo3yNFmksr/9YXk+Vt4rirD3fLYm8b9T3BVRlDEXcqevAk/aV/SFGlqpbc4X3OCJMFRBIuqrKnSKUMT0gpaoJVWodWRXYvnzPZfUGu98cY8mVNLAOEG/haa2r9YfEy7ginWgQ4fh5jCduVuWHudXc3VzNYhwrdcYc9eZtL1NpTU8kme46XQKA5pvU7OgFnOjgW52Y9vhFMj/eeWSyQCh803xwsJahNHOGY3JvaU9CEN26AcY2SeffRQv/7gd9DeCfx6GE4xNbJS0X+ARVZl/nsd2Wv6/oWsN5yd6LdF0i36bwumqA==",
+      "metadataSize": "590",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "66435424",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/termina-tools-dlc/package/dlc_termina-tools-dlc_package_15411.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguzgmup7wxnvk6kxohoo2oid.signed"
+        },
+        "sha256": "mq2sASnFxjuCKy+erIML/4sAkIgA8M65TRS2I7F22ZI="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-tools-dlc",
+      "metadataSignature": "i7sONsqXIw8W5gcYkuhUJQB0TMschc7m221nXzmCST1tjp1bFw8MXpZkTNW0QctmWNtS/+gf+b2IIdIRzdzrrFXTIhwVmQKl+Pd3pIBIF4Ng76eBpyp6tB9zciwslnMZDYmEbOIQrSI/MzDIpVFYj8ePMGWP+ij3vV67IBZ6jySpTUPttbtklwNwyoEwXmbyzGHE7+9qIv1WGfDx0P/lu7+pNGjV3G3th5oGjSi20INSNX225cPr4KBIUlzgFHPtxf15WzHrOadOd630RdS0GGoVYrqsfCx4NEwFXUxlAVzvz2LSeKXdasfsLKBpebX7kXzC7lvjjg7OFOqspR/WgQ==",
+      "metadataSize": "391",
+      "sourceVersion": "15411.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "8804108",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/libsoda-model-en-us/package/dlc_libsoda-model-en-us_package_15446.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguztbtnrlvxa5fysrr5eixw5.signed"
+        },
+        "sha256": "pjosoY83x5JrVGc/F4KzwA2Khw4sH00XDRZ0MlQG4PU="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda-model-en-us",
+      "metadataSignature": "Gg9+hlwiaaJz900PSYv9wE0XnUVd26a7NVuqQDxIKYxnXEXp+IiUOb4X6+oGyYhwmVzH+rtdFwWKTh8+fGm8fsiUarBMiSwynPbajdAbBbv0iMxageA3yXaK6OD0U6ViZ0XrhqbjyD86gqiAcu63nx0OGcEisDd5npzqmKXs3UU8oJGTTAFr7vbyyAm0MLYjljlrZKLrJuQj+8O7HKhIdeNIisX/p3wMf4Xx3R5q+7iYIcr44rZYhaCirZ3qzoyGNHxT1a7ibaxjy4sMVxhdlt2jE/8OhZWRKyh0vuoCaLb6SdWRZW/wAJoaiETa9jNfLbEprOxc477dZhMe1HfPBA==",
+      "metadataSize": "1792",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "447891",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/libsoda/package/dlc_libsoda_package_15446.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguzthk54hkuopqvjmqyigbk2.signed"
+        },
+        "sha256": "5yk41kbmgcD3KbngUb4icQRMShaSFVj6qIIvkwOYpyk="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda",
+      "metadataSignature": "v6Neec2RthAc6focqgXxzQXFUu9WIUCYPxPGS1rMG6iWLpZYTT1PINDCXi1FYim+sXf05h2mZGTNh/DqmcEOXp/03MKGU4tiQlLOQIGpDipGWeMYXUI0z/B13UgJLc+8maTJ5bGxZKgNy2SwR4WfmXK3bPI9TCWk2YVVi7yk+IlMuB2r7mVzsqtAnEY5DUDc3vH8b2BVgQyZPuBzTfsIz/hQ3kNojLjn/q2Go2rDUJQbhqSZSGS4/4z3X4BhxPkH16rDrV9WUBzsSp0WPkJBpmKgXNGJdUkWLgPVHmE39Fp/7IE7Vq8zVB/sO6tcct2DyTBizdugc8usRBNIYppnBw==",
+      "metadataSize": "658",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "100624",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/pumpkin/package/dlc_pumpkin_package_15446.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfguztlhk6pmiorr6vioixk7oe.signed"
+        },
+        "sha256": "e0BcJoxT+6bh84lQFoMYukDLBs8NYg0qdYOh9MznWcE="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_pumpkin",
+      "metadataSignature": "xl9Oty7dVZZnkFuKg1mNTKR9AKMXfF/bzt6vjCpERseY5vWFU4pwxdkOfiImKOEMY5EzMrMTFrkKxPSEHCLsw3skc3CednjFKlZMQojzFi//mSbY+DaZkewxOwuSOubdV/x7uR6gviNzNs3STxqAbFzEBCoo0pc7Itfu6nFk84z/vtTuj23ydVd5xufZ7+EQ3dJR16azucffe77FxvcG5ePiwVC/jEOMQDaQXwnHwJMy7MXpq0hQ9I9wK6PhlHafWWtsqyCB//HvqjCX6cSmtW11aBJHenYqf09LWBOfgYyw1ZrlttoJKCZcdihMrOhMA3cisaye7eZw42EihM95SA==",
+      "metadataSize": "332",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "9797",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/sample-dlc/package/dlc_sample-dlc_package_15446.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfgzrteb5dlvym3yiuvukno4xk.signed"
+        },
+        "sha256": "mA48hD3INDw4gKKg5uMxJL9KZS/nBHx/v99+52Zmxlk="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sample-dlc",
+      "metadataSignature": "yBnIvCInyIZBncV3h3SXg/+CcobNX9QgZr1Y+ryEjk5UMMB5vwfUonHZ1USq+ade33+nZcqtk5N4GlS8/zIWAIuKhElWAbjtmECW4AWN6/NLGwnkDTJWZUwgSJdkba4noCtlaycz0E4x23ROiH/yLLkA13VDhwjTlSoWpdkb+SqioBh2237Ewl3hv1dBNollZ5GErAw42QrNjo0QRK0asP88msOCuzo4ruyftlD0vlivM+X9gziGcnLsDDcE8/RQCTOy360teZjWHOOn0SVC1u9Ux5VG4QH8zBMuQq/8PODuBMMpJfdWY9gbrvXHDJxijgzZ6KGYsxt9kZGpw3y6Uw==",
+      "metadataSize": "333",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "5508",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/sr-bt-dlc/package/dlc_sr-bt-dlc_package_15446.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfgzsgndrc3bwhwnphtgtunkh3.signed"
+        },
+        "sha256": "sWUptAIB94L195E+/p5a8ABYPz0Qq7h7+an13aq/M4A="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sr-bt-dlc",
+      "metadataSignature": "sf7gwSXNcYlyNTaihoXWRgB0T2sLqz4fQOJsgDSd7B7rjVDa4yeBcNrk8fXOKKHquQvRJGXE2dOljT1NQkttP83LmNUc0scmbKh3s1F9HRWRsvdcpyVA0s2vJYu/BYFOgJ7GRmJLuAFk3DW5NLIy4AiH25p4wrnttGe+H+yDVZMvrEPmuD4sZdTs3Hkq5YDsgadXAC7LS0//rfe579lqn36R/qM93ed0hF8LRX6OS82+HEQtnN/eBqErxrQZCgq8oiVk0ADK7fHqmT0vp+RjL8umEyOj4ThCMIQpKoeozdhdQOReG8MWsnWiAyw+2GdnjhnHa6gpv210fQ9qg8KgZw==",
+      "metadataSize": "446",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "46577",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/termina-dlc/package/dlc_termina-dlc_package_15446.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfgzstozviesapenvnmoxo55wg.signed"
+        },
+        "sha256": "j8Ls77fu2asoP/cKCGRMFOqvxKenw27MAONl1WfbGmg="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-dlc",
+      "metadataSignature": "s38Hv/jjeJkRM/Ao1SGK8uYFveOG//gOn/AwTk0sE3CJg5XiA5fL8UG2zGN0PK5em4JSjKdAvFiyEKqIDTCFBpRheNGe1mmUgIUCiHXHR11WD2f/M0yPEvr7lF7DQTQ9MK80M4tEOlzcZv7gb2Dz22WGGQlttJUFij9kFbgiqdADZUtR1HhtMl8iUzIWZKhTSMNhDKbAX/+5ysqxUzOTew/hUhLi19x3faohWlf5WT1jP3lEqICphQxvpaKdjcxN/D9QlncHArCdZ88SfvdY22Cble255FPI4DJQ5ISzW2EpTgI/ifUmP8c4yr6iyfX36fDNxzMMHlAaEiOgAtNoAA==",
+      "metadataSize": "590",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "49054874",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/termina-tools-dlc/package/dlc_termina-tools-dlc_package_15446.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfgzrtbaq2xfhohtmefglei6c5.signed"
+        },
+        "sha256": "32g7lkGq5qBZMlNR7CODs5iKNUc1zUPqd92pi1j/7jI="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-tools-dlc",
+      "metadataSignature": "qL/h6ElzluL4PJMQ0YeTkycNlIASVc3YpcdBvV56dD1rHglEBpsVhH4wNge7zEAxM3pRIBihD2lEEgUHjbF0WdlsSi6yPAtPC3rQ25GBI9Htb/gN7Kgrrgp5Fk3YxKPCJDfdVhwKFiOz7MoSMPtO6ZWaMsYQDMKdybzyRFmTsh6IQPeb+GownxWEYOfCNv0kMyD3psoHXQuJsbkLLP5lCPMkwEhnyR55E0mzPcf0aOAr+mTcU29wmbcZGfR7sQuF6g7j9qkLDtw73WMmDNE+lfRJU5VuJwsBva0eq4UWX6I9Vr3nAd7KdC9NNgpE6sLGqDcV5IoR+Z18SjE1YsLNPA==",
+      "metadataSize": "391",
+      "sourceVersion": "15446.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "3561242",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/libsoda-model-en-us/package/dlc_libsoda-model-en-us_package_15449.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfgzrde3fchasiwropq7kcrg3h.signed"
+        },
+        "sha256": "xLXukvPEU5sJErcpfro+gZw4T2YorNfloeiP4cAeTkw="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda-model-en-us",
+      "metadataSignature": "tDbhaDGc1+55bROZAezrDtp7t+JYqk+UkKDyavWyUGh73PB8JO2YmVWPS+3mjpP/IvkRLzIkJE9HCTcDHcL098t3z1bl8jx8fxtg6CGm8ESHsjwNKhHhgdO4v6/8/MXtlUDiU2T/rKIkXxDG6w/KQR+dw68r+8NnlGrSRVR6L0Iht0/eHd6LLDs77GLXsckWQ6+T1NNXpvzrnNPLD0nO+l2LS/WHETtViKENzFwdzR9vDbY9rccgAYAppA0o8AwzKXWM7yFhjH5Fj5Pd9rGd7EkhxvepGskiBab6mPXtXUScygZMhKCeMilgl1GP54JFhShlulM/touctY/QS+oIaw==",
+      "metadataSize": "1792",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "447891",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/libsoda/package/dlc_libsoda_package_15449.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfgzqtmigj63wof6i4emmgogif.signed"
+        },
+        "sha256": "4UxbC1BfxLOK5+5cGaMJReOcTty8G4ii0qkx3EZcbwY="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda",
+      "metadataSignature": "EsMaT3BRHequNXvwmg214hQklBMTyDgULJfjd5Gqzl747gGJEpCAsGMRnX13tx1Co+b9vip6ljNgTCrrma448gMk2JQQb0BV04Kq5Tw0Vp4nKf4F9/EqTxrhYbFETSqup5ffBjqR2sxwOSADtAocgOUx896M0Q4a1dt2Mo15hsKUHgDct3jEs+ywIQOlumr/Y3BAAynptWSvk671uOVCb6gJha9M13fieQPzS0KCRlXpEnQr1gxofyiBjgJMqeBy4+hzOLeWqHB70VTenXjc/zvUMhItPcPggiiH9Zy9DtzxwJUBPlmwJT+mirgTd5jzTIaVEfRvkIRsOo1RTW8lqw==",
+      "metadataSize": "658",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "100622",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/pumpkin/package/dlc_pumpkin_package_15449.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfhaztnovxapg7fmitybl7yxpt.signed"
+        },
+        "sha256": "6i5/lut81xgJ4PMyG38ex9UFg1GNa82yo3vUnlskE1Y="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_pumpkin",
+      "metadataSignature": "zX9aJFI8U0PnZrkpMa1mdSL79uYNwtGajRvjXhbWD7/+dlVdvLov7T4CbcqBP3eprS9xKkKQRpDaer9vlabngHK65zaYRibOJ2YFlI3UQEtynKw2luapz8V5dWuKrr82a9eyZJCY/yibKEgnqbDHr6a3D2v0+/hWsB3y9KkgcbCgAL5c2hyTuBFKihs7LcPNnzWXnmkjAPXXloi26EBMSHp5qvZr6aXAcFshdAxLPjKQz4CUaGzMbXsX/tfysovhkbEm2YLVrZTZuU5TyI+aHEIBTI0EqhgwTYVNidew2kzGBsv42PyCeNjiQpaZGiHozJnztA4+uPcbSCRaGBTZUg==",
+      "metadataSize": "332",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "9800",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/sample-dlc/package/dlc_sample-dlc_package_15449.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfhaywnkxppzou6romiocrhodg.signed"
+        },
+        "sha256": "yaZ57Tyge2Mwn8BPbSDvSG5Q4VVCgD/KQ/0z8fBthZ4="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sample-dlc",
+      "metadataSignature": "GFy3vVnGaNzTGCraxaFSJKMENHnm+uii0KLKnZTAUkqVlNYFEwLj5SvOWfQImttgMOtG0XGBjR2w9uJBSTf8VaudIFuKsn8y9E07IHX2iY+MJjWMeVwn2uZXx1akcMhYTtVKSC+6v9Cf/FU6DNlCpyxQ6uaREVzQHwz7m4oGWK5zDT7BwthUTtH8G4Oe2Jjx0T5BOxvSspFPDnoh+Hnlw9K5H0fr2/UdPGMBSuw6te7nXlBgDkBZAFMQJs/3rBGuJ9mRsub+q41udfJ2KCVwa6UVK1ArfjQaVlmKvShCMFoTdQOBWQSenk7iPzo4MCGJDNFS7b6328C7ST3oTVAayw==",
+      "metadataSize": "373",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "5448",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/sr-bt-dlc/package/dlc_sr-bt-dlc_package_15449.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfhaywjzvwa6w5krrh7xgm3tuw.signed"
+        },
+        "sha256": "/nJQ0XAHRYl7qIsAiGRdNlcTvZ+okvhQiYhFw5N1npA="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sr-bt-dlc",
+      "metadataSignature": "x32YqBexeS7oQtzlDFVx0c2FgfvT7vlserbaj6LbNtro5Mu8zW3uN+9hseEuwvzNOXbNzJuvEg/vHUPTmOWMPcR3bx9nbylHkKn/FGIW5vOFAYPSCegOes76npgpJ/UNKJs4YKFXi9dQnRV4vjyieSXxi6u6gjJeBep4rd+1fQe6utOBOU0AQs1A36b65Jly+0ctYCcwr9fLhTCJJjIA6GMakvfC6swRVzg+7Ilc2+sTSd5Uc3P++J3V07EjmOF34z+JkaBy1jyKwU6wex0utSyXks5TUqMf50WsFMX6jkRT6ta9ZrEb30qU6iW419vrGmWkqK/8Yyz58bbUmWeZMQ==",
+      "metadataSize": "446",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "46578",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/termina-tools-dlc/package/dlc_termina-tools-dlc_package_15449.0.0-15452.0.0_strongbad_canary-channel_delta.bin-gy2dkndfhaywco2qzpuq4ri65eac6g3v.signed"
+        },
+        "sha256": "XvLNIRPvmgUCjVrixv+6bm2j9B3NmOWOrYnAAwEhMEc="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-tools-dlc",
+      "metadataSignature": "ANfTGUPTs/0GoW3JeSypjVde7YC0VpZcTic+miZNlmMMJj0JT4zzO6PrXclCnnQ8W10svfcDt9DAOsnj6QiueblPWu3/gXT0Ap2hRuFMRgocnA0td7hcy8hqBlCtICmmtv9qud7hiKZLmshsY6/lUq1PsFI0+Sn/aWHI5ImCogqoAdQu7JE/7HMSmxDl4+OpnGyCv9RLNX4kadpm2tVS8Tb/bePdJokXJGwiICKN/oLC6r8skglLTCG7GL800GnLM+CdJjpuwWhVcMPi6Sai5Egb8VapkhhhCB2el+xHcf9NWtHbwTHYVxpFf/X9z9o7l5xNLO9wNt/Lx9oK1oLw7Q==",
+      "metadataSize": "391",
+      "sourceVersion": "15449.0.0",
+      "targetVersion": "15452.0.0",
+      "size": "3561242",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/libsoda-model-en-us/package/dlc_libsoda-model-en-us_package_15437.8.0-15452.0.0_strongbad_dev-channel_delta.bin-gy2dkndfhaygcjxwu6m3ezyqzrilbi47.signed"
+        },
+        "sha256": "UKcicqIcHXHsQg4D8B0yQqz4ShWuT03tPNw5TxmL17I="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda-model-en-us",
+      "metadataSignature": "mHTjcx7e35vrz16P+/k2NviuyqRDDbomhdgLI4oP10SJdEudj0yv3sbMayPWoXvGUnQtVsp/pm4b/+sf4drUi4woBBn5zRFt2maC8IxeLWTVRpaOt7iSQ/cDizHCCUpAjT3+tsgVY+DvPY3dU/qwuDUcJ7P45hvW2MhaQuW+uwarnKL2r4Ew7axURsMDu5zA3HBe/1atuX35y6cdYnLAfzoZ+9Ony8vWz7N/Y8U9T2sRxPCiQjSV9bF5YRXql4d3B09sAiinFoAewR4TPSxNy3e42p4n/HsqUJ7KKNE8KmT8snZJXh+3LurDdY37b45bD4GzzgHzysZGBDh7IxjeIg==",
+      "metadataSize": "1792",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "447891",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/libsoda/package/dlc_libsoda_package_15437.8.0-15452.0.0_strongbad_dev-channel_delta.bin-gy2dkndfg5sweakzi7bi522qkea6jf2x.signed"
+        },
+        "sha256": "MNFDR6SazULOuzMm77R5qJxLb1un9GePpRGvdzAGjCI="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda",
+      "metadataSignature": "iUrSab4dl+F1X+58Uvs0xshB5cZNUssmO6WOnM8lfFFbDpWuBFvOHF35MRr3zEAZQDfXf4GADCYV0KZlY2/7O1sbkICARjVONn6H6r2xger7OhceZvLihP+BVIMybs9XILME5Pq8aCKVemCIs2ydPA2/zAvEinLGQxEIYSFlIPpcAMbm1w/IwUrVdD8f0XBXTpLWSwvffZYnUzeaCB2ChcH2vWej+CSqJS/i+6JPObOHZmMk5chu0XuTUbCh7I/gsvhqjrV2KRE6NF45ekJ/4T3hX5VbeHZMUUDqXiETeghHjiwsww6kOm/JauuM8QdSwIH5Fd4zlggBRlI9Mq1PUA==",
+      "metadataSize": "658",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "100622",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/pumpkin/package/dlc_pumpkin_package_15437.8.0-15452.0.0_strongbad_dev-channel_delta.bin-gy2dkndfg5stgg7sk5thxvoennpom2d4.signed"
+        },
+        "sha256": "sjGaobSTwH8ERQYo9R5A8uR2x2mA0+UCZhis19abtSY="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_pumpkin",
+      "metadataSignature": "ODev0XbiDIRDaKzEEunkEraDHuUzOa1e5mbl/m1sc09vSDc8Tz5XRDv4Bhs6TJou/A6FYhKOc2jmIPNkfXByuUofhMMidh5c44SW3ucLyz6xvG+3MhaFDxbWNgFuWb2JmLqV7/HsGyzI5FX6a6PoRUavyixYdwPu96dSTaAEHB9k39SoCCNqtn3QM3JqdKwjUzLDFO55mEvzQVnZI6qw1w8CU415ws8hW3p1Z5kizfZgv7W2fFf6NBzo7i74v6x7XCier/qbIEwYKu4fu5xvfJKoIjgG6mzHbvBhTWPPp0W3ChQe5DlJt89WQed+TP5mv4ptqCcocFFr3vg8Fn5fUg==",
+      "metadataSize": "332",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "9799",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/sample-dlc/package/dlc_sample-dlc_package_15437.8.0-15452.0.0_strongbad_dev-channel_delta.bin-gy2dkndfg5sghinuqjsm6pknvjxqsg7x.signed"
+        },
+        "sha256": "z2XNL1oUZzw9Jv7TXXyzsvjuBrqxIzmhiBMB6RBR+gc="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sample-dlc",
+      "metadataSignature": "GPLK2c2Qrfi7axtAXwSVxb9AyZg5dThU3I1c4rx7H1fwgP59TQzf8e4coct5y+CEY9UgbnLs29Q1hAlusYIdZwCyxrcJL1UGNfOMVWop3L1nY+EeDwp+HWqWuopuBtZhj3PIb7Kz4EOOt5dC03LWNtIddtjsRzZ3hJcd8gDKl3l/6gBbWoaXN13qg+kPoDrQyEGbeoHcyKw0UaNbceW/N04/kZWI4vnuzLKMpKREUH7/5XDa7hZSneImzrv7yGZgsc5vzIJqBi43wkJ+5FuUgDpntwcNEE9P0eD6Mrf1Uc7UDh6wSOu0ValKMrLfWSeUF4vAEiOnP2qvFdtF78lYrw==",
+      "metadataSize": "193",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "9083",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/sr-bt-dlc/package/dlc_sr-bt-dlc_package_15437.8.0-15452.0.0_strongbad_dev-channel_delta.bin-gy2dkndfg5sdekus5ie6snkfh4qejcyj.signed"
+        },
+        "sha256": "fJlyia0Kjc2HaAX96LdBIE25pTCOI0M6qA73gYjNITI="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sr-bt-dlc",
+      "metadataSignature": "ekPSxW3F8XNbTHyq3Gs7YrAnZbDLnPbjO0tTxgNevQsaE233n3IlzLCIFTZqK9/lnLfAEIJpz5md14PWq0teKXsuPur9UzLnSlGak53nFxpkbA2s1eL0HxmU8RiJIvR7kJ2GfYsFm41jHnHuzxRjwDGOrHEYND0HWBwV11EMZogPtPCQiqaiL7s/Uxw+mPfnapaHf9f9nsV4Mnexs6ZgUbnNDMLDTz420nDAyq7OIY4eLq8rxAeywabh8d4mUH3ysRhiLq6lb6S1j7E/7Qc5rN8uO84QEGJN4agCfM0/dGC/G3lWSt5E0L6Vv2cv1vHzQNQEw/PkQQEMCrab4rQJuQ==",
+      "metadataSize": "446",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "46578",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/termina-dlc/package/dlc_termina-dlc_package_15437.8.0-15452.0.0_strongbad_dev-channel_delta.bin-gy2dkndfg5qtgkcgu7etnyimg4cx5xiu.signed"
+        },
+        "sha256": "ADjsWR1VppSIA0cD5JRAJ8ygR5U0iJCY8ChF0HH8zv4="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-dlc",
+      "metadataSignature": "KBCXP3xBC/rSsv/Zv5qfZj01xRA7clmoPANHbfwFFcLPg9ROAEWJMxzapheh2AYYbYEBGGNkcyqT6ziNu5Pp8y5YGBldaFTmKwrsH/xG489EHV4YemS+V9L+gAgjSlFpyqKLdGgV23+2x9cv8xbdM3oUQyL4jbAzOnN5SP5bvWald1DQxjk7k48nzy5rsJ34Q5psW4q5R28Pvvdnxk3XK0VpHbOwF6wIe9J9ZNKeTQT69IKDYA+EcdVEfx5tjAjpIBMvJxl63iA4BeH+pZ9S5b+exFQ+NgNY5bbQVgX5edZkXR75h/4RNWvfRag00OvTWT30PPs+mrTahFEQHgANEA==",
+      "metadataSize": "589",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "45604652",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_DELTA",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/termina-tools-dlc/package/dlc_termina-tools-dlc_package_15437.8.0-15452.0.0_strongbad_dev-channel_delta.bin-gy2dkndfg44dtpy3cizlh5hjxurogm6b.signed"
+        },
+        "sha256": "Nl8CuqugKzaijSNZ1AxV7OafB7mxy2rHCmJHgbNgmuM="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-tools-dlc",
+      "metadataSignature": "k1MEhoPZVLd421L8a7J4K8e0g/kfzEXT2T0XL6Bh12X/KMUIVrt7JXJhJnNxlosEyhwl/4Upsy6ZcN8BvL5IzdCwbbBI7gNlM09k6KRwtmHrDrNqCCZR7wWKGgoeSnFO2bolCDhDP5G1Ae2pdUh5w2gUbAhTXhkZJHP/zQLkHUDHP3V9JtlKLSDv9M4lp+L3xNnqD9M7RZ0fRSkiBsJJPzU2iOj6M+hf6cZYkjW2Jee6kmVO51sr5P+mSr/EkQKtZnH37y1wrXi0MoDvDKhqaq9AvPgtQpu3wqoFLy0K2bTwHhXS5VojGFmLEgdK6gEygzeu66xUpITdua9TY2fMtw==",
+      "metadataSize": "388",
+      "sourceVersion": "15437.8.0",
+      "targetVersion": "15452.0.0",
+      "size": "1921338",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/libsoda-model-en-us/package/dlc_libsoda-model-en-us_package_15452.0.0_strongbad_canary-channel_full.bin-gy2dkndfgztgh5bdm74tvawi227rr6h5.signed"
+        },
+        "sha256": "PYzYEkihAJe77llb6Af/lbgVHNGxi1egiB8fw37flVM="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda-model-en-us",
+      "metadataSignature": "G92VUi5EvP1dcZQVw/lJJjji3G9qxA5NPVL5cnrx3oAYAqhXbi/35+H3RwOIGnZIDmXlCzJUbRE6PRhO+h64uzlpxTzkGrXYE8EvCN94OH5kEQxVHbXtATZljKoWhbHt1Lp/FAZw2UE1Lkdayo/mLly2NjmfXqEKnLwpdpw8XaqMyMF1297amPgdy1rV5DjZkVRmMXqpwJoJvkGHXsDg+1Pj6MAEZY25ukXKIMQHN6kpVF/UPQ0WvLVXxx1W9A9ZqHXB1UQRpJGC4sqv0gN9QNjdUbP72oq2KQhwW2VphSXbtYW3ZVU6zA8kZhd2bkBsXFMwJ9oPF1G3vIQBa6l6YQ==",
+      "metadataSize": "1666",
+      "targetVersion": "15452.0.0",
+      "size": "55441800",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/libsoda/package/dlc_libsoda_package_15452.0.0_strongbad_canary-channel_full.bin-gy2dkndfgy3dbmeacjvjbj3f7w4t6cxf.signed"
+        },
+        "sha256": "fiO2GxkNLFWhsljeeFdRzGfDZZlbthz6F8na7HnJkw4="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda",
+      "metadataSignature": "xnhs5WGVZ0WshMcXtYdJCJaebqqQ4/s+kpxju3vvR/cTQoCYk21+c+KPH06OaQK918T+hHzML1S81DRmQe/N7gNXqcAA+JrFvTrViZ+qFYkrir/aOUr2ZnKLk41C5l4HLV7udD6Vu2641z2PbjlxpHcEZJac3JACkdaBjVVGCSr9R16FpDdXID4t4TgqXD4cO98/Gx9kytjQIEHGvQ3jw3QkHYOy/Gbn0gPbqWJqOmV/u8UROzTl0c0Bk/De/UzrZOEP98Sgrp4zBvBw1fXz7Hz8hc5gquNacvUj3Yoz7VEtYciywe3cAg6GUb0vGYZprc56sp623OXRFpSiUyyFQg==",
+      "metadataSize": "485",
+      "targetVersion": "15452.0.0",
+      "size": "12642586",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/pumpkin/package/dlc_pumpkin_package_15452.0.0_strongbad_canary-channel_full.bin-gy2dkndfgy3dsqj7ammh5ysqaergq7ci.signed"
+        },
+        "sha256": "twuI7VIMIfr4pYAjiZXsqWMaJmyNQ34A6U/6g97zRxQ="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_pumpkin",
+      "metadataSignature": "RVJNcF0zfg0os7jN4MG5ryf1wGm/qyyheX079zV3wNUjawrZB6QMQZy7fTNP23i5urwJeVDnkXkmx5xG4z2KwUEJTU4JiKAzuq5bLAngDQnbid0Qr+q9xZHzuR6WYXYR7HqyfZ0LDFM9p9fo4OqydLvbSsrvb/ifaeODBQvtRTlagjB5/FLiuldW7/6UNUDphntx/weBPATjnTfJKooO99+aywO7CSexeL/tJtL8sFtDy4wghuhmZ17k0vyR3JumkefegsdWI7W7aG+vh+26q6UTQTPV7KqTFbFdtI6do+6pOA3SmkZqg1HejFjMd7HCLWoDhCgPhixwHXB/ulg3uQ==",
+      "metadataSize": "152",
+      "targetVersion": "15452.0.0",
+      "size": "1065050",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/sample-dlc/package/dlc_sample-dlc_package_15452.0.0_strongbad_canary-channel_full.bin-gy2dkndfgy4dgowbbl3f7y4nyz4w2gfm.signed"
+        },
+        "sha256": "QLSrQ+XEU8bEYk/bLix3P0MT0uo8tIM2LiOYm9AEr08="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sample-dlc",
+      "metadataSignature": "p54adSFBLliFiQj1Dr/CbcRummE7YIy8LhC5tU5msxFRuWYUWwjpcyhEAfFgfO/N+GUE7oAM/8jFtGcj3a2COORGHD/0XCbfHiQCggMNzib6goB5hQ9rxhb3N4pi8Tkm0GmPqLL+5RV5NlwTdpOriEHNrBWFjMFwSgsmNoO7TTArEAdv9d21E6BXG3F14KiDWUlzVVD+zb5nEIX7DfOwo4YZKdV0eHTy8/Y+38aVbpt1w9u3h2RtfDov0cVryu3lI5V8zwE5q7SvO1KN2qrVhKw4IhAiykW4N8apheFGGzXyuT29PDZKW7nw3BCn4GkUquN/zCY5lg95CVKoXAQRuQ==",
+      "metadataSize": "152",
+      "targetVersion": "15452.0.0",
+      "size": "9042",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/sr-bt-dlc/package/dlc_sr-bt-dlc_package_15452.0.0_strongbad_canary-channel_full.bin-gy2dkndfgy4toiqmklnatqtpnc43mdro.signed"
+        },
+        "sha256": "Paej1vZOtwhSVp7KE9Y4lWXYpLekxwqFKTaTHeo6Lck="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sr-bt-dlc",
+      "metadataSignature": "oT+6mGoj0MHUpe3NjUU5328dD0KmgmNxboqfxEidoa2N2aTh4Paw9gbjb5zKdzfjFDhaxCQIObo/xweYk3kADzEl+CFVhdRWT5+7p7wd7hWpH2h7Y4aW53P+D9WoG1kiuEPDefQmwRSlNxq4KG6iybtPIhPkTuCBtSUBzsyhlRU1cm4jNOmQ3oSOoMLTzRLnklVBnPgZ7ZRj0dRjsQz3oHJTs3JPMUweB3ucsM/GTIul3dtJ13jWJVoKPumJmDnxUXEU+T4LjoMecEl++362EB1Nf0O5GA8oqda0Hvw3zXGWi5mDLHD06WMcJEBuH2yc7HpN67/hYaMEtRS595FWEQ==",
+      "metadataSize": "266",
+      "targetVersion": "15452.0.0",
+      "size": "5759680",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/termina-dlc/package/dlc_termina-dlc_package_15452.0.0_strongbad_canary-channel_full.bin-gy2dkndfgy4ttbbtt2unxdimyuyeuihh.signed"
+        },
+        "sha256": "Hie5oJeJ99Kux24tHhJn7eiuiwi7MJKw3MvYhGK3xPE="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-dlc",
+      "metadataSignature": "pQNRw8GBBhYogu8+uve3vwLtL1Va7NzGL+GY6HmRaDvzTQ+vricj3ItsBU3b31y0ZzISI2L0ykCXfwwSjMORJyyfUjHMDxV3HXS9+XWKgYV0mVR+e5fcu5MaWzkN6aW73x7HaKRnAb5YBzOC2MV6PuRHQ8LJdBRIizPZlwa1X41fwRDV6VhzGBx8Sh+ud9nxx02IN5vlJaV7QJkzBPTFtZWbB2RR3IpDQZwxssfjXGras8EcD2AxzgrnUtrCEvqDss8Hq437+dp+uHqAAl2s5lzgb0VygVoAgaaUNM0y1uTNMT2GKiav0hildbNiWFr+T8siMA0C0W1a4ORxBMZylg==",
+      "metadataSize": "3550",
+      "targetVersion": "15452.0.0",
+      "size": "129005760",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/canary-channel/strongbad/15452.0.0/payloads/dlc/termina-tools-dlc/package/dlc_termina-tools-dlc_package_15452.0.0_strongbad_canary-channel_full.bin-gy2dkndfgzqtbqqmbg5kgpjiehqclvcx.signed"
+        },
+        "sha256": "NANxlauWvfDGl/Wy4uetW6FcGayqjVZem0rLdb3Herw="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_CANARY",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-tools-dlc",
+      "metadataSignature": "QJtdwVhNjZ+tciXCR9a8OxeJO48AZVQXl8zsOFJ6Ceb87MDlCTsKkyurjaYRJD8mzUAwwHACN+T/LrBmHBLyibYSEUGsX2gyfbc0fF7fA/v4kFZ7X4+79lxLgVriqQQtDM/KMVzCkU66dUiwB2xo66OvQGlVkDuT7edqRWbB4nmJETTdVmdoQBnMI1BKcBL3D7no8SPzmBrkqA+jeZ5CR2ns2zOXEH09ykn/ve7wxcgVxbnMvCTRiY2R1Fs+koUBQDKxziOCizXCuswzPchsOd3YvaAq6VbZk4uTlB0o0Pm+aleYcwxmDZSHWgrnvkHf5TwQNJcGN+24IVFAbIyy7Q==",
+      "metadataSize": "716",
+      "targetVersion": "15452.0.0",
+      "size": "21802746",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/libsoda-model-en-us/package/dlc_libsoda-model-en-us_package_15452.0.0_strongbad_dev-channel_full.bin-gy2dkndfgzqthzdobscrvaaodhwswajn.signed"
+        },
+        "sha256": "PYzYEkihAJe77llb6Af/lbgVHNGxi1egiB8fw37flVM="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda-model-en-us",
+      "metadataSignature": "G92VUi5EvP1dcZQVw/lJJjji3G9qxA5NPVL5cnrx3oAYAqhXbi/35+H3RwOIGnZIDmXlCzJUbRE6PRhO+h64uzlpxTzkGrXYE8EvCN94OH5kEQxVHbXtATZljKoWhbHt1Lp/FAZw2UE1Lkdayo/mLly2NjmfXqEKnLwpdpw8XaqMyMF1297amPgdy1rV5DjZkVRmMXqpwJoJvkGHXsDg+1Pj6MAEZY25ukXKIMQHN6kpVF/UPQ0WvLVXxx1W9A9ZqHXB1UQRpJGC4sqv0gN9QNjdUbP72oq2KQhwW2VphSXbtYW3ZVU6zA8kZhd2bkBsXFMwJ9oPF1G3vIQBa6l6YQ==",
+      "metadataSize": "1666",
+      "targetVersion": "15452.0.0",
+      "size": "55441800",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/libsoda/package/dlc_libsoda_package_15452.0.0_strongbad_dev-channel_full.bin-gy2dkndfguztchhsecgddjmb5lva4uhq.signed"
+        },
+        "sha256": "fiO2GxkNLFWhsljeeFdRzGfDZZlbthz6F8na7HnJkw4="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_libsoda",
+      "metadataSignature": "xnhs5WGVZ0WshMcXtYdJCJaebqqQ4/s+kpxju3vvR/cTQoCYk21+c+KPH06OaQK918T+hHzML1S81DRmQe/N7gNXqcAA+JrFvTrViZ+qFYkrir/aOUr2ZnKLk41C5l4HLV7udD6Vu2641z2PbjlxpHcEZJac3JACkdaBjVVGCSr9R16FpDdXID4t4TgqXD4cO98/Gx9kytjQIEHGvQ3jw3QkHYOy/Gbn0gPbqWJqOmV/u8UROzTl0c0Bk/De/UzrZOEP98Sgrp4zBvBw1fXz7Hz8hc5gquNacvUj3Yoz7VEtYciywe3cAg6GUb0vGYZprc56sp623OXRFpSiUyyFQg==",
+      "metadataSize": "485",
+      "targetVersion": "15452.0.0",
+      "size": "12642586",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/pumpkin/package/dlc_pumpkin_package_15452.0.0_strongbad_dev-channel_full.bin-gy2dkndfguzgnbbdtjpy42atmf5pwdlg.signed"
+        },
+        "sha256": "twuI7VIMIfr4pYAjiZXsqWMaJmyNQ34A6U/6g97zRxQ="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_pumpkin",
+      "metadataSignature": "RVJNcF0zfg0os7jN4MG5ryf1wGm/qyyheX079zV3wNUjawrZB6QMQZy7fTNP23i5urwJeVDnkXkmx5xG4z2KwUEJTU4JiKAzuq5bLAngDQnbid0Qr+q9xZHzuR6WYXYR7HqyfZ0LDFM9p9fo4OqydLvbSsrvb/ifaeODBQvtRTlagjB5/FLiuldW7/6UNUDphntx/weBPATjnTfJKooO99+aywO7CSexeL/tJtL8sFtDy4wghuhmZ17k0vyR3JumkefegsdWI7W7aG+vh+26q6UTQTPV7KqTFbFdtI6do+6pOA3SmkZqg1HejFjMd7HCLWoDhCgPhixwHXB/ulg3uQ==",
+      "metadataSize": "152",
+      "targetVersion": "15452.0.0",
+      "size": "1065050",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/sample-dlc/package/dlc_sample-dlc_package_15452.0.0_strongbad_dev-channel_full.bin-gy2dkndfguztpi47kt7y5c2mtfm3okp6.signed"
+        },
+        "sha256": "QLSrQ+XEU8bEYk/bLix3P0MT0uo8tIM2LiOYm9AEr08="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sample-dlc",
+      "metadataSignature": "p54adSFBLliFiQj1Dr/CbcRummE7YIy8LhC5tU5msxFRuWYUWwjpcyhEAfFgfO/N+GUE7oAM/8jFtGcj3a2COORGHD/0XCbfHiQCggMNzib6goB5hQ9rxhb3N4pi8Tkm0GmPqLL+5RV5NlwTdpOriEHNrBWFjMFwSgsmNoO7TTArEAdv9d21E6BXG3F14KiDWUlzVVD+zb5nEIX7DfOwo4YZKdV0eHTy8/Y+38aVbpt1w9u3h2RtfDov0cVryu3lI5V8zwE5q7SvO1KN2qrVhKw4IhAiykW4N8apheFGGzXyuT29PDZKW7nw3BCn4GkUquN/zCY5lg95CVKoXAQRuQ==",
+      "metadataSize": "152",
+      "targetVersion": "15452.0.0",
+      "size": "9042",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/sr-bt-dlc/package/dlc_sr-bt-dlc_package_15452.0.0_strongbad_dev-channel_full.bin-gy2dkndfguztsi5rhlghhb7mav2kqfcn.signed"
+        },
+        "sha256": "Paej1vZOtwhSVp7KE9Y4lWXYpLekxwqFKTaTHeo6Lck="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_sr-bt-dlc",
+      "metadataSignature": "oT+6mGoj0MHUpe3NjUU5328dD0KmgmNxboqfxEidoa2N2aTh4Paw9gbjb5zKdzfjFDhaxCQIObo/xweYk3kADzEl+CFVhdRWT5+7p7wd7hWpH2h7Y4aW53P+D9WoG1kiuEPDefQmwRSlNxq4KG6iybtPIhPkTuCBtSUBzsyhlRU1cm4jNOmQ3oSOoMLTzRLnklVBnPgZ7ZRj0dRjsQz3oHJTs3JPMUweB3ucsM/GTIul3dtJ13jWJVoKPumJmDnxUXEU+T4LjoMecEl++362EB1Nf0O5GA8oqda0Hvw3zXGWi5mDLHD06WMcJEBuH2yc7HpN67/hYaMEtRS595FWEQ==",
+      "metadataSize": "266",
+      "targetVersion": "15452.0.0",
+      "size": "5759680",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/termina-dlc/package/dlc_termina-dlc_package_15452.0.0_strongbad_dev-channel_full.bin-gy2dkndfguztn7cs4jedsa4m4m2fredh.signed"
+        },
+        "sha256": "Hie5oJeJ99Kux24tHhJn7eiuiwi7MJKw3MvYhGK3xPE="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-dlc",
+      "metadataSignature": "pQNRw8GBBhYogu8+uve3vwLtL1Va7NzGL+GY6HmRaDvzTQ+vricj3ItsBU3b31y0ZzISI2L0ykCXfwwSjMORJyyfUjHMDxV3HXS9+XWKgYV0mVR+e5fcu5MaWzkN6aW73x7HaKRnAb5YBzOC2MV6PuRHQ8LJdBRIizPZlwa1X41fwRDV6VhzGBx8Sh+ud9nxx02IN5vlJaV7QJkzBPTFtZWbB2RR3IpDQZwxssfjXGras8EcD2AxzgrnUtrCEvqDss8Hq437+dp+uHqAAl2s5lzgb0VygVoAgaaUNM0y1uTNMT2GKiav0hildbNiWFr+T8siMA0C0W1a4ORxBMZylg==",
+      "metadataSize": "3550",
+      "targetVersion": "15452.0.0",
+      "size": "129005760",
+      "recoveryKeyVersion": 1
+    },
+    {
+      "payload": {
+        "type": "PAYLOAD_FULL",
+        "uri": {
+          "gcs": "gs://chromeos-releases/dev-channel/strongbad/15452.0.0/payloads/dlc/termina-tools-dlc/package/dlc_termina-tools-dlc_package_15452.0.0_strongbad_dev-channel_full.bin-gy2dkndfguztkjzdwxdqoar6mx4cnbba.signed"
+        },
+        "sha256": "NANxlauWvfDGl/Wy4uetW6FcGayqjVZem0rLdb3Herw="
+      },
+      "payloadType": "PAYLOAD_TYPE_DLC",
+      "channel": "CHANNEL_DEV",
+      "appid": "{ABD68995-5A83-31CA-9AC6-49D8194EEA52}_termina-tools-dlc",
+      "metadataSignature": "QJtdwVhNjZ+tciXCR9a8OxeJO48AZVQXl8zsOFJ6Ceb87MDlCTsKkyurjaYRJD8mzUAwwHACN+T/LrBmHBLyibYSEUGsX2gyfbc0fF7fA/v4kFZ7X4+79lxLgVriqQQtDM/KMVzCkU66dUiwB2xo66OvQGlVkDuT7edqRWbB4nmJETTdVmdoQBnMI1BKcBL3D7no8SPzmBrkqA+jeZ5CR2ns2zOXEH09ykn/ve7wxcgVxbnMvCTRiY2R1Fs+koUBQDKxziOCizXCuswzPchsOd3YvaAq6VbZk4uTlB0o0Pm+aleYcwxmDZSHWgrnvkHf5TwQNJcGN+24IVFAbIyy7Q==",
+      "metadataSize": "716",
+      "targetVersion": "15452.0.0",
+      "size": "21802746",
+      "recoveryKeyVersion": 1
+    }
+  ],
+  "sdkVersion": "2023.05.02.162206",
+  "toolchainUrl": "2023/05/%(target)s-2023.05.02.162206.tar.xz",
+  "toolchains": [
+    "aarch64-cros-linux-gnu",
+    "armv7a-cros-linux-gnueabihf",
+    "armv7m-cros-eabi",
+    "arm-none-eabi"
+  ],
+  "dlcs": {
+    "dlcArtifacts": [
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc/libsoda-model-en-us/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc/libsoda/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc/pumpkin/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc/sample-dlc/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc/sr-bt-dlc/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc/termina-dlc/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc/termina-tools-dlc/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/assistant-dlc/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-am/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ar/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-base/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-be/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-bg/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-bn/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ca/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-cs/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-da/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-de/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-el/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-es/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-et/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-fa/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-fi/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-fil/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-fr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ga/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-gu/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-hi/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-hr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-hu/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-hy/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-id/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-is/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-it/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-iw/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ja/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ka/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-kk/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-km/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-kn/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ko/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-lo/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-lt/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-lv/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ml/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-mn/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-mr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ms/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-mt/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-my/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ne/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-nl/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-no/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-or/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-pa/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-pl/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-pt/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ro/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ru/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-si/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-sk/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-sl/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-sr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-sv/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ta/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-te/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-th/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ti/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-tr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-uk/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-ur/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-vi/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-zh-HK/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/handwriting-zh/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/nc-ap-dlc/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/scaled-dlc/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/screen-ai/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-bn-bd/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-cs-cz/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-da-dk/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-de-de/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-el-gr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-en-au/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-en-gb/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-en-us/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-es-es/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-es-us/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-fi-fi/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-fil-ph/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-fr-fr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-hi-in/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-hu-hu/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-id-id/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-it-it/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-ja-jp/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-km-kh/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-ko-kr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-nb-no/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-ne-np/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-nl-nl/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-pl-pl/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-pt-br/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-si-lk/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-sk-sk/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-sv-se/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-th-th/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-tr-tr/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-uk-ua/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-vi-vn/package/dlc.img"
+      },
+      {
+        "gcs": "gs://chromeos-image-archive/strongbad-release/R115-15452.0.0/dlc-scaled/tts-yue-hk/package/dlc.img"
+      }
+    ]
+  }
+}

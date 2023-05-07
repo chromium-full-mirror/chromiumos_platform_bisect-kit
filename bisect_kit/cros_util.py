@@ -124,12 +124,14 @@ test_image_filename = 'chromiumos_test_image.bin'
 test_image_zip_filename = 'image.zip'
 sample_partition_filename = 'full_dev_part_KERN.bin.gz'
 
+VERSION_KEY_BUILDBUCKET_ID = 'buildbucket_id'
 VERSION_KEY_CROS_SHORT_VERSION = 'cros_short_version'
 VERSION_KEY_CROS_FULL_VERSION = 'cros_full_version'
 VERSION_KEY_MILESTONE = 'milestone'
 VERSION_KEY_CR_VERSION = 'cr_version'
 VERSION_KEY_ANDROID_BUILD_ID = 'android_build_id'
 VERSION_KEY_ANDROID_BRANCH = 'android_branch'
+VERSION_KEY_ANDROID_TARGET = 'android_target'
 CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
 FORWARDED_DUT_HOST = 'localhost'
 FORWARDED_DUT_PORT = 2222
@@ -528,6 +530,28 @@ def query_dut_os_release(host):
             'unable to read /etc/os-release; not a DUT'
         ) from e
     return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
+
+
+def query_dut_cpu_arch(host: str):
+    """Query CPU architecture of the given DUT.
+
+    Args:
+      host: the DUT address.
+
+    Returns:
+      CPU architecture in string.
+
+    Raise:
+      errors.SshConnectionError: cannot connect to host.
+      errors.ExternalError: failed to run 'uname -m' on the given DUT.
+    """
+    try:
+        arch = util.ssh_cmd(host, 'uname', '-m').strip()
+    except subprocess.CalledProcessError as e:
+        raise errors.ExternalError(
+            'unable to get DUT architecture by "uname -m"'
+        ) from e
+    return arch
 
 
 def is_dut(host):
@@ -1647,6 +1671,7 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> dict:
     # e.g. caroline R60-9462.0.0
     # Let's try both.
     metadata_filenames = ['metadata.json', 'partial-metadata.json']
+    info = {}
     for gs_path in _iter_valid_prebuilt_gs_path(board, cros_version):
         for metadata_filename in metadata_filenames:
             metadata_str = gsutil(
@@ -1657,29 +1682,42 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> dict:
             metadata = json.loads(metadata_str)
             v = metadata['version']
             board_metadata = metadata['board-metadata'].get(board, {})
-            info = {
-                VERSION_KEY_CROS_SHORT_VERSION: v['platform'],
-                VERSION_KEY_CROS_FULL_VERSION: v['full'],
-                VERSION_KEY_MILESTONE: v['milestone'],
-            }
+            info.update(
+                {
+                    VERSION_KEY_CROS_SHORT_VERSION: v['platform'],
+                    VERSION_KEY_CROS_FULL_VERSION: v['full'],
+                    VERSION_KEY_MILESTONE: v['milestone'],
+                }
+            )
 
             if 'buildbucket_id' in metadata:
-                info['buildbucket_id'] = metadata['buildbucket_id']
+                info[VERSION_KEY_BUILDBUCKET_ID] = int(
+                    metadata['buildbucket_id']
+                )
             if 'chrome' in v:
                 info[VERSION_KEY_CR_VERSION] = v['chrome']
             if 'android' in v:
                 info[VERSION_KEY_ANDROID_BUILD_ID] = v['android']
+            if 'android-target' in v:
+                info[VERSION_KEY_ANDROID_TARGET] = v['android-target']
             if 'android-branch' in v:  # this appears since R58-9317.0.0
                 info[VERSION_KEY_ANDROID_BRANCH] = v['android-branch']
             elif 'android-container-branch' in board_metadata:
                 info[VERSION_KEY_ANDROID_BRANCH] = v['android-container-branch']
-            return info
+        metadata_str = gsutil(
+            'cat', f'{gs_path}/build_report.json', ignore_errors=True
+        )
+        if not metadata_str:
+            continue
+        config = json.loads(metadata_str).get('config', {})
+        branch = config.get('androidContainerBranch', {}).get('name')
+        if branch:
+            info[VERSION_KEY_ANDROID_BRANCH] = branch
+        target = config.get('androidContainerTarget', {}).get('name')
+        if target:
+            info[VERSION_KEY_ANDROID_TARGET] = target
 
-    logger.error('Failed to read metadata from gs://chromeos-image-archive')
-    logger.error(
-        'Note, so far no quick way to look up version info for too old builds'
-    )
-    return {}
+    return info
 
 
 def fetch_buildbucket_version_info(
@@ -1718,6 +1756,7 @@ def fetch_buildbucket_version_info(
         VERSION_KEY_CR_VERSION: target_versions.get('chromeVersion'),
         VERSION_KEY_ANDROID_BUILD_ID: target_versions.get('androidVersion'),
         VERSION_KEY_ANDROID_BRANCH: target_versions.get('androidBranchVersion'),
+        VERSION_KEY_ANDROID_TARGET: target_versions.get('androidTargetVersion'),
     }
     return {k: v for k, v in result.items() if v is not None}
 

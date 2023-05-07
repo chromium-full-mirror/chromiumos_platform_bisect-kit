@@ -458,7 +458,6 @@ class TestCrosUtil(unittest.TestCase):
             self.assertEqual(
                 cros_util.extract_major_version('R64-10123.0.0-45678'), '10123'
             )
-
             self.assertEqual(
                 cros_util.version_to_full('samus', 'R64-10123.0.0'),
                 'R64-10123.0.0',
@@ -471,16 +470,90 @@ class TestCrosUtil(unittest.TestCase):
                 'R64-10123.0.0',
             )
 
-    def test_version_info(self):
-        with open(testing.get_testdata_path('partial-metadata.json')) as f:
-            sample = f.read()
-        with mock.patch.object(cros_util, 'gsutil', return_value=sample):
+    @mock.patch('bisect_kit.cros_util.gsutil_ls')
+    def test_version_info(self, mock_gsutil_ls):
+        mock_gsutil_ls.return_value = ['fake_path']
+
+        def gen_mock_gsutil(metadata, partial_metadata, build_report):
+            def mock_gsutil(*args, **unused_kargs):
+                if args[0] == 'cat':
+                    if args[1].endswith('/partial-metadata.json'):
+                        return partial_metadata
+                    if args[1].endswith('/metadata.json'):
+                        return metadata
+                    if args[1].endswith('/build_report.json'):
+                        return build_report
+                return ''
+
+            return mock_gsutil
+
+        with open(
+            testing.get_testdata_path(
+                'version_info_files/1/partial-metadata.json'
+            )
+        ) as f:
+            partial_metadata = f.read()
+        with mock.patch.object(
+            cros_util,
+            'gsutil',
+            side_effect=gen_mock_gsutil('', partial_metadata, ''),
+        ):
             with mock.patch.object(
                 cros_util, 'fetch_buildbucket_version_info', return_value={}
             ):
                 info = cros_util.version_info('caroline', 'R89-13664.0.0')
                 self.assertEqual(
-                    info[cros_util.VERSION_KEY_CROS_SHORT_VERSION], '13664.0.0'
+                    {
+                        cros_util.VERSION_KEY_BUILDBUCKET_ID: 8860981718532549296,
+                        cros_util.VERSION_KEY_CROS_SHORT_VERSION: '13664.0.0',
+                        cros_util.VERSION_KEY_CROS_FULL_VERSION: 'R89-13664.0.0',
+                        cros_util.VERSION_KEY_MILESTONE: '89',
+                        cros_util.VERSION_KEY_CR_VERSION: '89.0.4351.0',
+                        cros_util.VERSION_KEY_ANDROID_BUILD_ID: '7026951',
+                        cros_util.VERSION_KEY_ANDROID_BRANCH: 'git_pi-arc',
+                        cros_util.VERSION_KEY_ANDROID_TARGET: 'cheets',
+                    },
+                    info,
+                )
+
+        with open(
+            testing.get_testdata_path(
+                'version_info_files/2/partial-metadata.json'
+            )
+        ) as f:
+            partial_metadata = f.read()
+        with open(
+            testing.get_testdata_path('version_info_files/2/metadata.json')
+        ) as f:
+            metadata = f.read()
+        with open(
+            testing.get_testdata_path('version_info_files/2/build_report.json')
+        ) as f:
+            build_report = f.read()
+
+        with mock.patch.object(
+            cros_util,
+            'gsutil',
+            side_effect=gen_mock_gsutil(
+                metadata, partial_metadata, build_report
+            ),
+        ):
+            with mock.patch.object(
+                cros_util, 'fetch_buildbucket_version_info', return_value={}
+            ):
+                info = cros_util.version_info('stronbad', 'R115-15452.0.0')
+                self.assertEqual(
+                    {
+                        cros_util.VERSION_KEY_BUILDBUCKET_ID: 8781974877551968897,
+                        cros_util.VERSION_KEY_CROS_SHORT_VERSION: '15452.0.0',
+                        cros_util.VERSION_KEY_CROS_FULL_VERSION: 'R115-15452.0.0',
+                        cros_util.VERSION_KEY_MILESTONE: '115',
+                        cros_util.VERSION_KEY_CR_VERSION: '115.0.5751.0',
+                        # cros_util.VERSION_KEY_ANDROID_BRANCH is missied
+                        cros_util.VERSION_KEY_ANDROID_BRANCH: "git_rvc-arc",
+                        cros_util.VERSION_KEY_ANDROID_TARGET: 'bertha',
+                    },
+                    info,
                 )
 
     @mock.patch('bisect_kit.cros_util.gsutil', _gsutil_stat)

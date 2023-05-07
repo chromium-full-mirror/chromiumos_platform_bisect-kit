@@ -8,7 +8,11 @@
 Example:
   $ ./bisect_android_repo.py init --old rev1 --new rev2 \\
       --android_root ~/android \\
-      --android_mirror $ANDROID_MIRROR
+      --android_mirror ANDROID_MIRROR
+      --branch BRANCH \\
+      --flavor FLAVOR \\
+      --board BOARD
+
   $ ./bisect_android_repo.py config switch ./switch_arc_localbuild.py
   $ ./bisect_android_repo.py config eval ./eval-manually.sh
   $ ./bisect_android_repo.py run
@@ -24,13 +28,11 @@ will be set:
 import logging
 
 from bisect_kit import android_util
-from bisect_kit import arc_util
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import configure
 from bisect_kit import core
-from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import repo_util
@@ -52,7 +54,6 @@ def determine_android_build_id(opts, rev):
       Android build id
     """
     if cros_util.is_cros_version(rev):
-        assert opts.board, 'need to specify BOARD for cros version'
         android_build_id = cros_util.query_android_build_id(opts.board, rev)
         assert android_util.is_android_build_id(android_build_id)
         logger.info(
@@ -98,75 +99,40 @@ class AndroidRepoDomain(core.BisectDomain):
             '--android_root',
             metavar='ANDROID_ROOT',
             type=cli.argtype_dir_path,
-            required=True,
-            default=configure.get('ANDROID_ROOT'),
+            default=configure.get('ANDROID_ROOT', ''),
             help='Android tree root',
         )
         parser.add_argument(
             '--android_mirror',
             type=cli.argtype_dir_path,
-            required=True,
-            default=configure.get('ANDROID_MIRROR'),
+            default=configure.get('ANDROID_MIRROR', ''),
             help='Android repo mirror path',
         )
         parser.add_argument(
             '--branch',
+            type=cli.argtype_notempty,
             metavar='ANDROID_BRANCH',
+            default=configure.get('ANDROID_BRANCH', ''),
             help='branch name like "git_mnc-dr-arc-dev"; '
             'default is auto detect via DUT',
         )
         parser.add_argument(
             '--flavor',
+            type=cli.argtype_notempty,
             metavar='ANDROID_FLAVOR',
-            default=configure.get('ANDROID_FLAVOR'),
+            default=configure.get('ANDROID_FLAVOR', ''),
             help='example: cheets_x86-user; default is auto detect via DUT',
         )
         parser.add_argument(
             '--board',
+            type=cli.argtype_notempty,
             metavar='BOARD',
-            default=configure.get('BOARD'),
+            default=configure.get('BOARD', ''),
             help='ChromeOS board name, if ARC++',
         )
 
     @staticmethod
     def init(opts):
-        if opts.dut:
-            if cros_lab_util.is_satlab_dut(opts.dut):
-                cros_lab_util.write_satlab_ssh_config(opts.dut)
-            assert cros_util.is_dut(opts.dut)
-
-        if not opts.flavor:
-            if not opts.dut:
-                raise errors.ArgumentError(
-                    '--dut and --flavor', 'Neither is specified'
-                )
-            opts.flavor = arc_util.query_flavor(opts.dut)
-
-        if not opts.board:
-            if not opts.dut:
-                raise errors.ArgumentError(
-                    '--dut and --board', 'Neither is specified'
-                )
-            opts.board = cros_util.query_dut_board(opts.dut)
-        if not opts.branch:
-            if not opts.dut:
-                raise errors.ArgumentError(
-                    '--dut and --branch', 'Neither is specified'
-                )
-            version = cros_util.query_dut_short_version(opts.dut)
-            if not cros_util.is_cros_short_version(version):
-                base = '.'.join(version.split('.')[:-1] + ['0'])
-                logger.info(
-                    'ChromeOS version of DUT (%s) is local build, '
-                    'use its base version %s to determine Android branch',
-                    version,
-                    base,
-                )
-                version = base
-            opts.branch = cros_util.query_android_branch(opts.board, version)
-            logger.debug('branch=%s', opts.branch)
-            assert opts.branch
-
         old = determine_android_build_id(opts, opts.old)
         new = determine_android_build_id(opts, opts.new)
 
@@ -201,7 +167,8 @@ class AndroidRepoDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev=None):
-        env['DUT'] = self.config['dut']
+        if self.config.get('dut'):
+            env['DUT'] = self.config['dut']
         env['ANDROID_ROOT'] = self.config['android_root']
         env['ANDROID_FLAVOR'] = self.config['flavor']
         env['ANDROID_BRANCH'] = self.config['branch']
