@@ -196,7 +196,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         android_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
-        chrome_with_tests = bool(self.config['test_name'])  # not CTS/GTS
+        should_build_chrome_localbuild_with_tests = bool(
+            self.config['test_name']
+        )  # not CTS/GTS
         cros_buildbucket_build = (
             cros_util.is_buildbucket_buildable(self.config['cros_prebuilt_old'])
             and not self.config['disable_buildbucket_chromeos']
@@ -209,14 +211,14 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cros_localbuild_extra_switch_cmd = common_switch_cmd
 
         diagnoser.diagnose(
-            autotest=True,
+            is_autotest=True,
             common_switch_cmd=common_switch_cmd,
             cros_prebuilt_extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
             cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
             android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
             lacros_prebuilt_eval_cmd=lacros_prebuilt_eval_cmd,
             chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
-            chrome_localbuild_with_tests=chrome_with_tests,
+            should_build_chrome_localbuild_with_tests=should_build_chrome_localbuild_with_tests,
             cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,
             cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd,
         )

@@ -607,7 +607,7 @@ class NoisyBinarySearch:
                 1.0 - self.new_p,
             )
 
-    def get_noise_observation(self):
+    def get_noise_observation(self) -> str | None:
         """Gets current noise observation.
 
         This includes the counts of prior observations from __init__.

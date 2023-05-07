@@ -125,12 +125,14 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cros_localbuild_extra_switch_cmd = common_switch_cmd
 
         diagnoser.diagnose(
+            is_autotest=False,
             common_switch_cmd=common_switch_cmd,
             cros_prebuilt_extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
             cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
             android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
             lacros_prebuilt_eval_cmd=lacros_prebuilt_eval_cmd,
             chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
+            should_build_chrome_localbuild_with_tests=True,
             cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,
             cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd,
         )

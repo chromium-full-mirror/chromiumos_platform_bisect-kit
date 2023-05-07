@@ -77,21 +77,21 @@ class CrosDiagnoser:
 
     def diagnose(
         self,
-        autotest: bool = False,
-        common_switch_cmd: list[str] = None,
-        cros_prebuilt_extra_switch_cmd: list[str] = None,
-        cros_prebuilt_eval_cmd: list[str] = None,
-        android_prebuilt_eval_cmd: list[str] = None,
-        lacros_prebuilt_eval_cmd: list[str] = None,
-        chrome_localbuild_eval_cmd: list[str] = None,
-        chrome_localbuild_with_tests: bool = True,
-        cros_localbuild_eval_cmd: list[str] = None,
-        cros_localbuild_extra_switch_cmd: list[str] = None,
+        is_autotest: bool,
+        common_switch_cmd: list[str],
+        cros_prebuilt_extra_switch_cmd: list[str],
+        cros_prebuilt_eval_cmd: list[str],
+        android_prebuilt_eval_cmd: list[str],
+        lacros_prebuilt_eval_cmd: list[str],
+        chrome_localbuild_eval_cmd: list[str],
+        should_build_chrome_localbuild_with_tests: bool,
+        cros_localbuild_eval_cmd: list[str],
+        cros_localbuild_extra_switch_cmd: list[str],
     ):
         def init_dut_to_old_cros(dut):
             logger.info('init dut %s to old cros', dut)
-            self.switch_chromeos_to_old(
-                dut, force=self.config['always_reflash']
+            self._switch_chromeos_to_old(
+                dut, should_always_reflash=self.config['always_reflash']
             )
             util.check_call(
                 *(common_switch_cmd + [self.cros_old, '--dut', dut])
@@ -109,7 +109,7 @@ class CrosDiagnoser:
                 - only few tests do so
                 - tests are migrating away from autotest
             """
-            if autotest and chrome_localbuild_with_tests:
+            if is_autotest and should_build_chrome_localbuild_with_tests:
                 logger.info('init autotest deps for %s', dut)
                 util.call(*chrome_localbuild_eval_cmd, dut)
             else:
@@ -233,7 +233,7 @@ class CrosDiagnoser:
                 chrome_localbuild_eval_cmd,
                 buildbucket_build=buildbucket_buildable
                 and self.config['enable_buildbucket_chrome'],
-                with_tests=chrome_localbuild_with_tests,
+                should_build_with_tests=should_build_chrome_localbuild_with_tests,
             ):
                 return
         except errors.DiagnoseContradiction:
@@ -260,8 +260,13 @@ class CrosDiagnoser:
         )
 
     def narrow_down_chromeos_prebuilt(
-        self, dut_manager, old, new, eval_cmd, extra_switch_cmd=None
-    ):
+        self,
+        dut_manager: dut_manager_module.DutManager,
+        old: str,
+        new: str,
+        eval_cmd: list[str],
+        extra_switch_cmd: list[str] | None = None,
+    ) -> None:
         """Bisect with ChromeOS prebuilt.
 
         Args:
@@ -380,14 +385,16 @@ class CrosDiagnoser:
             self.new_info.android_build_id,
         )
 
-    def switch_chromeos_to_old(self, dut, force=False):
+    def _switch_chromeos_to_old(
+        self, dut: str, should_always_reflash: bool = False
+    ) -> None:
         """Switch ChromeOS version to old prebuilt.
 
         Args:
           dut: the DUT.
-          force: always do 'cros flash' no matter the current version number of DUT
+          should_always_reflash: always do 'cros flash' no matter the current version number of DUT
         """
-        if not force:
+        if not should_always_reflash:
             if cros_util.is_cros_full_version(self.cros_old):
                 version = cros_util.version_to_short(self.cros_old)
             else:
@@ -469,7 +476,12 @@ class CrosDiagnoser:
 
         return True
 
-    def narrow_down_android(self, dut_manager, eval_cmd, extra_switch_cmd=None):
+    def narrow_down_android(
+        self,
+        dut_manager: dut_manager_module.DutManager,
+        eval_cmd: list[str],
+        extra_switch_cmd: list[str] | None = None,
+    ) -> bool:
         """Bisect with Android prebuilt and localbuild.
 
         It's known that the version of ChromeOS has old behavior.
@@ -659,8 +671,11 @@ class CrosDiagnoser:
         return verified
 
     def narrow_down_lacros_prebuilt(
-        self, dut_manager, eval_cmd: str, extra_switch_cmd=None
-    ):
+        self,
+        dut_manager: dut_manager_module.DutManager,
+        eval_cmd: list[str],
+        extra_switch_cmd: list[str] | None = None,
+    ) -> bool:
         """Bisect with Lacros Prebuilt.
 
         It's known that the version of ChromeOS has old behavior.
@@ -765,12 +780,12 @@ class CrosDiagnoser:
 
     def narrow_down_chrome(
         self,
-        dut_manager,
-        eval_cmd,
-        buildbucket_build=False,
-        extra_switch_cmd=None,
-        with_tests=True,
-    ):
+        dut_manager: dut_manager_module.DutManager,
+        eval_cmd: list[str],
+        buildbucket_build: bool = False,
+        extra_switch_cmd: list[str] | None = None,
+        should_build_with_tests: bool = True,
+    ) -> bool:
         """Bisect with Chrome localbuild.
 
         It's known that the version of ChromeOS has old behavior.
@@ -780,7 +795,7 @@ class CrosDiagnoser:
           eval_cmd: command to reproduce the regression
           buildbucket_build: to build Chrome image on buildbucket
           extra_switch_cmd: additional command to run when switch chrome version
-          with_tests: build test binaries as well
+          should_build_with_tests: build test binaries as well
 
         Returns:
           True: culprit is inside Chrome
@@ -841,7 +856,7 @@ class CrosDiagnoser:
                 '--board_cpu_arch',
                 self.config['board_cpu_arch'],
             ]
-            if not with_tests:
+            if not should_build_with_tests:
                 switch_cmd.append('--without_tests')
             if self.config['chrome_deploy_image']:
                 switch_cmd += [
@@ -902,11 +917,11 @@ class CrosDiagnoser:
 
     def narrow_down_chromeos_localbuild(
         self,
-        dut_manager,
-        eval_cmd,
-        buildbucket_build=False,
-        extra_switch_cmd=None,
-    ):
+        dut_manager: dut_manager_module.DutManager,
+        eval_cmd: list[str],
+        buildbucket_build: bool = False,
+        extra_switch_cmd: list[str] | None = None,
+    ) -> None:
         """Bisect with ChromeOS localbuild.
 
         Args:

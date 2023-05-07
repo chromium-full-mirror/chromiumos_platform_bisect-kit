@@ -24,7 +24,7 @@ class BisectorWrapper:
         self.name = name
         self.module = importlib.import_module(name)
         self.session = session
-        self.switch_cmds = []
+        self.switch_cmds: list[list[str]] = []
         self.dut_manager = dut_manager
 
         self.domain_cls = None
@@ -49,23 +49,23 @@ class BisectorWrapper:
 
     def init_if_necessary(
         self,
-        old,
-        new,
-        init_args,
-        switch_cmd,
-        eval_cmd,
-        future_build_cmd=None,
-        old_value=None,
-        new_value=None,
-        term_old=None,
-        term_new=None,
-        recompute_init_values=False,
-        noisy=None,
-        endpoint_verification=False,
-    ):
+        old: str,
+        new: str,
+        init_args: list[str],
+        switch_cmd: list[str],
+        eval_cmd: list[str],
+        future_build_cmd: list[str] | None = None,
+        old_value: float | None = None,
+        new_value: float | None = None,
+        term_old: str | None = None,
+        term_new: str | None = None,
+        recompute_init_values: bool = False,
+        noisy: str | None = None,
+        endpoint_verification: bool = False,
+    ) -> None:
         status = self.current_status()
         if not status['inited']:
-            common_init_args = ['--old', old, '--new', new]
+            common_init_args: list[str] = ['--old', old, '--new', new]
             if term_old:
                 common_init_args += ['--term_old', term_old]
             if term_new:
@@ -99,11 +99,11 @@ class BisectorWrapper:
         )
         self.call('config', 'switch', '--mode=bisectkit', 'sh', '-c', cmdline)
 
-    def append_switch_command(self, cmd):
+    def append_switch_command(self, cmd: list[str]) -> None:
         self.switch_cmds.append(cmd)
         self._set_switch_commands()
 
-    def narrow_down(self):
+    def narrow_down(self) -> tuple[str, str, str | None]:
         status = self.current_status()
         logger.info(
             '%s old=%s, new=%s, done=%s',
