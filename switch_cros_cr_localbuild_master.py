@@ -59,6 +59,12 @@ def create_argument_parser():
         help='Address of DUT',
     )
     parser.add_argument(
+        '--board_cpu_arch',
+        type=cli.argtype_notempty,
+        metavar='BOARD_CPU_ARCH',
+        default=configure.get('BOARD_CPU_ARCH', ''),
+    )
+    parser.add_argument(
         'rev',
         nargs='?',
         type=cli.argtype_notempty,
@@ -67,7 +73,10 @@ def create_argument_parser():
         help='Version string',
     )
     parser.add_argument(
-        '--board', default=configure.get('BOARD'), help='ChromeOS board name'
+        '--board',
+        type=cli.argtype_notempty,
+        default=configure.get('BOARD', ''),
+        help='ChromeOS board name',
     )
     parser.add_argument(
         '--chrome_root',
@@ -151,10 +160,6 @@ def switch_main(args: typing.Optional[tuple[str]]):
             raise errors.ArgumentError(
                 '--dut', 'DUT can be omitted only if --nodeploy'
             )
-        if not opts.board:
-            raise errors.ArgumentError(
-                '--board', 'board must be specified if no --dut'
-            )
     else:
         if cros_lab_util.is_satlab_dut(opts.dut):
             cros_lab_util.write_satlab_ssh_config(opts.dut)
@@ -162,8 +167,6 @@ def switch_main(args: typing.Optional[tuple[str]]):
             raise errors.BrokenDutException(
                 '%r is not a valid DUT address' % opts.dut
             )
-    if not opts.board:
-        opts.board = cros_util.query_dut_board(opts.dut)
     if opts.deploy_method != 'chrome_deploy':
         if not opts.chromeos_root:
             raise errors.ArgumentError(
@@ -197,7 +200,9 @@ def switch_main(args: typing.Optional[tuple[str]]):
     elif opts.deploy_method == 'image':
         switch_cros_localbuild.build_and_deploy(opts)
 
-    lacros_util.build_and_deploy(opts.chrome_src, opts.dut)
+    lacros_util.build_and_deploy(
+        opts.chrome_src, opts.board_cpu_arch, opts.dut, opts.nodeploy
+    )
 
 
 def main(args: typing.Optional[tuple[str]] = None) -> int:

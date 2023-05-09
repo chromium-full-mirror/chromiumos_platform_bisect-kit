@@ -202,103 +202,75 @@ def is_prebuilt_path_available(lacros_bucket_url: str) -> bool:
     )
 
 
-def is_prebuilt_version_available(lacros_version: str, dut_ip: str) -> bool:
+def is_prebuilt_version_available(
+    lacros_version: str, board_cpu_arch: str
+) -> bool:
     """Check if a lacros version is available to fetch for a specific dut
 
     Args:
       lacros_version: lacros prebuilt version to fetch
-      dut_ip: IP of the DUT
+      board_cpu_arch: CPU architecture of the board
 
     Retunrs:
       True if the lacros version is available to fetch.
       False if not available to fetch.
     """
-    lacros_folder_name = get_lacros_folder_name(dut_ip)
+    lacros_folder_name = get_lacros_folder_name(board_cpu_arch)
     lacros_bucket_url = LACROS_ZIP_PATH.format(
         version=lacros_version, lacros_folder_name=lacros_folder_name
     )
     return is_prebuilt_path_available(lacros_bucket_url)
 
 
-def get_dut_cpu_architecture(dut_ip: str) -> str:
-    """Ssh into the dut and run 'uname -m' to get the architecture of the dut.
-
-    Args:
-      dut_ip: IP of a DUT
-
-    Returns:
-      The Cpu architecture ['x86_64','aarch64']
-    """
-    try:
-        # TODO(njrafi): Update if any dut architecture is wrong for this command
-        dut_architecture = util.ssh_cmd(dut_ip, 'uname', '-m')
-        # There is a extra newline in the output
-        dut_architecture = dut_architecture.splitlines()[0]
-        logger.debug('DUT CPU architecture: %s', dut_architecture)
-        return dut_architecture
-    except subprocess.CalledProcessError:
-        logger.error('Get DUT architecture failed')
-        raise
-
-
-def get_lacros_folder_name(dut_ip: str) -> str:
+def get_lacros_folder_name(board_cpu_arch: str) -> str:
     """Get a lacros prebuilt to determine the folder name in the GS bucket.
 
     Currently there are 2 folder names: 'lacros-64' and 'lacros-arm32' depending
       on architecture.
 
     Args:
-      dut_ip: IP of a DUT
+      board_cpu_arch: CPU architecture of the board
 
     Returns:
       the appropriate folder name
     """
+    if BOARD_ARCHITECTURES.get(board_cpu_arch) is not None:
+        return BOARD_ARCHITECTURES[board_cpu_arch]['lacros_dir']
 
-    dut_architecture = get_dut_cpu_architecture(dut_ip)
-
-    if BOARD_ARCHITECTURES.get(dut_architecture) is not None:
-        return BOARD_ARCHITECTURES[dut_architecture]['lacros_dir']
-
-    raise errors.InternalError(
-        'Unknown board architecture %s' % dut_architecture
-    )
+    raise errors.InternalError('Unknown board architecture %s' % board_cpu_arch)
 
 
-def _get_device_architecture_arg_for_gn(dut_ip: str) -> str:
+def _get_device_architecture_arg_for_gn(board_cpu_arch: str) -> str:
     """Get the device architecture argument for args.gn file
 
     Currently there are 2 supported acchitecture: 'amd64' and 'arm' depending
       on architecture.
 
     Args:
-      dut_ip: IP of a DUT
+      board_cpu_arch: CPU architecture of the board
 
     Returns:
       the appropriate architecture name
     """
-    dut_architecture = get_dut_cpu_architecture(dut_ip)
+    if BOARD_ARCHITECTURES.get(board_cpu_arch) is not None:
+        return BOARD_ARCHITECTURES[board_cpu_arch]['arg_for_gn']
 
-    if BOARD_ARCHITECTURES.get(dut_architecture) is not None:
-        return BOARD_ARCHITECTURES[dut_architecture]['arg_for_gn']
-
-    raise errors.InternalError(
-        'Unknown board architecture %s' % dut_architecture
-    )
+    raise errors.InternalError('Unknown board architecture %s' % board_cpu_arch)
 
 
-def fetch_lacros_prebuilt(lacros_version: str, dut_ip: str) -> str:
+def fetch_lacros_prebuilt(lacros_version: str, board_cpu_arch: str) -> str:
     """Fetch and unzip a specific lacros version.
 
     Args:
       lacros_version: lacros prebuilt version to fetch
-      dut_ip: IP of the DUT
+      board_cpu_arch: CPU architecture of the board
 
     Returns:
       A temp directory where the lacros prebuilt file is unzipped
     """
 
     try:
-        lacros_folder_name = get_lacros_folder_name(dut_ip)
+        lacros_folder_name = get_lacros_folder_name(board_cpu_arch)
         lacros_bucket_url = LACROS_ZIP_PATH.format(
             version=lacros_version, lacros_folder_name=lacros_folder_name
         )
@@ -381,12 +353,13 @@ def deploy_lacros_to_dut(
 
 
 def fetch_and_deploy_lacros_prebuilt_to_dut(
-    lacros_version: str, dut_ip: str, chromeos_root: str
+    lacros_version: str, board_cpu_arch: str, dut_ip: str, chromeos_root: str
 ) -> int:
     """Fetch and deploy a specific lacros prebuilt version to a DUT.
 
     Args:
       lacros_version: lacros prebuilt version to fetch
+      board_cpu_arch, CPU architecture of the board
       dut_ip: IP of the DUT
       chromeos_root: ChromeOS source root directory
 
@@ -396,7 +369,7 @@ def fetch_and_deploy_lacros_prebuilt_to_dut(
     assert cr_util.is_chrome_version(lacros_version)
     try:
         lacros_prebuilt_directory = fetch_lacros_prebuilt(
-            lacros_version, dut_ip
+            lacros_version, board_cpu_arch
         )
 
         deploy_chrome_path = _get_deploy_chrome_path(
@@ -446,16 +419,18 @@ is_component_build = false
 
 
 def _generate_gn_arguments(
-    chrome_src: str, dut_ip: str, out_device_lacros_dir: str
+    chrome_src: str, board_cpu_arch: str, out_device_lacros_dir: str
 ):
     """Generate GN arguments for lacros build
 
     Args:
       chrome_src: Chrome source root directory
-      dut_ip: IP of the DUT
+      board_cpu_arch: CPU architecture of the board
       out_device_lacros_dir: The directory where the arg.gn file will be created
     """
-    device_architecture_arg_for_gn = _get_device_architecture_arg_for_gn(dut_ip)
+    device_architecture_arg_for_gn = _get_device_architecture_arg_for_gn(
+        board_cpu_arch
+    )
 
     logger.debug(
         'Generating lacros gn arguments for %s', device_architecture_arg_for_gn
@@ -471,12 +446,12 @@ def _generate_gn_arguments(
     util.check_output(*gn_gen_command, cwd=chrome_src)
 
 
-def build_lacros(chrome_src: str, dut_ip: str):
+def build_lacros(chrome_src: str, board_cpu_arch: str):
     """Build lacros from chrome source tree
 
     Args:
       chrome_src: Chrome source root directory
-      dut_ip: IP of the DUT
+      board_cpu_arch: CPU architecture of the board
 
     Returns:
       The output directory of lacros build
@@ -484,7 +459,7 @@ def build_lacros(chrome_src: str, dut_ip: str):
     out_device_lacros_dir = os.path.join('out_device_lacros', 'Release')
     output_directory = os.path.join(chrome_src, out_device_lacros_dir)
     pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
-    _generate_gn_arguments(chrome_src, dut_ip, output_directory)
+    _generate_gn_arguments(chrome_src, board_cpu_arch, output_directory)
 
     logger.debug('Building lacros from source')
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
@@ -507,15 +482,21 @@ def build_lacros(chrome_src: str, dut_ip: str):
         return output_directory
 
 
-def build_and_deploy(chrome_src: str, dut_ip: str):
+def build_and_deploy(
+    chrome_src: str, board_cpu_arch: str, dut_ip: str, nodeploy: bool = False
+):
     """Build and deploy lacros
 
     Build lacros from chrome source and deploy to dut
 
     Args:
       chrome_src: Chrome source root directory
+      cpu_arc: the CPU architecture of the board
       dut_ip: IP of the DUT
+      nodeploy: whether not to deploy
     """
-    build_dir = build_lacros(chrome_src, dut_ip)
+    build_dir = build_lacros(chrome_src, board_cpu_arch)
+    if nodeploy:
+        return
     deploy_chrome_script_path = _get_deploy_chrome_path(chrome_src=chrome_src)
     deploy_lacros_to_dut(build_dir, dut_ip, deploy_chrome_script_path)

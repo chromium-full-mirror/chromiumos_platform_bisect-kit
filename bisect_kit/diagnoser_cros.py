@@ -129,6 +129,12 @@ class CrosDiagnoser:
         cros_localbuild_eval_cmd: list[str] = None,
         cros_localbuild_extra_switch_cmd: list[str] = None,
     ):
+        if not self.config.get('board_cpu_arch'):
+            self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(
+                self.dut
+            )
+            self.states.save()
+
         # Step 1: Narrows down ChromeOS prebuilt.
         self.narrow_down_chromeos_prebuilt(
             self.config['cros_prebuilt_old'],
@@ -469,10 +475,9 @@ class CrosDiagnoser:
         if not self._need_android_bisect(self.old_info, self.new_info):
             return verified
 
-        cpu_arch = cros_util.query_dut_cpu_arch(self.dut)
         android_flavor = '%s_%s-user' % (
             self.old_info['android_target'],
-            cpu_arch,
+            self.config['board_cpu_arch'],
         )
 
         if (
@@ -701,10 +706,12 @@ class CrosDiagnoser:
         init_args = [
             '--dut',
             self.dut,
-            '--board',
-            self.config['board'],
             '--chromeos_root',
             self.config['chromeos_root'],
+            '--board',
+            self.config['board'],
+            '--board_cpu_arch',
+            self.config['board_cpu_arch'],
         ]
 
         try:
@@ -821,6 +828,10 @@ class CrosDiagnoser:
                 '--rich_result',
                 '--dut',
                 self.dut,
+                '--board',
+                self.config['board'],
+                '--board_cpu_arch',
+                self.config['board_cpu_arch'],
             ]
             if not with_tests:
                 switch_cmd.append('--without_tests')

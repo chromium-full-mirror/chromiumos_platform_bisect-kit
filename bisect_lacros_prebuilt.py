@@ -27,8 +27,6 @@ from bisect_kit import cli
 from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cr_util
-from bisect_kit import cros_lab_util
-from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import lacros_util
 
@@ -50,14 +48,6 @@ class LacrosVersionDomain(core.BisectDomain):
     @staticmethod
     def add_init_arguments(parser):
         parser.add_argument(
-            '--chromeos_root',
-            required=True,
-            metavar='CHROMEOS_ROOT',
-            type=cli.argtype_dir_path,
-            default=configure.get('CHROMEOS_ROOT'),
-            help='Root of chromeOS source tree, like ~/chromiumos',
-        )
-        parser.add_argument(
             '--dut',
             type=cli.argtype_notempty,
             metavar='DUT',
@@ -65,26 +55,31 @@ class LacrosVersionDomain(core.BisectDomain):
             help='Address of DUT (Device Under Test)',
         )
         parser.add_argument(
+            '--chromeos_root',
+            metavar='CHROMEOS_ROOT',
+            type=cli.argtype_dir_path,
+            default=configure.get('CHROMEOS_ROOT', ''),
+            help='Root of chromeOS source tree, like ~/chromiumos',
+        )
+        parser.add_argument(
             '--board',
+            type=cli.argtype_notempty,
             metavar='BOARD',
-            default=configure.get('BOARD'),
+            default=configure.get('BOARD', ''),
             help='ChromeOS board name',
+        )
+        parser.add_argument(
+            '--board_cpu_arch',
+            type=cli.argtype_notempty,
+            metavar='BOARD_CPU_ARCH',
+            default=configure.get('BOARD_CPU_ARCH', ''),
         )
 
     @staticmethod
     def init(opts):
-        if not opts.dut:
-            raise errors.ArgumentError('--dut', 'is required')
-
-        if cros_lab_util.is_satlab_dut(opts.dut):
-            cros_lab_util.write_satlab_ssh_config(opts.dut)
-        assert cros_util.is_dut(opts.dut)
-
-        if not opts.board:
-            assert opts.dut
-            opts.board = cros_util.query_dut_board(opts.dut)
-
-        lacros_folder_name = lacros_util.get_lacros_folder_name(opts.dut)
+        lacros_folder_name = lacros_util.get_lacros_folder_name(
+            opts.board_cpu_arch
+        )
 
         if not cr_util.is_direct_relative_version(opts.old, opts.new):
             logger.warning(
@@ -101,18 +96,22 @@ class LacrosVersionDomain(core.BisectDomain):
             )
             opts.old = lowest_common_ancestor
 
-        if not lacros_util.is_prebuilt_version_available(opts.old, opts.dut):
+        if not lacros_util.is_prebuilt_version_available(
+            opts.old, opts.board_cpu_arch
+        ):
             raise errors.ArgumentError(
                 '--old',
-                'Lacros version %s is not available for dut %s'
-                % (opts.old, opts.dut),
+                'Lacros version %s is not available for board_cpu_arch %s'
+                % (opts.old, opts.board_cpu_arch),
             )
 
-        if not lacros_util.is_prebuilt_version_available(opts.new, opts.dut):
+        if not lacros_util.is_prebuilt_version_available(
+            opts.new, opts.board_cpu_arch
+        ):
             raise errors.ArgumentError(
                 '--new',
-                'Lacros version %s is not available for dut %s'
-                % (opts.new, opts.dut),
+                'Lacros version %s is not available for board_cpu_arch %s'
+                % (opts.new, opts.board_cpu_arch),
             )
 
         revlist = lacros_util.get_lacros_prebuilt_versions_between(
@@ -124,6 +123,7 @@ class LacrosVersionDomain(core.BisectDomain):
             old=opts.old,
             new=opts.new,
             chromeos_root=opts.chromeos_root,
+            board_cpu_arch=opts.board_cpu_arch,
         )
 
         details = {}
@@ -137,12 +137,12 @@ class LacrosVersionDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        env['CHROMEOS_ROOT'] = self.config['chromeos_root']
-        env['LACROS_VERSION'] = rev
-        if self.config['board']:
-            env['BOARD'] = self.config['board']
         if self.config['dut']:
             env['DUT'] = self.config['dut']
+        env['CHROMEOS_ROOT'] = self.config['chromeos_root']
+        env['BOARD'] = self.config['board']
+        env['BOARD_CPU_ARCH'] = self.config['board_cpu_arch']
+        env['LACROS_VERSION'] = rev
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:
