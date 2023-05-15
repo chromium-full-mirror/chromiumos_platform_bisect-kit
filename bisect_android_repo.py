@@ -8,7 +8,7 @@
 Example:
   $ ./bisect_android_repo.py init --old rev1 --new rev2 \\
       --android_root ~/android \\
-      --android_mirror ANDROID_MIRROR
+      --android_mirror ANDROID_MIRROR \\
       --branch BRANCH \\
       --flavor FLAVOR \\
       --board BOARD
