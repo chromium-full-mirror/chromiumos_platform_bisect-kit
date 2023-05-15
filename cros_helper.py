@@ -735,7 +735,7 @@ def main():
     # "cros_helper.py allocate_dut" and "diagnose_cros_*.py init".
     # --chromeos_root is already an argument of the latter in another
     # argument group, so it is left out here.
-    parser.add_argument(
+    parser_allocate_dut.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
         default=configure.get(
