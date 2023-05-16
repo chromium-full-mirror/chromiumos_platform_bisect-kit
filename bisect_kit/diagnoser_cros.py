@@ -320,18 +320,18 @@ class CrosDiagnoser:
                 cr_version=self.config['chrome_localbuild_new']
             )
         elif self.config['bisect_android']:
-            base_cros_info = cros_util.version_info(
+            base_cros_info = cros_util.query_version_info(
                 self.config['board'], self.config['base_cros_version']
             )
             self.old_info = cros_util.VersionInfo(
                 android_build_id=self.config['android_prebuilt_old'],
-                android_branch=base_cros_info.get('android_branch'),
-                android_target=base_cros_info.get('android_target'),
+                android_branch=base_cros_info.android_branch,
+                android_target=base_cros_info.android_target,
             )
             self.new_info = cros_util.VersionInfo(
                 android_build_id=self.config['android_prebuilt_new'],
-                android_branch=base_cros_info.get('android_branch'),
-                android_target=base_cros_info.get('android_target'),
+                android_branch=base_cros_info.android_branch,
+                android_target=base_cros_info.android_target,
             )
         else:
             self.old_info = cros_util.query_version_info(
@@ -446,13 +446,10 @@ class CrosDiagnoser:
             )
             return False
 
-        if old_info.get('android_target') != new_info.get('android_target'):
+        if old_info.android_target != new_info.android_target:
             self.make_decision(
                 'Android target mismatch: %s vs %s; unable to bisect Android'
-                % (
-                    old_info.get('android_target'),
-                    new_info.get('android_target'),
-                )
+                % (old_info.android_target, new_info.android_target)
             )
             return False
 
@@ -476,7 +473,7 @@ class CrosDiagnoser:
             return verified
 
         android_flavor = '%s_%s-user' % (
-            self.old_info['android_target'],
+            self.old_info.android_target,
             self.config['board_cpu_arch'],
         )
 
