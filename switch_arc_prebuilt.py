@@ -45,7 +45,7 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT'),
+        default=configure.get('DUT', ''),
         help='DUT address',
     )
     parser.add_argument(
@@ -62,8 +62,6 @@ def create_argument_parser():
         default=configure.get('ANDROID_FLAVOR', ''),
         help='example: cheets_x86-user',
     )
-    parser.add_argument('--nodeploy', action='store_true', help='Do not deploy')
-
     return parser
 
 
@@ -72,13 +70,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
     opts = parser.parse_args(args)
     common.config_logging(opts)
 
-    if opts.nodeploy:
-        return
-
-    if not opts.dut:
-        raise errors.ArgumentError(
-            '--dut', 'DUT can be omitted only if --nodeploy'
-        )
+    # opts.dut is guaranteed to be nonempty in the add_argument() definition.
     if cros_lab_util.is_satlab_dut(opts.dut):
         cros_lab_util.write_satlab_ssh_config(opts.dut)
     if not cros_util.is_good_dut(opts.dut):

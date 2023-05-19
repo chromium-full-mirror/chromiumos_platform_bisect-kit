@@ -257,7 +257,7 @@ class BuildbucketApi:
         request = GetBuildRequest(id=buildbucket_id, fields=field_mask)
         return self._post('GetBuild', request, Build)
 
-    def schedule_build(
+    def search_and_schedule_build(
         self,
         board: str,
         manifest_xml: str,
@@ -266,6 +266,7 @@ class BuildbucketApi:
         git_auth: bool = True,
         bucket: str = 'bisector',
         force_rebuild: bool = False,
+        search_only: bool = False,
         build_tags: dict[str, str] | None = None,
     ):
         """Schedule a build job in buildbucket.
@@ -278,6 +279,8 @@ class BuildbucketApi:
           git_auth: A workaround for crbug.com/1068743
           bucket: A bucket name of buildbucket that will handle this build
           force_rebuild: Set True to ignore existing builds on buildbucket
+          search_only: If ture, search for exsiting builds only but do not
+            schedule a new build even if the search fails.
           build_tags: Tags for buildbucket build object.
 
         Returns:
@@ -349,6 +352,9 @@ class BuildbucketApi:
             )
             if build:
                 return build
+            # No existing build.
+            if search_only:
+                return None
 
         request = ScheduleBuildRequest(builder=builder, tags=tags)
         request.properties.update(properties)
@@ -504,7 +510,9 @@ class BuildbucketApi:
         deps_digest=None,
         deps_src_ver=None,
     ):
-        """Search for recent success build if exists.
+        """Search for recent successful build if exists.
+
+        Note that it won't return builds in progress.
 
         Args:
           board: ChromeOS board name.

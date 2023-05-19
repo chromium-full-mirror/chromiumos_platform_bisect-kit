@@ -29,6 +29,7 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import repo_util
+import switch_helper
 
 
 logger = logging.getLogger(__name__)
@@ -57,14 +58,8 @@ def create_common_argument_parser():
         help='Instead of mere exit code, output detailed information in json',
     )
     parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='DUT address',
-    )
-    parser.add_argument(
         '--board',
+        type=cli.argtype_notempty,
         metavar='BOARD',
         default=configure.get('BOARD', ''),
         help='ChromeOS board name',
@@ -83,7 +78,10 @@ def create_common_argument_parser():
         help='ChromeOS repo mirror path',
     )
     parser.add_argument(
-        '--nodeploy', action='store_true', help='Do not deploy after build'
+        '--wait_for_build_completion',
+        action='store_true',
+        help='When used with --no_deploy, the script exits '
+        'after the build is done instead of immediately.',
     )
     parser.add_argument(
         '--buildbucket_id',
@@ -120,6 +118,7 @@ def create_argument_parser():
     parents = [
         common.create_session_optional_parser(),
         create_common_argument_parser(),
+        switch_helper.common_local_build_flags(),
     ]
     # chromeos parser
     parser_cros = subparsers.add_parser(
@@ -360,7 +359,7 @@ def search_build_image(buildbucket_id):
     return image_info
 
 
-def schedule_build(opts) -> int:
+def search_and_schedule_build(opts) -> int | None:
     build_tags = {
         'bisector_chromeos_version': opts.chromeos_rev,
         'bisector_session': opts.session,
@@ -382,28 +381,31 @@ def schedule_build(opts) -> int:
         deps = None
         git_auth = True
 
-    build_id = int(
-        api.schedule_build(
-            opts.board,
-            manifest,
-            bucket=opts.bucket,
-            build_tags=build_tags,
-            deps=deps,
-            git_auth=git_auth,
-        ).id
+    build_info = api.search_and_schedule_build(
+        opts.board,
+        manifest,
+        bucket=opts.bucket,
+        build_tags=build_tags,
+        deps=deps,
+        git_auth=git_auth,
+        search_only=opts.no_build,
     )
-    logger.info('schedule a build, id = %d', build_id)
+
+    if build_info is None:
+        return None
+
+    build_id = int(build_info.id)
+    logger.info('buildbucket id = %d', build_id)
     logger.info(
         'build url: %s',
         buildbucket_util.get_luci_link(
             opts.board, build_id, bucket=opts.bucket
         ),
     )
-
     return build_id
 
 
-def wait_build_complete(opts, build_id: int):
+def wait_for_build_completion(opts, build_id: int):
     """Wait until a build completes.
 
     Raises:
@@ -451,20 +453,32 @@ def build_revlist(opts):
 
 
 def switch(opts) -> core.StepResult:
-    assert opts.board
-
     # schedule build request and prepare image
     if opts.buildbucket_id:
         buildbucket_id = opts.buildbucket_id
     else:
-        buildbucket_id = schedule_build(opts)
+        buildbucket_id = search_and_schedule_build(opts)
 
-    # If --nodeploy is given, the script will exit as soon as job scheduled and
-    # ignore potential build errors.
-    if opts.nodeploy:
-        return core.StepResult('skip', reason='--nodeploy is on')
+    logger.info('buildbucket_id: %s', buildbucket_id)
 
-    wait_build_complete(opts, buildbucket_id)
+    if not buildbucket_id:
+        msg = 'no buildbucket_id found'
+        logger.info(msg)
+        return core.StepResult('fatal', reason=msg)
+
+    # If --no_deploy is False, always wait for build completion.
+    # Otherwise,
+    # 1. If --wait_for_build_completion is False, exit as soon as job scheduled
+    # and ignore potential.
+    # 2. If --wait_for_build_completion is True, exit after the build completes.
+    if not opts.no_deploy or opts.wait_for_build_completion:
+        wait_for_build_completion(opts, buildbucket_id)
+
+    if opts.no_deploy:
+        msg = '--no_deploy is True'
+        logger.info(msg)
+        return core.StepResult('skip', reason=msg)
+
     image_info = search_build_image(buildbucket_id)
 
     # deploy and flash
@@ -490,33 +504,22 @@ def switch(opts) -> core.StepResult:
 def switch_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
     parser = create_argument_parser()
     opts = parser.parse_args(args)
+    switch_helper.post_init_local_build_flags(opts)
     common.config_logging(opts)
 
-    if not opts.dut:
-        if not opts.nodeploy:
-            raise errors.ArgumentError(
-                '--dut', 'DUT can be omitted only if --nodeploy'
-            )
-        if not opts.board:
-            raise errors.ArgumentError(
-                '--board', 'board must be specified if no --dut'
-            )
-    else:
+    if opts.dut:
         if cros_lab_util.is_satlab_dut(opts.dut):
             cros_lab_util.write_satlab_ssh_config(opts.dut)
         if not cros_util.is_dut(opts.dut):
             raise errors.BrokenDutException(
                 '%r is not a valid DUT address' % opts.dut
             )
-    if not opts.nodeploy:
         if not cros_util.is_good_dut(opts.dut):
             logger.fatal('%r is not a good DUT', opts.dut)
             if not cros_lab_util.repair(opts.dut):
                 raise errors.BrokenDutException(
                     '%r is not a good DUT' % opts.dut
                 )
-    if not opts.board:
-        opts.board = cros_util.query_dut_board(opts.dut)
 
     if cros_util.is_cros_short_version(opts.chromeos_rev):
         opts.chromeos_rev = cros_util.version_to_full(
@@ -531,7 +534,7 @@ def switch_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
     try:
         result = switch(opts)
     finally:
-        if not opts.nodeploy:
+        if opts.dut:
             # No matter switching succeeded or not, DUT must be in good state.
             # switch() already tried repairing if possible, no repair here.
             if not cros_util.is_good_dut(opts.dut):

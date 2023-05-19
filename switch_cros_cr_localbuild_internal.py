@@ -39,26 +39,23 @@ from bisect_kit import gclient_util
 from bisect_kit import lacros_util
 from bisect_kit import util
 import switch_cros_localbuild
+import switch_helper
 
 
 logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-    parents = [common.create_session_optional_parser()]
+    parents = [
+        common.create_session_optional_parser(),
+        switch_helper.common_local_build_flags(),
+    ]
     parser = argparse.ArgumentParser(parents=parents)
     cli.patching_argparser_exit(parser)
     parser.add_argument(
         '--rich_result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
-    )
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='Address of DUT',
     )
     parser.add_argument(
         'rev',
@@ -121,27 +118,9 @@ def create_argument_parser():
         default='chrome_deploy',
         help='Deploy method (default: %(default)s)',
     )
-    parser.add_argument(
-        '--skip_sync_code',
-        action='store_true',
-        help='Skip the step syncing source code',
-    )
-    parser.add_argument(
-        '--nobuild',
-        action='store_true',
-        help='Stop after source code sync; do not build; imply --nodeploy',
-    )
-    parser.add_argument(
-        '--nodeploy', action='store_true', help='Do not deploy after build'
-    )
 
     group = parser.add_argument_group(
         title='Options for building chrome in chromeos sdk chroot'
-    )
-    group.add_argument(
-        '--noimage',
-        action='store_true',
-        help='Build packages only; do not build image; imply --nodeploy',
     )
     group.add_argument(
         '--chromeos_root',
@@ -177,22 +156,10 @@ def _apply_additional_patch(root_dir, rev):
 def switch_main(args: typing.Optional[tuple[str]]):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
+    switch_helper.post_init_local_build_flags(opts)
     common.config_logging(opts)
 
-    # --nobuild imply --nodeploy
-    if opts.nobuild:
-        opts.nodeploy = True
-
-    if opts.skip_sync_code and opts.nobuild:
-        raise errors.ArgumentError(
-            '--skip_sync_code and --nobuild', 'nothing to do'
-        )
-    if not opts.dut:
-        if not opts.nodeploy:
-            raise errors.ArgumentError(
-                '--dut', 'DUT can be omitted only if --nodeploy'
-            )
-    else:
+    if opts.dut:
         if cros_lab_util.is_satlab_dut(opts.dut):
             cros_lab_util.write_satlab_ssh_config(opts.dut)
         if not cros_util.is_dut(opts.dut):
@@ -218,59 +185,68 @@ def switch_main(args: typing.Optional[tuple[str]]):
         chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror
     )
 
-    cache = gclient_util.GclientCache(opts.chrome_mirror)
-    spec_manager = cr_util.ChromeSpecManager(config)
-    code_manager = codechange.CodeManager(opts.chrome_root, spec_manager, cache)
-
-    if not opts.skip_sync_code:
+    if not opts.no_sync_code:
         logger.info('switch source code')
+        cache = gclient_util.GclientCache(opts.chrome_mirror)
+        spec_manager = cr_util.ChromeSpecManager(config)
+        code_manager = codechange.CodeManager(
+            opts.chrome_root, spec_manager, cache
+        )
         code_manager.switch(opts.rev)
         _apply_additional_patch(opts.chrome_root, opts.rev)
 
-    if opts.nobuild:
-        return
+    if not opts.no_build:
+        if cr_util.is_chrome_version(opts.rev):
+            # Use the default gclient file.
+            gclientfile = None
+        else:
+            # Because the DEPS file referenced in .gclient file is pointing to the DEPS
+            # snapshot, runhook may fail due to DEPS file changes in the infra versions
+            # (b/129100282). Here we create a temporary gclient file pointing to the
+            # live DEPS in the tree. Note this gclient file is used only for runhook,
+            # not for code sync.
+            gclientfile = '.gclient-for-runhook'
+            custom_var_list = [
+                'checkout_src_internal=True',
+                'cros_boards="arm-generic:amd64-generic"',
+                'checkout_lacros_sdk=True',
+            ]
+            gclient_util.config(
+                opts.chrome_root,
+                url='https://chromium.googlesource.com/chromium/src.git',
+                gclientfile=gclientfile,
+                custom_var_list=custom_var_list,
+                cache_dir=opts.chrome_mirror,
+                target_os='chromeos',
+            )
+        gclient_util.runhook(opts.chrome_root, gclientfile=gclientfile)
 
-    if cr_util.is_chrome_version(opts.rev):
-        # Use the default gclient file.
-        gclientfile = None
-    else:
-        # Because the DEPS file referenced in .gclient file is pointing to the DEPS
-        # snapshot, runhook may fail due to DEPS file changes in the infra versions
-        # (b/129100282). Here we create a temporary gclient file pointing to the
-        # live DEPS in the tree. Note this gclient file is used only for runhook,
-        # not for code sync.
-        gclientfile = '.gclient-for-runhook'
-        custom_var_list = [
-            'checkout_src_internal=True',
-            'cros_boards="arm-generic:amd64-generic"',
-            'checkout_lacros_sdk=True',
-        ]
-        gclient_util.config(
-            opts.chrome_root,
-            url='https://chromium.googlesource.com/chromium/src.git',
-            gclientfile=gclientfile,
-            custom_var_list=custom_var_list,
-            cache_dir=opts.chrome_mirror,
-            target_os='chromeos',
-        )
-    gclient_util.runhook(opts.chrome_root, gclientfile=gclientfile)
+        # TODO(kcwu): support local patch.
+        if opts.deploy_method == 'chrome_deploy':
+            cr_util.build(
+                opts.chrome_src,
+                opts.board,
+                opts.target,
+                opts.with_tests,
+            )
+        elif opts.deploy_method == 'image':
+            switch_cros_localbuild.build(opts)
 
-    # TODO(kcwu): support local patch.
-    if opts.deploy_method == 'chrome_deploy':
-        cr_util.build_and_deploy(
-            opts.chrome_src,
-            opts.board,
-            opts.dut,
-            opts.target,
-            opts.with_tests,
-            nodeploy=opts.nodeploy,
-        )
-    elif opts.deploy_method == 'image':
-        switch_cros_localbuild.build_and_deploy(opts)
+        lacros_util.build(opts.chrome_src, opts.board_cpu_arch)
 
-    lacros_util.build_and_deploy(
-        opts.chrome_src, opts.board_cpu_arch, opts.dut, opts.nodeploy
-    )
+    if not opts.no_deploy:
+        if opts.deploy_method == 'chrome_deploy':
+            cr_util.deploy(
+                opts.chrome_src,
+                opts.board,
+                opts.dut,
+                opts.target,
+                opts.with_tests,
+            )
+        elif opts.deploy_method == 'image':
+            switch_cros_localbuild.deploy(opts)
+
+        lacros_util.deploy(opts.chrome_src, opts.dut)
 
     # Sanity check. The OS version should not change.
     if opts.dut:

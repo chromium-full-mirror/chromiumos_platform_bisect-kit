@@ -286,7 +286,7 @@ def do_future_build(
             and fetch the result of previous jobs.
 
     For example, switch_cros_localbuild_buildbucket.py can do:
-        1. Use --nodeploy to start a build job, the script exits immediately
+        1. Use --no_deploy to start a build job, the script exits immediately
             after job starts.
         2. When switch a version, the script will check if there's any existing
             job and resue the artifacts.

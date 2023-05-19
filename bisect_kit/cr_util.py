@@ -17,7 +17,6 @@ import urllib.request
 import bisect_kit
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util
@@ -309,38 +308,19 @@ def determine_targets_to_build(
     return result
 
 
-def workaround_missing_nacl(dut):
-    """Returns true if bisector should force adding nacl_helper in target list."""
-    # TODO(b/258539287): nacl_helper is not shown in `gn ls`, remove this if
-    # unnecessary.
-    major = cros_util.extract_major_version(
-        cros_util.query_dut_short_version(dut)
-    )
-    # From M108.
-    return int(major) >= 15120
-
-
-def build_and_deploy(
-    chrome_src, board, dut, targets, with_tests=True, nodeploy=False
-):
-    """Build and deploy Chrome binaries to ChromeOS DUT
+def build(chrome_src, board, targets, with_tests=True):
+    """Build Chrome binaries.
 
     Args:
       chrome_src: git repo path of chrome/src
       board: ChromeOS board name
-      dut: DUT address
       targets: ninja targets. Default to build chrome.
       with_tests: build test binaries as well if targets is not specified
-      nodeploy: if True, only build, do not deploy
     """
     if not targets:
         targets = determine_targets_to_build(
-            chrome_src,
-            board,
-            with_tests=with_tests,
-            force_nacl=workaround_missing_nacl(dut),
+            chrome_src, board, with_tests=with_tests, force_nacl=True
         )
-
     logger.info('build %s', targets)
     out_dir = os.path.join('out_%s' % board, 'Release')
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
@@ -355,9 +335,24 @@ def build_and_deploy(
             shutil.rmtree(os.path.join(chrome_src, out_dir))
             simple_chrome_shell(chrome_src, board, *cmd, internal=True)
 
-    if nodeploy:
-        return
 
+def deploy(chrome_src, board, dut, targets, with_tests=True):
+    """Deploy Chrome binaries.
+
+    Args:
+      chrome_src: git repo path of chrome/src
+      board: ChromeOS board name
+      dut: DUT address
+      targets: ninja targets. Default to build chrome.
+      with_tests: build test binaries as well if targets is not specified
+    """
+    if not targets:
+        targets = determine_targets_to_build(
+            chrome_src,
+            board,
+            with_tests=with_tests,
+            force_nacl=True,
+        )
     logger.info('deploy %s', targets)
     env = os.environ.copy()
     env['DUT'] = dut

@@ -37,26 +37,23 @@ from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import lacros_util
 import switch_cros_localbuild
+import switch_helper
 
 
 logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-    parents = [common.create_session_optional_parser()]
+    parents = [
+        common.create_session_optional_parser(),
+        switch_helper.common_local_build_flags(),
+    ]
     parser = argparse.ArgumentParser(parents=parents)
     cli.patching_argparser_exit(parser)
     parser.add_argument(
         '--rich_result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
-    )
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='Address of DUT',
     )
     parser.add_argument(
         '--board_cpu_arch',
@@ -108,27 +105,9 @@ def create_argument_parser():
         default='chrome_deploy',
         help='Deploy method (default: %(default)s)',
     )
-    parser.add_argument(
-        '--skip_sync_code',
-        action='store_true',
-        help='Skip the step syncing source code',
-    )
-    parser.add_argument(
-        '--nobuild',
-        action='store_true',
-        help='Stop after source code sync; do not build; imply --nodeploy',
-    )
-    parser.add_argument(
-        '--nodeploy', action='store_true', help='Do not deploy after build'
-    )
 
     group = parser.add_argument_group(
         title='Options for building chrome in chromeos sdk chroot'
-    )
-    group.add_argument(
-        '--noimage',
-        action='store_true',
-        help='Build packages only; do not build image; imply --nodeploy',
     )
     group.add_argument(
         '--chromeos_root',
@@ -145,22 +124,10 @@ def create_argument_parser():
 def switch_main(args: typing.Optional[tuple[str]]):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
+    switch_helper.post_init_local_build_flags(opts)
     common.config_logging(opts)
 
-    # --nobuild imply --nodeploy
-    if opts.nobuild:
-        opts.nodeploy = True
-
-    if opts.skip_sync_code and opts.nobuild:
-        raise errors.ArgumentError(
-            '--skip_sync_code and --nobuild', 'nothing to do'
-        )
-    if not opts.dut:
-        if not opts.nodeploy:
-            raise errors.ArgumentError(
-                '--dut', 'DUT can be omitted only if --nodeploy'
-            )
-    else:
+    if opts.dut:
         if cros_lab_util.is_satlab_dut(opts.dut):
             cros_lab_util.write_satlab_ssh_config(opts.dut)
         if not cros_util.is_dut(opts.dut):
@@ -180,29 +147,36 @@ def switch_main(args: typing.Optional[tuple[str]]):
     assert bisect_cr_localbuild_master.verify_gclient_dep(opts.chrome_root)
     rev = bisect_cr_localbuild_master.guess_git_rev(opts, opts.rev)
 
-    if not opts.skip_sync_code:
+    if not opts.no_sync_code:
         git_util.checkout_version(opts.chrome_src, rev)
         gclient_util.sync(opts.chrome_root)
 
-    if opts.nobuild:
-        return
+    if not opts.no_build:
+        # TODO(kcwu): support local patch.
+        if opts.deploy_method == 'chrome_deploy':
+            cr_util.build(
+                opts.chrome_src,
+                opts.board,
+                opts.target,
+                opts.with_tests,
+            )
+        elif opts.deploy_method == 'image':
+            switch_cros_localbuild.build(opts)
+        lacros_util.build(opts.chrome_src, opts.board_cpu_arch)
 
-    # TODO(kcwu): support local patch.
-    if opts.deploy_method == 'chrome_deploy':
-        cr_util.build_and_deploy(
-            opts.chrome_src,
-            opts.board,
-            opts.dut,
-            opts.target,
-            opts.with_tests,
-            nodeploy=opts.nodeploy,
-        )
-    elif opts.deploy_method == 'image':
-        switch_cros_localbuild.build_and_deploy(opts)
-
-    lacros_util.build_and_deploy(
-        opts.chrome_src, opts.board_cpu_arch, opts.dut, opts.nodeploy
-    )
+    if not opts.no_deploy:
+        # TODO(kcwu): support local patch.
+        if opts.deploy_method == 'chrome_deploy':
+            cr_util.deploy(
+                opts.chrome_src,
+                opts.board,
+                opts.dut,
+                opts.target,
+                opts.with_tests,
+            )
+        elif opts.deploy_method == 'image':
+            switch_cros_localbuild.deploy(opts)
+        lacros_util.deploy(opts.chrome_src, opts.dut)
 
 
 def main(args: typing.Optional[tuple[str]] = None) -> int:

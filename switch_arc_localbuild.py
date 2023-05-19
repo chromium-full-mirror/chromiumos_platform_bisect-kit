@@ -24,26 +24,23 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import locking
 from bisect_kit import repo_util
+import switch_helper
 
 
 logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-    parents = [common.create_session_optional_parser()]
+    parents = [
+        common.create_session_optional_parser(),
+        switch_helper.common_local_build_flags(),
+    ]
     parser = argparse.ArgumentParser(parents=parents)
     cli.patching_argparser_exit(parser)
     parser.add_argument(
         '--rich_result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
-    )
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='DUT address',
     )
     parser.add_argument(
         'rev',
@@ -73,14 +70,6 @@ def create_argument_parser():
         default=configure.get('ANDROID_FLAVOR', ''),
         help='example: cheets_x86-user',
     )
-    parser.add_argument(
-        '--nobuild',
-        action='store_true',
-        help='Sync source code only; do not build; imply --nodeploy',
-    )
-    parser.add_argument(
-        '--nodeploy', action='store_true', help='Do not deploy after build'
-    )
     return parser
 
 
@@ -90,24 +79,22 @@ def switch(opts):
         flavor=opts.flavor,
         android_mirror=opts.android_mirror,
     )
-    spec_manager = android_util.AndroidSpecManager(config)
-    cache = repo_util.RepoMirror(opts.android_mirror)
-    code_manager = codechange.CodeManager(
-        opts.android_root, spec_manager, cache
-    )
+    if not opts.no_sync_code:
+        logger.info('switch source code')
+        spec_manager = android_util.AndroidSpecManager(config)
+        cache = repo_util.RepoMirror(opts.android_mirror)
+        code_manager = codechange.CodeManager(
+            opts.android_root, spec_manager, cache
+        )
+        code_manager.switch(opts.rev)
 
-    logger.info('switch source code')
-    code_manager.switch(opts.rev)
+    if not opts.no_build:
+        logger.info('build')
+        # TODO(kcwu): use lower job count for non distributed compilation.
+        with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
+            android_util.lunch(opts.android_root, opts.flavor, 'm', '-j1000')
 
-    if opts.nobuild:
-        return
-
-    logger.info('build')
-    # TODO(kcwu): use lower job count for non distributed compilation.
-    with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
-        android_util.lunch(opts.android_root, opts.flavor, 'm', '-j1000')
-
-    if not opts.nodeploy:
+    if not opts.no_deploy:
         logger.info('deploy')
         arc_util.push_localbuild_to_device(
             opts.android_root, opts.dut, opts.flavor
@@ -117,14 +104,10 @@ def switch(opts):
 def switch_main(args: typing.Optional[tuple[str]]):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
+    switch_helper.post_init_local_build_flags(opts)
     common.config_logging(opts)
 
-    if not opts.dut:
-        if not opts.nodeploy:
-            raise errors.ArgumentError(
-                '--dut', 'DUT can be omitted only if --nodeploy'
-            )
-    else:
+    if opts.dut:
         if cros_lab_util.is_satlab_dut(opts.dut):
             cros_lab_util.write_satlab_ssh_config(opts.dut)
         if not cros_util.is_dut(opts.dut):

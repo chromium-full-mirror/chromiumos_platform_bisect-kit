@@ -369,7 +369,7 @@ class CrosDiagnoser:
             self.config['chromeos_mirror'],
             '--board',
             self.config['board'],
-            '--nobuild',
+            '--sync_code_only',
             self.cros_old,
         )
 
@@ -816,6 +816,8 @@ class CrosDiagnoser:
                 self.config['chromeos_mirror'],
                 '--chromeos_rev',
                 self.cros_old,
+                '--board',
+                self.config['board'],
             ]
             if not self.config['disable_rootfs_verification']:
                 switch_cmd.append('--no_disable_rootfs_verification')
@@ -932,12 +934,16 @@ class CrosDiagnoser:
                 './switch_cros_localbuild_buildbucket.py',
                 'bisect_chromeos',
                 '--rich_result',
+                '--board',
+                self.config['board'],
             ]
             future_build_cmd = [
                 './switch_cros_localbuild_buildbucket.py',
                 'bisect_chromeos',
                 '--rich_result',
-                '--nodeploy',
+                '--no_deploy',
+                '--board',
+                self.config['board'],
             ]
 
         if not self.config['disable_rootfs_verification']:

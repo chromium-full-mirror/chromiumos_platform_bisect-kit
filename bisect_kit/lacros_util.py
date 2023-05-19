@@ -421,14 +421,14 @@ is_component_build = false
 
 
 def _generate_gn_arguments(
-    chrome_src: str, board_cpu_arch: str, out_device_lacros_dir: str
+    chrome_src: str, board_cpu_arch: str, output_directory: str
 ):
     """Generate GN arguments for lacros build
 
     Args:
       chrome_src: Chrome source root directory
       board_cpu_arch: CPU architecture of the board
-      out_device_lacros_dir: The directory where the arg.gn file will be created
+      output_directory: The directory where the arg.gn file will be created
     """
     device_architecture_arg_for_gn = _get_device_architecture_arg_for_gn(
         board_cpu_arch
@@ -438,17 +438,24 @@ def _generate_gn_arguments(
         'Generating lacros gn arguments for %s', device_architecture_arg_for_gn
     )
 
-    output_directory = os.path.join(chrome_src, out_device_lacros_dir)
     args_gn_path = os.path.join(output_directory, 'args.gn')
     with open(args_gn_path, 'w') as f:
         f.write(_get_args_gn_config(device_architecture_arg_for_gn))
 
     # TODO(njrafi): Check if `goma_ctl ensure_start` command is required
-    gn_gen_command = ['gn', 'gen', out_device_lacros_dir]
+    gn_gen_command = ['gn', 'gen', output_directory]
     util.check_output(*gn_gen_command, cwd=chrome_src)
 
 
-def build_lacros(chrome_src: str, board_cpu_arch: str):
+_DEFAULT_OUT_DEVICE_LACRO_DIR = os.path.join('out_device_lacros', 'Release')
+
+
+def _get_output_directory(chrome_src: str) -> str:
+    output_directory = os.path.join(chrome_src, _DEFAULT_OUT_DEVICE_LACRO_DIR)
+    return output_directory
+
+
+def build(chrome_src: str, board_cpu_arch: str):
     """Build lacros from chrome source tree
 
     Args:
@@ -458,8 +465,7 @@ def build_lacros(chrome_src: str, board_cpu_arch: str):
     Returns:
       The output directory of lacros build
     """
-    out_device_lacros_dir = os.path.join('out_device_lacros', 'Release')
-    output_directory = os.path.join(chrome_src, out_device_lacros_dir)
+    output_directory = _get_output_directory(chrome_src)
     pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
     _generate_gn_arguments(chrome_src, board_cpu_arch, output_directory)
 
@@ -468,7 +474,7 @@ def build_lacros(chrome_src: str, board_cpu_arch: str):
         lacros_build_cmd = [
             './third_party/depot_tools/autoninja',
             '-C',
-            out_device_lacros_dir,
+            _DEFAULT_OUT_DEVICE_LACRO_DIR,
             'chrome',
         ]
         logger.debug('Lacros Build Command: %s', ' '.join(lacros_build_cmd))
@@ -481,24 +487,16 @@ def build_lacros(chrome_src: str, board_cpu_arch: str):
             time.sleep(10)
             shutil.rmtree(output_directory)
             util.check_output(*lacros_build_cmd, cwd=chrome_src)
-        return output_directory
+        return
 
 
-def build_and_deploy(
-    chrome_src: str, board_cpu_arch: str, dut_ip: str, nodeploy: bool = False
-):
-    """Build and deploy lacros
-
-    Build lacros from chrome source and deploy to dut
+def deploy(chrome_src: str, dut_ip: str):
+    """Deploy lacros
 
     Args:
       chrome_src: Chrome source root directory
-      cpu_arc: the CPU architecture of the board
       dut_ip: IP of the DUT
-      nodeploy: whether not to deploy
     """
-    build_dir = build_lacros(chrome_src, board_cpu_arch)
-    if nodeploy:
-        return
+    output_directory = _get_output_directory(chrome_src)
     deploy_chrome_script_path = _get_deploy_chrome_path(chrome_src=chrome_src)
-    deploy_lacros_to_dut(build_dir, dut_ip, deploy_chrome_script_path)
+    deploy_lacros_to_dut(output_directory, dut_ip, deploy_chrome_script_path)

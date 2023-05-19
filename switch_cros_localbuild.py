@@ -23,6 +23,7 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import repo_util
 from bisect_kit import util
+import switch_helper
 
 
 logger = logging.getLogger(__name__)
@@ -56,20 +57,16 @@ def add_build_and_deploy_arguments(parser_group):
 
 
 def create_argument_parser():
-    parents = [common.create_session_optional_parser()]
+    parents = [
+        common.create_session_optional_parser(),
+        switch_helper.common_local_build_flags(),
+    ]
     parser = argparse.ArgumentParser(parents=parents)
     cli.patching_argparser_exit(parser)
     parser.add_argument(
         '--rich_result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
-    )
-    parser.add_argument(
-        '--dut',
-        type=cli.argtype_notempty,
-        metavar='DUT',
-        default=configure.get('DUT'),
-        help='DUT address',
     )
     parser.add_argument(
         'rev',
@@ -98,24 +95,6 @@ def create_argument_parser():
         type=cli.argtype_dir_path,
         default=configure.get('CHROMEOS_MIRROR', ''),
         help='ChromeOS repo mirror path',
-    )
-    parser.add_argument(
-        '--skip_sync_code',
-        action='store_true',
-        help='Skip the step syncing source code',
-    )
-    parser.add_argument(
-        '--nobuild',
-        action='store_true',
-        help='Stop after source code sync; do not build; imply --noimage',
-    )
-    parser.add_argument(
-        '--noimage',
-        action='store_true',
-        help='Build packages only; do not build image; imply --nodeploy',
-    )
-    parser.add_argument(
-        '--nodeploy', action='store_true', help='Do not deploy after build'
     )
 
     group = parser.add_argument_group(title='Build and deploy options')
@@ -198,7 +177,23 @@ def _build_packages(opts):
     )
 
 
-def build(opts, do_mark_as_stable=True):
+def _get_image_folder(opts):
+    cached_name = 'bisect-%s' % util.escape_rev(opts.rev)
+    image_folder = os.path.join(
+        cros_util.cached_images_dir, opts.board, cached_name
+    )
+    return image_folder
+
+
+def _get_image_path(opts):
+    image_path = os.path.join(
+        _get_image_folder(opts), cros_util.test_image_filename
+    )
+
+    return image_path
+
+
+def _do_build(opts, do_mark_as_stable=True):
     # Used many times in this function, shorten it.
     chromeos_root = opts.chromeos_root
 
@@ -209,15 +204,8 @@ def build(opts, do_mark_as_stable=True):
         logger.info('mark as stable')
         mark_as_stable(opts)
 
-    if opts.noimage:
-        _build_packages(opts)
-        return None
-
-    cached_name = 'bisect-%s' % util.escape_rev(opts.rev)
-    image_folder = os.path.join(
-        cros_util.cached_images_dir, opts.board, cached_name
-    )
-    image_path = os.path.join(image_folder, cros_util.test_image_filename)
+    image_folder = _get_image_folder(opts)
+    image_path = _get_image_path(opts)
 
     # If the given version is already built, reuse it.
     chromeos_root_image_folder = os.path.join(chromeos_root, image_folder)
@@ -235,24 +223,23 @@ def build(opts, do_mark_as_stable=True):
             chromeos_root_image_folder,
         )
 
-    return image_path
 
-
-def build_and_deploy(opts):
+def build(opts):
+    logger.info('build')
     try:
-        image_path = build(opts, do_mark_as_stable=opts.mark_as_stable)
+        _do_build(opts, do_mark_as_stable=opts.mark_as_stable)
     except cros_util.NeedRecreateChrootException as e:
         logger.warning('recreate chroot and retry again, reason: %s', e)
         util.check_output(
             'chromite/bin/cros_sdk', '--delete', cwd=opts.chromeos_root
         )
-        image_path = build(opts, do_mark_as_stable=opts.mark_as_stable)
+        _do_build(opts, do_mark_as_stable=opts.mark_as_stable)
 
-    if opts.noimage or opts.nodeploy:
-        return
 
+def deploy(opts):
+    logger.info('deploy')
     image_info = cros_util.ImageInfo()
-    image_info[cros_util.ImageType.DISK_IMAGE] = image_path
+    image_info[cros_util.ImageType.DISK_IMAGE] = _get_image_path(opts)
 
     cros_util.provision_image_with_retry(
         opts.chromeos_root,
@@ -267,9 +254,10 @@ def build_and_deploy(opts):
 
 
 def switch(opts):
-    cleanup(opts)
+    if not opts.no_sync_code or not opts.no_build:
+        cleanup(opts)
 
-    if not opts.skip_sync_code:
+    if not opts.no_sync_code:
         logger.info('switch source code')
         config = dict(
             board=opts.board,
@@ -283,10 +271,11 @@ def switch(opts):
         )
         code_manager.switch(opts.rev)
 
-    if opts.nobuild:
-        return
+    if not opts.no_build:
+        build(opts)
 
-    build_and_deploy(opts)
+    if not opts.no_deploy:
+        deploy(opts)
 
 
 def parse_args(args):
@@ -295,24 +284,7 @@ def parse_args(args):
 
 
 def inner_main(opts):
-    # --nobuild imply --nodeploy
-    if opts.nobuild:
-        opts.nodeploy = True
-
-    if opts.skip_sync_code and opts.nobuild:
-        raise errors.ArgumentError(
-            '--skip_sync_code and --nobuild', 'nothing to do'
-        )
-    if not opts.dut:
-        if not opts.nodeploy:
-            raise errors.ArgumentError(
-                '--dut', 'DUT can be omitted only if --nodeploy'
-            )
-        if not opts.board:
-            raise errors.ArgumentError(
-                '--board', 'board must be specified if no --dut'
-            )
-    if not opts.nodeploy:
+    if opts.dut:
         if cros_lab_util.is_satlab_dut(opts.dut):
             cros_lab_util.write_satlab_ssh_config(opts.dut)
         if not cros_util.is_good_dut(opts.dut):
@@ -321,8 +293,6 @@ def inner_main(opts):
                 raise errors.BrokenDutException(
                     '%r is not a good DUT' % opts.dut
                 )
-    if not opts.board:
-        opts.board = cros_util.query_dut_board(opts.dut)
 
     if cros_util.is_cros_short_version(opts.rev):
         opts.rev = cros_util.version_to_full(opts.board, opts.rev)
@@ -332,7 +302,7 @@ def inner_main(opts):
     try:
         switch(opts)
     finally:
-        if not opts.nodeploy:
+        if not opts.no_deploy:
             # No matter switching succeeded or not, DUT must be in good state.
             # switch() already tried repairing if possible, no repair here.
             if not cros_util.is_good_dut(opts.dut):
@@ -344,6 +314,7 @@ def inner_main(opts):
 
 def switch_main(args: typing.Optional[tuple[str]]):
     opts = parse_args(args)
+    switch_helper.post_init_local_build_flags(opts)
     common.config_logging(opts)
     inner_main(opts)
 

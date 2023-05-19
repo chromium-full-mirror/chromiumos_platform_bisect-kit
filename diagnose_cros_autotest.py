@@ -174,7 +174,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         util.check_call(
             './switch_cros_localbuild.py',
-            '--nobuild',
+            '--sync_code_only',
             '--chromeos_root',
             self.config['chromeos_root'],
             '--chromeos_mirror',

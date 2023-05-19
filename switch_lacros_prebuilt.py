@@ -46,7 +46,7 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT'),
+        default=configure.get('DUT', ''),
     )
     parser.add_argument(
         '--board_cpu_arch',
@@ -69,9 +69,6 @@ def create_argument_parser():
         default=configure.get('LACROS_VERSION', ''),
         help='Lacros version number, e.g 105.0.5118.0',
     )
-    parser.add_argument(
-        '--nodeploy', action='store_true', help='Do not deploy after build'
-    )
 
     return parser
 
@@ -90,13 +87,6 @@ def switch_main(args: typing.Optional[tuple[str]]):
             % (opts.version, opts.board_cpu_arch),
         )
 
-    if opts.nodeploy:
-        return
-
-    if not opts.dut:
-        raise errors.ArgumentError(
-            '--dut', 'dut can be omitted only if --nodeploy'
-        )
     if cros_lab_util.is_satlab_dut(opts.dut):
         cros_lab_util.write_satlab_ssh_config(opts.dut)
     if not cros_util.is_good_dut(opts.dut):
