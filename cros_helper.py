@@ -318,6 +318,11 @@ def do_allocate_dut(opts: argparse.Namespace | DutAllocateSpec):
     if opts.dut_name:
         # If dut_name is specified, pool is ignored.
         opts.pool = None
+
+        if cros_lab_util.is_satlab_dut(opts.dut_name):
+            cros_lab_util.write_satlab_ssh_config(opts.dut_name)
+        if not opts.builder_hint:
+            opts.builder_hint = cros_util.query_dut_board(opts.dut_name)
     elif not opts.pool:
         raise errors.ArgumentError(
             '--pool', 'need to be specified if not --dut_name'
