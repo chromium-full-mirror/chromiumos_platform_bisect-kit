@@ -95,9 +95,7 @@ def create_argument_parser():
 
 def switch(autotest_dir, board, version, test_name, dut):
     logger.info('Unpack autotest packages for %s %s', board, version)
-    if cros_util.is_cros_short_version(
-        version
-    ) or cros_util.is_cros_full_version(version):
+    if cros_util.is_cros_version(version):
         full_version = cros_util.version_to_full(board, version)
         autotest_client_path = GS_AUTOTEST_CLIENT_PATH.format(
             board=board, full_version=full_version
