@@ -1252,7 +1252,6 @@ def list_chromeos_prebuilt_versions(
       board: ChromeOS board name
       old: start version (inclusive)
       new: end version (inclusive)
-      only_good_build: only if test image is available
       use_snapshot: return snapshot versions if found
 
     Returns:
