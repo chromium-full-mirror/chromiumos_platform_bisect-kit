@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_SESSION_BASE = 'bisect.sessions'
 DEFAULT_SESSION_NAME = 'default'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
+DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors').expanduser())
+DEFAULT_WORK_BASE = str(pathlib.Path('~/bisect-workdir').expanduser())
+DEFAULT_CHROMEOS_ROOT = str(pathlib.Path('~/chromiumos').expanduser())
 
 
 def determine_session_dir(

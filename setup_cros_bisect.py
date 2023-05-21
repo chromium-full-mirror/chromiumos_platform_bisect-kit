@@ -42,8 +42,6 @@ from bisect_kit import repo_util
 from bisect_kit import util
 
 
-DEFAULT_MIRROR_BASE = os.path.expanduser('~/git-mirrors')
-DEFAULT_WORK_BASE = os.path.expanduser('~/bisect-workdir')
 CHECKOUT_TEMPLATE_NAME = 'template'
 MANIFEST_FOR_DELETED = 'deleted-repos.xml'
 
@@ -685,7 +683,9 @@ def cmd_delete(opts):
     os.rmdir(os.path.join(opts.work_base, opts.session))
 
     # remove caches
-    chromeos_root = os.getenv('DEFAULT_CHROMEOS_ROOT')
+    chromeos_root = os.getenv(
+        'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
+    )
     if chromeos_root:
         path = os.path.join(chromeos_root, 'devserver/static')
         if os.path.exists(path):
@@ -712,13 +712,13 @@ def create_parser():
     base_parser.add_argument(
         '--mirror_base',
         metavar='MIRROR_BASE',
-        default=configure.get('MIRROR_BASE', DEFAULT_MIRROR_BASE),
+        default=configure.get('MIRROR_BASE', common.DEFAULT_MIRROR_BASE),
         help='Directory for mirrors (default: %(default)s)',
     )
     base_parser.add_argument(
         '--work_base',
         metavar='WORK_BASE',
-        default=configure.get('WORK_BASE', DEFAULT_WORK_BASE),
+        default=configure.get('WORK_BASE', common.DEFAULT_WORK_BASE),
         help='Directory for bisection working directories'
         ' (default: %(default)s)',
     )

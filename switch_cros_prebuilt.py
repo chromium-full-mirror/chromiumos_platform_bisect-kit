@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 import typing
 
@@ -70,7 +69,7 @@ def create_argument_parser():
         '--default_chromeos_root',
         type=cli.argtype_dir_path,
         default=configure.get(
-            'DEFAULT_CHROMEOS_ROOT', os.path.expanduser('~/chromiumos')
+            'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
         ),
         help='Default chromeos tree to run "cros flash" (default: %(default)s)',
     )

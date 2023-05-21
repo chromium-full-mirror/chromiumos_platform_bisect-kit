@@ -1488,17 +1488,13 @@ class DiagnoseCommandLineBase:
         group.add_argument(
             '--mirror_base',
             metavar='MIRROR_BASE',
-            default=configure.get(
-                'MIRROR_BASE', setup_cros_bisect.DEFAULT_MIRROR_BASE
-            ),
+            default=configure.get('MIRROR_BASE', common.DEFAULT_MIRROR_BASE),
             help='Directory for mirrors (default: %(default)s)',
         )
         group.add_argument(
             '--work_base',
             metavar='WORK_BASE',
-            default=configure.get(
-                'WORK_BASE', setup_cros_bisect.DEFAULT_WORK_BASE
-            ),
+            default=configure.get('WORK_BASE', common.DEFAULT_WORK_BASE),
             help='Directory for bisection working directories '
             '(default: %(default)s)',
         )

@@ -14,7 +14,6 @@ import dataclasses
 import functools
 import json
 import logging
-import os
 import random
 import time
 
@@ -741,7 +740,7 @@ def main():
         '--chromeos_root',
         type=cli.argtype_dir_path,
         default=configure.get(
-            'DEFAULT_CHROMEOS_ROOT', os.path.expanduser('~/chromiumos')
+            'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
         ),
         help='ChromeOS source tree, for overlay data (default: %(default)s)',
     )

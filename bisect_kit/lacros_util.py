@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import time
 
+from bisect_kit import common
 from bisect_kit import cr_util
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -39,7 +40,6 @@ BOARD_ARCHITECTURES = {
         'arg_for_gn': 'arm',
     },
 }
-DEFAULT_CHROMEOS_ROOT = os.path.expanduser('~/chromiumos')
 
 
 def get_lacros_gs_path_list(
@@ -314,7 +314,9 @@ def _get_deploy_chrome_path(
             chrome_src, 'third_party/chromite/bin/deploy_chrome'
         )
 
-    return os.path.join(DEFAULT_CHROMEOS_ROOT, 'chromite/bin/deploy_chrome')
+    return os.path.join(
+        common.DEFAULT_CHROMEOS_ROOT, 'chromite/bin/deploy_chrome'
+    )
 
 
 def deploy_lacros_to_dut(
