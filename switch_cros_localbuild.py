@@ -37,20 +37,17 @@ def add_build_and_deploy_arguments(parser_group):
         'chroot',
     )
     parser_group.add_argument(
-        '--clobber-stateful',
         '--clobber_stateful',
         action='store_true',
         help='Clobber stateful partition when performing update',
     )
     parser_group.add_argument(
-        '--no-disable-rootfs-verification',
         '--no_disable_rootfs_verification',
         dest='disable_rootfs_verification',
         action='store_false',
         help="Don't disable rootfs verification after update is completed",
     )
     parser_group.add_argument(
-        '--no-mark-as-stable',
         '--no_mark_as_stable',
         dest='mark_as_stable',
         action='store_false',

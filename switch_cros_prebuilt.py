@@ -56,13 +56,11 @@ def create_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
-        '--clobber-stateful',
         '--clobber_stateful',
         action='store_true',
         help='Clobber stateful partition when performing update',
     )
     parser.add_argument(
-        '--no-disable-rootfs-verification',
         '--no_disable_rootfs_verification',
         dest='disable_rootfs_verification',
         action='store_false',

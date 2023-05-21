@@ -36,13 +36,11 @@ logger = logging.getLogger(__name__)
 
 def add_build_and_deploy_arguments(parser_group):
     parser_group.add_argument(
-        '--clobber-stateful',
         '--clobber_stateful',
         action='store_true',
         help='Clobber stateful partition when performing update',
     )
     parser_group.add_argument(
-        '--no-disable-rootfs-verification',
         '--no_disable_rootfs_verification',
         dest='disable_rootfs_verification',
         action='store_false',
