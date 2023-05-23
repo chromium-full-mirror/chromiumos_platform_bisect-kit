@@ -4,6 +4,7 @@
 
 """Test lacros_util module."""
 
+import pathlib
 import unittest
 from unittest import mock
 
@@ -173,6 +174,25 @@ class TestLacrosUtil(unittest.TestCase):
                     '103.0.5060.5',
                 ],
             )
+
+    def test_get_RBE_environment_variables(self):
+        # pylint: disable=protected-access
+        env = lacros_util._get_RBE_environment_variables()
+
+        self.assertTrue('RBE_credential_file' in env)
+        self.assertEqual(
+            env['RBE_credential_file'],
+            pathlib.Path.home() / 'bisect-runner.json',
+        )
+
+        self.assertTrue('RBE_use_application_default_credentials' in env)
+        self.assertEqual(env['RBE_use_application_default_credentials'], 'true')
+
+        self.assertTrue('RBE_use_gce_credentials' in env)
+        self.assertEqual(env['RBE_use_gce_credentials'], 'false')
+
+        self.assertTrue('RBE_automatic_auth' in env)
+        self.assertEqual(env['RBE_automatic_auth'], 'false')
 
 
 if __name__ == '__main__':

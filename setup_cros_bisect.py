@@ -412,7 +412,8 @@ solutions = [
     "custom_vars": {
       'checkout_src_internal': True,
       'cros_boards': 'amd64-generic:arm-generic',
-      'checkout_lacros_sdk': True
+      'checkout_lacros_sdk': True,
+      'download_remoteexec_cfg': True,
     },
   },
 ]

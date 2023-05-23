@@ -210,6 +210,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
                 'checkout_src_internal=True',
                 'cros_boards="arm-generic:amd64-generic"',
                 'checkout_lacros_sdk=True',
+                'download_remoteexec_cfg=True',
             ]
             gclient_util.config(
                 opts.chrome_root,

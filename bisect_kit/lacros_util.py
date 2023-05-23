@@ -407,7 +407,7 @@ import("//build/args/chromeos/%s-generic-crostoolchain.gni")
 target_os="chromeos"
 is_chromeos_device=true
 chromeos_is_browser_only=true
-use_goma=true
+use_remoteexec = true
 is_chrome_branded=true
 is_official_build=false
 is_debug=false
@@ -455,6 +455,23 @@ def _get_output_directory(chrome_src: str) -> str:
     return output_directory
 
 
+def _get_RBE_environment_variables() -> dict[str, str]:
+    """Generate environment variables for reproxy
+
+    Returns:
+        A dictionary containing required variables
+    """
+    env = os.environ.copy()
+
+    bisect_runner_json_path = pathlib.Path.home() / 'bisect-runner.json'
+    env['RBE_credential_file'] = bisect_runner_json_path
+    env['RBE_use_application_default_credentials'] = 'true'
+    env['RBE_use_gce_credentials'] = 'false'
+    env['RBE_automatic_auth'] = 'false'
+
+    return env
+
+
 def build(chrome_src: str, board_cpu_arch: str):
     """Build lacros from chrome source tree
 
@@ -472,21 +489,22 @@ def build(chrome_src: str, board_cpu_arch: str):
     logger.debug('Building lacros from source')
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
         lacros_build_cmd = [
-            './third_party/depot_tools/autoninja',
+            'autoninja',
             '-C',
             _DEFAULT_OUT_DEVICE_LACRO_DIR,
             'chrome',
         ]
         logger.debug('Lacros Build Command: %s', ' '.join(lacros_build_cmd))
+        env = _get_RBE_environment_variables()
         try:
-            util.check_output(*lacros_build_cmd, cwd=chrome_src)
+            util.check_output(*lacros_build_cmd, cwd=chrome_src, env=env)
         except subprocess.CalledProcessError:
             logger.warning('build failed, delete out directory and retry again')
             # Some compiler processes are still terminating. Short delay is
             # necessary.
             time.sleep(10)
             shutil.rmtree(output_directory)
-            util.check_output(*lacros_build_cmd, cwd=chrome_src)
+            util.check_output(*lacros_build_cmd, cwd=chrome_src, env=env)
         return
 
 
