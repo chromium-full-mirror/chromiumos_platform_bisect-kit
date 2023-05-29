@@ -4,6 +4,7 @@
 
 """Test cr_util module"""
 
+import pathlib
 import unittest
 
 from bisect_kit import cr_util
@@ -94,6 +95,25 @@ class TestCrUtil(unittest.TestCase):
             cr_util.get_lca('100.0.2.0', '100.0.3.1', chrome_version_list),
             '100.0.2.0',
         )
+
+    def test_get_RBE_environment_variables(self):
+        # pylint: disable=protected-access
+        env = cr_util.get_RBE_environment_variables()
+
+        self.assertTrue('RBE_credential_file' in env)
+        self.assertEqual(
+            env['RBE_credential_file'],
+            pathlib.Path.home() / 'bisect-runner.json',
+        )
+
+        self.assertTrue('RBE_use_application_default_credentials' in env)
+        self.assertEqual(env['RBE_use_application_default_credentials'], 'true')
+
+        self.assertTrue('RBE_use_gce_credentials' in env)
+        self.assertEqual(env['RBE_use_gce_credentials'], 'false')
+
+        self.assertTrue('RBE_automatic_auth' in env)
+        self.assertEqual(env['RBE_automatic_auth'], 'false')
 
 
 if __name__ == '__main__':

@@ -455,23 +455,6 @@ def _get_output_directory(chrome_src: str) -> str:
     return output_directory
 
 
-def _get_RBE_environment_variables() -> dict[str, str]:
-    """Generate environment variables for reproxy
-
-    Returns:
-        A dictionary containing required variables
-    """
-    env = os.environ.copy()
-
-    bisect_runner_json_path = pathlib.Path.home() / 'bisect-runner.json'
-    env['RBE_credential_file'] = bisect_runner_json_path
-    env['RBE_use_application_default_credentials'] = 'true'
-    env['RBE_use_gce_credentials'] = 'false'
-    env['RBE_automatic_auth'] = 'false'
-
-    return env
-
-
 def build(chrome_src: str, board_cpu_arch: str):
     """Build lacros from chrome source tree
 
@@ -495,7 +478,7 @@ def build(chrome_src: str, board_cpu_arch: str):
             'chrome',
         ]
         logger.debug('Lacros Build Command: %s', ' '.join(lacros_build_cmd))
-        env = _get_RBE_environment_variables()
+        env = cr_util.get_RBE_environment_variables()
         try:
             util.check_output(*lacros_build_cmd, cwd=chrome_src, env=env)
         except subprocess.CalledProcessError:

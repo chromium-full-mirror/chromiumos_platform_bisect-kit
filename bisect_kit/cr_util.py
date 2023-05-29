@@ -7,6 +7,7 @@
 import json
 import logging
 import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -223,12 +224,7 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
     if kwargs.get('internal'):
         prefix.append('--internal')
 
-    # This work around http://crbug.com/1072400
-    # New goma exists in depot_tools but chromite still uses old way to fetch
-    # goma.
-    goma_dir = os.path.expanduser('~/depot_tools/.cipd_bin')
-    if os.path.exists(os.path.join(goma_dir, 'gomacc')):
-        prefix += ['--gomadir', goma_dir]
+    prefix.append('--use-remoteexec')
 
     lkgm_file = os.path.join(chrome_src, 'chromeos', 'CHROMEOS_LKGM')
     if os.path.exists(lkgm_file):
@@ -248,13 +244,8 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
         os.path.join(chrome_src, 'buildtools')
     )
 
-    if os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'):
-        env['GOMA_SERVICE_ACCOUNT_JSON_FILE'] = os.environ.get(
-            'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'
-        )
-        env['GOMA_SERVER_HOST'] = 'goma.chromium.org'
-        env['GOMA_RPC_EXTRA_PARAMS'] = '?prod'
-        env['GOMA_ARBITRARY_TOOLCHAIN_SUPPORT'] = 'true'
+    # Add the environment variables for reproxy
+    env.update(get_RBE_environment_variables())
 
     cmd = prefix + ['--'] + list(args)
 
@@ -324,7 +315,7 @@ def build(chrome_src, board, targets, with_tests=True):
     logger.info('build %s', targets)
     out_dir = os.path.join('out_%s' % board, 'Release')
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
-        cmd = ['./third_party/depot_tools/autoninja', '-C', out_dir] + targets
+        cmd = ['autoninja', '-C', out_dir] + targets
         try:
             simple_chrome_shell(chrome_src, board, *cmd, internal=True)
         except subprocess.CalledProcessError:
@@ -408,6 +399,23 @@ def get_lca(old_version: str, new_version: str, version_list: list[str]) -> str:
         'Unable to find their common ancestor: %s, %s'
         % (old_version, new_version)
     )
+
+
+def get_RBE_environment_variables() -> dict[str, str]:
+    """Generate environment variables for reproxy
+
+    Returns:
+        A dictionary containing required variables
+    """
+    env = os.environ.copy()
+
+    bisect_runner_json_path = pathlib.Path.home() / 'bisect-runner.json'
+    env['RBE_credential_file'] = bisect_runner_json_path
+    env['RBE_use_application_default_credentials'] = 'true'
+    env['RBE_use_gce_credentials'] = 'false'
+    env['RBE_automatic_auth'] = 'false'
+
+    return env
 
 
 class ChromeSpecManager(codechange.SpecManager):
