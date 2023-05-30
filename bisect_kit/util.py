@@ -11,8 +11,10 @@ import difflib
 import ipaddress
 import logging
 import os
+import pathlib
 import queue
 import re
+import shutil
 import socket
 import subprocess
 import threading
@@ -624,4 +626,53 @@ def is_valid_ip(ip: str) -> bool:
         ipaddress.ip_address(ip)
     except ValueError:
         return False
+    return True
+
+
+def copy_file_to_log_folder(file_path: str) -> bool:
+    """Copy a file to the log directory
+
+    Copy a file to the log directory. Log directory is parsed by 'LOG_FILE' environment variable.
+
+    Args:
+        file_path: The path of the file to be copied
+
+    Retruns:
+        True for successful copy, False otherwise
+    """
+    env_copy = os.environ.copy()
+
+    if 'LOG_FILE' not in env_copy:
+        logger.debug(
+            'LOG_FILE is not defined in env. No need to copy the result file.'
+        )
+        return False
+
+    log_path = pathlib.Path(env_copy['LOG_FILE'])
+    if not log_path.is_file():
+        logger.debug(
+            'Log file does not exist. No need to copy the result file.'
+        )
+        return False
+
+    file_path = pathlib.Path(file_path)
+    if not file_path.is_file():
+        logger.debug('Result file deos not exist.')
+        return False
+
+    # Assuming, log_path = bisect.sessions/session_name/log/log_file_name.txt
+    # and file_path = some_directory/results.json
+    # destination_file_name will be log_file_name.results.json
+    # destination_file_path will be bisect.sessions/session_name/log/log_file_name.results.json
+    destination_file_name = (
+        log_path.stem + '.' + file_path.stem + file_path.suffix
+    )
+    destination_file_path = log_path.parents[0] / destination_file_name
+
+    try:
+        shutil.copy(file_path, destination_file_path)
+    except shutil.SameFileError:
+        logger.warning('No copies are needed since they are the same file.')
+        return False
+    logger.debug('Copied %s -> %s', file_path, destination_file_path)
     return True

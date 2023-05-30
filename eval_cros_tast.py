@@ -244,6 +244,7 @@ def parse_results_json(
     passed = None
     reason = None
     results_path = os.path.join(result_dir, 'results.json')
+    util.copy_file_to_log_folder(results_path)
     with open(results_path) as f:
         for result in json.load(f):
             if result['name'] != test_name:
@@ -276,6 +277,7 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
         chart_path = os.path.join(
             result_dir, 'tests', opts.test_name, 'results-chart.json'
         )
+        util.copy_file_to_log_folder(chart_path)
         try:
             values = catapult_util.get_benchmark_values(chart_path, opts.metric)
         except Exception as e:

@@ -298,6 +298,7 @@ def parse_tauto_results(
     result_file = os.path.join(result_dir, 'test_report.log')
     if not os.path.exists(result_file):
         raise errors.ExternalError('test_report.log not found')
+    util.copy_file_to_log_folder(result_file)
 
     failed = None
     reason = None
@@ -349,6 +350,7 @@ def parse_cts_results(
     logger.info('found result file: %s', result_files)
     # Use the latest result file because it is the final result of retries.
     result_file = result_files[-1]
+    util.copy_file_to_log_folder(result_file)
 
     tree = xml.etree.ElementTree.parse(result_file)
     root = tree.getroot()
