@@ -54,6 +54,11 @@ class DiagnoseStates(core.States):
         Keep a mutable member dataclass for dut_allocate_spec, so it's easier
         and safer for clients to access the attributes.
         """
+        if 'dut_allocate_spec' not in self.data:
+            raise errors.InternalError(
+                '"dut_allocate_spec" not in session file, have you run '
+                '"%s init" correctly?' % sys.argv[0]
+            )
         self._dut_allocate_spec = cros_helper.DutAllocateSpec(
             **self.data['dut_allocate_spec']
         )
@@ -1175,12 +1180,12 @@ class DiagnoseCommandLineBase:
                 not opts.allocate_dut_board
                 and not opts.allocate_dut_model
                 and not opts.allocate_dut_sku
-                and not opts.allocate_dut_name
+                and not opts.allocate_dut_dut_name
             ):
                 self.argument_parser.error(
                     'either --allocate_dut_board, --allocate_dut_model, '
-                    '--allocate_dut_sku, or --allocate_dut_name'
-                    'need to be specified if DUT is "%s"'
+                    '--allocate_dut_sku, or --allocate_dut_dut_name '
+                    'need to be specified if DUT is missing or "%s"'
                     % cros_lab_util.LAB_DUT
                 )
             # Board name cannot be deduced from auto allocated devices because they
