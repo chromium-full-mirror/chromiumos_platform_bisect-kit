@@ -2066,13 +2066,22 @@ def prepare_chroot(chromeos_root):
             chromeos_root, 'chroot', 'home', os.environ['USER'], '.ssh'
         )
         to_file = os.path.join(to_folder, name)
+        if not os.path.exists(path):
+            logger.warning('File %s not found, ignored copying to chroot', name)
+            continue
         if os.path.isfile(to_file):
             os.remove(to_file)
         shutil.copy(path, to_folder)
 
     # Copy ssh keys into chromeos root.
-    for name in ['testing_rsa', 'testing_rsa.pub']:
+    for name in [
+        'testing_rsa',
+        'testing_rsa.pub',
+        'partner_testing_rsa',
+        'partner_testing_rsa.pub',
+    ]:
         possible_paths = [
+            os.path.join(chromeos_root, 'sshkeys', name),
             os.path.join(
                 chromeos_root,
                 'src',
@@ -2091,6 +2100,7 @@ def prepare_chroot(chromeos_root):
                 'ssh_keys',
                 name,
             ),
+            os.path.expanduser(os.path.join('~/.ssh', name)),
         ]
         to_folder = os.path.join(
             chromeos_root, 'chroot', 'home', os.environ['USER'], '.ssh'
@@ -2099,14 +2109,15 @@ def prepare_chroot(chromeos_root):
         if os.path.isfile(to_file):
             os.remove(to_file)
 
-        assert any(os.path.exists(x) for x in possible_paths)
+        if not any(os.path.exists(x) for x in possible_paths):
+            logger.warning('File %s not found, ignored copying to chroot', name)
         for path in possible_paths:
             if os.path.exists(path):
                 shutil.copy(path, to_folder)
                 break
 
     # Remove the write permission for private keys.
-    for name in ['testing_rsa', 'chromeos_ssh_proxy']:
+    for name in ['testing_rsa', 'partner_testing_rsa', 'chromeos_ssh_proxy']:
         util.check_call(
             'chmod',
             'o-r,g-r',
