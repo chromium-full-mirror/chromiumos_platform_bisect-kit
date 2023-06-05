@@ -20,7 +20,7 @@ from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import util
-import cros_helper
+import experiment
 import setup_cros_bisect
 
 
@@ -166,12 +166,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         return common_switch_cmd, common_eval_cmd
 
     def do_run(self, dut):
-        if (
-            dut != cros_lab_util.LAB_DUT
-            and self.config['dut'] == cros_lab_util.LAB_DUT
-        ):
-            self.update_dut_alloc_spec(dut)
-
         util.check_call(
             './switch_cros_localbuild.py',
             '--sync_code_only',
@@ -235,16 +229,17 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         self.states.load_states()
 
         try:
-            reason = cros_lab_util.make_lease_reason(self.config['session'])
-
-            def allocator():
-                return cros_helper.allocate_dut(self.dut_allocate_spec)
-
-            with cros_lab_util.dut_manager(
-                self.config['dut'], reason, allocator
-            ) as dut:
+            # Allocate a DUT globally only if not performing a statless bisect.
+            logger.info('experiments: %s', self.config['experiments'])
+            should_auto_allocate = (
+                not experiment.ID.STATELESS in self.config['experiments']
+            )
+            allocator = diagnoser_cros.DutAllocator(
+                self.states, should_auto_allocate
+            )
+            with allocator.run() as dut:
                 self.do_run(dut)
-                logger.info('%s done', __file__)
+            logger.info('%s done', __file__)
         except Exception as e:
             logger.exception('got exception; stop')
             exception_name = e.__class__.__name__

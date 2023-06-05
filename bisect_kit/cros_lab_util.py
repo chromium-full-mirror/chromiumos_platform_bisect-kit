@@ -891,7 +891,7 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
 
 
 @contextlib.contextmanager
-def dut_lease_manager(dut, reason):
+def dut_lease_status_monitor(dut, reason):
     """Takes care DUT lease status.
 
     If the DUT is leased from skylab, this manager will spawn a thread to monitor
@@ -931,50 +931,6 @@ def dut_lease_manager(dut, reason):
         logger.debug('wait keeper thread terminated')
         thread.join()
         logger.debug('keeper thread is terminated')
-
-
-@contextlib.contextmanager
-def dut_manager(dut, reason, allocator):
-    """Context manager to handle host allocation.
-
-    If `dut` is magic value, ":lab:", the context manager will call `allocator`
-    to allocate a host and release the host upon leaving the scope.
-
-    For other value of `dut`, the context manager simply yields `dut` and does
-    nothing else.
-
-    Args:
-      dut: dut address
-      reason: lease reason
-      allocator: host allocation callback function.
-        If None, defer dut allocation.
-
-    Raise:
-      errors.NoDutAvailable() if failed to allocate a DUT.
-
-    Yields:
-      The allocated DUT or ":lab:" if defer allocation.
-    """
-    if dut == LAB_DUT:
-        # Defer allocation.
-        if not allocator:
-            yield LAB_DUT
-            return
-
-        host = allocator()
-        if not host:
-            raise errors.NoDutAvailable('unable to allocate DUT')
-
-        try:
-            # Append (partial) domain name of the lab
-            with dut_lease_manager(dut_name_to_address(host), reason):
-                yield dut_name_to_address(host)
-        finally:
-            logger.info('auto release DUT %s', host)
-            crosfleet_release_dut(host)
-    else:
-        with dut_lease_manager(dut, reason):
-            yield dut
 
 
 def reboot_via_servo(dut):
