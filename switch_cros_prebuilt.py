@@ -84,12 +84,19 @@ def switch(opts):
         )
         if states.load_states():
             cros_util.SnapshotStore.init_with_state(states)
+    # TODO(kcwu): clear cache of cros flash
+    image_info = cros_util.search_image(opts.board, opts.version)
+    if not image_info:
+        raise errors.ExecutionFatalError(
+            'no images available for %s %s' % (opts.board, opts.version)
+        )
 
     cros_util.provision_image_with_retry(
         opts.default_chromeos_root,
         opts.dut,
         opts.board,
-        opts.version,
+        image_info,
+        version=opts.version,
         clobber_stateful=opts.clobber_stateful,
         disable_rootfs_verification=opts.disable_rootfs_verification,
         repair_callback=cros_lab_util.repair,
