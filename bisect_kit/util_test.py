@@ -12,6 +12,7 @@ import subprocess
 import unittest
 from unittest import mock
 
+from bisect_kit import testing
 from bisect_kit import util
 
 
@@ -38,6 +39,19 @@ class TestUtilFunctions(unittest.TestCase):
         assert not util.is_direct_relative_version('9123.0.0', '9100.1.2')
 
         assert not util.is_direct_relative_version('1.0.1', '2.0.9')
+
+    def test_is_valid_ip(self):
+        self.assertEqual(util.is_valid_ip('127.0.0.1'), True)
+        self.assertEqual(
+            util.is_valid_ip('2001:0db8:75a2:0000:0000:8a2e:0340:9999'), True
+        )
+
+        self.assertEqual(util.is_valid_ip('abcd'), False)
+        self.assertEqual(util.is_valid_ip('127.0.1'), False)
+        self.assertEqual(util.is_valid_ip('127.0.0.999'), False)
+        self.assertEqual(
+            util.is_valid_ip('2001:0db8:75a2:0000:0000:8a2e:0340'), False
+        )
 
 
 class TestPopen(unittest.TestCase):
@@ -88,27 +102,16 @@ class TestPopen(unittest.TestCase):
         self.assertEqual(util.dict_get(test_dict, 'a', 'c', 'd'), None)
         self.assertEqual(util.dict_get(None, 'a', 'c', 'd'), None)
 
-    def test_is_valid_ip(self):
-        self.assertEqual(util.is_valid_ip('127.0.0.1'), True)
-        self.assertEqual(
-            util.is_valid_ip('2001:0db8:75a2:0000:0000:8a2e:0340:9999'), True
-        )
-
-        self.assertEqual(util.is_valid_ip('abcd'), False)
-        self.assertEqual(util.is_valid_ip('127.0.1'), False)
-        self.assertEqual(util.is_valid_ip('127.0.0.999'), False)
-        self.assertEqual(
-            util.is_valid_ip('2001:0db8:75a2:0000:0000:8a2e:0340'), False
-        )
-
 
 class TestCopyFileToLogFolder(unittest.TestCase):
     """Test copy_file_to_log_folder()"""
 
     def test_copy_file_to_log_folder(self):
-        log_file_path = pathlib.Path('testdata/log/dummy.eval.txt')
+        log_file_path = pathlib.Path(
+            testing.get_testdata_path('log/dummy.eval.txt')
+        )
         result_file_path = pathlib.Path(
-            'testdata/tast_test_result/pass/results.json'
+            testing.get_testdata_path('tast_test_result/pass/results.json')
         )
         self.assertTrue(log_file_path.exists())
         self.assertTrue(result_file_path.exists())
@@ -123,7 +126,7 @@ class TestCopyFileToLogFolder(unittest.TestCase):
         with mock.patch.dict(os.environ, {"LOG_FILE": str(log_file_path)}):
             self.assertTrue(util.copy_file_to_log_folder(str(result_file_path)))
             destination_file_path = pathlib.Path(
-                'testdata/log/dummy.eval.results.json'
+                testing.get_testdata_path('log/dummy.eval.results.json')
             )
             self.assertTrue(destination_file_path.exists())
             self.assertTrue(
@@ -132,14 +135,16 @@ class TestCopyFileToLogFolder(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        dummy_log_file_path = pathlib.Path('testdata/log/dummy.eval.txt')
+        dummy_log_file_path = pathlib.Path(
+            testing.get_testdata_path('log/dummy.eval.txt')
+        )
         dummy_log_file_path.parent.mkdir(parents=True, exist_ok=True)
         with dummy_log_file_path.open("w", encoding="utf-8") as f:
             f.write("Dummy eval text")
 
     @classmethod
     def tearDownClass(cls):
-        log_folder = pathlib.Path('testdata/log')
+        log_folder = pathlib.Path(testing.get_testdata_path('log'))
         if log_folder.exists():
             shutil.rmtree(log_folder)
 
