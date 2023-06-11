@@ -28,6 +28,7 @@ from bisect_kit import configure
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import gs_util
 from bisect_kit import util
 
 
@@ -123,7 +124,7 @@ def switch(autotest_dir, board, version, test_name, dut):
         shutil.rmtree(autotest_dir)
     os.makedirs(autotest_dir)
 
-    cros_util.gsutil('cp', autotest_client_path, tmp_dir)
+    gs_util.cp(autotest_client_path, tmp_dir)
     tarball = os.path.join(tmp_dir, AUTOTEST_CLIENT_TARBALL)
     util.check_call(
         'tar',
@@ -133,7 +134,7 @@ def switch(autotest_dir, board, version, test_name, dut):
         'autotest',  # only extract autotest/
         cwd=autotest_dir,
     )
-    cros_util.gsutil('cp', autotest_server_path, tmp_dir)
+    gs_util.cp(autotest_server_path, tmp_dir)
     tarball = os.path.join(tmp_dir, AUTOTEST_SERVER_TARBALL)
     util.check_call(
         'tar',

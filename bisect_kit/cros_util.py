@@ -15,12 +15,9 @@ Terminology used in this module.
 from __future__ import annotations
 
 import ast
-import calendar
 import contextlib
 import dataclasses
-import datetime
 import enum
-import errno
 import glob
 import ipaddress
 import json
@@ -44,6 +41,7 @@ from bisect_kit import codechange
 from bisect_kit import core
 from bisect_kit import errors
 from bisect_kit import git_util
+from bisect_kit import gs_util
 from bisect_kit import locking
 from bisect_kit import repo_util
 from bisect_kit import util
@@ -74,9 +72,6 @@ gs_manifest_path = (
     'gs://chromeos-manifest-versions/buildspecs/{milestone}'
     '/{short_version}.xml'
 )
-
-# Assume gsutil is in PATH.
-gsutil_bin = 'gsutil'
 
 # Since snapshots with version >= 12618.0.0 have android and chrome version
 # info.
@@ -277,7 +272,7 @@ class SnapshotStore:
                         snapshot_version=snapshot_version,
                         filename=filename,
                     )
-                    output = gsutil_ls(path, ignore_errors=True)
+                    output = gs_util.ls(path, ignore_errors=True)
                     if output:
                         img_type = ImageType.determine(output[0])
                         cls.images[snapshot_version][img_type] = output[0]
@@ -333,7 +328,7 @@ class SnapshotStore:
                 snapshot_id=snapshot_id,
                 version='R*-{snapshot_id}-*',
             )
-            for line in gsutil_ls(gs_path, ignore_errors=True):
+            for line in gs_util.ls(gs_path, ignore_errors=True):
                 info = cls.parse_snapshot_path(line)
                 if info.get('snapshot_id') == snapshot_id:
                     return info.get('snapshot_version')
@@ -722,168 +717,6 @@ def wait_reboot_done(host, boot_id):
     raise errors.ExternalError('reboot failed?')
 
 
-def gsutil(*args, **kwargs):
-    """gsutil command line wrapper.
-
-    Args:
-      args: command line arguments passed to gsutil
-      kwargs:
-        ignore_errors: if true, return '' for failures, for example 'gsutil ls'
-          but the path not found.
-
-    Returns:
-      stdout of gsutil
-
-    Raises:
-      errors.ExternalError: gsutil failed to run
-      subprocess.CalledProcessError: command failed
-    """
-    stderr_lines = []
-    try:
-        return util.check_output(
-            gsutil_bin, *args, stderr_callback=stderr_lines.append
-        )
-    except subprocess.CalledProcessError as e:
-        stderr = ''.join(stderr_lines)
-        if re.search(r'ServiceException:.* does not have .*access', stderr):
-            raise errors.ExternalError(
-                'gsutil failed due to permission. '
-                + 'Run "%s config" and follow its instruction. ' % gsutil_bin
-                + 'Fill any string if it asks for project-id'
-            ) from e
-        if kwargs.get('ignore_errors'):
-            return ''
-        raise
-    except OSError as e:
-        if e.errno == errno.ENOENT:
-            raise errors.ExternalError(
-                'Unable to run %s. gsutil is not installed or not in PATH?'
-                % gsutil_bin
-            )
-        raise
-
-
-def gsutil_ls(*args, **kwargs) -> list[str]:
-    """gsutil ls.
-
-    Args:
-      args: arguments passed to 'gsutil ls'
-      kwargs: extra parameters, where
-        ignore_errors: if true, return empty list instead of raising exception,
-          ex. path not found.
-
-    Returns:
-      list of 'gsutil ls' result. One element for one line of gsutil output.
-
-    Raises:
-      subprocess.CalledProcessError: gsutil failed, usually means path not found
-    """
-    return gsutil('ls', *args, **kwargs).splitlines()
-
-
-def gsutil_stat_max_creation_time(*args, **kwargs):
-    """Returns the max creation time of a set of files.
-
-    For each file, the function will lookup the `create_time_seconds` key is
-    set in metadata.
-
-    Args:
-      args: a list of filenames passed to gsutil
-      kwargs: extra parameters for gsutil
-
-    Returns:
-      A integer indicates the creation timestamp.
-
-    Raises:
-      subprocess.CalledProcessError: gsutil failed, usually means path not found
-      errors.ExternalError: creation time is not found
-    """
-    timestamps = [
-        x['create_time_seconds']
-        if 'create_time_seconds' in x
-        else x.get('Creation time')
-        for x in gsutil_stat(*args, **kwargs).values()
-    ]
-    if None in timestamps:
-        raise errors.ExternalError(
-            "didn't find creation time or create_time_seconds"
-        )
-    return max(timestamps)
-
-
-def gsutil_stat(*args, **kwargs) -> dict[str, dict[str, typing.Any]]:
-    """Returns a key-value dict for each file in gsutil stat.
-
-    Note that it only supports a small set of field names.
-
-    Args:
-      args: a list of filename passed to gsutil
-      kwargs: extra parameters for gsutil
-
-    Returns:
-      A dict, result[filename][key] = value
-
-    Raises:
-      subprocess.CalledProcessError: gsutil failed, usually means path not found
-    """
-
-    time_format = '%a, %d %b %Y %H:%M:%S GMT'
-    supported_fields = [
-        'Creation time',
-        'Update time',
-        'Storage class',
-        'Content-Length',
-        'Content-Type',
-        'create_time_seconds',  # metadata
-        'Hash (crc32c)',
-        'Hash (md5)',
-        'ETag',
-        'Generation',
-        'Metageneration',
-    ]
-    datetime_fields = [
-        'Creation time',
-        'Update time',
-    ]
-    int_fields = [
-        'Content-Length',
-        'create_time_seconds',
-        'Generation',
-    ]
-
-    result = {}
-    current_file = None
-
-    for line in gsutil('stat', *args, **kwargs).splitlines():
-        if ':' not in line:
-            continue
-        key, value = line.split(':', 1)
-        key, value = key.strip(), value.strip()
-
-        # fine a new file
-        # gs://file_name: will be splitted to key=gs value=//file_name: here
-        if key == 'gs':
-            file_name = 'gs:%s' % value.rstrip(':')
-            if file_name in args:
-                current_file = file_name
-                result[current_file] = {}
-            continue
-
-        # current file not found
-        if not current_file:
-            continue
-
-        # find a key we want
-        if key in supported_fields:
-            if key in int_fields:
-                value = int(value)
-            if key in datetime_fields:
-                dt = datetime.datetime.strptime(value, time_format)
-                value = int(calendar.timegm(dt.utctimetuple()))
-            result[current_file][key] = value
-    return result
-
-
 def should_fetch_release_manifest_from_gs(version: str) -> bool:
     """Returns whether the manifest of given version is avaliable on gs.
 
@@ -926,7 +759,7 @@ def _iter_valid_prebuilt_gs_path(
         path = gs_archive_path.format(
             board=board, bucket=bucket, version=version
         )
-        for gs_path in gsutil_ls('-d', path, ignore_errors=True):
+        for gs_path in gs_util.ls('-d', path, ignore_errors=True):
             yield gs_path.rstrip('/')
 
 
@@ -1149,7 +982,7 @@ def _find_files_from_image_archive(
                     )
                     async_results.append(
                         pool.apply_async(
-                            gsutil_ls, [gs_path], dict(ignore_errors=True)
+                            gs_util.ls, [gs_path], dict(ignore_errors=True)
                         )
                     )
 
@@ -1350,7 +1183,7 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
             if os.path.exists(cache_path_full):
                 return cache_path
             with tempfile.TemporaryDirectory() as tmp_dir:
-                gsutil('cp', path, tmp_dir)
+                gs_util.cp(path, tmp_dir)
                 local_path = os.path.join(tmp_dir, os.path.basename(path))
                 assert os.path.exists(local_path)
                 util.check_call(
@@ -1370,7 +1203,7 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
             cache_path_full = os.path.join(chromeos_root, cache_path)
             if os.path.exists(cache_path_full):
                 return cache_path
-            gsutil('cp', path, cache_path_full)
+            gs_util.cp(path, cache_path_full)
             return cache_path
 
     path = image_info.get(ImageType.PARTITION_IMAGE)
@@ -1393,7 +1226,7 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
         with tempfile.TemporaryDirectory() as tmp_dir:
             local_path = path
             if path.startswith('gs://'):
-                gsutil('cp', path, tmp_dir)
+                gs_util.cp(path, tmp_dir)
                 local_path = os.path.join(tmp_dir, os.path.basename(path))
                 assert os.path.exists(local_path)
             util.check_call(
@@ -1532,13 +1365,13 @@ def search_prebuilt_image(board, version) -> ImageInfo:
 
     image_info = ImageInfo()
     for gs_path in _iter_valid_prebuilt_gs_path(board, version):
-        if gsutil_ls(
+        if gs_util.ls(
             f'{gs_path}/{disk_image_bundle_filename}', ignore_errors=True
         ):
             image_info[
                 ImageType.DISK_IMAGE
             ] = f'{gs_path}/{disk_image_bundle_filename}'
-        if gsutil_ls(
+        if gs_util.ls(
             f'{gs_path}/{sample_partition_filename}', ignore_errors=True
         ):
             image_info[ImageType.PARTITION_IMAGE] = gs_path
@@ -1703,8 +1536,8 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> VersionInfo:
     info = VersionInfo()
     for gs_path in _iter_valid_prebuilt_gs_path(board, cros_version):
         for metadata_filename in metadata_filenames:
-            metadata_str = gsutil(
-                'cat', f'{gs_path}/{metadata_filename}', ignore_errors=True
+            metadata_str = gs_util.cat(
+                f'{gs_path}/{metadata_filename}', ignore_errors=True
             )
             if not metadata_str:
                 continue
@@ -1727,8 +1560,8 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> VersionInfo:
                 info.android_branch = v['android-branch']
             elif 'android-container-branch' in board_metadata:
                 info.android_branch = v['android-container-branch']
-        metadata_str = gsutil(
-            'cat', f'{gs_path}/build_report.json', ignore_errors=True
+        metadata_str = gs_util.cat(
+            f'{gs_path}/build_report.json', ignore_errors=True
         )
         if not metadata_str:
             continue
@@ -2598,9 +2431,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
         old_path = SnapshotStore.query_snapshot_image(self.config['board'], old)
         new_path = SnapshotStore.query_snapshot_image(self.config['board'], new)
         if old_path:
-            old_timestamp = gsutil_stat_max_creation_time(old_path) - 86400
+            old_timestamp = gs_util.stat_max_creation_time(old_path) - 86400
         if new_path:
-            new_timestamp = gsutil_stat_max_creation_time(new_path) + 86400
+            new_timestamp = gs_util.stat_max_creation_time(new_path) + 86400
             # 1558657989 is snapshot_id 5982's commit time, this ensures every time
             # we can find snapshot 5982
             # snapshot_id <= 5982 has different commit message format, so we need
@@ -2879,7 +2712,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
 
     def list_release_milestones(self) -> list[str]:
         path = '%s%s' % (gs_manifest_base, 'buildspecs')
-        return [x.removeprefix(path).strip('/') for x in gsutil_ls(path)]
+        return [x.removeprefix(path).strip('/') for x in gs_util.ls(path)]
 
     def list_release_manifests(self, milestone: str) -> list[str]:
         if int(milestone) < gs_manifest_cutoff_milestone:
@@ -2890,17 +2723,17 @@ class ChromeOSSpecManager(codechange.SpecManager):
             )
 
         path = '%s%s/%s' % (gs_manifest_base, 'buildspecs', milestone)
-        return [x.removeprefix(path).lstrip('/') for x in gsutil_ls(path)]
+        return [x.removeprefix(path).lstrip('/') for x in gs_util.ls(path)]
 
     def get_gs_release_manifest(self, path: str) -> typing.Optional[str]:
         """Query the manifest content of a release version on gs."""
-        return gsutil('cat', '%s%s' % (gs_manifest_base, path))
+        return gs_util.cat('%s%s' % (gs_manifest_base, path))
 
     def query_gs_release_manifest_timestamp(
         self, path: str
     ) -> typing.Optional[str]:
         """Query the timestamp of a release version on gs."""
-        return gsutil_stat_max_creation_time('%s%s' % (gs_manifest_base, path))
+        return gs_util.stat_max_creation_time('%s%s' % (gs_manifest_base, path))
 
     def query_release_manifest_timestamp(self, full_version: str) -> int:
         assert is_cros_full_version(full_version)
@@ -2910,7 +2743,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             path = gs_manifest_path.format(
                 milestone=milestone, short_version=short_version
             )
-            return gsutil_stat_max_creation_time(path)
+            return gs_util.stat_max_creation_time(path)
         return git_util.get_commit_time(
             self.historical_manifest_git_dir,
             self.historical_manifest_branch_name,

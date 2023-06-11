@@ -17,8 +17,8 @@ import time
 
 from bisect_kit import common
 from bisect_kit import cr_util
-from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import gs_util
 from bisect_kit import locking
 from bisect_kit import util
 
@@ -79,7 +79,7 @@ def get_lacros_gs_path_list(
             )
             async_results.append(
                 pool.apply_async(
-                    cros_util.gsutil_ls,
+                    gs_util.ls,
                     [lacros_zip_path],
                     {'ignore_errors': True},
                 )
@@ -195,9 +195,7 @@ def is_prebuilt_path_available(lacros_bucket_url: str) -> bool:
       True if the lacros version is available to fetch.
       False if not available to fetch.
     """
-    gsutil_ls_result = cros_util.gsutil_ls(
-        lacros_bucket_url, ignore_errors=True
-    )
+    gsutil_ls_result = gs_util.ls(lacros_bucket_url, ignore_errors=True)
     return (
         len(gsutil_ls_result) == 1 and gsutil_ls_result[0] == lacros_bucket_url
     )
@@ -283,7 +281,7 @@ def fetch_lacros_prebuilt(lacros_version: str, board_cpu_arch: str) -> str:
 
         # Downloading lacros.zip to the temp directory
 
-        cros_util.gsutil('cp', lacros_bucket_url, temp_dir)
+        gs_util.cp(lacros_bucket_url, temp_dir)
 
         # unzip lacros.zip
         logger.debug('fetch and unpack lacros.zip to %s', temp_dir)

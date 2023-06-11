@@ -13,13 +13,14 @@ from unittest import mock
 
 from bisect_kit import cli
 from bisect_kit import cros_util
+from bisect_kit import gs_util
 from bisect_kit import testing
 
 
 logger = logging.getLogger(__name__)
 
 
-def _gsutil_ls(*args, **_kwargs):
+def _fake_gs_util_ls(*args, **_kwargs):
     archive_base = 'gs://chromeos-image-archive/foo-release/'
     snapshot_base = 'gs://chromeos-image-archive/foo-snapshot/'
 
@@ -56,53 +57,11 @@ def _gsutil_ls(*args, **_kwargs):
     return result
 
 
-def _gsutil_stat(*args, **_kwargs):
-    stat_14469_8 = [
-        'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml:',
-        '    Creation time:          Fri, 08 Apr 2022 17:31:36 GMT',
-        '    Update time:            Fri, 08 Apr 2022 17:32:14 GMT',
-        '    Storage class:          STANDARD',
-        '    Content-Length:         244194',
-        '    Content-Type:           text/xml; charset=utf-8',
-        '    Metadata:',
-        '        create_time_seconds:1643599521',
-        '    Hash (crc32c):          crc32_meow',
-        '    Hash (md5):             md5_woof==',
-        '    ETag:                   tagtag=',
-        '    Generation:             1649439096753030',
-        '    Metageneration:         2',
-    ]
-    # timestamp = 1649438944
-    stat_14469_7 = [
-        'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml:',
-        '    Creation time:          Fri, 08 Apr 2022 17:29:04 GMT',
-        '    Update time:            Fri, 08 Apr 2022 17:29:41 GMT',
-        '    Storage class:          STANDARD',
-        '    Content-Length:         244194',
-        '    Content-Type:           text/xml; charset=utf-8',
-        '    Hash (crc32c):          crc32_meow',
-        '    Hash (md5):             md5_woof==',
-        '    ETag:                   tagtag=',
-        '    Generation:             1649438944196998',
-        '    Metageneration:         2',
-    ]
-    files = {
-        'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml': stat_14469_8,
-        'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml': stat_14469_7,
-    }
-
-    result = ''
-    for arg in args:
-        if arg in files:
-            result += '\n'.join(files[arg]) + '\n'
-    return result
-
-
-def _query_milestone_by_version(_1, _2):
+def _fake_query_milestone_by_version(_1, _2):
     return '63'
 
 
-def _version_to_full(_board, version):
+def _fake_version_to_full(_board, version):
     if version.startswith('R'):
         return version
     return 'R63-' + version
@@ -291,20 +250,9 @@ class TestCrosUtil(unittest.TestCase):
                 'R84-13059.0.0-31619',
             )
 
-    def test_gsutil(self):
-        with mock.patch('bisect_kit.util.check_output', return_value='abc'):
-            self.assertEqual(cros_util.gsutil('cat', 'foo'), 'abc')
-
-        with mock.patch(
-            'bisect_kit.util.check_output',
-            side_effect=subprocess.CalledProcessError(1, 'cmd'),
-        ):
-            with self.assertRaises(subprocess.CalledProcessError):
-                cros_util.gsutil('cat', 'bar')
-
     def test_query_prebuilt_gs_path(self):
-        def gsutil_ls(*args, **kwargs):
-            logger.debug('gsutil_ls %r %r', args, kwargs)
+        def fake_gs_util_ls(*args, **kwargs):
+            logger.debug('fake_gs_util_ls %r %r', args, kwargs)
             if args in [
                 (
                     '-d',
@@ -333,7 +281,7 @@ class TestCrosUtil(unittest.TestCase):
                 ]
             return []
 
-        with mock.patch.object(cros_util, 'gsutil_ls', gsutil_ls):
+        with mock.patch.object(gs_util, 'ls', fake_gs_util_ls):
             gs_path = cros_util.query_prebuilt_gs_path('samus', 'R64-10123.0.0')
             self.assertEqual(
                 gs_path,
@@ -362,8 +310,8 @@ class TestCrosUtil(unittest.TestCase):
             self.assertEqual(gs_path, '')
 
     def test_has_release_prebuilt(self):
-        def gsutil_ls(*args, **kwargs):
-            logger.debug('gsutil_ls %r %r', args, kwargs)
+        def fake_gs_util_ls(*args, **kwargs):
+            logger.debug('fake_gs_util_ls %r %r', args, kwargs)
             if args in [
                 (
                     '-d',
@@ -379,7 +327,7 @@ class TestCrosUtil(unittest.TestCase):
                 ]
             return []
 
-        with mock.patch.object(cros_util, 'gsutil_ls', gsutil_ls):
+        with mock.patch.object(gs_util, 'ls', fake_gs_util_ls):
             self.assertTrue(
                 cros_util.has_release_prebuilt('samus', 'R64-10123.0.0')
             )
@@ -399,8 +347,8 @@ class TestCrosUtil(unittest.TestCase):
 
     def test_query_milestone_by_version(self):
         # Assume query_milestone_by_version is implemented via gsutil.
-        def gsutil_ls(*args, **kwargs):
-            logger.debug('gsutil_ls %r %r', args, kwargs)
+        def fake_gs_util_ls(*args, **kwargs):
+            logger.debug('fake_gs_util_ls %r %r', args, kwargs)
             if args == (
                 '-d',
                 'gs://chromeos-image-archive/samus-release/R*-10123.0.0',
@@ -418,7 +366,7 @@ class TestCrosUtil(unittest.TestCase):
             return []
 
         # First case, recent image, still exists in gs://chromeos-image-archive
-        with mock.patch.object(cros_util, 'gsutil_ls', gsutil_ls):
+        with mock.patch.object(gs_util, 'ls', fake_gs_util_ls):
             self.assertEqual(
                 cros_util.query_milestone_by_version('samus', '10123.0.0'), '64'
             )
@@ -470,12 +418,12 @@ class TestCrosUtil(unittest.TestCase):
                 'R64-10123.0.0',
             )
 
-    @mock.patch('bisect_kit.cros_util.gsutil_ls')
-    def test_query_version_info(self, mock_gsutil_ls):
-        mock_gsutil_ls.return_value = ['fake_path']
+    @mock.patch('bisect_kit.gs_util.ls')
+    def test_query_version_info(self, mock_gs_util_ls):
+        mock_gs_util_ls.return_value = ['fake_path']
 
-        def gen_mock_gsutil(metadata, partial_metadata, build_report):
-            def mock_gsutil(*args, **unused_kargs):
+        def create_fake_gsutil(metadata, partial_metadata, build_report):
+            def fake_gsutil(*args, **unused_kargs):
                 if args[0] == 'cat':
                     if args[1].endswith('/partial-metadata.json'):
                         return partial_metadata
@@ -485,7 +433,7 @@ class TestCrosUtil(unittest.TestCase):
                         return build_report
                 return ''
 
-            return mock_gsutil
+            return fake_gsutil
 
         with open(
             testing.get_testdata_path(
@@ -494,29 +442,28 @@ class TestCrosUtil(unittest.TestCase):
         ) as f:
             partial_metadata = f.read()
         with mock.patch.object(
+            gs_util,
+            '_gsutil',
+            side_effect=create_fake_gsutil('', partial_metadata, ''),
+        ), mock.patch.object(
             cros_util,
-            'gsutil',
-            side_effect=gen_mock_gsutil('', partial_metadata, ''),
+            'fetch_buildbucket_version_info',
+            return_value=cros_util.VersionInfo(),
         ):
-            with mock.patch.object(
-                cros_util,
-                'fetch_buildbucket_version_info',
-                return_value=cros_util.VersionInfo(),
-            ):
-                info = cros_util.query_version_info('caroline', 'R89-13664.0.0')
-                self.assertEqual(
-                    cros_util.VersionInfo(
-                        buildbucket_id=8860981718532549296,
-                        cros_short_version='13664.0.0',
-                        cros_full_version='R89-13664.0.0',
-                        milestone='89',
-                        cr_version='89.0.4351.0',
-                        android_build_id='7026951',
-                        android_branch='git_pi-arc',
-                        android_target='cheets',
-                    ),
-                    info,
-                )
+            info = cros_util.query_version_info('caroline', 'R89-13664.0.0')
+            self.assertEqual(
+                cros_util.VersionInfo(
+                    buildbucket_id=8860981718532549296,
+                    cros_short_version='13664.0.0',
+                    cros_full_version='R89-13664.0.0',
+                    milestone='89',
+                    cr_version='89.0.4351.0',
+                    android_build_id='7026951',
+                    android_branch='git_pi-arc',
+                    android_target='cheets',
+                ),
+                info,
+            )
 
         with open(
             testing.get_testdata_path(
@@ -534,76 +481,36 @@ class TestCrosUtil(unittest.TestCase):
             build_report = f.read()
 
         with mock.patch.object(
-            cros_util,
-            'gsutil',
-            side_effect=gen_mock_gsutil(
+            gs_util,
+            '_gsutil',
+            side_effect=create_fake_gsutil(
                 metadata, partial_metadata, build_report
             ),
+        ), mock.patch.object(
+            cros_util,
+            'fetch_buildbucket_version_info',
+            return_value=cros_util.VersionInfo(),
         ):
-            with mock.patch.object(
-                cros_util,
-                'fetch_buildbucket_version_info',
-                return_value=cros_util.VersionInfo(),
-            ):
-                info = cros_util.query_version_info(
-                    'stronbad', 'R115-15452.0.0'
-                )
-                self.assertEqual(
-                    cros_util.VersionInfo(
-                        buildbucket_id=8781974877551968897,
-                        cros_short_version='15452.0.0',
-                        cros_full_version='R115-15452.0.0',
-                        milestone='115',
-                        cr_version='115.0.5751.0',
-                        # android_branch is missied
-                        android_branch='git_rvc-arc',
-                        android_target='bertha',
-                    ),
-                    info,
-                )
+            info = cros_util.query_version_info('stronbad', 'R115-15452.0.0')
+            self.assertEqual(
+                cros_util.VersionInfo(
+                    buildbucket_id=8781974877551968897,
+                    cros_short_version='15452.0.0',
+                    cros_full_version='R115-15452.0.0',
+                    milestone='115',
+                    cr_version='115.0.5751.0',
+                    # android_branch is missied
+                    android_branch='git_rvc-arc',
+                    android_target='bertha',
+                ),
+                info,
+            )
 
-    @mock.patch('bisect_kit.cros_util.gsutil', _gsutil_stat)
-    def test_gsutil_stat(self):
-        self.assertDictEqual(cros_util.gsutil_stat('nothing'), {})
-        self.assertDictEqual(
-            cros_util.gsutil_stat(
-                'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml'
-            ),
-            {
-                'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml': {
-                    'Creation time': 1649439096,
-                    'Update time': 1649439134,
-                    'Storage class': 'STANDARD',
-                    'Content-Length': 244194,
-                    'Content-Type': 'text/xml; charset=utf-8',
-                    'create_time_seconds': 1643599521,
-                    'Hash (crc32c)': 'crc32_meow',
-                    'Hash (md5)': 'md5_woof==',
-                    'ETag': 'tagtag=',
-                    'Generation': 1649439096753030,
-                    'Metageneration': '2',
-                },
-            },
-        )
-
-    @mock.patch('bisect_kit.cros_util.gsutil', _gsutil_stat)
-    def test_gsutil_stat_max_creation_time(self):
-        time7 = 1649438944
-        time8 = 1643599521
-        file7 = 'gs://chromeos-manifest-versions/buildspecs/99/14469.7.0.xml'
-        file8 = 'gs://chromeos-manifest-versions/buildspecs/99/14469.8.0.xml'
-        self.assertEqual(cros_util.gsutil_stat_max_creation_time(file7), time7)
-        self.assertEqual(cros_util.gsutil_stat_max_creation_time(file8), time8)
-        self.assertEqual(
-            cros_util.gsutil_stat_max_creation_time(file7, file8),
-            max(time7, time8),
-        )
-
-    @mock.patch('bisect_kit.cros_util.gsutil_ls', _gsutil_ls)
-    @mock.patch('bisect_kit.cros_util.version_to_full', _version_to_full)
+    @mock.patch('bisect_kit.gs_util.ls', _fake_gs_util_ls)
+    @mock.patch('bisect_kit.cros_util.version_to_full', _fake_version_to_full)
     @mock.patch(
         'bisect_kit.cros_util.query_milestone_by_version',
-        _query_milestone_by_version,
+        _fake_query_milestone_by_version,
     )
     def test_list_chromeos_prebuilt_versions(self):
         # Both ends are in gs://chromeos-image-archive
@@ -645,11 +552,11 @@ class TestCrosUtil(unittest.TestCase):
         )
 
     @mock.patch('bisect_kit.cros_util.snapshot_cutover_version', '0.0.0')
-    @mock.patch('bisect_kit.cros_util.gsutil_ls', _gsutil_ls)
-    @mock.patch('bisect_kit.cros_util.version_to_full', _version_to_full)
+    @mock.patch('bisect_kit.gs_util.ls', _fake_gs_util_ls)
+    @mock.patch('bisect_kit.cros_util.version_to_full', _fake_version_to_full)
     @mock.patch(
         'bisect_kit.cros_util.query_milestone_by_version',
-        _query_milestone_by_version,
+        _fake_query_milestone_by_version,
     )
     def test_list_chromeos_prebuilt_versions_with_snapshots(self):
         # snapshot 1: release ~ release

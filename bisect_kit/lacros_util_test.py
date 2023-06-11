@@ -7,8 +7,8 @@
 import unittest
 from unittest import mock
 
-from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import gs_util
 from bisect_kit import lacros_util
 
 
@@ -53,14 +53,12 @@ class TestLacrosUtil(unittest.TestCase):
             'gs://chrome-unsigned/desktop-5c0tCh/'
             '100.0.4896.6/lacros64/lacros.zip'
         )
-        with mock.patch.object(
-            cros_util, 'gsutil_ls', return_value=[lacros_image_url]
-        ):
+        with mock.patch.object(gs_util, 'ls', return_value=[lacros_image_url]):
             self.assertEqual(
                 lacros_util.is_prebuilt_path_available(lacros_image_url), True
             )
 
-        with mock.patch.object(cros_util, 'gsutil_ls', return_value=[]):
+        with mock.patch.object(gs_util, 'ls', return_value=[]):
             self.assertEqual(
                 lacros_util.is_prebuilt_path_available(
                     'not_available_image_url'

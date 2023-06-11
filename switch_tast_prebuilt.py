@@ -26,6 +26,7 @@ from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import gs_util
 from bisect_kit import util
 
 
@@ -96,7 +97,7 @@ def switch(opts, board, version, dut):
         shutil.rmtree(tast_dir)
     os.makedirs(tast_dir)
 
-    cros_util.gsutil('cp', autotest_server_path, tmp_dir)
+    gs_util.cp(autotest_server_path, tmp_dir)
     tarball = os.path.join(tmp_dir, AUTOTEST_SERVER_TARBALL)
     util.check_call(
         'tar', 'xf', tarball, '--strip-components=1', 'tast', cwd=tast_dir
