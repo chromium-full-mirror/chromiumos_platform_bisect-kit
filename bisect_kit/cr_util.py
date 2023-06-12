@@ -45,6 +45,7 @@ CHROME_TEST_BINARIES = [
     'fake_dmserver',
     'libtest_trace_processor.so',
     'image_processor_test',
+    'image_processor_perf_test',
     'jpeg_decode_accelerator_unittest',
     'jpeg_encode_accelerator_unittest',
     'ozone_gl_unittests',
