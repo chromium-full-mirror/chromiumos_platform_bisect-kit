@@ -40,6 +40,7 @@ BOARD_ARCHITECTURES = {
         'arg_for_gn': 'arm',
     },
 }
+_DEFAULT_OUT_DEVICE_LACROS_DIR = os.path.join('out_device_lacros', 'Release')
 
 
 def get_lacros_gs_path_list(
@@ -442,16 +443,12 @@ def _generate_gn_arguments(
     with open(args_gn_path, 'w') as f:
         f.write(_get_args_gn_config(device_architecture_arg_for_gn))
 
-    # TODO(njrafi): Check if `goma_ctl ensure_start` command is required
     gn_gen_command = ['gn', 'gen', output_directory]
     util.check_output(*gn_gen_command, cwd=chrome_src)
 
 
-_DEFAULT_OUT_DEVICE_LACRO_DIR = os.path.join('out_device_lacros', 'Release')
-
-
 def _get_output_directory(chrome_src: str) -> str:
-    output_directory = os.path.join(chrome_src, _DEFAULT_OUT_DEVICE_LACRO_DIR)
+    output_directory = os.path.join(chrome_src, _DEFAULT_OUT_DEVICE_LACROS_DIR)
     return output_directory
 
 
@@ -474,7 +471,7 @@ def build(chrome_src: str, board_cpu_arch: str):
         lacros_build_cmd = [
             'autoninja',
             '-C',
-            _DEFAULT_OUT_DEVICE_LACRO_DIR,
+            _DEFAULT_OUT_DEVICE_LACROS_DIR,
             'chrome',
         ]
         logger.debug('Lacros Build Command: %s', ' '.join(lacros_build_cmd))
