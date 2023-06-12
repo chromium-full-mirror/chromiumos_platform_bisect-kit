@@ -552,7 +552,7 @@ def do_sync(opts):
     if sync_all or opts.chromeos:
         try:
             sync_chromeos_code(opts, path_factory)
-        except subprocess.CalledProcessError:
+        except Exception:
             # b/222638221: repo may be broken due to infra issues
             # re-create the whole repo and sync again
             logger.warning(
