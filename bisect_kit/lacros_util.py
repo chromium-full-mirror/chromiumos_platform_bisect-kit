@@ -477,11 +477,15 @@ def build(chrome_src: str, board_cpu_arch: str):
         try:
             util.check_output(*lacros_build_cmd, cwd=chrome_src, env=env)
         except subprocess.CalledProcessError:
-            logger.warning('build failed, delete out directory and retry again')
+            logger.warning(
+                'Lacros build failed, delete out directory and retry again'
+            )
             # Some compiler processes are still terminating. Short delay is
             # necessary.
             time.sleep(10)
             shutil.rmtree(output_directory)
+            pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
+            _generate_gn_arguments(chrome_src, board_cpu_arch, output_directory)
             util.check_output(*lacros_build_cmd, cwd=chrome_src, env=env)
         return
 
