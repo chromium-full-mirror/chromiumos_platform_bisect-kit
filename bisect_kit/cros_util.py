@@ -167,6 +167,21 @@ class VersionInfo:
         return self
 
 
+@dataclasses.dataclass
+class PartitionInfo:
+    """A data class indicates partition info.
+
+    Example:
+        disk: /dev/sda
+        active_kernel_partition: 2 (/dev/sda2)
+        active_root_partition: 3 (/dev/sda3)
+    """
+
+    active_kernel_partition: int
+    active_root_partition: int
+    disk: str
+
+
 class ImageType(enum.Enum):
     """ChromeOS image type
 
@@ -577,6 +592,101 @@ def query_dut_cpu_arch(host: str):
             'unable to get DUT architecture by "uname -m"'
         ) from e
     return arch
+
+
+def query_dut_root_partition(host: str) -> PartitionInfo:
+    """Query partition of the given DUT.
+
+    Args:
+        host: the DUT address.
+
+    Returns:
+        A PartitionInfo object indicates the partition used on the DUT.
+
+    Raise:
+        errors.ExternalError: SSH connection error, or failed to parse partition info.
+    """
+    # https://chromium.googlesource.com/chromiumos/docs/+/HEAD/disk_format.md#drive-partitions
+    partition_kernel_a = 2
+    partition_root_a = 3
+    partition_kernel_b = 4
+    partition_root_b = 5
+
+    try:
+        # Example1: "/dev/mmcblk0"
+        # Example2: "/dev/sdb"
+        root_disk = util.ssh_cmd(host, 'rootdev', '-s', '-d').strip()
+        # Example1: "/dev/mmcblk0p5"
+        # Example2: "/dev/sdb2"
+        cur_root_partition = util.ssh_cmd(host, 'rootdev', '-s').strip()
+        # Example1: "/dev/mmcblk0p5" => 5
+        # Example2: "/dev/sdb2" => 2
+        match = re.match(r'.*([0-9]+)', cur_root_partition)
+        if not match:
+            raise errors.ExternalError(
+                f'failed to match partition number from {cur_root_partition}'
+            )
+        partition_number = int(match.group(1))
+        if partition_number == partition_root_a:
+            return PartitionInfo(
+                disk=root_disk,
+                active_root_partition=partition_root_a,
+                active_kernel_partition=partition_kernel_a,
+            )
+        if partition_number == partition_root_b:
+            return PartitionInfo(
+                disk=root_disk,
+                active_root_partition=partition_root_b,
+                active_kernel_partition=partition_kernel_b,
+            )
+        raise errors.ExternalError(
+            f'Unknown partition number {partition_number} from {cur_root_partition}'
+        )
+    except subprocess.CalledProcessError as e:
+        raise errors.ExternalError('unable to query dut root partition') from e
+
+
+def is_dut_kernel_ready(host: str) -> bool:
+    """Query if the kernel partition is ready on the given DUT.
+
+    Args:
+        host: the DUT address.
+
+    Returns:
+        A boolean, indicates if the dut partition is ready.
+
+    Raise:
+        errors.ExternalError: SSH connection error, or failed to parse partition info.
+    """
+    info = query_dut_root_partition(host)
+    try:
+        # Returns '1' or '0', indicates the successful flag of a partition.
+        # https://chromium.googlesource.com/chromiumos/platform/vboot_reference/+/6d1c48e3179056d965edfdd630a9dd6cda12f14b/cgpt/cgpt_common.c#835
+        ready = util.ssh_cmd(
+            host,
+            'cgpt',
+            'show',
+            '-S',
+            '-i',
+            str(info.active_kernel_partition),
+            info.disk,
+        ).strip()
+    except subprocess.CalledProcessError as e:
+        raise errors.ExternalError(
+            'unable to query if dut kernel is ready'
+        ) from e
+    return ready == '1'
+
+
+def wait_kernel_ready(host: str):
+    """Wait until kernel ready on given DUT."""
+    # timeout: 120 seconds, query every 2 seconds
+    for _ in range(60):
+        if is_dut_kernel_ready(host):
+            logger.debug('host %s kernel partition is ready', host)
+            return
+        time.sleep(2)
+    raise errors.ExternalError('kernel partition not ready')
 
 
 def is_dut(host):
@@ -1273,6 +1383,7 @@ def quick_provision(chromeos_root, host, image_info):
     ]
     try:
         cros_sdk(chromeos_root, *quick_provision_cmd)
+        wait_kernel_ready(host)
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError('quick-provision failed') from e
     return True
@@ -1459,6 +1570,7 @@ def cros_flash(
 
     try:
         cros_sdk(chromeos_root, 'cros', 'flash', *args)
+        wait_kernel_ready(host)
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError('cros flash failed') from e
     return True

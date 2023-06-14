@@ -13,6 +13,7 @@ from unittest import mock
 
 from bisect_kit import cli
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import gs_util
 from bisect_kit import testing
 
@@ -977,6 +978,45 @@ class TestCrosUtil(unittest.TestCase):
         self.assertEqual(
             cros_util.normalize_test_name('tauto.dummy_test3'), 'dummy_test3'
         )
+
+    @mock.patch('bisect_kit.util.ssh_cmd')
+    def test_query_dut_root_partition(self, mock_ssh_cmd):
+        # partition B, A
+        mock_ssh_cmd.side_effect = ['/dev/mmcblk0', '/dev/mmcblk0p5']
+        self.assertEqual(
+            cros_util.query_dut_root_partition('foo'),
+            cros_util.PartitionInfo(
+                disk='/dev/mmcblk0',
+                active_root_partition=5,
+                active_kernel_partition=4,
+            ),
+        )
+        mock_ssh_cmd.side_effect = ['/dev/sdb', '/dev/sdb3']
+        self.assertEqual(
+            cros_util.query_dut_root_partition('bar'),
+            cros_util.PartitionInfo(
+                disk='/dev/sdb',
+                active_root_partition=3,
+                active_kernel_partition=2,
+            ),
+        )
+        # unknown partition
+        mock_ssh_cmd.side_effect = ['/dev/sdb', '/dev/sdb2']
+        self.assertRaises(
+            errors.ExternalError, cros_util.query_dut_root_partition, 'moo'
+        )
+        # format incorrect
+        mock_ssh_cmd.side_effect = ['/dev/sdb', '/dev/sdb']
+        self.assertRaises(
+            errors.ExternalError, cros_util.query_dut_root_partition, 'meow'
+        )
+
+    @mock.patch('bisect_kit.util.ssh_cmd')
+    def test_is_dut_kernel_ready(self, mock_ssh_cmd):
+        mock_ssh_cmd.side_effect = ['/dev/mmcblk0', '/dev/mmcblk0p5', '1']
+        self.assertEqual(cros_util.is_dut_kernel_ready('foo'), True)
+        mock_ssh_cmd.side_effect = ['/dev/mmcblk0', '/dev/mmcblk0p5', '0']
+        self.assertEqual(cros_util.is_dut_kernel_ready('bar'), False)
 
 
 if __name__ == '__main__':
