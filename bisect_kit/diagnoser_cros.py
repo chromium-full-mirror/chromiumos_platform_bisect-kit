@@ -86,7 +86,7 @@ class DutAllocator:
             'entering DutAllocator context: should_auto_allocate = %s',
             self._should_auto_allocate,
         )
-        if cros_lab_util.is_lab_dut(self._pre_allocated_dut):
+        if self._pre_allocated_dut != cros_lab_util.LAB_DUT:
             logger.info('dut %s pre-allocated', self._pre_allocated_dut)
         else:
             if not self._should_auto_allocate:
