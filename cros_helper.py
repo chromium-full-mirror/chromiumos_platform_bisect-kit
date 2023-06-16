@@ -78,6 +78,8 @@ def cmd_lease_dut(opts):
 
 def cmd_release_dut(opts):
     host = cros_lab_util.dut_host_name(opts.dut)
+    if opts.enable_rootfs_verification:
+        cros_lab_util.enable_rootfs_verification(host, opts.chromeos_root)
     cros_lab_util.crosfleet_release_dut(host)
     logger.info('%s released', host)
 
@@ -724,6 +726,20 @@ def main():
     )
     parser_release_dut.add_argument('dut')
     parser_release_dut.set_defaults(func=cmd_release_dut)
+    parser_release_dut.add_argument(
+        '--chromeos_root',
+        type=cli.argtype_dir_path,
+        default=configure.get(
+            'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
+        ),
+        help='ChromeOS source tree, for overlay data (default: %(default)s)',
+    )
+    parser_release_dut.add_argument(
+        '--enable_rootfs_verification',
+        dest='enable_rootfs_verification',
+        action='store_true',
+        help="Enable rootfs verification when releasing the DUT",
+    )
 
     parser_allocate_dut = subparsers.add_parser(
         'allocate_dut',

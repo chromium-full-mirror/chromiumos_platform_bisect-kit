@@ -313,6 +313,7 @@ def ssh_cmd(
 
     Raises:
       subprocess.CalledProcessError if the exit code is non-zero.
+      errors.SshConnectionError on connection failure
     """
     cmd = ['ssh']
     # Avoid keyboard-interactive to prevent hang forever.

@@ -29,6 +29,7 @@ import signal
 import subprocess
 import threading
 import time
+import timeit
 import urllib.parse
 
 from bisect_kit import common
@@ -997,12 +998,12 @@ def repair(dut):
 
 
 def write_satlab_ssh_config(satlab_dut: str, satlab_ip: str = ''):
-    '''Write the required ssh config for sshing into a satlab dut
+    """Write the required ssh config for sshing into a satlab dut
 
     Args:
         satlab_dut: The satlab dut host names
         satlab_ip: The satlab ip if already known
-    '''
+    """
     ssh_config_template_path = os.path.expanduser('~/.ssh/config_template')
     ssh_config_path = os.path.expanduser('~/.ssh/config')
     if os.path.isfile(ssh_config_template_path):
@@ -1030,3 +1031,71 @@ def write_satlab_ssh_config(satlab_dut: str, satlab_ip: str = ''):
     ssh_config.set('satlab', Hostname=satlab_ip)
 
     ssh_config.save()
+
+
+def is_rootfs_verification_on(dut: str) -> bool:
+    """Check if a DUT has rootfs verification on
+
+    Args:
+        dut: dut host name
+
+    Returns:
+        True if the rootfs verificaion is enabled on the DUT
+
+    Raises:
+        subprocess.CalledProcessError or errors.SshConnectionError in case of ssh failure
+    """
+    output = util.ssh_cmd(dut, "rootdev")
+    if output.startswith("/dev/dm"):
+        return True
+    return False
+
+
+def enable_rootfs_verification(dut: str, chromeos_root: str) -> bool:
+    """Enable rootfs verification on a DUT
+
+    Args:
+        dut: dut host name
+        chromeos_root: ChromeOS root
+
+    Returns:
+        True if the rootfs verificaion is enabled on the DUT, False otherwise
+    """
+    try:
+        if is_rootfs_verification_on(dut):
+            logger.debug("Rootfs verification is already on")
+            return True
+    except (subprocess.CalledProcessError, errors.SshConnectionError):
+        logger.debug("Failed to get rootfs verification info from DUT")
+
+    start_time = timeit.default_timer()
+    logger.debug("Trying to enable rootfs verification on the DUT")
+    try:
+        cros_short_version = cros_util.query_dut_short_version(dut)
+        dut_board = cros_util.query_dut_board(dut)
+        cros_full_version = cros_util.version_to_full(
+            dut_board, cros_short_version
+        )
+        image_info = cros_util.search_image(dut_board, cros_short_version)
+    except (subprocess.CalledProcessError, errors.SshConnectionError):
+        logger.exception("Failed to get DUT information")
+        return False
+
+    try:
+        cros_util.provision_image(
+            chromeos_root,
+            dut,
+            dut_board,
+            image_info,
+            cros_full_version,
+            disable_rootfs_verification=False,
+        )
+    except errors.ExternalError:
+        logger.exception("Enable rootfs verification failed")
+        return False
+    end_time = timeit.default_timer()
+    time_elapsed_in_minutes = (end_time - start_time) / 60
+    logger.debug(
+        "Enabled rootfs verifaction on in %.2f minutes", time_elapsed_in_minutes
+    )
+    return True
