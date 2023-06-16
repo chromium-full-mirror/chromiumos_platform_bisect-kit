@@ -464,15 +464,11 @@ class CrosDiagnoser:
                 bisector='bisect_cros_version',
                 session=self.config['session'],
             )
-            bisector = wrapper.BisectorWrapper(
-                'bisect_cros_version', self.config['session']
-            )
             switch_cmd = [
                 './switch_cros_prebuilt.py',
                 '--rich_result',
                 '--session',
                 self.config['session'],
-                '--rich_result',
             ]
             if not self.config['disable_rootfs_verification']:
                 switch_cmd.append('--no_disable_rootfs_verification')
@@ -480,6 +476,10 @@ class CrosDiagnoser:
             init_args = ['--dut', self.dut, '--board', self.config['board']]
             if self.config['disable_snapshot']:
                 init_args.append('--disable_snapshot')
+
+            bisector = wrapper.BisectorWrapper(
+                'bisect_cros_version', self.config['session']
+            )
             bisector.init_if_necessary(
                 old,
                 new,
