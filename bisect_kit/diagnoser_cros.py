@@ -116,12 +116,13 @@ class DutAllocator:
         Note that the DUT may be a pre-allocated one or one auto allocated.
         """
         dut = self._allocated_dut or self._pre_allocated_dut
-        if cros_lab_util.is_lab_dut(dut):
+        if dut != cros_lab_util.LAB_DUT:
             logger.info('monitoring DUT lease status for %s', dut)
-            reason = (cros_lab_util.make_lease_reason(self.config['session']),)
+            reason = cros_lab_util.make_lease_reason(self.config['session'])
             with cros_lab_util.dut_lease_status_monitor(dut, reason):
                 yield dut
-        yield dut
+        else:
+            yield dut
 
     @contextlib.contextmanager
     def run(self):
