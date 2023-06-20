@@ -17,6 +17,7 @@ import logging
 
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
+from bisect_kit import dut_manager as dut_manager_module
 import experiment
 import setup_cros_bisect
 
@@ -140,15 +141,18 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         self.states.load_states()
 
         try:
-            # Allocate a DUT globally only if not performing a statless bisect.
+            # Allocate a DUT globally only if not performing a stateless bisect.
             logger.info('experiments: %s', self.config['experiments'])
             should_auto_allocate = (
                 not experiment.ID.STATELESS in self.config['experiments']
             )
-            allocator = diagnoser_cros.DutAllocator(
-                self.states, should_auto_allocate
+            dut_manager = dut_manager_module.DutManager(
+                self.states,
+                self.config['dut'],
+                should_auto_allocate,
+                force_monitoring=True,
             )
-            with allocator.run() as dut:
+            with dut_manager.provision() as dut:
                 self.do_run(dut)
             logger.info('%s done', __file__)
         except Exception as e:
