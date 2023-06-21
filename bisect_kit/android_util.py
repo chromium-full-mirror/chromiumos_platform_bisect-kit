@@ -22,6 +22,7 @@ from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import git_util
+from bisect_kit import plugin_util
 from bisect_kit import repo_util
 from bisect_kit import util
 import google.oauth2.service_account
@@ -52,6 +53,7 @@ def argtype_android_build_id(s):
     return s
 
 
+@plugin_util.patch
 def fetch_android_build_data(url):
     """Fetches file from android build server.
 
@@ -72,6 +74,7 @@ def fetch_android_build_data(url):
         raise errors.ExternalError(str(e))
 
 
+@plugin_util.patch
 def is_good_build(branch, flavor, build_id):
     """Determine a build_id was succeeded.
 
@@ -93,6 +96,7 @@ def is_good_build(branch, flavor, build_id):
     return False
 
 
+@plugin_util.patch
 def get_build_ids_between(branch, flavor, start, end):
     """Returns a list of build IDs.
 

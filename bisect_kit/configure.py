@@ -11,7 +11,6 @@ import os
 import pathlib
 import re
 import sys
-import typing
 
 
 SUPPRESS_CONFIG = 'none'
@@ -54,21 +53,14 @@ class ConfigStore:
     Attributes:
       path: path of configure file. None for dummy store.
       children: nested ConfigStore objects.
-      plugins: plugin list.
       options: dict of option values.
     """
 
     def __init__(self, path: PathLike | None):
         self.path = pathlib.Path(path) if path is not None else None
         self.children: list[ConfigStore] = []
-        self.plugins: list[pathlib.Path] = []
         self.options = {}
         self._parse_config()
-
-    def iter_plugins(self) -> typing.Iterator[pathlib.Path]:
-        yield from self.plugins
-        for child in self.children:
-            yield from child.iter_plugins()
 
     def get_option(self, key):
         if key in self.options:
@@ -98,27 +90,7 @@ class ConfigStore:
             child = ConfigStore(include_path)
             self.children.append(child)
 
-        self.plugins = [
-            _rebase_relative_path(plugin_path, self.path.parent)
-            for plugin_path in config.get('plugins', [])
-        ]
         self.options = config.get('options', {})
-
-
-def load_plugins(plugin_list: typing.Iterable[PathLike]) -> None:
-    """Load plugins."""
-    for plugin_path in plugin_list:
-        plugin_path = pathlib.Path(plugin_path)
-        if not plugin_path.exists():
-            raise ValueError(f'Plugin file "{plugin_path}" not found')
-        module = {}
-        with plugin_path.open() as f:
-            code = compile(f.read(), plugin_path, 'exec')
-            # pylint: disable=exec-used
-            exec(code, module)
-        loaded_func = module.get('loaded', None)
-        if loaded_func:
-            loaded_func()
 
 
 def search_config_file(args: list[str]) -> PathLike | None:

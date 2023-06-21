@@ -30,6 +30,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 import typing
 import urllib.parse
@@ -43,6 +44,7 @@ from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import gs_util
 from bisect_kit import locking
+from bisect_kit import plugin_util
 from bisect_kit import repo_util
 from bisect_kit import util
 from google.protobuf import json_format
@@ -123,15 +125,6 @@ sample_partition_filename = 'full_dev_part_KERN.bin.gz'
 CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
 FORWARDED_DUT_HOST = 'localhost'
 FORWARDED_DUT_PORT = 2222
-
-autotest_shadow_config = """
-# This file is created by src/platform/bisect-kit/bisect_kit/cros_util.py
-[CROS]
-enable_ssh_tunnel_for_servo: True
-enable_ssh_tunnel_for_chameleon: True
-enable_ssh_connection_for_devserver: True
-enable_ssh_tunnel_for_moblab: True
-"""
 
 
 @dataclasses.dataclass
@@ -1960,10 +1953,24 @@ def _copy_template_files(src, dst):
     )
 
 
+@plugin_util.patch
+def get_autotest_shadow_config():
+    return textwrap.dedent(
+        """\
+        # This file is created by src/platform/bisect-kit/bisect_kit/cros_util.py
+        [CROS]
+        enable_ssh_tunnel_for_servo: True
+        enable_ssh_tunnel_for_chameleon: True
+        enable_ssh_connection_for_devserver: True
+        enable_ssh_tunnel_for_moblab: True
+        """
+    )
+
+
 def override_autotest_config(autotest_dir):
     shadow_config_path = os.path.join(autotest_dir, 'shadow_config.ini')
     with open(shadow_config_path, 'w') as f:
-        f.write(autotest_shadow_config)
+        f.write(get_autotest_shadow_config())
 
 
 def prepare_chroot(chromeos_root):

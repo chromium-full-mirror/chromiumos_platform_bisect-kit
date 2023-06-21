@@ -9,7 +9,6 @@ import os
 import pathlib
 import shutil
 import tempfile
-import textwrap
 import typing
 import unittest
 from unittest import mock
@@ -169,46 +168,6 @@ class TestConfigure(unittest.TestCase):
         ):
             config = configure.ConfigStore(path)
             self.assertEqual(config.get_option('foo'), 'bar')
-
-    def test_plugins(self):
-        subdir = self.progdir / 'subdir'
-        subdir.mkdir(exist_ok=True)
-
-        with _scoped_file(
-            self.progdir,
-            'a',
-            """{"include": ["subdir/b.json"], "plugins": ["a.py"] }""",
-        ) as path, _scoped_file(
-            self.progdir,
-            'a.py',
-            textwrap.dedent(
-                """
-                from bisect_kit import configure_test
-
-                def loaded():
-                    configure_test.aaa = 111
-                """
-            ),
-        ), _scoped_file(
-            subdir,
-            'b.json',
-            """{"plugins": ["b.py"]}""",
-        ), _scoped_file(
-            subdir,
-            'b.py',
-            textwrap.dedent(
-                """
-                from bisect_kit import configure_test
-
-                def loaded():
-                    configure_test.bbb = 222
-                """
-            ),
-        ):
-            config = configure.ConfigStore(path)
-            configure.load_plugins(config.iter_plugins())
-            self.assertEqual(globals().get('aaa'), 111)
-            self.assertEqual(globals().get('bbb'), 222)
 
 
 if __name__ == '__main__':
