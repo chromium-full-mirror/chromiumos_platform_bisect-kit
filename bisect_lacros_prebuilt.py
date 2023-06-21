@@ -137,8 +137,6 @@ class LacrosVersionDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        if self.config['dut']:
-            env['DUT'] = self.config['dut']
         env['CHROMEOS_ROOT'] = self.config['chromeos_root']
         env['BOARD'] = self.config['board']
         env['BOARD_CPU_ARCH'] = self.config['board_cpu_arch']

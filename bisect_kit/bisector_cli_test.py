@@ -12,6 +12,7 @@ from unittest import mock
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import core
+from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
 from bisect_kit import testing
 
@@ -93,12 +94,19 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.random_list = testing.RandomNum()
         self.old_rate = None
         self.new_rate = None
+        self.dut_manager = dut_manager_module.DutManager(
+            states=None,
+            pre_allocated_dut='pre_allocated_dut',
+            should_auto_allocate=False,
+        )
 
     def tearDown(self):
         self.session_base_patcher.reset()
 
     def test_run_true(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=10', '--old=0', '--new=9')
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'true')
@@ -110,7 +118,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(result.get('verified'), False)
 
     def test_run_false(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=10', '--old=0', '--new=9')
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
@@ -122,7 +132,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(result.get('verified'), False)
 
     def test_run_true_with_endpoint_verification(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main(
             'init', '--num=10', '--old=0', '--new=9', '--endpoint_verification'
         )
@@ -135,7 +147,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(result.get('verified'), False)
 
     def test_run_false_with_endpoint_verification(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main(
             'init', '--num=10', '--old=0', '--new=9', '--endpoint_verification'
         )
@@ -148,7 +162,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(result.get('verified'), False)
 
     def test_simple(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=20', '--old=3', '--new=15')
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'sh', '-c', '[ "$BISECT_REV" -lt 7 ]')
@@ -160,7 +176,9 @@ class TestBisectorCommandLine(unittest.TestCase):
             bisector.main('log')
 
     def test_switch_fail(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=20', '--old=3', '--new=15')
         bisector.main('config', 'switch', 'false')
         bisector.main('config', 'eval', 'sh', '-c', '[ "$BISECT_REV" -lt 7 ]')
@@ -193,7 +211,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         return core.StepResult('old')
 
     def test_run_classic(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=200', '--old=0', '--new=99')
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
@@ -223,7 +243,9 @@ class TestBisectorCommandLine(unittest.TestCase):
             self.assertEqual(mock_stdout.getvalue(), 'done\n')
 
     def test_run_classic_with_endpoint_verification(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main(
             'init',
             '--num=200',
@@ -254,7 +276,9 @@ class TestBisectorCommandLine(unittest.TestCase):
             self.assertEqual(mock_stdout.getvalue(), 'done\n')
 
     def test_run_noisy(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main(
             'init',
             '--num=100',
@@ -280,7 +304,9 @@ class TestBisectorCommandLine(unittest.TestCase):
             self.assertIn(mock_stdout.getvalue(), ['done\n', '41\n', '42\n'])
 
     def test_run_noisy_with_endpoint_verification(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main(
             'init',
             '--num=100',
@@ -307,7 +333,9 @@ class TestBisectorCommandLine(unittest.TestCase):
 
     def test_cmd_old_and_new(self):
         """Tests cmd_old and cmd_new"""
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=100', '--old=0', '--new=99')
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
@@ -328,7 +356,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(bisector.strategy.get_range(), (20, 30))
 
     def test_run_very_noisy(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main(
             'init',
             '--num=100',
@@ -351,7 +381,9 @@ class TestBisectorCommandLine(unittest.TestCase):
 
     def test_run_noisy_many_times(self):
         """Test noisy cases with different ratio"""
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         total_correct_count = 0
         total_wrong_count = 0
 
@@ -411,14 +443,16 @@ class TestBisectorCommandLine(unittest.TestCase):
 
     def test_cmd_switch(self):
         """Test cmd_switch"""
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=100', '--old=0', '--new=99')
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
 
         switched = []
 
-        def do_switch(_cmd, _domain, rev, _log_file):
+        def do_switch(_cmd, _domain, rev, _log_file, _action, _dut):
             switched.append(rev)
 
         with mock.patch('bisect_kit.bisector_cli.do_switch', do_switch):
@@ -429,7 +463,9 @@ class TestBisectorCommandLine(unittest.TestCase):
             self.assertEqual(switched, ['99', '3', '5', '4'])
 
     def test_cmd_view(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=100', '--old=10', '--new=90')
         with mock.patch.object(
             DummyDomain, 'fill_candidate_summary'
@@ -438,7 +474,9 @@ class TestBisectorCommandLine(unittest.TestCase):
             mock_view.assert_called()
 
     def test_cmd_config_confidence(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main(
             'init', '--num=100', '--old=10', '--new=90', '--confidence=0.75'
         )
@@ -453,7 +491,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(bisector.states.config['confidence'], 0.875)
 
     def test_cmd_config_noisy(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main(
             'init', '--num=100', '--old=10', '--new=90', '--noisy=new=9/10'
         )
@@ -470,7 +510,9 @@ class TestBisectorCommandLine(unittest.TestCase):
             bisector.main('view')
 
     def test_current_status(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         result = bisector.current_status()
         self.assertEqual(result.get('inited'), False)
 
@@ -481,7 +523,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(result.get('inited'), True)
 
     def test_future_switch_versions(self):
-        bisector = bisector_cli.BisectorCommandLine(DummyDomain)
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
         bisector.main('init', '--num=100', '--old=0', '--new=99')
         bisector.main('view')  # init bisector.strategy
 

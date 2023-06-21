@@ -41,26 +41,40 @@ def common_local_build_flags() -> argparse.ArgumentParser:
         help='DUT address',
     )
     parser.add_argument(
-        '--no_sync_code', action='store_true', help='Do no sync source code'
+        '--no_sync_code',
+        action='store_true',
+        default=os.environ.get('NO_SYNC_CODE') == 'true',
+        help='Do no sync source code',
     )
-    parser.add_argument('--no_build', action='store_true', help='Do no build')
     parser.add_argument(
-        '--no_deploy', action='store_true', help='Do no deploy to DUT'
+        '--no_build',
+        action='store_true',
+        default=os.environ.get('NO_BUILD') == 'true',
+        help='Do no build',
+    )
+    parser.add_argument(
+        '--no_deploy',
+        action='store_true',
+        default=os.environ.get('NO_DEPLOY') == 'true',
+        help='Do no deploy to DUT',
     )
     shortcut_group = parser.add_mutually_exclusive_group()
     shortcut_group.add_argument(
         '--sync_code_only',
         action='store_true',
+        default=os.environ.get('SYNC_CODE_ONLY') == 'true',
         help='sync code only. Shorthand for --no_build and --no_deploy',
     )
     shortcut_group.add_argument(
         '--build_only',
         action='store_true',
+        default=os.environ.get('BUILD_ONLY') == 'true',
         help='build only. Shorthand for --no_sync_code and --no_deploy',
     )
     shortcut_group.add_argument(
         '--deploy_only',
         action='store_true',
+        default=os.environ.get('DEPLOY_ONLY') == 'true',
         help='deploy only. Shorthand for --no_sync_code and --no_build',
     )
     return parser

@@ -37,13 +37,22 @@ class CrosDiagnoser:
     """Integrated bisectors API for ChromeOS regression analysis."""
 
     def __init__(self, states, path_factory, config, dut):
+        """Initializer.
+
+        Args:
+          states: a DiagnoseStates objejct.
+          path_factory: a DefaultProjectPathFactory object.
+          config: a config from a DiagnoseStates object.
+          dut: a pre-allocated DUT address, or the string ":lab:" to indicate
+              a DUT is to be auto-allocated.
+        """
         self.states = states
         self.path_factory = path_factory
         self.config = config
         # self.noisy will be updated after we gather more information from each
         # bisect session.
         self.noisy = config['noisy']
-        self.dut = dut
+        self.pre_allocated_dut = dut
 
         self.cros_old: str = ''
         self.cros_new: str = ''
@@ -79,80 +88,132 @@ class CrosDiagnoser:
         cros_localbuild_eval_cmd: list[str] = None,
         cros_localbuild_extra_switch_cmd: list[str] = None,
     ):
-        if not self.config.get('board_cpu_arch'):
-            self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(
-                self.dut
+        def init_dut_to_old_cros(dut):
+            logger.info('init dut %s to old cros', dut)
+            self.switch_chromeos_to_old(
+                dut, force=self.config['always_reflash']
             )
-            self.states.save()
+            util.check_call(
+                *(common_switch_cmd + [self.cros_old, '--dut', dut])
+            )
 
-        # Step 1: Narrows down ChromeOS prebuilt.
-        self.narrow_down_chromeos_prebuilt(
-            self.config['cros_prebuilt_old'],
-            self.config['cros_prebuilt_new'],
-            cros_prebuilt_eval_cmd,
-            extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
+        def init_autotest_deps_workaround(dut):
+            """A workaround initialization for autotest.
+
+            The version of autotest on the DUT is unknown and may be even
+            not installed. Invoke the test once here, so
+                - make sure autotest-deps is installed, with expected version
+                - autotest-deps is installed first, so our chrome test binaries
+                    won't be reset to default version during bisection.
+            It's acceptable to spend extra time to run test once because
+                - only few tests do so
+                - tests are migrating away from autotest
+            """
+            if autotest and chrome_localbuild_with_tests:
+                logger.info('init autotest deps for %s', dut)
+                util.call(*chrome_localbuild_eval_cmd, dut)
+            else:
+                logger.info('no need to init autotest deps')
+
+        should_auto_allocate_dut = (
+            experiment.ID.STATELESS in self.config['experiments']
         )
-
-        # Switches CrOS repository and DUT to narrowed down old version.
-        self.switch_chromeos_to_old(force=self.config['always_reflash'])
-        util.check_call(
-            *(common_switch_cmd + [self.cros_old, '--dut', self.dut])
+        # Steps 1 to 3 are prebuilt stages. So we can just use the same DUT in
+        # stateless bisection.
+        dut_manager = dut_manager_module.DutManager(
+            self.states, self.pre_allocated_dut, should_auto_allocate_dut
         )
-        dut_os_version = cros_util.query_dut_short_version(self.dut)
-
-        # Step 2: Narrows down Android prebuilt. If the error can be reproduced,
-        # returns the result and skips other steps.
-        try:
-            if self.narrow_down_android(android_prebuilt_eval_cmd):
-                return
-        except errors.DiagnoseContradiction:
-            raise
-        except Exception:
-            self.make_decision(
-                'Exception in Android bisector before verification; '
-                'assume the culprit is not inside Android and continue'
+        with dut_manager.provision() as dut:
+            if not self.config.get('board_cpu_arch'):
+                self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(
+                    dut
+                )
+                self.states.save()
+            # Step 1: Narrows down ChromeOS prebuilt.
+            self.narrow_down_chromeos_prebuilt(
+                dut_manager,
+                self.config['cros_prebuilt_old'],
+                self.config['cros_prebuilt_new'],
+                cros_prebuilt_eval_cmd,
+                extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
             )
-        # Assume it's ok to leave random version of android prebuilt on DUT.
-        # Sanity check. The OS version should not change after android bisect.
-        assert dut_os_version == cros_util.query_dut_short_version(
-            self.dut
-        ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
-        # Step 3: Narrows down Lacros prebuilt. If the error can be reproduced,
-        # Run the Chrome local build step with the narrowed down range.
-        # In case of failure, run the Chrome local build step with the previous range.
-        try:
-            self.narrow_down_lacros_prebuilt(lacros_prebuilt_eval_cmd)
-        except errors.DiagnoseContradiction:
-            raise
-        except Exception:
-            self.make_decision(
-                'Exception in Lacros bisector before verification; '
-                'assume the culprit is not inside Lacros and continue'
-            )
-        # Assume it's ok to leave random version of Lacros prebuilt on DUT.
-        # Sanity check. The OS version should not change after lacros bisect.
-        assert dut_os_version == cros_util.query_dut_short_version(
-            self.dut
-        ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+            # Switches CrOS repository and DUT to narrowed down old version.
+            init_dut_to_old_cros(dut)
+            dut_os_version = cros_util.query_dut_short_version(dut)
+
+            # Step 2: Narrows down Android prebuilt. If the error can be reproduced,
+            # returns the result and skips other steps.
+            try:
+                if self.narrow_down_android(
+                    dut_manager, android_prebuilt_eval_cmd
+                ):
+                    return
+            except errors.DiagnoseContradiction:
+                raise
+            except Exception:
+                self.make_decision(
+                    'Exception in Android bisector before verification; '
+                    'assume the culprit is not inside Android and continue'
+                )
+            # Assume it's ok to leave random version of android prebuilt on DUT.
+            # Sanity check. The OS version should not change after android bisect.
+            assert dut_os_version == cros_util.query_dut_short_version(
+                dut
+            ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+
+            # Step 3: Narrows down Lacros prebuilt. If the error can be reproduced,
+            # Run the Chrome local build step with the narrowed down range.
+            # In case of failure, run the Chrome local build step with the previous range.
+            try:
+                self.narrow_down_lacros_prebuilt(
+                    dut_manager, lacros_prebuilt_eval_cmd
+                )
+            except errors.DiagnoseContradiction:
+                raise
+            except Exception:
+                self.make_decision(
+                    'Exception in Lacros bisector before verification; '
+                    'assume the culprit is not inside Lacros and continue'
+                )
+            # Assume it's ok to leave random version of Lacros prebuilt on DUT.
+            # Sanity check. The OS version should not change after lacros bisect.
+            assert dut_os_version == cros_util.query_dut_short_version(
+                dut
+            ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
         # Step 4: Narrows down Chrome local build. If the error can be reproduced,
         # returns the result and skips other steps.
+
+        def bisect_local_chrome_dut_init_func(dut):
+            init_dut_to_old_cros(dut)
+            init_autotest_deps_workaround(dut)
+
+        def bisect_local_chrome_dut_leave_context_check_func(dut):
+            logger.info('checking cros version on dut %s', dut)
+            # If chrome is not deployed with cros image, do the sanity check to ensure
+            # OS version.
+            if (
+                not self.config['chrome_deploy_image']
+                and not self.config['enable_buildbucket_chrome']
+            ):
+                assert dut_os_version == cros_util.query_dut_short_version(
+                    dut
+                ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+
+        dut_manager = dut_manager_module.DutManager(
+            self.states,
+            self.pre_allocated_dut,
+            should_auto_allocate_dut,
+            bisect_local_chrome_dut_init_func,
+            bisect_local_chrome_dut_leave_context_check_func,
+        )
         buildbucket_buildable = cros_util.is_buildbucket_buildable(
             self.config['cros_prebuilt_old']
         )
-        if autotest and chrome_localbuild_with_tests:
-            # Now, the version of autotest on the DUT is unknown and may be even
-            # not installed. Invoke the test once here, so
-            #   - make sure autotest-deps is installed, with expected version
-            #   - autotest-deps is installed first, so our chrome test binaries
-            #     won't be reset to default version during bisection.
-            # It's acceptable to spend extra time to run test once because
-            #   - only few tests do so
-            #   - tests are migrating away from autotest
-            util.call(*chrome_localbuild_eval_cmd)
         try:
             if self.narrow_down_chrome(
+                dut_manager,
                 chrome_localbuild_eval_cmd,
                 buildbucket_build=buildbucket_buildable
                 and self.config['enable_buildbucket_chrome'],
@@ -166,18 +227,15 @@ class CrosDiagnoser:
                 'Exception in Chrome bisector before verification; '
                 'assume the culprit is not inside Chrome and continue'
             )
-        # If chrome is not deployed with cros image, do the sanity check to ensure
-        # OS version.
-        if (
-            not self.config['chrome_deploy_image']
-            and not self.config['enable_buildbucket_chrome']
-        ):
-            assert dut_os_version == cros_util.query_dut_short_version(
-                self.dut
-            ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
         # Step 5: Narrowdown chromeos localbuild.
+        dut_manager = dut_manager_module.DutManager(
+            self.states,
+            self.pre_allocated_dut,
+            should_auto_allocate_dut,
+        )
         self.narrow_down_chromeos_localbuild(
+            dut_manager,
             cros_localbuild_eval_cmd,
             buildbucket_buildable
             and not self.config['disable_buildbucket_chromeos'],
@@ -185,11 +243,12 @@ class CrosDiagnoser:
         )
 
     def narrow_down_chromeos_prebuilt(
-        self, old, new, eval_cmd, extra_switch_cmd=None
+        self, dut_manager, old, new, eval_cmd, extra_switch_cmd=None
     ):
         """Bisect with ChromeOS prebuilt.
 
         Args:
+          dut_manager: a DutManager instance
           old: old ChromeOS version
           new: new ChromeOS version
           eval_cmd: command to reproduce the regression
@@ -229,12 +288,12 @@ class CrosDiagnoser:
             if not self.config['disable_rootfs_verification']:
                 switch_cmd.append('--no_disable_rootfs_verification')
 
-            init_args = ['--dut', self.dut, '--board', self.config['board']]
+            init_args = ['--board', self.config['board']]
             if self.config['disable_snapshot']:
                 init_args.append('--disable_snapshot')
 
             bisector = wrapper.BisectorWrapper(
-                'bisect_cros_version', self.config['session']
+                'bisect_cros_version', self.config['session'], dut_manager
             )
             bisector.init_if_necessary(
                 old,
@@ -304,10 +363,11 @@ class CrosDiagnoser:
             self.new_info.android_build_id,
         )
 
-    def switch_chromeos_to_old(self, force=False):
+    def switch_chromeos_to_old(self, dut, force=False):
         """Switch ChromeOS version to old prebuilt.
 
         Args:
+          dut: the DUT.
           force: always do 'cros flash' no matter the current version number of DUT
         """
         util.check_call(
@@ -328,7 +388,7 @@ class CrosDiagnoser:
                 version = cros_util.version_to_short(self.cros_old)
             else:
                 version = self.cros_old
-            if cros_util.query_dut_prebuilt_version(self.dut) == version:
+            if cros_util.query_dut_prebuilt_version(dut) == version:
                 return
         cmd = [
             './switch_cros_prebuilt.py',
@@ -338,7 +398,7 @@ class CrosDiagnoser:
             '--board',
             self.config['board'],
             '--dut',
-            self.dut,
+            dut,
             self.cros_old,
         ]
         if not self.config['disable_rootfs_verification']:
@@ -405,12 +465,13 @@ class CrosDiagnoser:
 
         return True
 
-    def narrow_down_android(self, eval_cmd, extra_switch_cmd=None):
+    def narrow_down_android(self, dut_manager, eval_cmd, extra_switch_cmd=None):
         """Bisect with Android prebuilt and localbuild.
 
         It's known that the version of ChromeOS has old behavior.
 
         Args:
+          dut_manager: a DutManager instance.
           eval_cmd: command to reproduce the regression
           extra_switch_cmd: additional command to run when switch android version
 
@@ -449,15 +510,13 @@ class CrosDiagnoser:
                 session=self.config['session'],
             )
             bisector = wrapper.BisectorWrapper(
-                'bisect_android_build_id', self.config['session']
+                'bisect_android_build_id', self.config['session'], dut_manager
             )
             try:
                 bisector.init_if_necessary(
                     self.old_info.android_build_id,
                     self.new_info.android_build_id,
                     init_args=[
-                        '--dut',
-                        self.dut,
                         '--branch',
                         self.old_info.android_branch,
                         '--flavor',
@@ -536,15 +595,13 @@ class CrosDiagnoser:
             session=self.config['session'],
         )
         bisector = wrapper.BisectorWrapper(
-            'bisect_android_repo', self.config['session']
+            'bisect_android_repo', self.config['session'], dut_manager
         )
         try:
             bisector.init_if_necessary(
                 android_old,
                 android_new,
                 init_args=[
-                    '--dut',
-                    self.dut,
                     '--android_root',
                     android_root,
                     '--android_mirror',
@@ -597,12 +654,15 @@ class CrosDiagnoser:
             return verified
         return verified
 
-    def narrow_down_lacros_prebuilt(self, eval_cmd: str, extra_switch_cmd=None):
+    def narrow_down_lacros_prebuilt(
+        self, dut_manager, eval_cmd: str, extra_switch_cmd=None
+    ):
         """Bisect with Lacros Prebuilt.
 
         It's known that the version of ChromeOS has old behavior.
 
         Args:
+          dut_manager: a DutManager instance.
           eval_cmd: command to reproduce the regression
           extra_switch_cmd: additional command to run when switch lacros version
 
@@ -640,19 +700,15 @@ class CrosDiagnoser:
         switch_cmd = [
             './switch_lacros_prebuilt.py',
             '--rich_result',
-            '--dut',
-            self.dut,
             '--chromeos_root',
             self.config['chromeos_root'],
         ]
 
         bisector = wrapper.BisectorWrapper(
-            'bisect_lacros_prebuilt', self.config['session']
+            'bisect_lacros_prebuilt', self.config['session'], dut_manager
         )
 
         init_args = [
-            '--dut',
-            self.dut,
             '--chromeos_root',
             self.config['chromeos_root'],
             '--board',
@@ -705,6 +761,7 @@ class CrosDiagnoser:
 
     def narrow_down_chrome(
         self,
+        dut_manager,
         eval_cmd,
         buildbucket_build=False,
         extra_switch_cmd=None,
@@ -715,8 +772,9 @@ class CrosDiagnoser:
         It's known that the version of ChromeOS has old behavior.
 
         Args:
+          dut_manager: a DutManager instance
           eval_cmd: command to reproduce the regression
-          buildbucket_build: to build ChromeOS image on buildbucket
+          buildbucket_build: to build Chrome image on buildbucket
           extra_switch_cmd: additional command to run when switch chrome version
           with_tests: build test binaries as well
 
@@ -747,6 +805,7 @@ class CrosDiagnoser:
             return False
 
         logger.info('bisect chrome local build')
+
         self.states.add_history(
             'bisect',
             text='bisect chrome local build',
@@ -758,8 +817,6 @@ class CrosDiagnoser:
                 './switch_cros_localbuild_buildbucket.py',
                 'bisect_chrome',
                 '--rich_result',
-                '--dut',
-                self.dut,
                 '--chromeos_root',
                 self.config['chromeos_root'],
                 '--chromeos_mirror',
@@ -775,8 +832,6 @@ class CrosDiagnoser:
             switch_cmd = [
                 './switch_cros_cr_localbuild_internal.py',
                 '--rich_result',
-                '--dut',
-                self.dut,
                 '--board',
                 self.config['board'],
                 '--board_cpu_arch',
@@ -794,7 +849,7 @@ class CrosDiagnoser:
                     switch_cmd.append('--no_disable_rootfs_verification')
 
         bisector = wrapper.BisectorWrapper(
-            'bisect_cr_localbuild_internal', self.config['session']
+            'bisect_cr_localbuild_internal', self.config['session'], dut_manager
         )
         try:
             bisector.init_if_necessary(
@@ -842,11 +897,16 @@ class CrosDiagnoser:
         return True
 
     def narrow_down_chromeos_localbuild(
-        self, eval_cmd, buildbucket_build=False, extra_switch_cmd=None
+        self,
+        dut_manager,
+        eval_cmd,
+        buildbucket_build=False,
+        extra_switch_cmd=None,
     ):
         """Bisect with ChromeOS localbuild.
 
         Args:
+          dut_manager: a DutManager instance
           eval_cmd: command to reproduce the regression
           buildbucket_build: to build ChromeOS image on buildbucket
           extra_switch_cmd: additional command to run when switch ChromeOS version
@@ -874,7 +934,7 @@ class CrosDiagnoser:
             session=self.config['session'],
         )
         bisector = wrapper.BisectorWrapper(
-            'bisect_cros_repo', self.config['session']
+            'bisect_cros_repo', self.config['session'], dut_manager
         )
         future_build_cmd = None
         if not buildbucket_build:
@@ -892,6 +952,7 @@ class CrosDiagnoser:
                 'bisect_chromeos',
                 '--rich_result',
                 '--no_deploy',
+                '--no_wait_for_build_completion',
                 '--board',
                 self.config['board'],
             ]
@@ -903,8 +964,6 @@ class CrosDiagnoser:
             self.cros_old,
             self.cros_new,
             init_args=[
-                '--dut',
-                self.dut,
                 '--board',
                 self.config['board'],
                 '--chromeos_root',

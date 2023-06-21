@@ -10,6 +10,7 @@ import argparse
 import collections
 import copy
 import datetime
+import enum
 import json
 import logging
 import os
@@ -222,7 +223,15 @@ def do_evaluate(
     return result
 
 
-def do_switch(switch_cmd, domain, rev, log_file) -> core.StepResult | None:
+class _SwitchAction(enum.StrEnum):
+    BUILD_AND_DEPLOY = 'build_and_deploy'
+    BUILD = 'build'
+    DEPLOY = 'deploy'
+
+
+def do_switch(
+    switch_cmd, domain, rev, log_file, action, dut
+) -> core.StepResult | None:
     """Invokes switcher command.
 
     The `switch_cmd` can get the target revision from the environment variable
@@ -241,12 +250,23 @@ def do_switch(switch_cmd, domain, rev, log_file) -> core.StepResult | None:
       domain: a bisect_kit.core.Domain instance.
       rev: version to switch.
       log_file: hint sub-process where to output detail log
+      action: a _SwitchAction object.
+      dut: the DUT. Can not be None unless action == _SwitchAction.BUILD.
 
     Returns:
       None if switch successfully, otherwise core.StepResult with 'skip' or
       'fatal'.
     """
     env = os.environ.copy()
+    if action == _SwitchAction.BUILD_AND_DEPLOY:
+        assert dut, 'dut must not be None when switching'
+        env['DUT'] = dut
+    elif action == _SwitchAction.BUILD:
+        env['NO_DEPLOY'] = 'true'
+    elif action == _SwitchAction.DEPLOY:
+        assert dut, 'dut must not be None when deploying'
+        env['DUT'] = dut
+        env['DEPLOY_ONLY'] = 'true'
     env['BISECT_REV'] = rev
     domain.setenv(env, rev)
 
@@ -259,6 +279,7 @@ def do_switch(switch_cmd, domain, rev, log_file) -> core.StepResult | None:
         result = _execute_git_step_command(exec_opts.command, env=env)
     else:
         result = _execute_bisectkit_step_command(exec_opts.command, env=env)
+
     if log_file and os.path.exists(log_file):
         with open(log_file, 'a') as f:
             f.write(END_OF_LOG_FILE_MARKER)
@@ -386,8 +407,10 @@ class BisectorCommandLine:
       bisector.main('run')
     """
 
-    def __init__(self, domain_cls):
+    def __init__(self, domain_cls, dut_manager=None):
         self.domain_cls = domain_cls
+        self.dut_manager = dut_manager
+
         self.domain = None
         self.session_dir = None
         self.states = None
@@ -568,6 +591,111 @@ class BisectorCommandLine:
         )
         return log_path
 
+    def _evaluate(self, rev: str, sample: dict, dut: str) -> bool:
+        """Evaluate at the rev.
+
+        Args:
+          rev: the revision.
+          sample: the dict to append result to. See _switch_and_eval() for details.
+          dut: the DUT.
+
+        Returns:
+          Success or not.
+        """
+        eval_cmd = self.config['eval'] + [dut]
+        eval_log = self._step_log_path(rev, 'eval')
+        eval_log_fullpath = os.path.join(self.session_dir, eval_log)
+        logger.debug('eval rev=%s', rev)
+
+        t0 = time.time()
+        result = do_evaluate(
+            eval_cmd,
+            self.domain,
+            rev,
+            eval_log_fullpath,
+            capture_values=self.strategy.is_value_bisection(),
+        )
+        t1 = time.time()
+        sample['eval_time'] = t1 - t0
+
+        status = result.data['status']
+        sample['status'] = status
+        if (
+            self.strategy.endpoint_verification
+            and not self.strategy.is_value_bisection()
+        ):
+            self.strategy.renew_initial_count(status, self.states.rev2idx(rev))
+
+        if os.path.exists(eval_log_fullpath):
+            sample['eval_log'] = eval_log
+        if result and 'reason' in result.data:
+            sample['reason'] = result.data['reason']
+        if status in ('skip', 'fatal'):
+            logger.debug('eval failed => %s', status)
+            return False
+
+        if self.strategy.is_value_bisection():
+            if status != 'value':
+                raise errors.ExecutionFatalError(
+                    'eval command (%s) terminated normally but did not output values'
+                    % eval_cmd
+                )
+            sample['values'] = result.data['values']
+            sample['status'] = self.strategy.classify_result_from_values(
+                result.data['values']
+            )
+
+        return True
+
+    def _switch(
+        self,
+        rev: str,
+        sample: dict,
+        action: _SwitchAction,
+        dut: str | None = None,
+    ) -> bool:
+        """Switch to a specific rev.
+
+        Args:
+          rev: the revision.
+          sample: the dict to append result to. See _switch_and_eval() for details.
+          action: BUILD for build only, DEPLOY for deploy only, BUILD_AND_DEPLOY for build + deploy.
+          dut: the DUT.
+        Returns
+          Successful or not.
+        """
+        switch_log = self._step_log_path(rev, 'switch')
+        switch_log_fullpath = os.path.join(self.session_dir, switch_log)
+        logger.debug('switch (%s) to rev=%s', action, rev)
+
+        t0 = time.time()
+        result = do_switch(
+            self.config['switch'],
+            self.domain,
+            rev,
+            switch_log_fullpath,
+            action,
+            dut,
+        )
+        t1 = time.time()
+
+        sample['switch_time'] = sample.get('switch_time', 0) + t1 - t0
+        if action == _SwitchAction.BUILD:
+            sample['build_time'] = t1 - t0
+        elif action == _SwitchAction.DEPLOY:
+            sample['deploy_time'] = t1 - t0
+
+        status = result.data['status'] if result else None
+        sample['status'] = status
+        if os.path.exists(switch_log_fullpath):
+            sample['switch_log'] = switch_log
+        if result and 'reason' in result.data:
+            sample['reason'] = result.data['reason']
+        if status in ('skip', 'fatal'):
+            logger.debug('switch (%s) failed => %s', action, status)
+            return False
+        return True
+
     def _switch_and_eval(self, rev, prev_rev=None):
         """Switches and evaluates given version.
 
@@ -603,67 +731,32 @@ class BisectorCommandLine:
         # We treat 'rev' as source of truth. 'index' is redundant and just
         # informative.
         sample = {'rev': rev, 'index': self.states.rev2idx(rev)}
+
+        assert self.dut_manager, 'dut_manager must not be None'
+        if self.dut_manager.has_preallocated_dut():
+            # DUT is already allocated. Do switch (build + deploy) all at
+            # once and only when prev_rev is not rev.
+            with self.dut_manager.provision() as dut:
+                if prev_rev != rev:
+                    if not self._switch(
+                        rev, sample, _SwitchAction.BUILD_AND_DEPLOY, dut
+                    ):
+                        return 'switch', sample
+                self._evaluate(rev, sample, dut)
+                return 'eval', sample
+
+        # DUT is not allocated yet. Do switch in two steps (build then
+        # deploy). Auto allocate a DUT at the deploy step.
         if prev_rev != rev:
-            switch_log = self._step_log_path(rev, 'switch')
-            switch_log_fullpath = os.path.join(self.session_dir, switch_log)
-            logger.debug('switch to rev=%s', rev)
-            t0 = time.time()
-            result = do_switch(
-                self.config['switch'], self.domain, rev, switch_log_fullpath
-            )
-            status = result.data['status'] if result else None
-            t1 = time.time()
-            sample['switch_time'] = t1 - t0
-            sample['status'] = status
-            if os.path.exists(switch_log_fullpath):
-                sample['switch_log'] = switch_log
-            if result and 'reason' in result.data:
-                sample['reason'] = result.data['reason']
-            if status in ('skip', 'fatal'):
-                logger.debug('switch failed => %s', status)
+            if not self._switch(rev, sample, _SwitchAction.BUILD):
                 return 'switch', sample
-
-        eval_log = self._step_log_path(rev, 'eval')
-        eval_log_fullpath = os.path.join(self.session_dir, eval_log)
-        logger.debug('eval rev=%s', rev)
-        t0 = time.time()
-        result = do_evaluate(
-            self.config['eval'],
-            self.domain,
-            rev,
-            eval_log_fullpath,
-            capture_values=self.strategy.is_value_bisection(),
-        )
-        status = result.data['status']
-
-        if (
-            self.strategy.endpoint_verification
-            and not self.strategy.is_value_bisection()
-        ):
-            self.strategy.renew_initial_count(status, self.states.rev2idx(rev))
-
-        t1 = time.time()
-        sample['eval_time'] = t1 - t0
-        sample['status'] = status
-        if os.path.exists(eval_log_fullpath):
-            sample['eval_log'] = eval_log
-        if result and 'reason' in result.data:
-            sample['reason'] = result.data['reason']
-        if status in ('skip', 'fatal'):
+        # Since DUT is leased everytime this function is called, deploy is
+        # needed no matter prev_rev == rev or not.
+        with self.dut_manager.provision() as dut:
+            if not self._switch(rev, sample, _SwitchAction.DEPLOY, dut):
+                return 'switch', sample
+            self._evaluate(rev, sample, dut)
             return 'eval', sample
-
-        if self.strategy.is_value_bisection():
-            if status != 'value':
-                raise errors.ExecutionFatalError(
-                    'eval command (%s) terminated normally but did not output values'
-                    % self.config['eval']
-                )
-            sample['values'] = result.data['values']
-            sample['status'] = self.strategy.classify_result_from_values(
-                result.data['values']
-            )
-
-        return 'eval', sample
 
     def estimate_cost(self, prev_rev):
         avg_switch_time = math_util.Averager()
@@ -1104,7 +1197,15 @@ class BisectorCommandLine:
 
         switch_log = self._step_log_path(rev, 'switch')
         logger.info('switch to %s', rev)
-        result = do_switch(self.config['switch'], self.domain, rev, switch_log)
+        with self.dut_manager.provision() as dut:
+            result = do_switch(
+                self.config['switch'],
+                self.domain,
+                rev,
+                switch_log,
+                _SwitchAction.BUILD_AND_DEPLOY,
+                dut,
+            )
         if result:
             print('switch failed')
 

@@ -137,8 +137,6 @@ class ChromeOSVersionDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        if self.config['dut']:
-            env['DUT'] = self.config['dut']
         env['BOARD'] = self.config['board']
 
         assert cros_util.is_cros_full_version(

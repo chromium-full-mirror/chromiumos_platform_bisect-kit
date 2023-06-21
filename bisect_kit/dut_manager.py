@@ -95,6 +95,8 @@ class DutManager:
         pre_allocated_dut: str,
         should_auto_allocate: bool,
         dut_init_func: typing.Callable[[str], None] | None = None,
+        dut_leave_context_check_func: typing.Callable[[str], None]
+        | None = None,
         force_monitoring: bool = False,
     ):
         """initializer.
@@ -108,6 +110,10 @@ class DutManager:
                 pre-allocated doesn't exist.
             dut_init_func: a function which accepts a DUT to do some
                 initialization after a DUT is auto-allocated.
+            dut_leave_context_check_func: a function to call when leaving the
+                context manager. It typically asserts some conditions on the
+                DUT. If the function raises exceptions, DutManager would raise
+                the exception when leaving the context manager.
             force_monitoring: Whether to spawn a thread to monitor DUT lease
                 status.
         """
@@ -118,6 +124,7 @@ class DutManager:
         else:
             self._pre_allocated_dut = pre_allocated_dut
         self._dut_init_func = dut_init_func
+        self._dut_leave_context_check_func = dut_leave_context_check_func
         self._force_monitoring = force_monitoring
 
         # DUT allocated by this DutManager, if any.
@@ -133,6 +140,9 @@ class DutManager:
     @property
     def dut_allocate_spec(self):
         return self._states.dut_allocate_spec
+
+    def has_preallocated_dut(self) -> bool:
+        return self._pre_allocated_dut is not None
 
     def dut(self) -> str:
         """Returns the DUT managed by this DutManager.
@@ -192,6 +202,18 @@ class DutManager:
     def __exit__(self, ex_type, ex_value, ex_traceback):
         """Releases the DUT allocated, if any."""
         logger.info('leaving DutManager context')
+
+        error = None
+        dut = self.dut()
+        if dut and self._dut_leave_context_check_func:
+            logger.info(
+                'calling dut leave context check function for dut %s', dut
+            )
+            try:
+                self._dut_leave_context_check_func(dut)
+            except Exception as e:
+                error = e
+
         if self._auto_allocated_dut:
             logger.info('releasing DUT %s', self._auto_allocated_dut)
             cros_lab_util.crosfleet_release_dut(
@@ -199,6 +221,26 @@ class DutManager:
             )
             self._auto_allocated_dut = None
             self._dut_initialized = False
+
+        if error:
+            raise error
+
+    def run_init_func(self):
+        dut = self.dut()
+        if not dut:
+            logger.info('no dut allocated yet, can not run init func')
+            return
+
+        if self._dut_initialized:
+            logger.info(
+                'dut %s has been initialized, do not run initialization function',
+                dut,
+            )
+        else:
+            if self._dut_init_func:
+                logger.info('running initialization function for %s...', dut)
+                self._dut_init_func(dut)
+            self._dut_initialized = True
 
     @contextlib.contextmanager
     def provision(self):
@@ -222,18 +264,7 @@ class DutManager:
             if dut == self._auto_allocated_dut:
                 self.update_dut_alloc_spec(dut)
 
-                if self._dut_initialized:
-                    logger.info(
-                        'dut %s considered initialized, do not run initialization function',
-                        dut,
-                    )
-                else:
-                    if self._dut_init_func:
-                        logger.info(
-                            'running initialization function for %s...', dut
-                        )
-                        self._dut_init_func(dut)
-                    self._dut_initialized = True
+            self.run_init_func()
 
             # Note that the monitoring thread is spawn only for DUT auto allocated by
             # the instance, because a pre-allocated DUT layer might have already been

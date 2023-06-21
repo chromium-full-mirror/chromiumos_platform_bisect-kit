@@ -100,13 +100,13 @@ def is_dut_needs_forwarded(dut: str) -> bool:
     return False
 
 
-def is_lab_dut(dut):
+def is_lab_dut(dut: str):
     if is_dut_needs_forwarded(dut):
         return True
     return dut.endswith('.cros')
 
 
-def dut_host_name(dut):
+def dut_host_name(dut: str):
     """Converts DUT address to host name (aka dut_name).
 
     Args:
@@ -118,7 +118,7 @@ def dut_host_name(dut):
     return dut[:-5]
 
 
-def dut_name_to_address(dut_name):
+def dut_name_to_address(dut_name: str):
     """Converts DUT name to DUT address.
 
     Args:

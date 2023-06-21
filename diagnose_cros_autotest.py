@@ -93,22 +93,20 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cts_timeout=opts.cts_timeout,
         )
 
-        if opts.dut == cros_lab_util.LAB_DUT:
-            raise NotImplementedError(
-                f'dut "{cros_lab_util.LAB_DUT}" is not supported  yet'
+        if opts.dut != cros_lab_util.LAB_DUT:
+            # NOTE(cylee): Not sure why this is needed in "init" phase. This step is
+            # skipped if a DUT is auto allocated in the "run" phase.
+            # Unpack old autotest prebuilt, assume following information don't change
+            # between versions:
+            #  - what chrome binaries to run
+            #  - dependency labels for DUT allocation
+            common_switch_cmd, _common_eval_cmd = self._build_cmds()
+            util.check_call(
+                *(
+                    common_switch_cmd
+                    + [self.config['cros_prebuilt_old'], '--dut', opts.dut]
+                )
             )
-
-        # Unpack old autotest prebuilt, assume following information don't change
-        # between versions:
-        #  - what chrome binaries to run
-        #  - dependency labels for DUT allocation
-        common_switch_cmd, _common_eval_cmd = self._build_cmds()
-        util.check_call(
-            *(
-                common_switch_cmd
-                + [self.config['cros_prebuilt_old'], '--dut', opts.dut]
-            )
-        )
 
     def _build_cmds(self):
         # prebuilt version will be specified later.
@@ -189,7 +187,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         )
 
         common_switch_cmd, common_eval_cmd = self._build_cmds()
-        common_eval_cmd.append(dut)
 
         # Do not specify version for autotest prebuilt switching here. The trick
         # is that version number is obtained via bisector's environment variable

@@ -167,8 +167,6 @@ class AndroidRepoDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev=None):
-        if self.config.get('dut'):
-            env['DUT'] = self.config['dut']
         env['ANDROID_ROOT'] = self.config['android_root']
         env['ANDROID_FLAVOR'] = self.config['flavor']
         env['ANDROID_BRANCH'] = self.config['branch']

@@ -11,6 +11,7 @@ from unittest import mock
 
 import bisect_git
 from bisect_kit import bisector_cli
+from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import git_util_test
 from bisect_kit import testing
 
@@ -32,7 +33,14 @@ class TestGitDomain(unittest.TestCase):
 
     def test_basic(self):
         """Tests basic functionality."""
-        bisector = bisector_cli.BisectorCommandLine(bisect_git.GitDomain)
+        dut_manager = dut_manager_module.DutManager(
+            states=None,
+            pre_allocated_dut='pre_allocated_dut',
+            should_auto_allocate=False,
+        )
+        bisector = bisector_cli.BisectorCommandLine(
+            bisect_git.GitDomain, dut_manager
+        )
 
         self.git.create_commits(10)
         revs = self.git.revs

@@ -76,10 +76,10 @@ def create_common_argument_parser():
         help='ChromeOS repo mirror path',
     )
     parser.add_argument(
-        '--wait_for_build_completion',
+        '--no_wait_for_build_completion',
         action='store_true',
         help='When used with --no_deploy, the script exits '
-        'after the build is done instead of immediately.',
+        'immediately after the job is scheduled.',
     )
     parser.add_argument(
         '--buildbucket_id',
@@ -464,12 +464,13 @@ def switch(opts) -> core.StepResult:
         logger.info(msg)
         return core.StepResult('fatal', reason=msg)
 
-    # If --no_deploy is False, always wait for build completion.
-    # Otherwise,
-    # 1. If --wait_for_build_completion is False, exit as soon as job scheduled
-    # and ignore potential.
-    # 2. If --wait_for_build_completion is True, exit after the build completes.
-    if not opts.no_deploy or opts.wait_for_build_completion:
+    # If --no_deploy is False, always wait for build completion because the
+    # binary is needed for deploy.  Otherwise,
+    # 1. If --no_wait_for_build_completion is True, exit as soon as job
+    #   scheduled and ignore potential errors.
+    # 2. If --no_wait_for_build_completion is False, exit after the build
+    #   completes.
+    if not opts.no_deploy or not opts.no_wait_for_build_completion:
         wait_for_build_completion(opts, buildbucket_id)
 
     if opts.no_deploy:

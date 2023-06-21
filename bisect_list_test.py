@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 
 from bisect_kit import bisector_cli
+from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import testing
 import bisect_list
 
@@ -29,7 +30,14 @@ class TestListDomain(unittest.TestCase):
         # Testing ListDomain via BisectorCommandLineInterface, remember our purpose
         # is testing ListDomain, not bisector. Bisector logic should be tested
         # by its own unit test, not here.
-        bisector = bisector_cli.BisectorCommandLine(bisect_list.ListDomain)
+        dut_manager = dut_manager_module.DutManager(
+            states=None,
+            pre_allocated_dut='pre_allocated_dut',
+            should_auto_allocate=False,
+        )
+        bisector = bisector_cli.BisectorCommandLine(
+            bisect_list.ListDomain, dut_manager
+        )
 
         with mock.patch('sys.stdin', io.StringIO('S\nM\nL\nXL\nXXL\n')):
             bisector.main('init', '--old', 'S', '--new', 'XXL')

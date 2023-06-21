@@ -83,7 +83,6 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         )
 
         common_switch_cmd, common_eval_cmd = self._build_cmds()
-        common_eval_cmd.append(dut)
 
         cros_prebuilt_extra_switch_cmd = common_switch_cmd
         # So far only the `release` images support the `--prebuilt` option

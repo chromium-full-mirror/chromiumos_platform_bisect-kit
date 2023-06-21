@@ -111,8 +111,6 @@ class AndroidBuildIDDomain(core.BisectDomain):
         env['ANDROID_BRANCH'] = self.config['branch']
         env['ANDROID_FLAVOR'] = self.config['flavor']
         env['ANDROID_BUILD_ID'] = rev
-        if self.config.get('dut'):
-            env['DUT'] = self.config['dut']
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:

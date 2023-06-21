@@ -207,8 +207,6 @@ class ChromeSrcMasterDomain(core.BisectDomain):
 
         if self.config['board']:
             env['BOARD'] = self.config['board']
-        if self.config['dut']:
-            env['DUT'] = self.config['dut']
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:

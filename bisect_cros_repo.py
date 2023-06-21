@@ -93,12 +93,6 @@ class ChromeOSRepoDomain(core.BisectDomain):
             if cros_lab_util.is_satlab_dut(opts.dut):
                 cros_lab_util.write_satlab_ssh_config(opts.dut)
             assert cros_util.is_dut(opts.dut)
-        else:
-            logger.info(
-                "Tips: unless you don't need to build, otherwise it's "
-                'recommended to specify --dut in bisector instead of '
-                'switcher and evaluator.'
-            )
 
         if not opts.board:
             opts.board = cros_util.query_dut_board(opts.dut)
@@ -145,8 +139,6 @@ class ChromeOSRepoDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        if self.config['dut']:
-            env['DUT'] = self.config['dut']
         if self.config['board']:
             env['BOARD'] = self.config['board']
         env['CHROMEOS_ROOT'] = self.config['chromeos_root']

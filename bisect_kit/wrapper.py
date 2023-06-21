@@ -20,11 +20,12 @@ logger = logging.getLogger(__name__)
 class BisectorWrapper:
     """Wrapper of bisector scripts as python module."""
 
-    def __init__(self, name, session):
+    def __init__(self, name, session, dut_manager=None):
         self.name = name
         self.module = importlib.import_module(name)
         self.session = session
         self.switch_cmds = []
+        self.dut_manager = dut_manager
 
         self.domain_cls = None
         for x in vars(self.module).values():
@@ -34,7 +35,9 @@ class BisectorWrapper:
         assert self.domain_cls
 
     def call(self, cmd, *args, stdout=sys.stdout):
-        bisector = bisector_cli.BisectorCommandLine(self.domain_cls)
+        bisector = bisector_cli.BisectorCommandLine(
+            self.domain_cls, self.dut_manager
+        )
         full_args = [cmd, '--session', self.session] + list(args)
         logger.debug('call %s: %s', self.name, full_args)
         with contextlib.redirect_stdout(stdout):
