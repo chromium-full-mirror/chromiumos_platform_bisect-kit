@@ -58,7 +58,7 @@ def add_build_and_deploy_arguments(parser_group):
 
 def create_argument_parser():
     parents = [
-        common.create_session_optional_parser(),
+        cli.create_session_optional_parser(),
         switch_helper.common_local_build_flags(),
     ]
     parser = argparse.ArgumentParser(parents=parents)

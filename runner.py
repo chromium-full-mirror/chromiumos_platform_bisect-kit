@@ -60,7 +60,7 @@ def create_argument_parser():
     Returns:
       An argparse.ArgumentParser instance.
     """
-    parents = [common.create_session_optional_parser()]
+    parents = [cli.create_session_optional_parser()]
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
             """

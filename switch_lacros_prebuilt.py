@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
-    parents = [common.create_session_optional_parser()]
+    parents = [cli.create_session_optional_parser()]
     parser = argparse.ArgumentParser(description=__doc__, parents=parents)
     cli.patching_argparser_exit(parser)
     parser.add_argument(

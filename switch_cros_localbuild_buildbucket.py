@@ -116,7 +116,7 @@ def create_argument_parser():
     cli.patching_argparser_exit(parser)
 
     parents = [
-        common.create_session_optional_parser(),
+        cli.create_session_optional_parser(),
         create_common_argument_parser(),
         switch_helper.common_local_build_flags(),
     ]

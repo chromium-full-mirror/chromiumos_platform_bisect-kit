@@ -33,6 +33,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree
 
+from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import configure
 from bisect_kit import gclient_util
@@ -724,11 +725,11 @@ def create_parser():
         ' (default: %(default)s)',
     )
     parents_session_optional = [
-        common.create_session_optional_parser(),
+        cli.create_session_optional_parser(),
         base_parser,
     ]
     parents_session_required = [
-        common.create_session_required_parser(),
+        cli.create_session_required_parser(),
         base_parser,
     ]
 

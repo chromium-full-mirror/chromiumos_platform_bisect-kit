@@ -1593,7 +1593,7 @@ class DiagnoseCommandLineBase:
         pass  # implemented by subclass if necessary
 
     def create_argument_parser(self):
-        parents = [common.create_session_optional_parser()]
+        parents = [cli.create_session_optional_parser()]
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers(
             dest='command', title='commands', metavar='<command>', required=True

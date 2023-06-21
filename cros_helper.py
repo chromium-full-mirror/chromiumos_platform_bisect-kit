@@ -653,7 +653,7 @@ def add_allocate_dut_arguments(
 
 @cli.fatal_error_handler
 def main():
-    parents = [common.create_session_optional_parser()]
+    parents = [cli.create_session_optional_parser()]
     parser = argparse.ArgumentParser()
     cli.patching_argparser_exit(parser)
     subparsers = parser.add_subparsers(
@@ -702,7 +702,7 @@ def main():
     parser_lease_dut = subparsers.add_parser(
         'lease_dut',
         help='Lease a DUT in the lab',
-        parents=[common.create_common_argument_parser()],
+        parents=[cli.create_common_argument_parser()],
         description='Lease a DUT in the lab. '
         'This is implemented by `skylab lease-dut` with additional checking.',
     )
@@ -744,7 +744,7 @@ def main():
     parser_allocate_dut = subparsers.add_parser(
         'allocate_dut',
         help='Allocate a DUT in the lab',
-        parents=[common.create_session_optional_parser()],
+        parents=[cli.create_session_optional_parser()],
         description='Allocate a DUT in the lab. It will lease a DUT in the lab '
         'for bisecting. The caller (bisect-kit runner) of this command should '
         'retry this command again later if no DUT available now.',

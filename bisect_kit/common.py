@@ -4,15 +4,12 @@
 
 """Common functions used by almost of all bisect kit scripts."""
 
-import argparse
 import logging
 import logging.config
 import os
 import pathlib
 import sys
 import typing
-
-from bisect_kit import configure
 
 
 logger = logging.getLogger(__name__)
@@ -118,48 +115,6 @@ def config_logging(opts):
             },
         }
     )
-
-
-def create_common_argument_parser() -> argparse.ArgumentParser:
-    common_argument_parser = argparse.ArgumentParser(add_help=False)
-    common_argument_parser.add_argument(
-        '--log_file',
-        metavar='LOG_FILE',
-        default=configure.get('LOG_FILE'),
-        help='Override log filename',
-    )
-    common_argument_parser.add_argument(
-        '--debug', action='store_true', help='Output DEBUG log to console'
-    )
-    common_argument_parser.add_argument(
-        '--rc',
-        metavar=configure.CONFIG_ENV_NAME,
-        help='Specify config file to use. Otherwise searches default '
-        'locations. Use "none" to suppress config file searching.',
-    )
-    return common_argument_parser
-
-
-def create_session_optional_parser() -> argparse.ArgumentParser:
-    session_optional_parser = argparse.ArgumentParser(
-        add_help=False, parents=[create_common_argument_parser()]
-    )
-    session_optional_parser.add_argument(
-        '--session',
-        default=DEFAULT_SESSION_NAME,
-        help='Session name (default: %(default)r)',
-    )
-    return session_optional_parser
-
-
-def create_session_required_parser() -> argparse.ArgumentParser:
-    session_required_parser = argparse.ArgumentParser(
-        add_help=False, parents=[create_common_argument_parser()]
-    )
-    session_required_parser.add_argument(
-        '--session', required=True, help='Session name'
-    )
-    return session_required_parser
 
 
 def under_luci_context():
