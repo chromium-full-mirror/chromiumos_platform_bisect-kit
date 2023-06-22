@@ -328,12 +328,6 @@ def create_common_argument_parser() -> argparse.ArgumentParser:
     common_argument_parser.add_argument(
         '--debug', action='store_true', help='Output DEBUG log to console'
     )
-    common_argument_parser.add_argument(
-        '--rc',
-        metavar=configure.CONFIG_ENV_NAME,
-        help='Specify config file to use. Otherwise searches default '
-        'locations. Use "none" to suppress config file searching.',
-    )
     return common_argument_parser
 
 

@@ -8,16 +8,12 @@ import argparse
 import unittest
 from unittest import mock
 
-from bisect_kit import configure
 import runner
 
 
 @mock.patch('bisect_kit.common.config_logging', mock.Mock())
 class TestRunner(unittest.TestCase):
     """Test runner."""
-
-    def tearDown(self):
-        configure.reset()
 
     def test_argtype_ratio(self):
         self.assertEqual(runner.argtype_ratio('=1'), ('=', 1.0))

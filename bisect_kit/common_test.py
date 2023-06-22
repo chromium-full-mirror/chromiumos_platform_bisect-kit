@@ -13,7 +13,6 @@ from unittest import mock
 
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,6 @@ class TestCommon(unittest.TestCase):
 
     def tearDown(self):
         pathlib.Path(self.log_file).unlink(missing_ok=True)
-        configure.reset()
 
     @mock.patch(
         'bisect_kit.common.config_logging.configured', False, create=True
