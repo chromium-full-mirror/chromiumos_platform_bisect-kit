@@ -17,7 +17,6 @@ from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -33,7 +32,7 @@ def add_build_and_deploy_arguments(parser_group):
     parser_group.add_argument(
         '--goma_chromeos_dir',
         type=cli.argtype_dir_path,
-        default=configure.get('GOMA_CHROMEOS_DIR'),
+        default=os.environ.get('GOMA_CHROMEOS_DIR'),
         help='Goma-chromeos installed directory to mount into the ChromeOS '
         'chroot',
     )
@@ -73,27 +72,27 @@ def create_argument_parser():
         nargs='?',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
-        default=configure.get('CROS_VERSION', ''),
+        default=os.environ.get('CROS_VERSION', ''),
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
     )
     parser.add_argument(
         '--board',
         metavar='BOARD',
-        default=configure.get('BOARD', ''),
+        default=os.environ.get('BOARD', ''),
         help='ChromeOS board name',
     )
     parser.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
-        default=configure.get('CHROMEOS_ROOT', ''),
+        default=os.environ.get('CHROMEOS_ROOT', ''),
         help='ChromeOS tree root (default: %(default)s)',
     )
     parser.add_argument(
         '--chromeos_mirror',
         type=cli.argtype_dir_path,
-        default=configure.get('CHROMEOS_MIRROR', ''),
+        default=os.environ.get('CHROMEOS_MIRROR', ''),
         help='ChromeOS repo mirror path',
     )
 

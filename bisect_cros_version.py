@@ -22,10 +22,10 @@ will be set:
 """
 
 import logging
+import os
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -76,14 +76,14 @@ class ChromeOSVersionDomain(core.BisectDomain):
             '--dut',
             type=cli.argtype_notempty,
             metavar='DUT',
-            default=configure.get('DUT'),
+            default=os.environ.get('DUT'),
             help='Address of DUT (Device Under Test). Either --dut or '
             '--board need to be specified',
         )
         parser.add_argument(
             '--board',
             metavar='BOARD',
-            default=configure.get('BOARD'),
+            default=os.environ.get('BOARD'),
             help='ChromeOS board name. Either --dut or --board need '
             'to be specified',
         )

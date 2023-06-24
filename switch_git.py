@@ -16,10 +16,10 @@ be expanded at switch time, not now.)
 
 import argparse
 import logging
+import os
 
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import git_util
 
 
@@ -35,14 +35,14 @@ def create_argument_parser():
         nargs='?',
         type=git_util.argtype_git_rev,
         metavar='GIT_REV',
-        default=configure.get('GIT_REV', ''),
+        default=os.environ.get('GIT_REV', ''),
         help='Git revision id',
     )
     parser.add_argument(
         '--git_repo',
         type=cli.argtype_dir_path,
         metavar='GIT_REPO',
-        default=configure.get('GIT_REPO'),
+        default=os.environ.get('GIT_REPO'),
         help='Git repository path',
     )
 

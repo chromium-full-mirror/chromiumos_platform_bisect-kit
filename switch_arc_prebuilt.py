@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import typing
 
@@ -23,7 +24,6 @@ from bisect_kit import arc_util
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -45,7 +45,7 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT', ''),
+        default=os.environ.get('DUT', ''),
         help='DUT address',
     )
     parser.add_argument(
@@ -53,13 +53,13 @@ def create_argument_parser():
         nargs='?',
         type=android_util.argtype_android_build_id,
         metavar='ANDROID_BUILD_ID',
-        default=configure.get('ANDROID_BUILD_ID', ''),
+        default=os.environ.get('ANDROID_BUILD_ID', ''),
     )
     parser.add_argument(
         '--flavor',
         type=cli.argtype_notempty,
         metavar='ANDROID_FLAVOR',
-        default=configure.get('ANDROID_FLAVOR', ''),
+        default=os.environ.get('ANDROID_FLAVOR', ''),
         help='example: cheets_x86-user',
     )
     return parser

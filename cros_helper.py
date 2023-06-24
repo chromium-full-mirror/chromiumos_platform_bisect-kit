@@ -14,12 +14,12 @@ import dataclasses
 import functools
 import json
 import logging
+import os
 import random
 import time
 
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -729,7 +729,7 @@ def main():
     parser_release_dut.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
-        default=configure.get(
+        default=os.environ.get(
             'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
         ),
         help='ChromeOS source tree, for overlay data (default: %(default)s)',
@@ -760,7 +760,7 @@ def main():
     parser_allocate_dut.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
-        default=configure.get(
+        default=os.environ.get(
             'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
         ),
         help='ChromeOS source tree, for overlay data (default: %(default)s)',

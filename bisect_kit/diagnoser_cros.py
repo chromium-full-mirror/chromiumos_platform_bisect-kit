@@ -16,12 +16,10 @@ import logging
 import os
 import sys
 import time
-import typing
 
 from bisect_kit import android_util
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
@@ -1615,13 +1613,13 @@ class DiagnoseCommandLineBase:
         group.add_argument(
             '--mirror_base',
             metavar='MIRROR_BASE',
-            default=configure.get('MIRROR_BASE', common.DEFAULT_MIRROR_BASE),
+            default=os.environ.get('MIRROR_BASE', common.DEFAULT_MIRROR_BASE),
             help='Directory for mirrors (default: %(default)s)',
         )
         group.add_argument(
             '--work_base',
             metavar='WORK_BASE',
-            default=configure.get('WORK_BASE', common.DEFAULT_WORK_BASE),
+            default=os.environ.get('WORK_BASE', common.DEFAULT_WORK_BASE),
             help='Directory for bisection working directories '
             '(default: %(default)s)',
         )
@@ -1629,40 +1627,40 @@ class DiagnoseCommandLineBase:
             '--chromeos_root',
             metavar='CHROMEOS_ROOT',
             type=cli.argtype_dir_path,
-            default=configure.get('CHROMEOS_ROOT'),
+            default=os.environ.get('CHROMEOS_ROOT'),
             help='ChromeOS tree root',
         )
         group.add_argument(
             '--chromeos_mirror',
             type=cli.argtype_dir_path,
-            default=configure.get('CHROMEOS_MIRROR'),
+            default=os.environ.get('CHROMEOS_MIRROR'),
             help='ChromeOS repo mirror path',
         )
         group.add_argument(
             '--android_root',
             metavar='ANDROID_ROOT',
             type=cli.argtype_dir_path,
-            default=configure.get('ANDROID_ROOT'),
+            default=os.environ.get('ANDROID_ROOT'),
             help='Android tree root',
         )
         group.add_argument(
             '--android_mirror',
             type=cli.argtype_dir_path,
-            default=configure.get('ANDROID_MIRROR'),
+            default=os.environ.get('ANDROID_MIRROR'),
             help='Android repo mirror path',
         )
         group.add_argument(
             '--chrome_root',
             metavar='CHROME_ROOT',
             type=cli.argtype_dir_path,
-            default=configure.get('CHROME_ROOT'),
+            default=os.environ.get('CHROME_ROOT'),
             help='Chrome tree root',
         )
         group.add_argument(
             '--chrome_mirror',
             metavar='CHROME_MIRROR',
             type=cli.argtype_dir_path,
-            default=configure.get('CHROME_MIRROR'),
+            default=os.environ.get('CHROME_MIRROR'),
             help="chrome's gclient cache dir",
         )
 
@@ -1689,7 +1687,7 @@ class DiagnoseCommandLineBase:
         group.add_argument(
             '--board',
             metavar='BOARD',
-            default=configure.get('BOARD'),
+            default=os.environ.get('BOARD'),
             help='ChromeOS board name; auto detected if DUT is not auto allocated',
         )
         group.add_argument(

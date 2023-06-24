@@ -21,11 +21,11 @@ will be set:
 """
 
 import logging
+import os
 
 from bisect_kit import android_util
 from bisect_kit import bisector_cli
 from bisect_kit import cli
-from bisect_kit import configure
 from bisect_kit import core
 
 
@@ -49,14 +49,14 @@ class AndroidBuildIDDomain(core.BisectDomain):
             '--branch',
             type=cli.argtype_notempty,
             metavar='ANDROID_BRANCH',
-            default=configure.get('ANDROID_BRANCH', ''),
+            default=os.environ.get('ANDROID_BRANCH', ''),
             help='git branch like "git_mnc-dr-arc-dev"',
         )
         parser.add_argument(
             '--flavor',
             type=cli.argtype_notempty,
             metavar='ANDROID_FLAVOR',
-            default=configure.get('ANDROID_FLAVOR', ''),
+            default=os.environ.get('ANDROID_FLAVOR', ''),
             help='example: cheets_x86-user',
         )
         parser.add_argument(
@@ -71,7 +71,7 @@ class AndroidBuildIDDomain(core.BisectDomain):
             '--dut',
             type=cli.argtype_notempty,
             metavar='DUT',
-            default=configure.get('DUT'),
+            default=os.environ.get('DUT'),
             help='For ChromeOS, address of DUT (Device Under Test)',
         )
 

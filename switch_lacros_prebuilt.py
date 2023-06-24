@@ -16,13 +16,13 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -46,19 +46,19 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT', ''),
+        default=os.environ.get('DUT', ''),
     )
     parser.add_argument(
         '--board_cpu_arch',
         type=cli.argtype_notempty,
         metavar='BOARD_CPU_ARCH',
-        default=configure.get('BOARD_CPU_ARCH', ''),
+        default=os.environ.get('BOARD_CPU_ARCH', ''),
     )
     parser.add_argument(
         '--chromeos_root',
         metavar='CHROMEOS_ROOT',
         type=cli.argtype_dir_path,
-        default=configure.get('CHROMEOS_ROOT', ''),
+        default=os.environ.get('CHROMEOS_ROOT', ''),
         help='Root of ChromeOS source tree, like ~/chromiumOS',
     )
     parser.add_argument(
@@ -66,7 +66,7 @@ def create_argument_parser():
         nargs='?',
         type=cr_util.argtype_chrome_version,
         metavar='LACROS_VERSION',
-        default=configure.get('LACROS_VERSION', ''),
+        default=os.environ.get('LACROS_VERSION', ''),
         help='Lacros version number, e.g 105.0.5118.0',
     )
 

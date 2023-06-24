@@ -14,7 +14,6 @@ import os
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
@@ -70,7 +69,7 @@ class ChromeSrcDomain(core.BisectDomain):
             required=True,
             metavar='CHROME_ROOT',
             type=cli.argtype_dir_path,
-            default=configure.get('CHROME_ROOT'),
+            default=os.environ.get('CHROME_ROOT'),
             help='Root of chrome source tree, like ~/chromium',
         )
         parser.add_argument(
@@ -78,7 +77,7 @@ class ChromeSrcDomain(core.BisectDomain):
             required=True,
             metavar='CHROME_MIRROR',
             type=cli.argtype_dir_path,
-            default=configure.get('CHROME_MIRROR'),
+            default=os.environ.get('CHROME_MIRROR'),
             help='gclient cache dir',
         )
 
@@ -87,13 +86,13 @@ class ChromeSrcDomain(core.BisectDomain):
             '--dut',
             type=cli.argtype_notempty,
             metavar='DUT',
-            default=configure.get('DUT'),
+            default=os.environ.get('DUT'),
             help='For ChromeOS, address of DUT (Device Under Test)',
         )
         parser.add_argument(
             '--board',
             metavar='BOARD',
-            default=configure.get('BOARD'),
+            default=os.environ.get('BOARD'),
             help='For ChromeOS, board name',
         )
 

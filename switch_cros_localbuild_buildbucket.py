@@ -21,7 +21,6 @@ from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
@@ -61,20 +60,20 @@ def create_common_argument_parser():
         '--board',
         type=cli.argtype_notempty,
         metavar='BOARD',
-        default=configure.get('BOARD', ''),
+        default=os.environ.get('BOARD', ''),
         help='ChromeOS board name',
     )
     parser.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
-        default=configure.get('CHROMEOS_ROOT', ''),
+        default=os.environ.get('CHROMEOS_ROOT', ''),
         help='ChromeOS tree root (default: %(default)s)',
     )
     parser.add_argument(
         '--chromeos_mirror',
         type=cli.argtype_dir_path,
-        default=configure.get('CHROMEOS_MIRROR', ''),
+        default=os.environ.get('CHROMEOS_MIRROR', ''),
         help='ChromeOS repo mirror path',
     )
     parser.add_argument(
@@ -129,7 +128,7 @@ def create_argument_parser():
         nargs='?',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
-        default=configure.get('CROS_VERSION', ''),
+        default=os.environ.get('CROS_VERSION', ''),
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
     )
@@ -142,21 +141,21 @@ def create_argument_parser():
         '--chrome_root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
-        default=configure.get('CHROME_ROOT', ''),
+        default=os.environ.get('CHROME_ROOT', ''),
         help='Root of Chrome source tree, like ~/chromium',
     )
     parser_chrome.add_argument(
         '--chrome_mirror',
         metavar='CHROME_MIRROR',
         type=cli.argtype_dir_path,
-        default=configure.get('CHROME_MIRROR', ''),
+        default=os.environ.get('CHROME_MIRROR', ''),
         help='gclient cache dir',
     )
     parser_chrome.add_argument(
         '--chromeos_rev',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
-        default=configure.get('CROS_VERSION', ''),
+        default=os.environ.get('CROS_VERSION', ''),
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
     )
@@ -170,7 +169,7 @@ def create_argument_parser():
         nargs='?',
         type=cli.argtype_notempty,
         metavar='REV',
-        default=configure.get('REV', ''),
+        default=os.environ.get('REV', ''),
         help='Chrome version, local build intra version (in format "%s").'
         % codechange.make_intra_rev('X', 'Y', 3),
     )

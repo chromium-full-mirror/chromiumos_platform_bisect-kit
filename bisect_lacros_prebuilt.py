@@ -21,10 +21,10 @@ will be set:
 """
 
 import logging
+import os
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import errors
@@ -51,28 +51,28 @@ class LacrosVersionDomain(core.BisectDomain):
             '--dut',
             type=cli.argtype_notempty,
             metavar='DUT',
-            default=configure.get('DUT'),
+            default=os.environ.get('DUT'),
             help='Address of DUT (Device Under Test)',
         )
         parser.add_argument(
             '--chromeos_root',
             metavar='CHROMEOS_ROOT',
             type=cli.argtype_dir_path,
-            default=configure.get('CHROMEOS_ROOT', ''),
+            default=os.environ.get('CHROMEOS_ROOT', ''),
             help='Root of chromeOS source tree, like ~/chromiumos',
         )
         parser.add_argument(
             '--board',
             type=cli.argtype_notempty,
             metavar='BOARD',
-            default=configure.get('BOARD', ''),
+            default=os.environ.get('BOARD', ''),
             help='ChromeOS board name',
         )
         parser.add_argument(
             '--board_cpu_arch',
             type=cli.argtype_notempty,
             metavar='BOARD_CPU_ARCH',
-            default=configure.get('BOARD_CPU_ARCH', ''),
+            default=os.environ.get('BOARD_CPU_ARCH', ''),
         )
 
     @staticmethod

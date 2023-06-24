@@ -12,7 +12,6 @@ import signal
 import sys
 
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import errors
 from bisect_kit import util
 
@@ -322,7 +321,7 @@ def create_common_argument_parser() -> argparse.ArgumentParser:
     common_argument_parser.add_argument(
         '--log_file',
         metavar='LOG_FILE',
-        default=configure.get('LOG_FILE'),
+        default=os.environ.get('LOG_FILE'),
         help='Override log filename',
     )
     common_argument_parser.add_argument(

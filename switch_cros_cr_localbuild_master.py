@@ -28,7 +28,6 @@ import bisect_cr_localbuild_master
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -59,27 +58,27 @@ def create_argument_parser():
         '--board_cpu_arch',
         type=cli.argtype_notempty,
         metavar='BOARD_CPU_ARCH',
-        default=configure.get('BOARD_CPU_ARCH', ''),
+        default=os.environ.get('BOARD_CPU_ARCH', ''),
     )
     parser.add_argument(
         'rev',
         nargs='?',
         type=cli.argtype_notempty,
         metavar='REV',
-        default=configure.get('REV', ''),
+        default=os.environ.get('REV', ''),
         help='Version string',
     )
     parser.add_argument(
         '--board',
         type=cli.argtype_notempty,
-        default=configure.get('BOARD', ''),
+        default=os.environ.get('BOARD', ''),
         help='ChromeOS board name',
     )
     parser.add_argument(
         '--chrome_root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
-        default=configure.get('CHROME_ROOT', ''),
+        default=os.environ.get('CHROME_ROOT', ''),
         help='Root of Chrome source tree, like ~/chromium',
     )
 
@@ -113,7 +112,7 @@ def create_argument_parser():
         '--chromeos_root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
-        default=configure.get('CHROMEOS_ROOT'),
+        default=os.environ.get('CHROMEOS_ROOT'),
         help='ChromeOS tree root; only necessary if deploy_method is '
         'cros_deploy or image',
     )

@@ -22,11 +22,11 @@ will be set:
 """
 
 import logging
+import os
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -58,13 +58,13 @@ class ChromeOSRepoDomain(core.BisectDomain):
             '--dut',
             type=cli.argtype_notempty,
             metavar='DUT',
-            default=configure.get('DUT'),
+            default=os.environ.get('DUT'),
             help='DUT address',
         )
         parser.add_argument(
             '--board',
             metavar='BOARD',
-            default=configure.get('BOARD', ''),
+            default=os.environ.get('BOARD', ''),
             help='ChromeOS board name',
         )
         parser.add_argument(
@@ -72,13 +72,13 @@ class ChromeOSRepoDomain(core.BisectDomain):
             metavar='CHROMEOS_ROOT',
             type=cli.argtype_dir_path,
             required=True,
-            default=configure.get('CHROMEOS_ROOT'),
+            default=os.environ.get('CHROMEOS_ROOT'),
             help='ChromeOS tree root',
         )
         parser.add_argument(
             '--chromeos_mirror',
             type=cli.argtype_dir_path,
-            default=configure.get('CHROMEOS_MIRROR', ''),
+            default=os.environ.get('CHROMEOS_MIRROR', ''),
             help='ChromeOS repo mirror path',
         )
 

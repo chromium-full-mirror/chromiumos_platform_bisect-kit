@@ -35,7 +35,6 @@ import xml.etree.ElementTree
 
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import locking
@@ -714,13 +713,13 @@ def create_parser():
     base_parser.add_argument(
         '--mirror_base',
         metavar='MIRROR_BASE',
-        default=configure.get('MIRROR_BASE', common.DEFAULT_MIRROR_BASE),
+        default=os.environ.get('MIRROR_BASE', common.DEFAULT_MIRROR_BASE),
         help='Directory for mirrors (default: %(default)s)',
     )
     base_parser.add_argument(
         '--work_base',
         metavar='WORK_BASE',
-        default=configure.get('WORK_BASE', common.DEFAULT_WORK_BASE),
+        default=os.environ.get('WORK_BASE', common.DEFAULT_WORK_BASE),
         help='Directory for bisection working directories'
         ' (default: %(default)s)',
     )

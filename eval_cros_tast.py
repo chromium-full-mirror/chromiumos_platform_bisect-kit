@@ -21,7 +21,6 @@ from bisect_kit import bisector_cli
 from bisect_kit import catapult_util
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -58,13 +57,13 @@ def create_argument_parser():
         nargs='?',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT', ''),
+        default=os.environ.get('DUT', ''),
     )
     parser.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
-        default=configure.get('CHROMEOS_ROOT', ''),
+        default=os.environ.get('CHROMEOS_ROOT', ''),
         help='ChromeOS tree root',
     )
     parser.add_argument(

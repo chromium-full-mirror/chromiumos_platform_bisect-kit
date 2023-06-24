@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import typing
 
@@ -18,7 +19,6 @@ from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -47,27 +47,27 @@ def create_argument_parser():
         nargs='?',
         type=cli.argtype_notempty,
         metavar='INTRA_REV',
-        default=configure.get('INTRA_REV', ''),
+        default=os.environ.get('INTRA_REV', ''),
         help='Android build id, or bisecting intra version number',
     )
     parser.add_argument(
         '--android_root',
         type=cli.argtype_dir_path,
         metavar='ANDROID_ROOT',
-        default=configure.get('ANDROID_ROOT', ''),
+        default=os.environ.get('ANDROID_ROOT', ''),
         help='Android tree root',
     )
     parser.add_argument(
         '--android_mirror',
         type=cli.argtype_dir_path,
-        default=configure.get('ANDROID_MIRROR', ''),
+        default=os.environ.get('ANDROID_MIRROR', ''),
         help='Android repo mirror path',
     )
     parser.add_argument(
         '--flavor',
         type=cli.argtype_notempty,
         metavar='ANDROID_FLAVOR',
-        default=configure.get('ANDROID_FLAVOR', ''),
+        default=os.environ.get('ANDROID_FLAVOR', ''),
         help='example: cheets_x86-user',
     )
     return parser

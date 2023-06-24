@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import configure
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -38,20 +38,20 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT', ''),
+        default=os.environ.get('DUT', ''),
     )
     parser.add_argument(
         'version',
         nargs='?',
         type=cros_util.argtype_cros_version,
         metavar='CROS_VERSION',
-        default=configure.get('CROS_VERSION', ''),
+        default=os.environ.get('CROS_VERSION', ''),
         help='ChromeOS version number, short (10162.0.0) or full (R64-10162.0.0)',
     )
     parser.add_argument(
         '--board',
         metavar='BOARD',
-        default=configure.get('BOARD', ''),
+        default=os.environ.get('BOARD', ''),
         help='ChromeOS board name',
     )
     parser.add_argument(
@@ -68,7 +68,7 @@ def create_argument_parser():
     parser.add_argument(
         '--default_chromeos_root',
         type=cli.argtype_dir_path,
-        default=configure.get(
+        default=os.environ.get(
             'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
         ),
         help='Default chromeos tree to run "cros flash" (default: %(default)s)',

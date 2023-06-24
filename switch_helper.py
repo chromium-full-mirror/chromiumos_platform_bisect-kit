@@ -5,9 +5,9 @@
 
 import argparse
 import logging
+import os
 
 from bisect_kit import cli
-from bisect_kit import configure
 from bisect_kit import errors
 
 
@@ -37,7 +37,7 @@ def common_local_build_flags() -> argparse.ArgumentParser:
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=configure.get('DUT'),
+        default=os.environ.get('DUT'),
         help='DUT address',
     )
     parser.add_argument(
