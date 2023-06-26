@@ -834,15 +834,30 @@ def list_untracked(
     return result
 
 
+def remove_lock(git_repo: str) -> None:
+    """Remove git lock files.
+
+    Args:
+      git_repo: path of git repo.
+    """
+    head_lock = os.path.join(git_repo, '.git', 'HEAD.lock')
+    index_lock = os.path.join(git_repo, '.git', 'index.lock')
+    for lock_path in [head_lock, index_lock]:
+        if os.path.exists(lock_path):
+            os.unlink(lock_path)
+            logger.warning('git lock file deleted: %s', lock_path)
+
+
 def distclean(git_repo: str, excludes: list[str] | None = None) -> None:
     """Clean up git repo directory.
 
-    Restore modified and deleted files. Delete untracked files.
+    Restore modified and deleted files. Delete untracked files and lock files.
 
     Args:
       git_repo: path of git repo.
       excludes: files and/or directories to ignore, relative to git_repo
     """
+    remove_lock(git_repo)
     reset_hard(git_repo)
 
     # Delete untracked files.
