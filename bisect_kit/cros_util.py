@@ -192,7 +192,7 @@ class ImageType(enum.Enum):
     ZIP_FILE = enum.auto()
 
     @classmethod
-    def determine(cls, path: str) -> typing.Optional[ImageType]:
+    def determine(cls, path: str) -> ImageType | None:
         """Determine a filetype."""
         filename = path.split('/')[-1]
         if filename == sample_partition_filename:
@@ -250,7 +250,7 @@ class SnapshotStore:
     @classmethod
     def query_snapshot_image(
         cls, board: str, snapshot_version: str
-    ) -> typing.Optional[str]:
+    ) -> str | None:
         """Query a snapshot image path from SnapshotStore or gs bucket.
 
         Return a zip image if exists, else return a partition image.
@@ -311,7 +311,7 @@ class SnapshotStore:
     @classmethod
     def query_snapshot_version_by_id(
         cls, board: str, snapshot_id: str
-    ) -> typing.Optional[str]:
+    ) -> str | None:
         """Given a snapshot id, return its corresponding snapshot version."""
         for snapshot_version in cls.images:
             gs_path = cls.query_snapshot_image(board, snapshot_version)
@@ -905,9 +905,7 @@ def has_release_prebuilt(board: str, version: str) -> bool:
     return bool(query_prebuilt_gs_path(board, version, [release_bucket]))
 
 
-def query_milestone_by_version(
-    board: str, short_version: str
-) -> typing.Optional[str]:
+def query_milestone_by_version(board: str, short_version: str) -> str | None:
     """Query milestone by ChromeOS version number.
 
     Args:
@@ -2844,13 +2842,11 @@ class ChromeOSSpecManager(codechange.SpecManager):
         path = '%s%s/%s' % (gs_manifest_base, 'buildspecs', milestone)
         return [x.removeprefix(path).lstrip('/') for x in gs_util.ls(path)]
 
-    def get_gs_release_manifest(self, path: str) -> typing.Optional[str]:
+    def get_gs_release_manifest(self, path: str) -> str | None:
         """Query the manifest content of a release version on gs."""
         return gs_util.cat('%s%s' % (gs_manifest_base, path))
 
-    def query_gs_release_manifest_timestamp(
-        self, path: str
-    ) -> typing.Optional[str]:
+    def query_gs_release_manifest_timestamp(self, path: str) -> str | None:
         """Query the timestamp of a release version on gs."""
         return gs_util.stat_max_creation_time('%s%s' % (gs_manifest_base, path))
 

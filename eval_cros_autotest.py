@@ -20,7 +20,6 @@ import os
 import re
 import subprocess
 import sys
-import typing
 import xml.etree.ElementTree
 
 from bisect_kit import bisector_cli
@@ -292,8 +291,8 @@ def run_test(opts) -> str:
 # useless (see testdata/tast_test_result/fail.2 for example). So we have to
 # parse the machine-unfriendly test_report.log instead.
 def parse_tauto_results(
-    result_dir: str, test_name: typing.Optional[str]
-) -> tuple[bool, typing.Optional[str]]:
+    result_dir: str, test_name: str | None
+) -> tuple[bool, str | None]:
     result_file = os.path.join(result_dir, 'test_report.log')
     if not os.path.exists(result_file):
         raise errors.ExternalError('test_report.log not found')
@@ -329,9 +328,7 @@ def parse_tauto_results(
     return False, reason
 
 
-def parse_cts_results(
-    result_dir, test_name
-) -> tuple[bool, typing.Optional[str]]:
+def parse_cts_results(result_dir, test_name) -> tuple[bool, str | None]:
     # The result path looks like
     #   results-1-cheets_CTS_P.tradefed-run-test/
     #   cheets_CTS_P.tradefed-run-test.CtsCameraTestCases.testFocalLengths/
@@ -432,7 +429,7 @@ def is_cts(opts) -> bool:
     )
 
 
-def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
+def step_main(args: tuple[str] | None) -> core.StepResult:
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)
@@ -519,7 +516,7 @@ def step_main(args: typing.Optional[tuple[str]]) -> core.StepResult:
     return result
 
 
-def main(args: typing.Optional[tuple[str]] = None) -> int:
+def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.step_main_wrapper(step_main, args)
 
 

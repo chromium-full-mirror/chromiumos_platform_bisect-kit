@@ -17,7 +17,6 @@ import argparse
 import logging
 import os
 import sys
-import typing
 
 from bisect_kit import android_util
 from bisect_kit import arc_util
@@ -65,7 +64,7 @@ def create_argument_parser():
     return parser
 
 
-def switch_main(args: typing.Optional[tuple[str]]):
+def switch_main(args: tuple[str] | None):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)
@@ -93,7 +92,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
     logger.info('updated to "%s", done', arc_version)
 
 
-def main(args: typing.Optional[tuple[str]] = None) -> int:
+def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 

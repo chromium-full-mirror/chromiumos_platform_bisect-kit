@@ -27,8 +27,8 @@ class StepResult:
     def __init__(
         self,
         status: typing.Literal['old', 'new', 'skip', 'fatal', 'value'],
-        reason: typing.Optional[str] = None,
-        values: typing.Optional[list[float]] = None,
+        reason: str | None = None,
+        values: list[float] | None = None,
     ):
         self.data: dict[str, typing.Any] = {'status': status}
         if values:

@@ -11,7 +11,6 @@ import argparse
 import logging
 import os
 import sys
-import typing
 
 from bisect_kit import android_util
 from bisect_kit import arc_util
@@ -101,7 +100,7 @@ def switch(opts):
         )
 
 
-def switch_main(args: typing.Optional[tuple[str]]):
+def switch_main(args: tuple[str] | None):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     switch_helper.post_init_local_build_flags(opts)
@@ -119,7 +118,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
     switch(opts)
 
 
-def main(args: typing.Optional[tuple[str]] = None) -> int:
+def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 

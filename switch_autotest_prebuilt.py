@@ -19,7 +19,6 @@ import os
 import shutil
 import sys
 import tempfile
-import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -165,7 +164,7 @@ def switch(autotest_dir, board, version, test_name, dut):
     shutil.rmtree(tmp_dir)
 
 
-def switch_main(args: typing.Optional[tuple[str]]):
+def switch_main(args: tuple[str] | None):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)
@@ -202,7 +201,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
             assert 0  # unreachable
 
 
-def main(args: typing.Optional[tuple[str]] = None) -> int:
+def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 

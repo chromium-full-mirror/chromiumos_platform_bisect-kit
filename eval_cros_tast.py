@@ -15,7 +15,6 @@ import re
 import shutil
 import subprocess
 import sys
-import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import catapult_util
@@ -237,9 +236,7 @@ def run_test(opts, bundle):
 
 # Be careful that both tauto and tast generate results.json, but their format
 # is totally different.
-def parse_results_json(
-    result_dir, test_name
-) -> tuple[bool, typing.Optional[str]]:
+def parse_results_json(result_dir, test_name) -> tuple[bool, str | None]:
     passed = None
     reason = None
     results_path = os.path.join(result_dir, 'results.json')
@@ -300,7 +297,7 @@ def gather_test_result(opts, result_dir) -> core.StepResult:
     return core.StepResult('new', reason)
 
 
-def step_main(args: 'typing.Optional[tuple[str]]') -> core.StepResult:
+def step_main(args: tuple[str] | None) -> core.StepResult:
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     common.config_logging(opts)
@@ -372,7 +369,7 @@ def step_main(args: 'typing.Optional[tuple[str]]') -> core.StepResult:
     return gather_test_result(opts, result_dir)
 
 
-def main(args: typing.Optional[tuple[str]] = None) -> int:
+def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.step_main_wrapper(step_main, args)
 
 

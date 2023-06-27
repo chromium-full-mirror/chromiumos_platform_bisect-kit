@@ -222,9 +222,7 @@ def do_evaluate(
     return result
 
 
-def do_switch(
-    switch_cmd, domain, rev, log_file
-) -> typing.Optional[core.StepResult]:
+def do_switch(switch_cmd, domain, rev, log_file) -> core.StepResult | None:
     """Invokes switcher command.
 
     The `switch_cmd` can get the target revision from the environment variable
@@ -312,7 +310,7 @@ def do_future_build(
 
 def step_main_wrapper(
     step_main: typing.Callable[..., core.StepResult],
-    args: typing.Optional[tuple[str]],
+    args: tuple[str] | None,
 ) -> int:
     """Wrapper function for switch and eval step.
 
@@ -358,7 +356,7 @@ def step_main_wrapper(
 
 
 def switch_main_wrapper(
-    switch_main: typing.Callable[..., None], args: typing.Optional[tuple[str]]
+    switch_main: typing.Callable[..., None], args: tuple[str] | None
 ) -> int:
     def func(args):
         # "switch" step usually has no return values. No exception is good (old).

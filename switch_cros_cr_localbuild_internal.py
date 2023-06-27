@@ -22,7 +22,6 @@ import argparse
 import logging
 import os
 import sys
-import typing
 
 import bisect_cr_localbuild_internal
 import bisect_kit
@@ -152,7 +151,7 @@ def _apply_additional_patch(root_dir, rev):
         util.check_call('git', 'am', patch_file, cwd=path)
 
 
-def switch_main(args: typing.Optional[tuple[str]]):
+def switch_main(args: tuple[str] | None):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     switch_helper.post_init_local_build_flags(opts)
@@ -255,7 +254,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
         ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
 
-def main(args: typing.Optional[tuple[str]] = None) -> int:
+def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 

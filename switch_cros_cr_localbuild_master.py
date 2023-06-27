@@ -22,7 +22,6 @@ import argparse
 import logging
 import os
 import sys
-import typing
 
 import bisect_cr_localbuild_master
 from bisect_kit import bisector_cli
@@ -120,7 +119,7 @@ def create_argument_parser():
     return parser
 
 
-def switch_main(args: typing.Optional[tuple[str]]):
+def switch_main(args: tuple[str] | None):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     switch_helper.post_init_local_build_flags(opts)
@@ -178,7 +177,7 @@ def switch_main(args: typing.Optional[tuple[str]]):
         lacros_util.deploy(opts.chrome_src, opts.dut)
 
 
-def main(args: typing.Optional[tuple[str]] = None) -> int:
+def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 

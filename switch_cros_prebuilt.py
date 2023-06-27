@@ -11,7 +11,6 @@ import argparse
 import logging
 import os
 import sys
-import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -132,13 +131,13 @@ def inner_main(opts):
     logger.info('done')
 
 
-def switch_main(args: typing.Optional[tuple[str]]):
+def switch_main(args: tuple[str] | None):
     opts = parse_args(args)
     common.config_logging(opts)
     inner_main(opts)
 
 
-def main(args: typing.Optional[tuple[str]] = None) -> int:
+def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 
