@@ -306,7 +306,7 @@ def write_extra_manifest_to_mirror(repo_dir, removed):
                     remote_path,
                     path_spec.path,
                     remotes[scheme, netloc],
-                    path_spec.at,
+                    path_spec.rev,
                 )
             )
         f.write("""</manifest>\n""")

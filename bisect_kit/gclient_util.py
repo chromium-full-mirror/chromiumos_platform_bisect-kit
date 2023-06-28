@@ -1146,7 +1146,7 @@ class DepsParser:
             self.construct_deps_tree(
                 subtree,
                 path_spec.repo_url,
-                path_spec.at,
+                path_spec.rev,
                 subtree.start_time,
                 subtree.end_time,
                 parent_vars=subtree.parent_deps.variables,

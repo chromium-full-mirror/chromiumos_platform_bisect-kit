@@ -350,7 +350,7 @@ class TestBug123161903(unittest.TestCase):
             old_timestamp, new_timestamp, src_workdir
         ):
             if timestamp == 1547228986:
-                self.assertEqual(path_specs['src/assistant'].at, self.target)
+                self.assertEqual(path_specs['src/assistant'].rev, self.target)
 
 
 if __name__ == '__main__':

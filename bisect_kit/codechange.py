@@ -9,14 +9,17 @@ and their version relationship, i.e. pinned or floating git repo. In other
 words, it's abstraction of chrome's gclient DEPS, and chromeos and Android's
 repo manifest.
 """
+from __future__ import annotations
 
 import collections
 import copy
+import dataclasses
 import json
 import logging
 import os
 import re
 import shutil
+import typing
 
 from bisect_kit import cli
 from bisect_kit import errors
@@ -27,8 +30,6 @@ logger = logging.getLogger(__name__)
 
 _re_intra_rev = r'^([^,]+)~([^,]+)/(\d+)$'
 
-SPEC_FIXED = 'fixed'
-SPEC_FLOAT = 'float'
 _DIFF_CACHE_DIR = 'bisectkit-cache'
 
 
@@ -109,56 +110,49 @@ def argtype_intra_rev(argtype):
     return argtype_function
 
 
-def _normalize_repo_url(repo_url):
-    repo_url = re.sub(
-        r'https://chrome-internal.googlesource.com/a/',
-        r'https://chrome-internal.googlesource.com/',
-        repo_url,
-    )
-    repo_url = re.sub(r'\.git$', '', repo_url)
-    return repo_url
-
-
+@dataclasses.dataclass
 class PathSpec:
     """Specified code version of one path.
 
     Attributes:
       path: local path, relative to project base dir
       repo_url: code repository location
-      at: code version, could be git hash or branch name
+      rev: code version, could be git hash or branch name
     """
 
-    def __init__(self, path, repo_url, at):
-        self.path = path
-        self.repo_url = repo_url
-        self.at = at
+    path: str
+    repo_url: str
+    rev: str
 
-    def is_static(self):
-        return git_util.is_git_rev(self.at)
+    def is_static(self) -> bool:
+        return git_util.is_git_rev(self.rev)
 
-    def __eq__(self, rhs):
+    @property
+    def _normalized_repo_url(self):
+        return self.repo_url.removesuffix(r'.git').replace(
+            r'https://chrome-internal.googlesource.com/a/',
+            r'https://chrome-internal.googlesource.com/',
+        )
+
+    def __eq__(self, rhs: PathSpec) -> bool:
         if self.path != rhs.path:
             return False
-        if self.at != rhs.at:
+        if self.rev != rhs.rev:
             return False
-        if _normalize_repo_url(self.repo_url) != _normalize_repo_url(
-            rhs.repo_url
-        ):
+        if self._normalized_repo_url != rhs._normalized_repo_url:
             return False
         return True
 
-    def __ne__(self, rhs):
-        return not self == rhs
 
-
+@dataclasses.dataclass
 class Spec:
     """Collection of PathSpec.
 
     Spec is analogy to gclient's DEPS and repo's manifest.
 
     Attributes:
-      spec_type: type of spec, SPEC_FIXED or SPEC_FLOAT. SPEC_FIXED means code
-          version is pinned and fixed. On the other hand, SPEC_FLOAT is not
+      spec_type: type of spec, Spec.FIXED or Spec.FLOAT. Spec.FIXED means code
+          version is pinned and fixed. On the other hand, Spec.FLOAT is not
           pinned and the actual version (git commit) may change over time.
       name: name of this spec, for debugging purpose. usually version number
           or git hash
@@ -169,51 +163,68 @@ class Spec:
           this argument is not used in DEPS.
     """
 
-    def __init__(
-        self, spec_type, name, timestamp, path, entries=None, revision=None
-    ):
-        self.spec_type = spec_type
-        self.name = name
-        self.timestamp = timestamp
-        self.path = path
-        self.entries = entries
-        self.revision = revision
+    FIXED: typing.ClassVar[str] = 'fixed'
+    FLOAT: typing.ClassVar[str] = 'float'
 
-    def copy(self):
+    spec_type: str
+    name: str
+    timestamp: int
+    path: str
+    entries: dict[str, PathSpec] = dataclasses.field(default_factory=dict)
+    revision: str | None = None
+
+    @staticmethod
+    def new_fixed(*args) -> Spec:
+        return Spec(Spec.FIXED, *args)
+
+    @staticmethod
+    def new_float(*args) -> Spec:
+        return Spec(Spec.FLOAT, *args)
+
+    def copy(self) -> Spec:
         return copy.deepcopy(self)
 
-    def similar_score(self, rhs):
-        """Calculates similar score to another Spec.
+    def similarity_distance(self, rhs) -> float:
+        """Calculates similarity distance to another Spec.
+
+        Args:
+          rhs: the other Spec to compare with
 
         Returns:
-          score of similarity. Smaller value is more similar.
+          The distance of similarity. Smaller value is more similar.
         """
-        score = 0.0
+        distance = 0.0
         for path in set(self.entries) & set(rhs.entries):
             if rhs[path] == self[path]:
                 continue
-            if rhs[path].at == self[path].at:
+            if rhs[path].rev == self[path].rev:
                 # it's often that remote repo moved around but should be treated as the
                 # same one
-                score += 0.1
+                distance += 0.1
             else:
-                score += 1
-        score += len(set(self.entries) ^ set(rhs.entries))
-        return score
+                distance += 1
+        distance += len(set(self.entries) ^ set(rhs.entries))
+        return distance
 
-    def is_static(self):
+    def is_fixed(self) -> bool:
+        return self.spec_type == Spec.FIXED
+
+    def is_float(self) -> bool:
+        return self.spec_type == Spec.FLOAT
+
+    def is_static(self) -> bool:
         return all(path_spec.is_static() for path_spec in self.entries.values())
 
-    def is_subset(self, rhs):
+    def is_subset(self, rhs: Spec) -> bool:
         return set(self.entries.keys()) <= set(rhs.entries.keys())
 
-    def __getitem__(self, path):
+    def __getitem__(self, path: str) -> PathSpec:
         return self.entries[path]
 
-    def __contains__(self, path):
+    def __contains__(self, path: str) -> bool:
         return path in self.entries
 
-    def apply(self, action_group):
+    def apply(self, action_group) -> None:
         self.timestamp = action_group.timestamp
         self.name = '(%s)' % self.timestamp
         for action in action_group.actions:
@@ -222,20 +233,21 @@ class Spec:
                     action.path, action.repo_url, action.rev
                 )
             elif isinstance(action, GitCheckoutCommit):
-                self.entries[action.path].at = action.rev
+                self.entries[action.path].rev = action.rev
             elif isinstance(action, GitRemoveRepo):
                 del self.entries[action.path]
             else:
                 assert 0, 'unknown action: %s' % action.__class__.__name__
 
-    def dump(self):
-        # for debugging
-        print(self.name, self.path, self.timestamp)
-        print('size', len(self.entries))
-        for i, (path, path_spec) in enumerate(sorted(self.entries.items())):
-            print(i, path, path_spec.at)
+    def __repr__(self) -> str:
+        entries_repr = ',\n'.join(repr(entry) for entry in self.entries)
+        return (
+            f'Spec(name={self.name}, path={self.path}, '
+            f'timestamp={self.timestamp}, #entries={len(self.entries)}, '
+            f'entries:[\n{entries_repr}])'
+        )
 
-    def diff(self, rhs):
+    def show_diff(self, rhs: Spec) -> None:
         logger.info('diff between %s and %s', self.name, rhs.name)
         expect = set(self.entries)
         actual = set(rhs.entries)
@@ -248,9 +260,9 @@ class Spec:
             if self[path] == rhs[path]:
                 common_count += 1
                 continue
-            if self[path].at != rhs[path].at:
+            if self[path].rev != rhs[path].rev:
                 logger.info(
-                    ' %s: at %s vs %s', path, self[path].at, rhs[path].at
+                    ' %s: rev %s vs %s', path, self[path].rev, rhs[path].rev
                 )
             if self[path].repo_url != rhs[path].repo_url:
                 logger.info(
@@ -540,7 +552,9 @@ class SpecManager:
       - gclient sync and repo sync
     """
 
-    def collect_float_spec(self, old, new, fixed_specs=None):
+    def collect_float_spec(
+        self, old, new, fixed_specs: list[Spec] | None = None
+    ) -> list[Spec]:
         """Collects float Spec between two versions.
 
         This method may fetch spec from network. However, it should not switch tree
@@ -554,7 +568,7 @@ class SpecManager:
         """
         raise NotImplementedError
 
-    def collect_fixed_spec(self, old, new):
+    def collect_fixed_spec(self, old, new) -> list[Spec]:
         """Collects fixed Spec between two versions.
 
         This method may fetch spec from network. However, it should not switch tree
@@ -562,7 +576,7 @@ class SpecManager:
         """
         raise NotImplementedError
 
-    def parse_spec(self, spec):
+    def parse_spec(self, spec: Spec):
         """Parses information for Spec object.
 
         Args:
@@ -638,9 +652,9 @@ class CodeStorage:
           timestamp, returns the last commit.
         """
         git_root = self.cached_git_root(spec[path].repo_url)
-        # spec[path].at is remote reference name. Since git_root is a mirror (not
-        # a local checkout), there is no need to convert the name.
-        return git_util.get_rev_by_time(git_root, timestamp, spec[path].at)
+        # spec[path].rev is remote reference name. Since git_root is a mirror
+        # (not a local checkout), there is no need to convert the name.
+        return git_util.get_rev_by_time(git_root, timestamp, spec[path].rev)
 
     def get_actions_between_two_commit(
         self, spec, path, old, new, ignore_not_ancestor=False
@@ -679,7 +693,7 @@ class CodeStorage:
         for path, path_spec in spec.entries.items():
             if not path_spec.is_static():
                 continue
-            if not self.is_containing_commit(spec, path, path_spec.at):
+            if not self.is_containing_commit(spec, path, path_spec.rev):
                 return False
         return True
 
@@ -731,9 +745,9 @@ class CodeManager:
             # Add repo
             if path not in prev_float:
                 if next_float[path].is_static():
-                    next_at = next_float[path].at
+                    next_rev = next_float[path].rev
                 else:
-                    next_at = self.code_storage.get_rev_by_time(
+                    next_rev = self.code_storage.get_rev_by_time(
                         next_float, path, next_float.timestamp
                     )
                 last_group.add(
@@ -741,51 +755,55 @@ class CodeManager:
                         next_float.timestamp,
                         path,
                         next_float[path].repo_url,
-                        next_at,
+                        next_rev,
                     )
                 )
                 continue
 
             # Existing path is floating.
             if not prev_float[path].is_static():
-                # Enumerates commits until next spec. Get `prev_at` and `till_at`
-                # by prev_float and next_float's timestamp.
+                # Enumerates commits until next spec. Get `prev_rev` and
+                # `till_rev` by prev_float and next_float's timestamp.
                 #
                 # 1. Non-branched case:
                 #
-                #                prev_at                 till_at
+                #                prev_rev                till_rev
                 # prev branch ---> o --------> o --------> o --------> o --------> ...
                 #                       ^                        ^
                 #                 prev_float.timestamp        next_float.timestamp
                 #
-                # building an image between prev_at and till_at should follow
+                # building an image between prev_rev and till_rev should follow
                 # prev_float's spec.
                 #
                 # 2. Branched case:
                 #
-                #                     till_at
+                #                     till_rev
                 #              /------->o---------->
                 #             /            ^ next_float.timestamp
-                #            / prev_at
+                #            / prev_rev
                 # ---------->o---------------------->
                 #                ^prev_float.timestamp
                 #
-                # building an image between prev_at and till_at should follow
+                # building an image between prev_rev and till_rev should follow
                 # next_float's spec.
                 #
-                prev_at = self.code_storage.get_rev_by_time(
+                prev_rev = self.code_storage.get_rev_by_time(
                     prev_float, path, prev_float.timestamp
                 )
                 if is_chromeos_branched:
-                    till_at = self.code_storage.get_rev_by_time(
+                    till_rev = self.code_storage.get_rev_by_time(
                         next_float, path, next_float.timestamp
                     )
                 else:
-                    till_at = self.code_storage.get_rev_by_time(
+                    till_rev = self.code_storage.get_rev_by_time(
                         prev_float, path, next_float.timestamp
                     )
                 actions = self.code_storage.get_actions_between_two_commit(
-                    prev_float, path, prev_at, till_at, ignore_not_ancestor=True
+                    prev_float,
+                    path,
+                    prev_rev,
+                    till_rev,
+                    ignore_not_ancestor=True,
                 )
 
                 # Assume commits with the same timestamp as manifest/DEPS change are
@@ -798,14 +816,14 @@ class CodeManager:
                     group.add(action)
                     groups.append(group)
             else:
-                prev_at = till_at = prev_float[path].at
+                prev_rev = till_rev = prev_float[path].rev
 
             # At next_float.timestamp.
             if path not in next_float:
                 if path in is_removed:
                     continue
                 # remove repo
-                next_at = None
+                next_rev = None
                 sub_repos = [
                     p for p in prev_float.entries if p.startswith(path + '/')
                 ]
@@ -821,38 +839,38 @@ class CodeManager:
                             next_float.timestamp,
                             path2,
                             next_float[path2].repo_url,
-                            prev_float[path2].at,
+                            prev_float[path2].rev,
                         )
                     )
 
             elif next_float[path].is_static():
                 # pinned to certain commit on different branch
-                next_at = next_float[path].at
+                next_rev = next_float[path].rev
 
-            elif next_float[path].at == prev_float[path].at:
+            elif next_float[path].rev == prev_float[path].rev:
                 # keep floating on the same branch
-                next_at = till_at
+                next_rev = till_rev
 
             else:
                 # switch to another branch
-                #                prev_at                 till_at
+                #                prev_rev                till_rev
                 # prev branch ---> o --------> o --------> o --------> o --------> ...
                 #
-                #                                            next_at
+                #                                            next_rev
                 # next branch                 ...... o ------> o --------> o -----> ...
                 #                       ^                         ^
                 #                 prev_float.timestamp        next_float.timestamp
-                next_at = self.code_storage.get_rev_by_time(
+                next_rev = self.code_storage.get_rev_by_time(
                     next_float, path, next_float.timestamp
                 )
 
-            if next_at and next_at != till_at:
+            if next_rev and next_rev != till_rev:
                 last_group.add(
                     GitCheckoutCommit(
                         next_float.timestamp,
                         path,
                         next_float[path].repo_url,
-                        next_at,
+                        next_rev,
                     )
                 )
 
@@ -874,15 +892,15 @@ class CodeManager:
         result = {}
         for path, path_spec in float_spec.entries.items():
             if not path_spec.is_static():
-                at = self.code_storage.get_rev_by_time(
+                rev = self.code_storage.get_rev_by_time(
                     float_spec, path, timestamp
                 )
-                path_spec = PathSpec(path_spec.path, path_spec.repo_url, at)
+                path_spec = PathSpec(path_spec.path, path_spec.repo_url, rev)
 
             result[path] = copy.deepcopy(path_spec)
 
         name = '%s@%s' % (float_spec.path, timestamp)
-        return Spec(SPEC_FIXED, name, timestamp, float_spec.path, result)
+        return Spec(Spec.FIXED, name, timestamp, float_spec.path, result)
 
     def match_spec(self, target, specs, start_index=0):
         # ideal_index is the index of last spec before target
@@ -898,7 +916,7 @@ class CodeManager:
             )
             return None
 
-        scores = []
+        distance_list = []
         for i, spec in enumerate(specs[start_index:], start_index):
             if not spec.is_subset(target):
                 continue  # incompatible, ignore
@@ -908,22 +926,22 @@ class CodeManager:
                 timediff = 0, target.timestamp - spec.timestamp
             else:
                 timediff = 1, spec.timestamp - target.timestamp
-            score = spec.similar_score(target)
-            scores.append((score, timediff, i))
+            distance = spec.similarity_distance(target)
+            distance_list.append((distance, timediff, i))
 
-        if not scores:
+        if not distance_list:
             logger.error('unable to match %s: no compatible specs', target.name)
             spec = specs[start_index]
-            target.diff(spec)
+            target.show_diff(spec)
             return None
 
-        scores.sort()
-        score, _, index = scores[0]
-        if score != 0:
+        distance_list.sort()
+        distance, _, index = distance_list[0]
+        if distance != 0:
             logger.warning(
-                'not exactly match (score=%s): %s', score, target.name
+                'not exactly match (distance=%s): %s', distance, target.name
             )
-            target.diff(specs[index])
+            target.show_diff(specs[index])
 
         if index < ideal_index:
             logger.warning(
@@ -978,13 +996,13 @@ class CodeManager:
             timestamp, comment='make up glitch for %s' % fixed_spec.name
         )
         for path in set(fixed_spec.entries) & set(synthesized.entries):
-            if fixed_spec[path].at == synthesized[path].at:
+            if fixed_spec[path].rev == synthesized[path].rev:
                 continue
             action = GitCheckoutCommit(
                 timestamp,
                 path,
                 synthesized[path].repo_url,
-                synthesized[path].at,
+                synthesized[path].rev,
             )
             make_up.add(action)
 
@@ -1101,7 +1119,7 @@ class CodeManager:
 
             # handle glitch
             if (
-                fixed_specs[fixed_index].similar_score(
+                fixed_specs[fixed_index].similarity_distance(
                     synthesized[synthesized_index]
                 )
                 != 0

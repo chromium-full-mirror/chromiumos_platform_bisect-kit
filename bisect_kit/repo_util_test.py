@@ -107,9 +107,9 @@ class TestManifestParser(unittest.TestCase):
             result['frameworks/av'].repo_url,
             'https://example.com/platform/frameworks/av',
         )
-        self.assertEqual(result['frameworks/av'].at, 'foobar')
+        self.assertEqual(result['frameworks/av'].rev, 'foobar')
 
-        self.assertEqual(result['frameworks/base'].at, 'main')
+        self.assertEqual(result['frameworks/base'].rev, 'main')
 
         self.assertNotIn('frameworks/foo', result)
 

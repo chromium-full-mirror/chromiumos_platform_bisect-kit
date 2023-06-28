@@ -531,9 +531,7 @@ class ChromeSpecManager(codechange.SpecManager):
         for timestamp, path_specs in parser.enumerate_path_specs(
             old_timestamp, new_timestamp, meta_dir
         ):
-            spec = codechange.Spec(
-                codechange.SPEC_FLOAT, '(n/a)', timestamp, path
-            )
+            spec = codechange.Spec.new_float('(n/a)', timestamp, path)
             spec.entries = path_specs
             self._hack_trim_libassistant(old, new, spec)
             result.append(spec)
@@ -590,9 +588,7 @@ class ChromeSpecManager(codechange.SpecManager):
             meta_head_rev = git_util.get_commit_hash(meta_dir, 'HEAD')
 
             timestamp = git_util.get_commit_time(self.chrome_src, tag, 'DEPS')
-            spec = codechange.Spec(
-                codechange.SPEC_FIXED, tag, timestamp, 'DEPS'
-            )
+            spec = codechange.Spec.new_fixed(tag, timestamp, 'DEPS')
             path_specs_result = list(
                 parser.enumerate_path_specs(
                     timestamp, timestamp, meta_dir, meta_head_rev
@@ -638,7 +634,7 @@ class ChromeSpecManager(codechange.SpecManager):
             if not path_spec.is_static():  # only surgery for fixed spec
                 continue
             while True:
-                metadata = git_util.get_commit_metadata(git_repo, path_spec.at)
+                metadata = git_util.get_commit_metadata(git_repo, path_spec.rev)
                 if metadata.parent is None:
                     break
                 bot_email = 'chrome-release-bot@chromium.org'
@@ -648,7 +644,7 @@ class ChromeSpecManager(codechange.SpecManager):
                 ):
                     break
 
-                path_spec.at = metadata.parent[0]
+                path_spec.rev = metadata.parent[0]
 
     def sync_to_release(self, rev):
         """Switch source tree to given release version.

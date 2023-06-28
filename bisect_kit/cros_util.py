@@ -2637,7 +2637,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
                 ) from e
         return timestamp
 
-    def detect_float_spec_branch_level(self, spec):
+    def detect_float_spec_branch_level(self, spec: codechange.Spec) -> int:
         results = [
             detect_branch_level(branch)
             for branch in git_util.get_branches(
@@ -2647,10 +2647,12 @@ class ChromeOSSpecManager(codechange.SpecManager):
         results = [x for x in results if x > 0]
         return min(results) if results else 0
 
-    def branch_between_float_specs(self, old_spec, new_spec):
-        if old_spec.spec_type != codechange.SPEC_FLOAT:
+    def branch_between_float_specs(
+        self, old_spec: codechange.Spec, new_spec: codechange.Spec
+    ) -> bool:
+        if not old_spec.is_float():
             return False
-        if new_spec.spec_type != codechange.SPEC_FLOAT:
+        if not new_spec.is_float():
             return False
 
         level_old = self.detect_float_spec_branch_level(old_spec)
@@ -2661,7 +2663,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
             return False
         return level_old != level_new
 
-    def _determine_float_branch(self, old, new, fixed_specs):
+    def _determine_float_branch(
+        self, old: str, new: str, fixed_specs: list[codechange.Spec]
+    ) -> str:
         # There is no revision tag in snapshot's xml. We know snapshot
         # builds are on main branch.
         main_refname = 'refs/remotes/origin/main'
@@ -2730,7 +2734,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # With such property, among the branches containing the given manifest
         # file, the branch with "smallest" number guarantees where the release is.
 
-        def branch_key(s):
+        def branch_key(s) -> tuple:
             if s == main_refname:
                 return 0, 0, 0
             m = re.search(r'-(\d+)\.B$', s)
@@ -2749,7 +2753,12 @@ class ChromeOSSpecManager(codechange.SpecManager):
         common_branches.sort(key=branch_key)
         return common_branches[0]
 
-    def collect_float_spec(self, old, new, fixed_specs=None):
+    def collect_float_spec(
+        self,
+        old: str,
+        new: str,
+        fixed_specs: list[codechange.Spec] | None = None,
+    ) -> list[codechange.Spec]:
         assert fixed_specs
         branch = self._determine_float_branch(old, new, fixed_specs)
         logger.debug('float branch=%s', branch)
@@ -2772,13 +2781,11 @@ class ChromeOSSpecManager(codechange.SpecManager):
             old_timestamp, new_timestamp, path, branch=branch
         ):
             result.append(
-                codechange.Spec(
-                    codechange.SPEC_FLOAT, commit.rev, commit.timestamp, path
-                )
+                codechange.Spec.new_float(commit.rev, commit.timestamp, path)
             )
         return result
 
-    def collect_fixed_spec(self, old, new):
+    def collect_fixed_spec(self, old: str, new: str) -> list[codechange.Spec]:
         assert is_cros_full_version(old) or is_cros_snapshot_version(old)
         assert is_cros_full_version(new) or is_cros_snapshot_version(new)
 
@@ -2804,7 +2811,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
             result += self.collect_snapshot_specs(new, new)
         return result
 
-    def collect_snapshot_specs(self, old, new):
+    def collect_snapshot_specs(
+        self, old: str, new: str
+    ) -> list[codechange.Spec]:
         assert is_cros_snapshot_version(old)
         assert is_cros_snapshot_version(new)
 
@@ -2817,9 +2826,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             )
             if snapshot_version:
                 result.append(
-                    codechange.Spec(
-                        codechange.SPEC_FIXED, snapshot_version, timestamp, path
-                    )
+                    codechange.Spec.new_fixed(snapshot_version, timestamp, path)
                 )
             else:
                 logger.warning(
@@ -2912,9 +2919,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
                     rev = make_cros_full_version(milestone, short_version)
                     timestamp = self.query_release_manifest_timestamp(rev)
                     result.append(
-                        codechange.Spec(
-                            codechange.SPEC_FIXED, rev, timestamp, path
-                        )
+                        codechange.Spec.new_fixed(rev, timestamp, path)
                     )
 
         def version_key_func(spec):
@@ -2970,9 +2975,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
 
         return manifest_name
 
-    def parse_spec(self, spec):
+    def parse_spec(self, spec: codechange.Spec):
         parser = repo_util.ManifestParser(self.manifest_dir)
-        if spec.spec_type == codechange.SPEC_FIXED:
+        if spec.is_fixed():
             manifest_name = self.get_manifest_file(spec.name)
             manifest_path = os.path.join(self.manifest_dir, manifest_name)
             with open(manifest_path) as f:
@@ -2982,11 +2987,10 @@ class ChromeOSSpecManager(codechange.SpecManager):
             root = parser.parse_xml_recursive(spec.name, spec.path)
 
         spec.entries = parser.process_parsed_result(root)
-        if spec.spec_type == codechange.SPEC_FIXED:
-            if not spec.is_static():
-                raise ValueError(
-                    'fixed spec %r has unexpected floating entries' % spec.name
-                )
+        if spec.is_fixed() and not spec.is_static():
+            raise ValueError(
+                f'fixed spec {spec.name!r} has unexpected floating entries'
+            )
         spec.revision = root.get('revision')
 
         # (b/257863941) If the root tag is lack of revision information, try to

@@ -242,7 +242,6 @@ class AndroidSpecManager(codechange.SpecManager):
 
     def collect_float_spec(self, old, new, fixed_specs=None):
         del fixed_specs  # unused
-        result = []
         path = 'default.xml'
 
         commits = []
@@ -255,13 +254,11 @@ class AndroidSpecManager(codechange.SpecManager):
             if commit.timestamp > new_timestamp:
                 break
 
-        for commit in commits:
-            result.append(
-                codechange.Spec(
-                    codechange.SPEC_FLOAT, commit.rev, commit.timestamp, path
-                )
-            )
-        return result
+        float_specs = [
+            codechange.Spec.new_float(commit.rev, commit.timestamp, path)
+            for commit in commits
+        ]
+        return float_specs
 
     def collect_fixed_spec(self, old, new):
         result = []
@@ -274,13 +271,11 @@ class AndroidSpecManager(codechange.SpecManager):
             )
             path = os.path.join(self.manifest_dir, manifest_name)
             timestamp = lookup_build_timestamp(self.config['flavor'], rev)
-            result.append(
-                codechange.Spec(codechange.SPEC_FIXED, rev, timestamp, path)
-            )
+            result.append(codechange.Spec.new_fixed(rev, timestamp, path))
         return result
 
     def _load_manifest_content(self, spec):
-        if spec.spec_type == codechange.SPEC_FIXED:
+        if spec.is_fixed():
             manifest_name = fetch_manifest(
                 self.config['branch'], self.config['flavor'], spec.name
             )
@@ -298,11 +293,10 @@ class AndroidSpecManager(codechange.SpecManager):
         parser = repo_util.ManifestParser(self.manifest_dir)
         root = parser.parse_single_xml(manifest_content, allow_include=False)
         spec.entries = parser.process_parsed_result(root)
-        if spec.spec_type == codechange.SPEC_FIXED:
-            if not spec.is_static():
-                raise ValueError(
-                    'fixed spec %r has unexpected floating entries' % spec.name
-                )
+        if spec.is_fixed() and not spec.is_static():
+            raise ValueError(
+                f'fixed spec {spec.name!r} has unexpected floating entries'
+            )
 
     def sync_disk_state(self, rev):
         manifest_name = fetch_manifest(
