@@ -35,6 +35,7 @@ order_by_type = false
 minversion = "6.0"
 addopts = [
     "--cov",
+    "--no-cov-on-fail",
     "--log-level=DEBUG",
     "--quiet",
     "--numprocesses=auto",
