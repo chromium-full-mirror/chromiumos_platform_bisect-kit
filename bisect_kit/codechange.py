@@ -11,6 +11,7 @@ repo manifest.
 """
 from __future__ import annotations
 
+import abc
 import collections
 import copy
 import dataclasses
@@ -274,44 +275,40 @@ class Spec:
         logger.info('and common=%s', common_count)
 
 
+@dataclasses.dataclass
 class Action:
-    """Actions describe changes from one Spec to another.
+    """Describes changes from one Spec to another.
 
     Attributes:
       timestamp: action time
       path: action path, which is relative to project root
     """
 
-    def __init__(self, timestamp, path):
-        self.timestamp = timestamp
-        self.path = path
+    timestamp: int
+    path: str
 
-    def apply(self, _code_storage, _root_dir):
+    @abc.abstractmethod
+    def apply(self, code_storage: CodeStorage, root_dir: str) -> None:
+        del code_storage, root_dir
         raise NotImplementedError
 
-    def summary(self):
+    @abc.abstractmethod
+    def summary(self) -> dict:
         raise NotImplementedError
 
-    def __eq__(self, rhs):
-        return self.__dict__ == rhs.__dict__
+    def serialize(self) -> tuple[str, dict]:
+        return self.__class__.__name__, dataclasses.asdict(self)
 
-    def serialize(self):
-        return self.__class__.__name__, self.__dict__
-
-
-def unserialize_action(data):
-    classes = [GitCheckoutCommit, GitAddRepo, GitRemoveRepo]
-    class_name, values = data
-    assert class_name in [cls.__name__ for cls in classes], (
-        'unknown action class: %s' % class_name
-    )
-    for cls in classes:
-        if class_name == cls.__name__:
-            action = cls(**values)
-            break
-    return action
+    @staticmethod
+    def deserialize(action_data: tuple) -> Action:
+        class_name, values = action_data
+        for subclass in Action.__subclasses__():
+            if class_name == subclass.__name__:
+                return subclass(**values)
+        raise ValueError(f'Unknown action class: {class_name}')
 
 
+@dataclasses.dataclass
 class ActionGroup:
     """Atomic group of Action objects
 
@@ -323,13 +320,12 @@ class ActionGroup:
     Otherwise, one ActionGroup usually consists only one Action object.
     """
 
-    def __init__(self, timestamp, comment=None):
-        self.timestamp = timestamp
-        self.name = None
-        self.actions = []
-        self.comment = comment
+    timestamp: int
+    name: str | None = None
+    comment: str | None = None
+    actions: list[Action] = dataclasses.field(default_factory=list)
 
-    def add(self, action):
+    def append(self, action: Action) -> None:
         self.actions.append(action)
 
     def serialize(self):
@@ -340,7 +336,7 @@ class ActionGroup:
             actions=[a.serialize() for a in self.actions],
         )
 
-    def summary(self):
+    def summary(self) -> dict:
         result = {}
         if self.comment:
             result['comment'] = self.comment
@@ -348,19 +344,22 @@ class ActionGroup:
         return result
 
     @staticmethod
-    def unserialize(data):
-        ag = ActionGroup(data['timestamp'])
-        ag.name = data['name']
-        ag.comment = data['comment']
-        for x in data['actions']:
-            ag.add(unserialize_action(x))
-        return ag
+    def deserialize(group_data: dict) -> ActionGroup:
+        group = ActionGroup(
+            timestamp=group_data['timestamp'],
+            name=group_data['name'],
+            comment=group_data['comment'],
+        )
+        for action_data in group_data['actions']:
+            group.append(Action.deserialize(action_data))
+        return group
 
-    def apply(self, code_storage, root_dir):
+    def apply(self, code_storage: CodeStorage, root_dir: str) -> None:
         for action in self.actions:
             action.apply(code_storage, root_dir)
 
 
+@dataclasses.dataclass
 class GitCheckoutCommit(Action):
     """Describes a git commit action.
 
@@ -369,12 +368,10 @@ class GitCheckoutCommit(Action):
       rev: git commit to checkout
     """
 
-    def __init__(self, timestamp, path, repo_url, rev):
-        super().__init__(timestamp, path)
-        self.repo_url = repo_url
-        self.rev = rev
+    repo_url: str = ''
+    rev: str = ''
 
-    def _ensure_remote(self, code_storage, root_dir):
+    def _ensure_remote(self, code_storage: CodeStorage, root_dir: str) -> None:
         git_repo = os.path.join(root_dir, self.path)
         remotes = git_util.get_remotes(git_repo)
 
@@ -399,32 +396,32 @@ class GitCheckoutCommit(Action):
                 # Anyway, the target commit exists. Safe.
                 return
             raise errors.InternalError(
-                '%r has more than one tracking remote '
-                'and we do not know how to handle remote change' % self.path
+                f'{self.path!r} has more than one tracking remote '
+                'and we do not know how to handle remote change'
             )
 
         remote = remotes[0]
         git_util.set_remote_url(git_repo, remote, expected_remote_url)
         git_util.fetch(git_repo, remote)
 
-    def apply(self, code_storage, root_dir):
+    def apply(self, code_storage: CodeStorage, root_dir: str) -> None:
         git_repo = os.path.join(root_dir, self.path)
         assert git_util.is_git_root(git_repo)
         self._ensure_remote(code_storage, root_dir)
         git_util.checkout_version(git_repo, self.rev)
 
-    def summary(self):
-        text = 'commit %s %s' % (self.rev[:10], self.path)
+    def summary(self) -> dict:
         return dict(
             timestamp=self.timestamp,
             action_type='commit',
             path=self.path,
             repo_url=self.repo_url,
             rev=self.rev,
-            text=text,
+            text=f'commit {self.rev[:10]} {self.path}',
         )
 
 
+@dataclasses.dataclass
 class GitAddRepo(Action):
     """Describes a git repo add action.
 
@@ -433,12 +430,10 @@ class GitAddRepo(Action):
       rev: git commit to checkout
     """
 
-    def __init__(self, timestamp, path, repo_url, rev):
-        super().__init__(timestamp, path)
-        self.repo_url = repo_url
-        self.rev = rev
+    repo_url: str = ''
+    rev: str = ''
 
-    def apply(self, code_storage, root_dir):
+    def apply(self, code_storage: CodeStorage, root_dir: str) -> None:
         git_repo = os.path.join(root_dir, self.path)
         if os.path.exists(git_repo):
             if os.path.isdir(git_repo) and not os.listdir(git_repo):
@@ -459,26 +454,22 @@ class GitAddRepo(Action):
 
         code_storage.add_to_project_list(root_dir, self.path, self.repo_url)
 
-    def summary(self):
-        text = 'add repo %s from %s@%s' % (
-            self.path,
-            self.repo_url,
-            self.rev[:10],
-        )
+    def summary(self) -> dict:
         return dict(
             timestamp=self.timestamp,
             action_type='add_repo',
             path=self.path,
             repo_url=self.repo_url,
             rev=self.rev,
-            text=text,
+            text=f'add repo {self.path} from {self.repo_url}@{self.rev[:10]}',
         )
 
 
+@dataclasses.dataclass
 class GitRemoveRepo(Action):
     """Describes a git repo remove action."""
 
-    def apply(self, code_storage, root_dir):
+    def apply(self, code_storage: CodeStorage, root_dir: str) -> None:
         assert self.path
         root_dir = os.path.normpath(root_dir)
         git_repo = os.path.join(root_dir, self.path)
@@ -502,7 +493,7 @@ class GitRemoveRepo(Action):
 
         code_storage.remove_from_project_list(root_dir, self.path)
 
-    def summary(self):
+    def summary(self) -> dict:
         return dict(
             timestamp=self.timestamp,
             action_type='remove_repo',
@@ -511,7 +502,9 @@ class GitRemoveRepo(Action):
         )
 
 
-def apply_actions(code_storage, action_groups, root_dir):
+def apply_actions(
+    code_storage: CodeStorage, action_groups: list[ActionGroup], root_dir: str
+) -> None:
     # Speed optimization: only apply the last one of consecutive commits per
     # repo. It is possible to optimize further, but need to take care git repo
     # add/remove within another repo.
@@ -727,7 +720,7 @@ class CodeManager:
         """
         groups = []
         last_group = ActionGroup(next_float.timestamp)
-        is_removed = set()
+        removed_path_set = set()
 
         # `branch_between_float_specs` is currently a chromeos-only logic,
         # and branch behavior is not verified for android and chrome now.
@@ -750,7 +743,7 @@ class CodeManager:
                     next_rev = self.code_storage.get_rev_by_time(
                         next_float, path, next_float.timestamp
                     )
-                last_group.add(
+                last_group.append(
                     GitAddRepo(
                         next_float.timestamp,
                         path,
@@ -809,18 +802,18 @@ class CodeManager:
                 # Assume commits with the same timestamp as manifest/DEPS change are
                 # atomic.
                 if actions and actions[-1].timestamp == next_float.timestamp:
-                    last_group.add(actions.pop())
+                    last_group.append(actions.pop())
 
                 for action in actions:
                     group = ActionGroup(action.timestamp)
-                    group.add(action)
+                    group.append(action)
                     groups.append(group)
             else:
                 prev_rev = till_rev = prev_float[path].rev
 
             # At next_float.timestamp.
             if path not in next_float:
-                if path in is_removed:
+                if path in removed_path_set:
                     continue
                 # remove repo
                 next_rev = None
@@ -829,12 +822,14 @@ class CodeManager:
                 ]
                 # Remove deeper repo first
                 for path2 in sorted(sub_repos, reverse=True):
-                    last_group.add(GitRemoveRepo(next_float.timestamp, path2))
-                    is_removed.add(path2)
-                last_group.add(GitRemoveRepo(next_float.timestamp, path))
-                is_removed.add(path)
+                    last_group.append(
+                        GitRemoveRepo(next_float.timestamp, path2)
+                    )
+                    removed_path_set.add(path2)
+                last_group.append(GitRemoveRepo(next_float.timestamp, path))
+                removed_path_set.add(path)
                 for path2 in sorted(set(sub_repos) & set(next_float.entries)):
-                    last_group.add(
+                    last_group.append(
                         GitAddRepo(
                             next_float.timestamp,
                             path2,
@@ -865,7 +860,7 @@ class CodeManager:
                 )
 
             if next_rev and next_rev != till_rev:
-                last_group.add(
+                last_group.append(
                     GitCheckoutCommit(
                         next_float.timestamp,
                         path,
@@ -993,18 +988,19 @@ class CodeManager:
     def _create_make_up_actions(self, fixed_spec, synthesized):
         timestamp = synthesized.timestamp
         make_up = ActionGroup(
-            timestamp, comment='make up glitch for %s' % fixed_spec.name
+            timestamp, comment=f'make up glitch for {fixed_spec.name}'
         )
         for path in set(fixed_spec.entries) & set(synthesized.entries):
             if fixed_spec[path].rev == synthesized[path].rev:
                 continue
-            action = GitCheckoutCommit(
-                timestamp,
-                path,
-                synthesized[path].repo_url,
-                synthesized[path].rev,
+            make_up.append(
+                GitCheckoutCommit(
+                    timestamp,
+                    path,
+                    synthesized[path].repo_url,
+                    synthesized[path].rev,
+                )
             )
-            make_up.add(action)
 
         if not make_up.actions:
             return None
@@ -1209,7 +1205,7 @@ class CodeManager:
         result = []
         with open(cache_filename) as f:
             for data in json.load(f):
-                result.append(ActionGroup.unserialize(data))
+                result.append(ActionGroup.deserialize(data))
 
         return result
 
