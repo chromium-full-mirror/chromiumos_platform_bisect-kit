@@ -504,17 +504,17 @@ class ManifestParser:
 class RepoMirror(codechange.CodeStorage):
     """Repo git mirror."""
 
-    def __init__(self, mirror_dir):
+    def __init__(self, mirror_dir: str):
         self.mirror_dir = mirror_dir
 
-    def _url_to_cache_dir(self, url):
+    def _url_to_cache_dir(self, url) -> str:
         # Here we assume remote fetch url is always at root of server url, so we can
         # simply treat whole path as repo project name.
         path = urllib.parse.urlparse(url).path
         assert path[0] == '/'
         return '%s.git' % path[1:]
 
-    def cached_git_root(self, repo_url):
+    def cached_git_root(self, repo_url: str) -> str:
         cache_path = self._url_to_cache_dir(repo_url)
 
         # The location of chromeos manifest-internal repo mirror is irregular
@@ -524,17 +524,20 @@ class RepoMirror(codechange.CodeStorage):
 
         return os.path.join(self.mirror_dir, cache_path)
 
-    def _load_project_list(self, project_root):
+    def _load_project_list(self, project_root: str) -> list[str]:
         repo_project_list = os.path.join(project_root, '.repo', 'project.list')
         with open(repo_project_list) as f:
             return f.readlines()
 
-    def _save_project_list(self, project_root, lines):
+    def _save_project_list(self, project_root: str, lines: list[str]) -> None:
         repo_project_list = os.path.join(project_root, '.repo', 'project.list')
         with open(repo_project_list, 'w') as f:
             f.write(''.join(sorted(lines)))
 
-    def add_to_project_list(self, project_root, path, repo_url):
+    def add_to_project_list(
+        self, project_root: str, path: str, repo_url: str
+    ) -> None:
+        del repo_url
         lines = self._load_project_list(project_root)
 
         line = path + '\n'
@@ -543,7 +546,7 @@ class RepoMirror(codechange.CodeStorage):
 
         self._save_project_list(project_root, lines)
 
-    def remove_from_project_list(self, project_root, path):
+    def remove_from_project_list(self, project_root: str, path: str) -> None:
         lines = self._load_project_list(project_root)
 
         line = path + '\n'

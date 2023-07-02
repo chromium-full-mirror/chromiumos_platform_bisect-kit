@@ -545,8 +545,9 @@ class SpecManager:
       - gclient sync and repo sync
     """
 
+    @abc.abstractmethod
     def collect_float_spec(
-        self, old, new, fixed_specs: list[Spec] | None = None
+        self, old: str, new: str, fixed_specs: list[Spec] | None = None
     ) -> list[Spec]:
         """Collects float Spec between two versions.
 
@@ -559,27 +560,34 @@ class SpecManager:
           fixed_specs: fixed specs from collect_fixed_spec(old, new) for ChromeOS
               or None for others
         """
+        del old, new, fixed_specs
         raise NotImplementedError
 
-    def collect_fixed_spec(self, old, new) -> list[Spec]:
+    @abc.abstractmethod
+    def collect_fixed_spec(self, old: str, new: str) -> list[Spec]:
         """Collects fixed Spec between two versions.
 
         This method may fetch spec from network. However, it should not switch tree
         version state.
         """
+        del old, new
         raise NotImplementedError
 
-    def parse_spec(self, spec: Spec):
+    @abc.abstractmethod
+    def parse_spec(self, spec: Spec) -> None:
         """Parses information for Spec object.
 
         Args:
           spec: Spec object. It specifies what to parse and the parsed information
               is stored inside.
         """
+        del spec
         raise NotImplementedError
 
-    def sync_disk_state(self, rev):
+    @abc.abstractmethod
+    def sync_disk_state(self, rev: str) -> None:
         """Switch source tree state to given version."""
+        del rev
         raise NotImplementedError
 
 
@@ -600,7 +608,8 @@ class CodeStorage:
     repo's mirror.
     """
 
-    def cached_git_root(self, repo_url):
+    @abc.abstractmethod
+    def cached_git_root(self, repo_url: str) -> str:
         """The cached path of given remote git repo.
 
         Args:
@@ -609,16 +618,25 @@ class CodeStorage:
         Returns:
           path of cache folder
         """
+        del repo_url
         raise NotImplementedError
 
-    def add_to_project_list(self, project_root, path, repo_url):
+    @abc.abstractmethod
+    def add_to_project_list(
+        self, project_root: str, path: str, repo_url: str
+    ) -> None:
+        del project_root, path, repo_url
         raise NotImplementedError
 
-    def remove_from_project_list(self, project_root, path):
+    @abc.abstractmethod
+    def remove_from_project_list(self, project_root: str, path: str) -> None:
+        del project_root, path
         raise NotImplementedError
 
-    def is_ancestor_commit(self, spec, path, old, new):
-        """Determine one commit is ancestor of another.
+    def is_ancestor_commit(
+        self, spec: Spec, path: str, old: str, new: str
+    ) -> bool:
+        """Checks if one commit is ancestor of another.
 
         Args:
           spec: Spec object
@@ -632,7 +650,9 @@ class CodeStorage:
         git_root = self.cached_git_root(spec[path].repo_url)
         return git_util.is_ancestor_commit(git_root, old, new)
 
-    def get_rev_by_time(self, spec, path, timestamp):
+    def get_rev_by_time(
+        self, spec: Spec, path: str, timestamp: int
+    ) -> str | None:
         """Get commit hash of given spec by time.
 
         Args:

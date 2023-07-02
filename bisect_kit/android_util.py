@@ -234,13 +234,18 @@ class AndroidSpecManager(codechange.SpecManager):
     and sync to disk state according to them.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: dict):
         self.config = config
         self.manifest_dir = os.path.join(
             self.config['android_root'], '.repo', 'manifests'
         )
 
-    def collect_float_spec(self, old, new, fixed_specs=None):
+    def collect_float_spec(
+        self,
+        old: str,
+        new: str,
+        fixed_specs: list[codechange.Spec] | None = None,
+    ) -> list[codechange.Spec]:
         del fixed_specs  # unused
         path = 'default.xml'
 
@@ -260,7 +265,7 @@ class AndroidSpecManager(codechange.SpecManager):
         ]
         return float_specs
 
-    def collect_fixed_spec(self, old, new):
+    def collect_fixed_spec(self, old: str, new: str) -> list[codechange.Spec]:
         result = []
         revlist = get_build_ids_between(
             self.config['branch'], self.config['flavor'], int(old), int(new)
@@ -274,7 +279,7 @@ class AndroidSpecManager(codechange.SpecManager):
             result.append(codechange.Spec.new_fixed(rev, timestamp, path))
         return result
 
-    def _load_manifest_content(self, spec):
+    def _load_manifest_content(self, spec: codechange.Spec) -> str:
         if spec.is_fixed():
             manifest_name = fetch_manifest(
                 self.config['branch'], self.config['flavor'], spec.name
@@ -287,7 +292,7 @@ class AndroidSpecManager(codechange.SpecManager):
             )
         return content
 
-    def parse_spec(self, spec):
+    def parse_spec(self, spec: codechange.Spec) -> None:
         logger.debug('parse_spec %s', spec.name)
         manifest_content = self._load_manifest_content(spec)
         parser = repo_util.ManifestParser(self.manifest_dir)
@@ -298,7 +303,7 @@ class AndroidSpecManager(codechange.SpecManager):
                 f'fixed spec {spec.name!r} has unexpected floating entries'
             )
 
-    def sync_disk_state(self, rev):
+    def sync_disk_state(self, rev: str) -> None:
         manifest_name = fetch_manifest(
             self.config['android_root'], self.config['flavor'], rev
         )

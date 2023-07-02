@@ -427,17 +427,17 @@ class ChromeSpecManager(codechange.SpecManager):
     state according to them.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: dict):
         self.config = config
         self.spec_dir = os.path.join(config['chrome_root'], 'buildspec')
         self.chrome_src = os.path.join(config['chrome_root'], 'src')
 
-    def lookup_build_timestamp(self, rev):
+    def lookup_build_timestamp(self, rev: str) -> int:
         assert is_chrome_version(rev)
 
         return git_util.get_commit_time(self.chrome_src, rev, 'DEPS')
 
-    def generate_meta_deps(self, rev):
+    def generate_meta_deps(self, rev: str) -> str:
         """Generates a root DEPS file.
 
         This is kind of workaround for the limitation of our DEPS parser. When
@@ -486,7 +486,10 @@ class ChromeSpecManager(codechange.SpecManager):
 
         return meta_dir
 
-    def _hack_trim_libassistant(self, old, _new, spec):
+    def _hack_trim_libassistant(
+        self, old: str, new: str, spec: codechange.Spec
+    ) -> None:
+        del new
         # Before 74.0.3694.0, assistant use custom hook to sync code.
         # This is bad practice and difficult to deal. Because most of
         # regressions are not related to assistant, we simply remove repo
@@ -496,7 +499,12 @@ class ChromeSpecManager(codechange.SpecManager):
                 if path.startswith('src/chromeos/assistant/libassistant/src/'):
                     del spec.entries[path]
 
-    def collect_float_spec(self, old, new, fixed_specs=None):
+    def collect_float_spec(
+        self,
+        old: str,
+        new: str,
+        fixed_specs: list[codechange.Spec] | None = None,
+    ) -> list[codechange.Spec]:
         del fixed_specs  # unused
         logger.info('collect_float_spec')
         old_timestamp = self.lookup_build_timestamp(old)
@@ -537,7 +545,7 @@ class ChromeSpecManager(codechange.SpecManager):
             result.append(spec)
         return result
 
-    def enumerate_ancestor(self, new):
+    def enumerate_ancestor(self, new: str) -> list[str]:
         result = []
         for rev in git_util.get_tags(self.chrome_src):
             # 74.0.3696.0/DEPS is bad and rejected by gclient (crbug/929544)
@@ -572,7 +580,7 @@ class ChromeSpecManager(codechange.SpecManager):
 
         return get_lca(old_version, new_version, version_list_chrome)
 
-    def collect_fixed_spec(self, old, new):
+    def collect_fixed_spec(self, old: str, new: str) -> list[codechange.Spec]:
         logger.info('collect_fixed_spec')
         assert is_direct_relative_version(old, new)
         result = []
@@ -603,7 +611,7 @@ class ChromeSpecManager(codechange.SpecManager):
         assert result[-1].name == new, '%s != %s' % (result[-1].name, new)
         return result
 
-    def parse_spec(self, spec):
+    def parse_spec(self, spec: codechange.Spec) -> None:
         logger.debug('parse_spec %s', spec.name)
         code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
         assert spec.entries, 'it should already be parsed earlier'
@@ -646,7 +654,7 @@ class ChromeSpecManager(codechange.SpecManager):
 
                 path_spec.rev = metadata.parent[0]
 
-    def sync_to_release(self, rev):
+    def sync_to_release(self, rev: str) -> None:
         """Switch source tree to given release version.
 
         Args:
@@ -680,10 +688,10 @@ class ChromeSpecManager(codechange.SpecManager):
                 with_tags=True,
             )
 
-    def sync_disk_state(self, rev):
+    def sync_disk_state(self, rev: str) -> None:
         self.sync_to_release(rev)
 
-    def get_release_deps(self, rev):
+    def get_release_deps(self, rev: str) -> str:
         """Get DEPS content of given release.
 
         Args:

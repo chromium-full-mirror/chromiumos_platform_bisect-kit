@@ -2510,7 +2510,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
     and sync to disk state according to them.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: dict):
         self.config = config
         self.manifest_dir = os.path.join(
             self.config['chromeos_root'], '.repo', 'manifests'
@@ -2528,7 +2528,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
                 % self.historical_manifest_git_dir
             )
 
-    def lookup_snapshot_manifest_revisions(self, old, new):
+    def lookup_snapshot_manifest_revisions(
+        self, old: str, new: str
+    ) -> list[tuple[int, str, str]]:
         """Get manifest commits between snapshot versions.
 
         Returns:
@@ -2604,17 +2606,17 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # order.
         return list(reversed(result))
 
-    def lookup_build_timestamp(self, rev):
+    def lookup_build_timestamp(self, rev: str) -> int:
         assert is_cros_full_version(rev) or is_cros_snapshot_version(rev)
         if is_cros_full_version(rev):
             return self.lookup_release_build_timestamp(rev)
         return self.lookup_snapshot_build_timestamp(rev)
 
-    def lookup_snapshot_build_timestamp(self, rev):
+    def lookup_snapshot_build_timestamp(self, rev) -> int:
         assert is_cros_snapshot_version(rev)
         return int(self.lookup_snapshot_manifest_revisions(rev, rev)[0][0])
 
-    def lookup_release_build_timestamp(self, rev):
+    def lookup_release_build_timestamp(self, rev: str) -> int:
         assert is_cros_full_version(rev)
         milestone, short_version = version_split(rev)
         path = os.path.join('buildspecs', milestone, short_version + '.xml')
@@ -2774,16 +2776,15 @@ class ChromeOSSpecManager(codechange.SpecManager):
             new_timestamp = new_timestamp + 1800
 
         # TODO(zjchang): add logic to combine symlink target's (full.xml) history
-        result = []
         path = 'default.xml'
         parser = repo_util.ManifestParser(self.manifest_dir)
-        for commit in parser.enumerate_manifest_commits(
+        commits = parser.enumerate_manifest_commits(
             old_timestamp, new_timestamp, path, branch=branch
-        ):
-            result.append(
-                codechange.Spec.new_float(commit.rev, commit.timestamp, path)
-            )
-        return result
+        )
+        return [
+            codechange.Spec.new_float(commit.rev, commit.timestamp, path)
+            for commit in commits
+        ]
 
     def collect_fixed_spec(self, old: str, new: str) -> list[codechange.Spec]:
         assert is_cros_full_version(old) or is_cros_snapshot_version(old)
@@ -2849,13 +2850,13 @@ class ChromeOSSpecManager(codechange.SpecManager):
         path = '%s%s/%s' % (gs_manifest_base, 'buildspecs', milestone)
         return [x.removeprefix(path).lstrip('/') for x in gs_util.ls(path)]
 
-    def get_gs_release_manifest(self, path: str) -> str | None:
+    def get_gs_release_manifest(self, path: str) -> str:
         """Query the manifest content of a release version on gs."""
-        return gs_util.cat('%s%s' % (gs_manifest_base, path))
+        return gs_util.cat(f'{gs_manifest_base}{path}')
 
-    def query_gs_release_manifest_timestamp(self, path: str) -> str | None:
+    def query_gs_release_manifest_timestamp(self, path: str) -> int:
         """Query the timestamp of a release version on gs."""
-        return gs_util.stat_max_creation_time('%s%s' % (gs_manifest_base, path))
+        return gs_util.stat_max_creation_time(f'{gs_manifest_base}{path}')
 
     def query_release_manifest_timestamp(self, full_version: str) -> int:
         assert is_cros_full_version(full_version)
@@ -2922,7 +2923,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
                         codechange.Spec.new_fixed(rev, timestamp, path)
                     )
 
-        def version_key_func(spec):
+        def version_key_func(spec: codechange.Spec):
             _milestone, short_version = version_split(spec.name)
             return util.version_key_func(short_version)
 
@@ -2934,7 +2935,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         assert result[-1].name == new
         return result
 
-    def get_manifest(self, rev):
+    def get_manifest(self, rev: str) -> str:
         assert is_cros_full_version(rev) or is_cros_snapshot_version(rev)
         if is_cros_full_version(rev):
             milestone, short_version = version_split(rev)
@@ -2957,7 +2958,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             )
         return manifest
 
-    def get_manifest_file(self, rev):
+    def get_manifest_file(self, rev: str) -> str:
         assert is_cros_full_version(rev) or is_cros_snapshot_version(rev)
         manifest_name = 'manifest_%s.xml' % rev
         manifest_path = os.path.join(self.manifest_dir, manifest_name)
@@ -2975,7 +2976,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
 
         return manifest_name
 
-    def parse_spec(self, spec: codechange.Spec):
+    def parse_spec(self, spec: codechange.Spec) -> None:
         parser = repo_util.ManifestParser(self.manifest_dir)
         if spec.is_fixed():
             manifest_name = self.get_manifest_file(spec.name)
@@ -3004,7 +3005,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
                     spec.revision = subnode.get('revision')
                     break
 
-    def sync_disk_state(self, rev):
+    def sync_disk_state(self, rev: str) -> None:
         manifest_name = self.get_manifest_file(rev)
 
         # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks

@@ -113,7 +113,7 @@ def ls(*args, **kwargs) -> list[str]:
     return _gsutil('ls', *args, **kwargs).splitlines()
 
 
-def stat_max_creation_time(*args, **kwargs):
+def stat_max_creation_time(*args, **kwargs) -> int:
     """Returns the max creation time of a set of files.
 
     For each file, the function will lookup the `create_time_seconds` key is

@@ -1244,10 +1244,10 @@ class DepsParser:
 class GclientCache(codechange.CodeStorage):
     """Gclient git cache."""
 
-    def __init__(self, cache_dir):
+    def __init__(self, cache_dir: str):
         self.cache_dir = cache_dir
 
-    def _url_to_cache_dir(self, url):
+    def _url_to_cache_dir(self, url: str) -> str:
         # ref: depot_tools' git_cache.Mirror.UrlToCacheDir
         parsed = urllib.parse.urlparse(url)
         norm_url = parsed.netloc + parsed.path
@@ -1256,18 +1256,20 @@ class GclientCache(codechange.CodeStorage):
         norm_url = norm_url.replace('googlesource.com/a/', 'googlesource.com/')
         return norm_url.replace('-', '--').replace('/', '-').lower()
 
-    def cached_git_root(self, repo_url):
+    def cached_git_root(self, repo_url: str) -> str:
         cache_path = self._url_to_cache_dir(repo_url)
         return os.path.join(self.cache_dir, cache_path)
 
-    def add_to_project_list(self, project_root, path, repo_url):
+    def add_to_project_list(
+        self, project_root: str, path: str, repo_url: str
+    ) -> None:
         projects = load_gclient_entries(project_root)
 
         projects[path] = repo_url
 
         write_gclient_entries(project_root, projects)
 
-    def remove_from_project_list(self, project_root, path):
+    def remove_from_project_list(self, project_root: str, path: str) -> None:
         projects = load_gclient_entries(project_root)
 
         if path in projects:
