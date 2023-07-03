@@ -750,11 +750,15 @@ class BisectorCommandLine:
         if prev_rev != rev:
             if not self._switch(rev, sample, _SwitchAction.BUILD):
                 return 'switch', sample
-        # Since DUT is leased everytime this function is called, deploy is
-        # needed no matter prev_rev == rev or not.
         with self.dut_manager.provision() as dut:
-            if not self._switch(rev, sample, _SwitchAction.DEPLOY, dut):
-                return 'switch', sample
+            # Deploy is needed if a new version is to be deployed, or a new DUT
+            # has been allocated. If it's the same version and the same DUT,
+            # we don't need to deploy again.
+            if prev_rev != rev or not self.dut_manager.is_restored_dut():
+                if not self._switch(
+                    rev, sample, self._SwitchAction.DEPLOY, dut
+                ):
+                    return 'switch', sample
             self._evaluate(rev, sample, dut)
             return 'eval', sample
 

@@ -9,6 +9,7 @@ import dataclasses
 import inspect
 import logging
 import sys
+import threading
 import time
 import typing
 
@@ -75,6 +76,58 @@ class DiagnoseStates(core.States):
         self.save()
 
 
+class DelayedDutReleaser:
+    """A helper class to release dut after a pre-defined period of time.
+
+    During a bisection , sometimes DUTs are leased in a consecutive manner
+    (e.g., multiple "eval" operations in a row for a fixed version). In that
+    case, leasing a new DUT and initializing it every time is unnecessary.
+    This class starts a separated thread to release a DUT after a certain
+    period of time. If a new lease request comes during the period, the
+    release is canceled and the same DUT is reused.
+    """
+
+    _DELAYED_SECONDS = 60
+
+    def __init__(self, dut):
+        self._dut = dut
+        self._timer = None
+
+        self._lock = threading.Lock()
+        self._has_released = False
+        self._has_canceled = False
+
+    def start(self):
+        self._timer = threading.Timer(self._DELAYED_SECONDS, self.run)
+        self._timer.start()
+
+    def cancel(self) -> bool:
+        """Returns whether the cancellation is successful.
+
+        If the release process has been started, return False.
+        Otherwise, return True.
+        """
+        with self._lock:
+            if self._has_released:
+                return False
+            self._timer.cancel()
+            self._has_canceled = True
+        return True
+
+    def run(self):
+        with self._lock:
+            if self._has_canceled:
+                return
+            logger.info('releasing DUT %s', self._dut)
+            cros_lab_util.crosfleet_release_dut(
+                cros_lab_util.dut_host_name(self._dut)
+            )
+            self._has_released = True
+
+    def get_dut(self):
+        return self._dut
+
+
 class DutManager:
     """A helper class to encapsulate DUT allocation and monitoring logic.
 
@@ -91,13 +144,13 @@ class DutManager:
 
     def __init__(
         self,
-        states: typing.Type[DiagnoseStates],
-        pre_allocated_dut: str,
+        states: typing.Type[DiagnoseStates] | None,
+        pre_allocated_dut: str | None,
         should_auto_allocate: bool,
         dut_init_func: typing.Callable[[str], None] | None = None,
         dut_leave_context_check_func: typing.Callable[[str], None]
         | None = None,
-        force_monitoring: bool = False,
+        should_force_monitoring: bool = False,
     ):
         """initializer.
 
@@ -114,24 +167,32 @@ class DutManager:
                 context manager. It typically asserts some conditions on the
                 DUT. If the function raises exceptions, DutManager would raise
                 the exception when leaving the context manager.
-            force_monitoring: Whether to spawn a thread to monitor DUT lease
+            should_force_monitoring: Whether to spawn a thread to monitor DUT lease
                 status.
         """
-        self._states = states
-        self._should_auto_allocate = should_auto_allocate
-        if pre_allocated_dut == cros_lab_util.LAB_DUT:
-            self._pre_allocated_dut = None
-        else:
+        self._states: typing.Type[DiagnoseStates] | None = states
+        self._should_auto_allocate: bool = should_auto_allocate
+        self._pre_allocated_dut: str | None = None
+        if pre_allocated_dut != cros_lab_util.LAB_DUT:
             self._pre_allocated_dut = pre_allocated_dut
-        self._dut_init_func = dut_init_func
-        self._dut_leave_context_check_func = dut_leave_context_check_func
-        self._force_monitoring = force_monitoring
+        self._dut_init_func: typing.Callable[[str], None] | None = dut_init_func
+        self._dut_leave_context_check_func: typing.Callable[
+            [str], None
+        ] | None = dut_leave_context_check_func
+        self._should_force_monitoring: bool = should_force_monitoring
 
         # DUT allocated by this DutManager, if any.
-        self._auto_allocated_dut = None
+        self._auto_allocated_dut: str | None = None
 
         # Whether dut_init_func has been called on the auto-allocated DUT.
-        self._dut_initialized = False
+        self._is_dut_initialized: bool = False
+
+        # Object handling dut releasing
+        self._dut_releaser: typing.Type[DelayedDutReleaser] | None = None
+
+        # Whether dut is the previous leased one in consecutive
+        # provision() calls of a DutManager instance.
+        self._is_restored_dut: bool = False
 
     @property
     def config(self):
@@ -144,7 +205,12 @@ class DutManager:
     def has_preallocated_dut(self) -> bool:
         return self._pre_allocated_dut is not None
 
-    def dut(self) -> str:
+    def is_restored_dut(self):
+        logger.info('is_restored_dut: %s', self._is_restored_dut)
+        return self._is_restored_dut
+
+    @property
+    def _dut(self) -> str:
         """Returns the DUT managed by this DutManager.
 
         If a pre-allocated DUT exists, there should be no auto-allocated DUT.
@@ -182,21 +248,40 @@ class DutManager:
             self._should_auto_allocate,
         )
         # Do nothing if a DUT is already available.
-        dut = self.dut()
+        dut = self._dut
         if dut:
             return self
+
+        # Restore previous leased DUT if it hasn't been released.
+        if self._dut_releaser:
+            if not self._dut_releaser.cancel():
+                logger.info(
+                    'dut releaser has been started, can not be canceled'
+                )
+            else:
+                self._auto_allocated_dut = self._dut_releaser.get_dut()
+                # self._is_dut_initialized remains the same state as in the previous lease.
+                # If it has been initialized, self._is_dut_initialized = True so
+                # it won't be initialized again.
+                self._is_restored_dut = True
+                logger.info(
+                    'dut releaser has been canceled. DUT %s restored',
+                    self._auto_allocated_dut,
+                )
+                return self
 
         if not self._should_auto_allocate:
             logger.info('DUT is not allocated but allocation is deferred')
             return self
 
-        # Try allocate a DUT now.
+        # Try allocating a DUT now.
         host = cros_helper.allocate_dut(self.dut_allocate_spec)
         if not host:
             raise errors.NoDutAvailable('unable to allocate DUT')
         # A DUT is leased at this point successfully.
         self._auto_allocated_dut = cros_lab_util.dut_name_to_address(host)
-        self._dut_initialized = False
+        self._is_dut_initialized = False
+        self._is_restored_dut = False
         return self
 
     def __exit__(self, ex_type, ex_value, ex_traceback):
@@ -204,7 +289,7 @@ class DutManager:
         logger.info('leaving DutManager context')
 
         error = None
-        dut = self.dut()
+        dut = self._dut
         if dut and self._dut_leave_context_check_func:
             logger.info(
                 'calling dut leave context check function for dut %s', dut
@@ -215,23 +300,23 @@ class DutManager:
                 error = e
 
         if self._auto_allocated_dut:
-            logger.info('releasing DUT %s', self._auto_allocated_dut)
-            cros_lab_util.crosfleet_release_dut(
-                cros_lab_util.dut_host_name(self._auto_allocated_dut)
+            logger.info(
+                'scheduling to release DUT %s', self._auto_allocated_dut
             )
+            self._dut_releaser = DelayedDutReleaser(self._auto_allocated_dut)
+            self._dut_releaser.start()
             self._auto_allocated_dut = None
-            self._dut_initialized = False
 
         if error:
             raise error
 
     def run_init_func(self):
-        dut = self.dut()
+        dut = self._dut
         if not dut:
             logger.info('no dut allocated yet, can not run init func')
             return
 
-        if self._dut_initialized:
+        if self._is_dut_initialized:
             logger.info(
                 'dut %s has been initialized, do not run initialization function',
                 dut,
@@ -240,7 +325,7 @@ class DutManager:
             if self._dut_init_func:
                 logger.info('running initialization function for %s...', dut)
                 self._dut_init_func(dut)
-            self._dut_initialized = True
+            self._is_dut_initialized = True
 
     @contextlib.contextmanager
     def provision(self):
@@ -251,12 +336,12 @@ class DutManager:
         3. Call the registered init functions on the DUT if the DUT is
           considered uninitialized.
         4. Spawn a DUT lease status monitor thread if the DUT is auto
-          allocated or force_monitoring is True.
+          allocated or should_force_monitoring is True.
         5. Return the DUT. Note that None may be returned if allocation
           is deffered.
         """
         with self:
-            dut = self.dut()
+            dut = self._dut
             if not dut:
                 yield None
                 return
@@ -269,9 +354,9 @@ class DutManager:
             # Note that the monitoring thread is spawn only for DUT auto allocated by
             # the instance, because a pre-allocated DUT layer might have already been
             # monitored.
-            # Use force_monitoring = True for cases we want to spwan the monitoring
+            # Use should_force_monitoring = True for cases we want to spwan the monitoring
             # thread anyway.
-            if dut == self._auto_allocated_dut or self._force_monitoring:
+            if dut == self._auto_allocated_dut or self._should_force_monitoring:
                 logger.info('monitoring DUT lease status for %s', dut)
                 reason = cros_lab_util.make_lease_reason(self.config['session'])
                 with cros_lab_util.dut_lease_status_monitor(dut, reason):

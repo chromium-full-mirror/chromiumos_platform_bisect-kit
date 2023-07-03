@@ -236,7 +236,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                 self.states,
                 self.config['dut'],
                 should_auto_allocate,
-                force_monitoring=True,
+                should_force_monitoring=True,
             )
             with dut_manager.provision() as dut:
                 self.do_run(dut)

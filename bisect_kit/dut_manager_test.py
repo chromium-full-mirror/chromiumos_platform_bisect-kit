@@ -5,6 +5,7 @@
 """Test dut_manager module."""
 
 import logging
+import threading
 import unittest
 from unittest import mock
 
@@ -26,6 +27,8 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def setUp(self):
         super().setUp()
+        self.mock_states = self.dummy_mock_states()
+
         self.mock_update_dut_alloc_spec = self.enterContext(
             mock.patch.object(
                 dut_manager_module.DutManager,
@@ -38,17 +41,29 @@ class TestDutManagerAllocation(unittest.TestCase):
                 cros_lab_util, 'dut_lease_status_monitor', autospec=True
             )
         )
-        self.mock_crosfleet_release_dut = self.enterContext(
-            mock.patch.object(
-                cros_lab_util, 'crosfleet_release_dut', autospec=True
-            )
-        )
         self.mock_allocate_dut = self.enterContext(
             mock.patch.object(cros_helper, 'allocate_dut', autospec=True)
         )
         self.mock_dut_init_func = mock.Mock()
         self.mock_dut_leave_context_check_func = mock.Mock()
-        self.mock_states = self.dummy_mock_states()
+        self.mock_delayed_dut_releaser_cls = self.enterContext(
+            mock.patch.object(
+                dut_manager_module, 'DelayedDutReleaser', autospec=True
+            )
+        )
+        self.mock_dut_releaser = self.mock_delayed_dut_releaser_cls.return_value
+
+    def reset_all_mocks(self):
+        self.mock_update_dut_alloc_spec.reset_mock()
+        self.mock_dut_lease_status_monitor.reset_mock()
+        self.mock_allocate_dut.reset_mock()
+        self.mock_dut_init_func.reset_mock()
+        self.mock_dut_leave_context_check_func.reset_mock()
+        self.mock_delayed_dut_releaser_cls.reset_mock()
+        # By default self.mock_delayed_dut_releaser_cls.return_value is not
+        # reset when calling reset_mock(), so self.mock_dut_releaser is still
+        # valid.
+        self.mock_dut_releaser.reset_mock()
 
     def dummy_mock_states(self):
         dummy_allocate_spec_dict = {
@@ -86,7 +101,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.assertEqual(dut, 'pre_allocated_dut')
         self.mock_update_dut_alloc_spec.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
-        self.mock_crosfleet_release_dut.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
         self.mock_dut_init_func.assert_called_once_with('pre_allocated_dut')
         self.mock_dut_leave_context_check_func.assert_called_once_with(
@@ -105,7 +120,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.assertEqual(dut, 'pre_allocated_dut')
         self.mock_update_dut_alloc_spec.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
-        self.mock_crosfleet_release_dut.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
         self.mock_dut_init_func.assert_called_once_with('pre_allocated_dut')
         self.mock_dut_leave_context_check_func.assert_called_once_with(
@@ -119,7 +134,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             True,
             self.mock_dut_init_func,
             self.mock_dut_leave_context_check_func,
-            force_monitoring=True,
+            should_force_monitoring=True,
         )
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
@@ -127,7 +142,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'pre_allocated_dut', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_crosfleet_release_dut.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
         self.mock_dut_init_func.assert_called_once_with('pre_allocated_dut')
         self.mock_dut_leave_context_check_func.assert_called_once_with(
@@ -142,19 +157,23 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_init_func,
             self.mock_dut_leave_context_check_func,
         )
+        # First provision.
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
-        # provision is called twice, but the initialization function should not be
-        # called again.
+
+        self.reset_all_mocks()
+
+        # Second provision. dut_init_func should not be called again.
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
+
         self.mock_update_dut_alloc_spec.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
-        self.mock_crosfleet_release_dut.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
-        self.mock_dut_init_func.assert_called_once_with('pre_allocated_dut')
-        self.mock_dut_leave_context_check_func.assert_has_calls(
-            [mock.call('pre_allocated_dut'), mock.call('pre_allocated_dut')]
+        self.mock_dut_init_func.assert_not_called()
+        self.mock_dut_leave_context_check_func.assert_called_once_with(
+            'pre_allocated_dut'
         )
 
     def test_dut_pre_allocated_missing_dut_funcs(self):
@@ -168,13 +187,12 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.assertEqual(dut, 'pre_allocated_dut')
         self.mock_update_dut_alloc_spec.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
-        self.mock_crosfleet_release_dut.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
         self.mock_dut_init_func.assert_not_called()
         self.mock_dut_leave_context_check_func.assert_not_called()
 
     def test_no_pre_allocated_dut_should_auto_alloc(self):
-        self.mock_allocate_dut.return_value = 'host'
         dut_manager = dut_manager_module.DutManager(
             self.mock_states,
             cros_lab_util.LAB_DUT,
@@ -182,6 +200,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_init_func,
             self.mock_dut_leave_context_check_func,
         )
+        self.mock_allocate_dut.return_value = 'host'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host.cros')
         self.mock_update_dut_alloc_spec.assert_called_once_with(
@@ -190,7 +209,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_crosfleet_release_dut.assert_called_once_with('host')
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host.cros')
+        self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec
         )
@@ -200,7 +220,6 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_no_pre_allocated_dut_should_not_auto_alloc(self):
-        self.mock_allocate_dut.return_value = 'host'
         dut_manager = dut_manager_module.DutManager(
             self.mock_states,
             cros_lab_util.LAB_DUT,
@@ -208,17 +227,17 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_init_func,
             self.mock_dut_leave_context_check_func,
         )
+        self.mock_allocate_dut.return_value = 'host'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, None)
         self.mock_update_dut_alloc_spec.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
-        self.mock_crosfleet_release_dut.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
         self.mock_dut_init_func.assert_not_called()
         self.mock_dut_leave_context_check_func.assert_not_called()
 
     def test_no_pre_allocated_dut_auto_allocate_failed(self):
-        self.mock_allocate_dut.return_value = 'host'
         dut_manager = dut_manager_module.DutManager(
             self.mock_states,
             cros_lab_util.LAB_DUT,
@@ -232,12 +251,88 @@ class TestDutManagerAllocation(unittest.TestCase):
                 pass
         self.mock_update_dut_alloc_spec.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
-        self.mock_crosfleet_release_dut.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec
         )
         self.mock_dut_init_func.assert_not_called()
         self.mock_dut_leave_context_check_func.assert_not_called()
+
+    def test_consecutive_auto_allocate_restored_previous_dut(self):
+        dut_manager = dut_manager_module.DutManager(
+            self.mock_states,
+            cros_lab_util.LAB_DUT,
+            True,
+            self.mock_dut_init_func,
+            self.mock_dut_leave_context_check_func,
+        )
+        # First lease.
+        self.mock_allocate_dut.return_value = 'host'
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host.cros')
+
+        # Reset all the mocks to test the second lease.
+        self.reset_all_mocks()
+
+        # Second lease.
+        self.mock_dut_releaser.cancel.return_value = True
+        self.mock_dut_releaser.get_dut.return_value = 'host.cros'
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host.cros')
+            self.assertTrue(dut_manager.is_restored_dut())
+
+        self.mock_update_dut_alloc_spec.assert_called_once_with(
+            dut_manager, 'host.cros'
+        )
+        self.mock_dut_lease_status_monitor.assert_called_once_with(
+            'host.cros', cros_lab_util.make_lease_reason('stateless')
+        )
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host.cros')
+        self.mock_dut_releaser.start.assert_called_once()
+        self.mock_allocate_dut.assert_not_called()
+        self.mock_dut_init_func.assert_not_called()
+        self.mock_dut_leave_context_check_func.assert_called_once_with(
+            'host.cros'
+        )
+
+    def test_consecutive_auto_allocate_lease_new_dut(self):
+        dut_manager = dut_manager_module.DutManager(
+            self.mock_states,
+            cros_lab_util.LAB_DUT,
+            True,
+            self.mock_dut_init_func,
+            self.mock_dut_leave_context_check_func,
+        )
+        # First lease.
+        self.mock_allocate_dut.return_value = 'host'
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host.cros')
+
+        # Reset all the mocks to test the second lease.
+        self.reset_all_mocks()
+
+        # Second lease.
+        self.mock_dut_releaser.cancel.return_value = False
+        self.mock_allocate_dut.return_value = 'host2'
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host2.cros')
+            self.assertFalse(dut_manager.is_restored_dut())
+
+        self.mock_update_dut_alloc_spec.assert_called_once_with(
+            dut_manager, 'host2.cros'
+        )
+        self.mock_dut_lease_status_monitor.assert_called_once_with(
+            'host2.cros', cros_lab_util.make_lease_reason('stateless')
+        )
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host2.cros')
+        self.mock_dut_releaser.start.assert_called_once()
+        self.mock_allocate_dut.assert_called_once_with(
+            dut_manager.dut_allocate_spec
+        )
+        self.mock_dut_init_func.assert_called_once_with('host2.cros')
+        self.mock_dut_leave_context_check_func.assert_called_once_with(
+            'host2.cros'
+        )
 
     def test_auto_release_on_exception(self):
         self.mock_allocate_dut.return_value = 'host'
@@ -261,7 +356,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_crosfleet_release_dut.assert_called_once_with('host')
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host.cros')
+        self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec
         )
@@ -294,7 +390,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_crosfleet_release_dut.assert_called_once_with('host')
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host.cros')
+        self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec
         )
@@ -313,3 +410,51 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_states, 'pre_allocated_dut', True
         )
         self.assertTrue(dut_manager.has_preallocated_dut())
+
+
+class TestDelayedDutReleaser(unittest.TestCase):
+    """Test the dut release logic in DelayedDutReleaser."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_crosfleet_release_dut = self.enterContext(
+            mock.patch.object(
+                cros_lab_util, 'crosfleet_release_dut', autospec=True
+            )
+        )
+        self.mock_thread = self.enterContext(
+            mock.patch.object(threading, 'Timer', autospec=True)
+        )
+
+    def testCancelBeforeTimeUp(self):
+        dut_releaser = dut_manager_module.DelayedDutReleaser('host.cros')
+        dut_releaser.start()
+
+        self.assertTrue(dut_releaser.cancel())
+
+        # dut_releaser.run() is never called.
+
+    def testCancelAfterTimeUp(self):
+        dut_releaser = dut_manager_module.DelayedDutReleaser('host.cros')
+        dut_releaser.start()
+
+        # func is the function to be called when initializing the timer, which
+        # is dut_releaser.run().
+        func = self.mock_thread.call_args.args[1]
+        func()
+
+        self.assertFalse(dut_releaser.cancel())
+        self.mock_crosfleet_release_dut.assert_called_once_with('host')
+
+    def testCancelWhenTimeUpRaceCondition(self):
+        dut_releaser = dut_manager_module.DelayedDutReleaser('host.cros')
+        dut_releaser.start()
+
+        self.assertTrue(dut_releaser.cancel())
+
+        # Assuming dut_releaser.cancel() is too late. Though cancel() is
+        # successful, run() gets executed nevertheless.
+        func = self.mock_thread.call_args.args[1]
+        func()
+
+        self.mock_crosfleet_release_dut.assert_not_called()

@@ -139,6 +139,18 @@ class CrosDiagnoser:
             )
 
             # Switches CrOS repository and DUT to narrowed down old version.
+            util.check_call(
+                './switch_cros_localbuild.py',
+                '--rich_result',
+                '--chromeos_root',
+                self.config['chromeos_root'],
+                '--chromeos_mirror',
+                self.config['chromeos_mirror'],
+                '--board',
+                self.config['board'],
+                '--sync_code_only',
+                self.cros_old,
+            )
             init_dut_to_old_cros(dut)
             dut_os_version = cros_util.query_dut_short_version(dut)
 
@@ -370,19 +382,6 @@ class CrosDiagnoser:
           dut: the DUT.
           force: always do 'cros flash' no matter the current version number of DUT
         """
-        util.check_call(
-            './switch_cros_localbuild.py',
-            '--rich_result',
-            '--chromeos_root',
-            self.config['chromeos_root'],
-            '--chromeos_mirror',
-            self.config['chromeos_mirror'],
-            '--board',
-            self.config['board'],
-            '--sync_code_only',
-            self.cros_old,
-        )
-
         if not force:
             if cros_util.is_cros_full_version(self.cros_old):
                 version = cros_util.version_to_short(self.cros_old)
