@@ -262,34 +262,6 @@ def _is_acceptable_bot(
     return True
 
 
-async def lease_dut_parallelly(duration, bots, reason, timeout=None):
-    tasks = []
-    hosts = []
-    for bot in bots:
-        host = bot['dimensions']['dut_name'][0]
-        hosts.append(host)
-        tasks.append(
-            asyncio.create_task(
-                cros_lab_util.async_lease_with_retry(
-                    host, reason, duration=duration
-                )
-            )
-        )
-
-    try:
-        logger.info('trying to lease %d DUTs: %s', len(hosts), hosts)
-        for coro in asyncio.as_completed(tasks, timeout=timeout):
-            host = await coro
-            if host:
-                logger.info('leased %s', host)
-                # Unfinished lease tasks will be cancelled when asyncio.run is
-                # finishing.
-                return host
-        return None
-    except asyncio.TimeoutError:
-        return None
-
-
 def normalize_board_name(chromeos_root, board):
     """Normalize BOARD name.
 
@@ -470,8 +442,14 @@ def do_allocate_dut(opts: argparse.Namespace | DutAllocateSpec):
             break
         timeout = min(120, remaining_time)
         reason = cros_lab_util.make_lease_reason(opts.session)
+        async_dut_leaser = cros_lab_util.AsyncDutLeaser(
+            [bot['dimensions']['dut_name'][0] for bot in bots],
+            reason,
+            opts.duration,
+            timeout,
+        )
         host = asyncio.run(
-            lease_dut_parallelly(opts.duration, bots, reason, timeout)
+            async_dut_leaser.lease_parallelly(),
         )
         if host:
             if cros_lab_util.is_satlab_dut(host):

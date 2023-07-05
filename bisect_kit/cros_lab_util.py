@@ -506,120 +506,179 @@ async def create_async_crosfleet_proc(cmd: str, *args, **kwargs):
     )
 
 
-async def async_lease(dut_name, reason, duration=None):
-    if not duration:
-        duration = LEASE_DURATION
-    args = [
-        '-minutes',
-        '%d' % (duration // 60),
-        '-reason',
-        reason,
-        '-host',
-        dut_name_to_address(dut_name),
-    ]
-    proc = await create_async_crosfleet_proc(
-        'dut lease',
-        *args,
-        # combine two streams, so the code becomes simpler
-        stderr=subprocess.STDOUT,
-    )
+class AsyncDutLeaser:
+    """A class to lease lab DUTs asynchronously."""
 
-    pending_lease = None
-    try:
-        while True:
-            line = await proc.stdout.readline()
-            if not line:
-                break
-            line = line.decode('utf8')
-            logger.debug('lease(%s): %s', dut_name, line)
-            if not pending_lease:
-                pending_lease = extract_lease_info(line)
-            if 'INFRA_FAILURE' in line:
-                pending_lease = None
-                return None
+    def __init__(self, hosts, reason, duration=None, timeout=None):
+        self._hosts: list[str] = hosts
+        self._reason: str = reason
+        self._duration: int = duration or LEASE_DURATION
+        self._timeout: int | None = timeout
 
-        await proc.wait()
-        if proc.returncode != 0:
-            logger.warning(
-                'lease(%s): crosfleet command failed: %s',
-                dut_name,
-                proc.returncode,
-            )
-            raise errors.ExternalError(
-                'crosfleet command failed unexpectedly: %s' % proc.returncode
-            )
-        if not pending_lease:
-            raise errors.InternalError(
-                'not found lease info; crosfleet output format changed?'
-            )
+        # Guard self._is_dut_leased
+        self._lock = asyncio.Lock()
 
-        if is_satlab_dut(dut_name):
-            write_satlab_ssh_config(dut_name)
+        # This variable is guarded by self._lock
+        self._is_dut_leased: bool = False
 
-        if not cros_util.is_good_dut(dut_name_to_address(dut_name)):
-            logger.warning(
-                'lease(%s): the leased DUT is broken; '
-                'return it and lease another one later',
-                dut_name,
+    async def lease_parallelly(self):
+        tasks = []
+        for host in self._hosts:
+            tasks.append(asyncio.create_task(self._lease_with_retry(host)))
+        logger.info(
+            'trying to lease %d DUTs: %s', len(self._hosts), self._hosts
+        )
+        done, _ = await asyncio.wait(
+            tasks, timeout=self._timeout, return_when=asyncio.FIRST_COMPLETED
+        )
+        if len(done) == 0:
+            # Timeout happens.
+            logger.info(
+                'timeout, failed to lease %d DUTs: %s',
+                len(self._hosts),
+                self._hosts,
             )
             return None
+        host = done.pop().result()
+        logger.info('leased %s', host)
+        # Unfinished lease tasks will be cancelled when asyncio.run is
+        # finishing.
+        return host
 
-        # wait the state propagated
-        for _ in range(10):
-            await asyncio.sleep(5)
-            status = query_lease_status(dut_name, verbose_log=False)
-            if is_dut_leased_by_me(status):
-                logger.info('lease: %s', pending_lease)
-                break
-        else:
-            raise errors.DutLeaseException(
-                'lease verification failed: %s' % status
-            )
+    async def _lease(self, dut_name):
+        args = [
+            '-minutes',
+            '%d' % (self._duration // 60),
+            '-reason',
+            self._reason,
+            '-host',
+            dut_name_to_address(dut_name),
+        ]
+        proc = await create_async_crosfleet_proc(
+            'dut lease',
+            *args,
+            # combine two streams, so the code becomes simpler
+            stderr=subprocess.STDOUT,
+        )
 
         pending_lease = None
-        return dut_name
-    except asyncio.CancelledError:
-        logger.debug('lease(%s): got CancelledError', dut_name)
-        raise
-    except errors.DutLeaseException:
-        logger.exception(
-            'lease(%s): lease task state is unexpected. discard', dut_name
-        )
-        return None
-    finally:
-        if proc.returncode is None:
-            # We call asyncio.run() frequently. In other words, the event loop is
-            # short lived. Although asyncio.subprocess will cancel and terminate the
-            # process during event loop shutdown, the exit handler may be invoked
-            # after event loop is closed (too late and bounce exception).
-            # https://bugs.python.org/issue41320
-            try:
-                proc.kill()
-                await proc.wait()
-            except ProcessLookupError:
-                # The process may be already dead; ignore this error silently.
-                # Especially, our code and the process got ctrl-c at the same time and
-                # race.
-                pass
-        if pending_lease:
-            cancel_pending_lease(pending_lease)
-
-
-async def async_lease_with_retry(dut_name, reason, duration=None):
-    tries = 0
-    while True:
         try:
-            tries += 1
-            return await async_lease(dut_name, reason, duration)
-        except errors.ExternalError:
-            if tries < 3:
-                delay = 60
+            while True:
+                line = await proc.stdout.readline()
+                if not line:
+                    break
+                line = line.decode('utf8')
+                logger.debug('lease(%s): %s', dut_name, line)
+                if not pending_lease:
+                    pending_lease = extract_lease_info(line)
+                if 'INFRA_FAILURE' in line:
+                    pending_lease = None
+                    return None
+
+            await proc.wait()
+            if proc.returncode != 0:
                 logger.warning(
-                    'async_lease failed, will retry %d seconds later', delay
+                    'lease(%s): crosfleet command failed: %s',
+                    dut_name,
+                    proc.returncode,
                 )
-                time.sleep(delay)
-                continue
+                raise errors.ExternalError(
+                    'crosfleet command failed unexpectedly: %s'
+                    % proc.returncode
+                )
+            if not pending_lease:
+                raise errors.InternalError(
+                    'not found lease info; crosfleet output format changed?'
+                )
+
+            if is_satlab_dut(dut_name):
+                write_satlab_ssh_config(dut_name)
+
+            if not cros_util.is_good_dut(dut_name_to_address(dut_name)):
+                logger.warning(
+                    'lease(%s): the leased DUT is broken; '
+                    'return it and lease another one later',
+                    dut_name,
+                )
+                return None
+
+            # wait the state propagated
+            for _ in range(10):
+                await asyncio.sleep(5)
+                status = query_lease_status(dut_name, verbose_log=False)
+                if is_dut_leased_by_me(status):
+                    logger.info('lease: %s', pending_lease)
+                    break
+            else:
+                raise errors.DutLeaseException(
+                    'lease verification failed: %s' % status
+                )
+
+            # (b/290040570)
+            # When the even loop ends, all pending tasks are canceled. So
+            # normally asyncio.CancelledError is caught and the pending lease is
+            # canceled in the "finally" clause below. However there is a race
+            # condition that if two tasks reach here (almost) simultaneously,
+            # both of them got completely soon. The later task has no chance to
+            # receive the CancelledError before returning. In that case, the
+            # second task would not return the leased DUT to lab.
+            # Using a variable self._is_dut_leaseda to fix the issue.
+            async with self._lock:
+                if self._is_dut_leased:
+                    logger.debug(
+                        'a dut has been leased, canceling %s', dut_name
+                    )
+                    cancel_pending_lease(pending_lease)
+                self._is_dut_leased = True
+
+            pending_lease = None
+            return dut_name
+        except asyncio.CancelledError:
+            logger.debug('lease(%s): got CancelledError', dut_name)
             raise
+        except errors.DutLeaseException:
+            logger.exception(
+                'lease(%s): lease task state is unexpected. discard', dut_name
+            )
+            return None
+        finally:
+            if proc.returncode is None:
+                # We call asyncio.run() frequently. In other words, the event loop is
+                # short lived. Although asyncio.subprocess will cancel and terminate the
+                # process during event loop shutdown, the exit handler may be invoked
+                # after event loop is closed (too late and bounce exception).
+                # https://bugs.python.org/issue41320
+                try:
+                    logger.debug(
+                        'killing unfinished proc which is trying to lease %s',
+                        dut_name,
+                    )
+                    proc.kill()
+                    await proc.wait()
+                except ProcessLookupError:
+                    # The process may be already dead; ignore this error silently.
+                    # Especially, our code and the process got ctrl-c at the same time and
+                    # race.
+                    pass
+            if pending_lease:
+                logger.debug('cleaning up pending lease %s', dut_name)
+                cancel_pending_lease(pending_lease)
+
+    async def _lease_with_retry(self, dut_name):
+        tries = 0
+        while True:
+            try:
+                tries += 1
+                return await self._lease(dut_name)
+            except errors.ExternalError:
+                if tries < 3:
+                    delay = 60
+                    logger.warning(
+                        'lease failed, will retry %d seconds later', delay
+                    )
+                    asyncio.sleep(delay)
+                    continue
+                raise
 
 
 def make_lease_reason(session):
