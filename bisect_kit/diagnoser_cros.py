@@ -40,9 +40,9 @@ class CrosDiagnoser:
         """Initializer.
 
         Args:
-          states: a DiagnoseStates objejct.
+          states: a core.DiagnoseStates objejct.
           path_factory: a DefaultProjectPathFactory object.
-          config: a config from a DiagnoseStates object.
+          config: a config from a core.DiagnoseStates object.
           dut: a pre-allocated DUT address, or the string ":lab:" to indicate
               a DUT is to be auto-allocated.
         """
@@ -1001,7 +1001,7 @@ class CrosDiagnoser:
 
     def cmd_log(self, json_output=False):
         result = []
-        history = self.states.data['history']
+        history = self.states.history
         for i, entry in enumerate(history):
             if json_output:
                 entry = entry.copy()
@@ -1041,7 +1041,7 @@ class CrosDiagnoser:
 
         # Analyze log to determine what to show
         bisects = []
-        history = self.states.data['history']
+        history = self.states.history
         seen = set()
         for entry in history:
             if entry.get('event') != 'bisect':
@@ -1279,24 +1279,26 @@ class DiagnoseCommandLineBase:
         pass  # implemented by subclass if necessary
 
     @staticmethod
-    def _dut_allocate_spec_dict(opts):
-        """Extracts dut allocation related parameters into a dict."""
-        return {
-            'pool': opts.allocate_dut_pool,
-            'dimensions': opts.allocate_dut_dimensions,
-            'board': opts.allocate_dut_board,
-            'model': opts.allocate_dut_model,
-            'sku': opts.allocate_dut_sku,
-            'dut_name': opts.allocate_dut_dut_name,
-            'satlab_ip': opts.allocate_dut_satlab_ip,
-            'version_hint': opts.allocate_dut_version_hint,
-            'builder_hint': opts.allocate_dut_builder_hint,
-            'time_limit': opts.allocate_dut_time_limit,
-            'duration': opts.allocate_dut_duration,
-            'parallel': opts.allocate_dut_parallel,
-            'chromeos_root': opts.chromeos_root,
-            'session': opts.session,
-        }
+    def _dut_allocate_spec_from_args(
+        opts: argparse.Namespace,
+    ) -> core.DutAllocateSpec:
+        """Creates a DutAllocateSpec from command line args."""
+        return core.DutAllocateSpec(
+            pool=opts.allocate_dut_pool,
+            dimensions=opts.allocate_dut_dimensions,
+            board=opts.allocate_dut_board,
+            model=opts.allocate_dut_model,
+            sku=opts.allocate_dut_sku,
+            dut_name=opts.allocate_dut_dut_name,
+            satlab_ip=opts.allocate_dut_satlab_ip,
+            version_hint=opts.allocate_dut_version_hint,
+            builder_hint=opts.allocate_dut_builder_hint,
+            time_limit=opts.allocate_dut_time_limit,
+            duration=opts.allocate_dut_duration,
+            parallel=opts.allocate_dut_parallel,
+            chromeos_root=opts.chromeos_root,
+            session=opts.session,
+        )
 
     def cmd_init(self, opts):
         path_factory = setup_cros_bisect.DefaultProjectPathFactory(
@@ -1374,7 +1376,7 @@ class DiagnoseCommandLineBase:
             experiments=opts.experiments,
         )
 
-        self.states.init(config, self._dut_allocate_spec_dict(opts))
+        self.states.init_states(config, self._dut_allocate_spec_from_args(opts))
         self.init_hook(opts)
         self.states.save()
 
@@ -1691,5 +1693,5 @@ class DiagnoseCommandLineBase:
 
         session_dir = common.determine_session_dir(opts.session)
         session_file = os.path.join(session_dir, self.__class__.__name__)
-        self.states = dut_manager_module.DiagnoseStates(session_file)
+        self.states = core.DiagnoseStates(session_file)
         opts.func(opts)

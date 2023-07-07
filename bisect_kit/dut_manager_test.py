@@ -9,10 +9,11 @@ import threading
 import unittest
 from unittest import mock
 
+from bisect_kit import core
 from bisect_kit import cros_lab_util
+from bisect_kit import dut_allocator
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
-import cros_helper
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             )
         )
         self.mock_allocate_dut = self.enterContext(
-            mock.patch.object(cros_helper, 'allocate_dut', autospec=True)
+            mock.patch.object(dut_allocator, 'allocate_dut', autospec=True)
         )
         self.mock_dut_init_func = mock.Mock()
         self.mock_dut_leave_context_check_func = mock.Mock()
@@ -66,26 +67,11 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser.reset_mock()
 
     def dummy_mock_states(self):
-        dummy_allocate_spec_dict = {
-            'pool': None,
-            'dimensions': None,
-            'board': None,
-            'model': None,
-            'sku': None,
-            'dut_name': None,
-            'satlab_ip': None,
-            'version_hint': None,
-            'builder_hint': None,
-            'time_limit': None,
-            'duration': None,
-            'parallel': None,
-            'chromeos_root': None,
-            'session': None,
-        }
-        mock_states = dut_manager_module.DiagnoseStates('dummy_session_file')
-        mock_states.init(
+        dummy_allocate_spec = core.DutAllocateSpec()
+        mock_states = core.DiagnoseStates('dummy_session_file')
+        mock_states.init_states(
             config={'session': 'stateless'},
-            dut_allocate_spec_dict=dummy_allocate_spec_dict,
+            dut_allocate_spec=dummy_allocate_spec,
         )
         return mock_states
 

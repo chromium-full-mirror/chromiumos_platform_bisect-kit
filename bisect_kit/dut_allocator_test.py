@@ -5,8 +5,8 @@
 import unittest
 from unittest import mock
 
+from bisect_kit import dut_allocator
 from bisect_kit import errors
-import cros_helper
 
 
 class TestSampleAvailableBots(unittest.TestCase):
@@ -24,7 +24,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         variants = ['v1', 'v2']
         sample_num = len(available_bots)
         # pylint: disable=protected-access
-        acquired_bots = cros_helper._sample_available_bots(
+        acquired_bots = dut_allocator._sample_available_bots(
             dimensions, variants, sample_num
         )
 
@@ -43,7 +43,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         variants = ['v1', 'v2']
         sample_num = len(available_bots) // 2
         # pylint: disable=protected-access
-        acquired_bots = cros_helper._sample_available_bots(
+        acquired_bots = dut_allocator._sample_available_bots(
             dimensions, variants, sample_num
         )
 
@@ -62,7 +62,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         variants = ['v1', 'v2']
         sample_num = 10
         # pylint: disable=protected-access
-        acquired_bots = cros_helper._sample_available_bots(
+        acquired_bots = dut_allocator._sample_available_bots(
             dimensions, variants, sample_num
         )
 
@@ -77,7 +77,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         variants = ['v1', 'v2']
         sample_num = 10
         # pylint: disable=protected-access
-        acquired_bots = cros_helper._sample_available_bots(
+        acquired_bots = dut_allocator._sample_available_bots(
             dimensions, variants, sample_num
         )
 
@@ -100,7 +100,7 @@ class TestSampleAvailableBots(unittest.TestCase):
             return int(name[3:]) < 5
 
         # pylint: disable=protected-access
-        acquired_bots = cros_helper._sample_available_bots(
+        acquired_bots = dut_allocator._sample_available_bots(
             dimensions, variants, sample_num, filter_func
         )
 
@@ -118,12 +118,12 @@ class TestSampleAvailableBots(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             # pylint: disable=protected-access
-            cros_helper._sample_available_bots_with_retry(
+            dut_allocator._sample_available_bots_with_retry(
                 dimensions, variants, sample_num, max_attempts=max_attempts
             )
 
     @mock.patch('time.sleep')
-    @mock.patch('cros_helper._sample_available_bots')
+    @mock.patch.object(dut_allocator, '_sample_available_bots')
     def test_sample_available_bots_with_retry_is_busy_false(
         self, mock_sample_available_bots, mock_sleep
     ):
@@ -138,7 +138,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         max_attempts = 3
 
         # pylint: disable=protected-access
-        acquired_bots = cros_helper._sample_available_bots_with_retry(
+        acquired_bots = dut_allocator._sample_available_bots_with_retry(
             dimensions, variants, sample_num, max_attempts=max_attempts
         )
         self.assertCountEqual(acquired_bots, available_bots)
@@ -148,7 +148,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         )
 
     @mock.patch('time.sleep')
-    @mock.patch('cros_helper._sample_available_bots')
+    @mock.patch.object(dut_allocator, '_sample_available_bots')
     def test_sample_available_bots_with_retry_is_busy_none(
         self, mock_sample_available_bots, mock_sleep
     ):
@@ -164,7 +164,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         max_attempts = 3
 
         # pylint: disable=protected-access
-        acquired_bots = cros_helper._sample_available_bots_with_retry(
+        acquired_bots = dut_allocator._sample_available_bots_with_retry(
             dimensions, variants, sample_num, max_attempts=max_attempts
         )
         self.assertCountEqual(acquired_bots, available_bots)
@@ -177,7 +177,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         )
 
     @mock.patch('time.sleep')
-    @mock.patch('cros_helper._sample_available_bots')
+    @mock.patch.object(dut_allocator, '_sample_available_bots')
     def test_sample_available_bots_with_retry_once(
         self, mock_sample_available_bots, mock_sleep
     ):
@@ -195,7 +195,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         max_attempts = 3
 
         # pylint: disable=protected-access
-        acquired_bots = cros_helper._sample_available_bots_with_retry(
+        acquired_bots = dut_allocator._sample_available_bots_with_retry(
             dimensions, variants, sample_num, max_attempts=max_attempts
         )
         self.assertCountEqual(acquired_bots, available_bots)
@@ -218,7 +218,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         )
 
     @mock.patch('time.sleep')
-    @mock.patch('cros_helper._sample_available_bots')
+    @mock.patch.object(dut_allocator, '_sample_available_bots')
     def test_sample_available_bots_with_retry_not_available(
         self, mock_sample_available_bots, mock_sleep
     ):
@@ -232,7 +232,7 @@ class TestSampleAvailableBots(unittest.TestCase):
 
         with self.assertRaises(errors.NoDutAvailable):
             # pylint: disable=protected-access
-            cros_helper._sample_available_bots_with_retry(
+            dut_allocator._sample_available_bots_with_retry(
                 dimensions, variants, sample_num, max_attempts=max_attempts
             )
 

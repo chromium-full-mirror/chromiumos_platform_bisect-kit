@@ -5,75 +5,18 @@
 """A helper class to encapsulate DUT allocation and monitoring logic."""
 
 import contextlib
-import dataclasses
 import inspect
 import logging
-import sys
 import threading
-import time
 import typing
 
 from bisect_kit import core
 from bisect_kit import cros_lab_util
+from bisect_kit import dut_allocator
 from bisect_kit import errors
-import cros_helper
 
 
 logger = logging.getLogger(__name__)
-
-
-class DiagnoseStates(core.States):
-    """Diagnose states."""
-
-    def __init__(self, session_file: str):
-        super().__init__(session_file)
-        # Initialized in init_done().
-        self._dut_allocate_spec: cros_helper.DutAllocateSpec = None
-
-    def init(self, config: dict, dut_allocate_spec_dict: dict):
-        self.data = dict(
-            config=config, history=[], dut_allocate_spec=dut_allocate_spec_dict
-        )
-        self.init_done()
-
-    def init_done(self):
-        """Post process after loading the data json.
-
-        Keep a mutable member dataclass for dut_allocate_spec, so it's easier
-        and safer for clients to access the attributes.
-        """
-        if 'dut_allocate_spec' not in self.data:
-            raise errors.InternalError(
-                '"dut_allocate_spec" not in session file, have you run '
-                '"%s init" correctly?' % sys.argv[0]
-            )
-        self._dut_allocate_spec = cros_helper.DutAllocateSpec(
-            **self.data['dut_allocate_spec']
-        )
-        super().init_done()
-
-    def save(self):
-        """Save the object back to the json file.
-
-        If _dut_allocate_spec is modified, the content is saved.
-        """
-        self.data['dut_allocate_spec'] = dataclasses.asdict(
-            self._dut_allocate_spec
-        )
-        super().save()
-
-    @property
-    def config(self):
-        return self.data['config']
-
-    @property
-    def dut_allocate_spec(self) -> cros_helper.DutAllocateSpec:
-        return self._dut_allocate_spec
-
-    def add_history(self, event, **kwargs):
-        entry = dict(timestamp=time.time(), event=event, **kwargs)
-        self.data['history'].append(entry)
-        self.save()
 
 
 class DelayedDutReleaser:
@@ -144,7 +87,7 @@ class DutManager:
 
     def __init__(
         self,
-        states: typing.Type[DiagnoseStates] | None,
+        states: typing.Type[core.DiagnoseStates] | None,
         pre_allocated_dut: str | None,
         should_auto_allocate: bool,
         dut_init_func: typing.Callable[[str], None] | None = None,
@@ -155,7 +98,7 @@ class DutManager:
         """initializer.
 
         Args:
-            states: an instance of DiagnoseStates which contains the diagnose
+            states: an instance of core.DiagnoseStates which contains the diagnose
                 config and dut allocate spec.
             pre_allocated_dut: a pre-allocated DUT or ':lab:' if no
                 pre-allocated DUT.
@@ -170,7 +113,7 @@ class DutManager:
             should_force_monitoring: Whether to spawn a thread to monitor DUT lease
                 status.
         """
-        self._states: typing.Type[DiagnoseStates] | None = states
+        self._states: typing.Type[core.DiagnoseStates] | None = states
         self._should_auto_allocate: bool = should_auto_allocate
         self._pre_allocated_dut: str | None = None
         if pre_allocated_dut != cros_lab_util.LAB_DUT:
@@ -275,7 +218,7 @@ class DutManager:
             return self
 
         # Try allocating a DUT now.
-        host = cros_helper.allocate_dut(self.dut_allocate_spec)
+        host = dut_allocator.allocate_dut(self.dut_allocate_spec)
         if not host:
             raise errors.NoDutAvailable('unable to allocate DUT')
         # A DUT is leased at this point successfully.

@@ -4,6 +4,7 @@
 
 """Test core module."""
 
+import json
 import os
 import tempfile
 import unittest
@@ -56,33 +57,144 @@ class TestRevInfo(unittest.TestCase):
         self.assertEqual(rev_info['new'], 1)
 
 
+class TestDiagnoseStates(unittest.TestCase):
+    """Test core.Diagnose class."""
+
+    def setUp(self):
+        self.session_file = tempfile.mktemp()
+        self._fake_config = {
+            'session': 'session1',
+            'old_value': 'version_old',
+            'new_value': 'version_new',
+        }
+        self._fake_dut_allocate_spec = core.DutAllocateSpec(
+            pool='default_pool',
+            board='board1',
+            duration=1000,
+        )
+
+    def tearDown(self):
+        if os.path.exists(self.session_file):
+            os.unlink(self.session_file)
+
+    def test_init_states(self):
+        states = core.DiagnoseStates(self.session_file)
+        states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+
+        self.assertTrue(states.inited)
+        self.assertEqual(states.config, self._fake_config)
+        self.assertEqual(states.history, [])
+        self.assertEqual(states.dut_allocate_spec, self._fake_dut_allocate_spec)
+
+    def test_save_and_load(self):
+        states = core.DiagnoseStates(self.session_file)
+        states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+        states.save()
+
+        loaded_states = core.DiagnoseStates(self.session_file)
+        loaded_states.load_states()
+
+        self.assertTrue(loaded_states.inited)
+        self.assertEqual(loaded_states.config, self._fake_config)
+        self.assertEqual(loaded_states.history, [])
+        self.assertEqual(
+            loaded_states.dut_allocate_spec, self._fake_dut_allocate_spec
+        )
+
+    def test_load_empty_json(self):
+        with open(self.session_file, 'w') as f:
+            f.write(json.dumps({}, indent=4, sort_keys=True))
+        states = core.DiagnoseStates(self.session_file)
+        states.load_states()
+
+        self.assertTrue(states.inited)
+        # asserts the member variables is equal to the default values.
+        self.assertEqual(states.config, {})
+        self.assertEqual(states.history, [])
+        self.assertEqual(states.dut_allocate_spec, core.DutAllocateSpec())
+
+    def test_add_history(self):
+        states = core.DiagnoseStates(self.session_file)
+        states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+
+        states.add_history(event='event1', text='text1')
+        states.add_history(event='event2', text='text2')
+
+        loaded_states = core.DiagnoseStates(self.session_file)
+        loaded_states.load_states()
+
+        self.assertTrue(loaded_states.inited)
+        history = loaded_states.history
+        self.assertEqual(len(history), 2)
+        self.assertEqual(history[0]['event'], 'event1')
+        self.assertEqual(history[0]['text'], 'text1')
+        self.assertEqual(history[1]['event'], 'event2')
+        self.assertEqual(history[1]['text'], 'text2')
+
+    def test_reset(self):
+        states = core.DiagnoseStates(self.session_file)
+        states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+        states.save()
+
+        states = core.DiagnoseStates(self.session_file)
+        states.reset()
+        # asserts the member variables is equal to the default values.
+        self.assertEqual(states.config, {})
+        self.assertEqual(states.history, [])
+        self.assertEqual(states.dut_allocate_spec, core.DutAllocateSpec())
+
+        states = core.BisectStates(self.session_file)
+        # failed because the file doesn't exist.
+        self.assertFalse(states.load_states())
+        self.assertFalse(states.inited)
+
+
 class TestBisectStates(unittest.TestCase):
     """Test core.BisectStates class."""
 
     def setUp(self):
         self.session_file = tempfile.mktemp()
 
+        self.fake_config = {'a': 'b', 'c': 'd'}
+        self.fake_details = {'x': 'y'}
+
     def tearDown(self):
         if os.path.exists(self.session_file):
             os.unlink(self.session_file)
 
-    def test_simple(self):
+    def test_init_states(self):
         states = core.BisectStates(self.session_file)
-        states.init_states({}, ['a', 'b', 'c'])
+        states.init_states(self.fake_config, ['a', 'b', 'c'], self.fake_details)
+
+        self.assertTrue(states.inited)
+        self.assertEqual(states.config, self.fake_config)
+        self.assertEqual(states.details, self.fake_details)
         self.assertEqual(states.idx2rev(1), 'b')
         self.assertEqual(states.rev2idx('b'), 1)
 
     def test_save_and_load(self):
         states = core.BisectStates(self.session_file)
         revlist = [str(i) for i in range(10)]
-        states.init_states({}, revlist)
+        states.init_states({}, revlist, self.fake_details)
         states.config['foo'] = 'bar'
         states.save()
 
-        states = core.BisectStates(self.session_file)
-        states.load_states()
-        self.assertEqual(states.config.get('foo'), 'bar')
-        self.assertEqual(states.rev2idx('5'), 5)
+        loaded_states = core.BisectStates(self.session_file)
+        loaded_states.load_states()
+
+        self.assertTrue(loaded_states.inited)
+        self.assertEqual(loaded_states.config, {'foo': 'bar'})
+        self.assertEqual(loaded_states.details, self.fake_details)
+        self.assertEqual(loaded_states.rev2idx('5'), 5)
+
+    def test_load_failed(self):
+        with open(self.session_file, 'w') as f:
+            f.write(json.dumps({}, indent=4, sort_keys=True))
+
+        loaded_states = core.BisectStates(self.session_file)
+        # failed because 'revlist' is not in the loaded dict.
+        self.assertFalse(loaded_states.load_states())
+        self.assertFalse(loaded_states.inited)
 
     def test_reset(self):
         states = core.BisectStates(self.session_file)
@@ -93,9 +205,13 @@ class TestBisectStates(unittest.TestCase):
 
         states = core.BisectStates(self.session_file)
         states.reset()
+        self.assertEqual(states.data, dict(history=[]))
+        self.assertEqual(states.rev_index, {})
 
         states = core.BisectStates(self.session_file)
+        # failed because the file doesn't exist.
         self.assertFalse(states.load_states())
+        self.assertFalse(states.inited)
 
 
 if __name__ == '__main__':

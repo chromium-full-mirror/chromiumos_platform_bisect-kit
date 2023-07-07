@@ -1123,10 +1123,8 @@ class BisectorCommandLine:
         """
         self._create_states(session=session)
         if not self.states.inited and not self.states.load_states():
-            # Unable to load session file.
-            return dict(inited=False)
-        if not self.states.inited:
-            # Session file loaded but the initialization is not successful.
+            # load_states() is called, but unable to load session file or
+            # initialization is unsuccessful.
             return dict(inited=False)
 
         self.strategy = self._strategy_factory()
