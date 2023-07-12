@@ -138,10 +138,7 @@ class TestDiagnoseStates(unittest.TestCase):
 
         states = core.DiagnoseStates(self.session_file)
         states.reset()
-        # asserts the member variables is equal to the default values.
-        self.assertEqual(states.config, {})
-        self.assertEqual(states.history, [])
-        self.assertEqual(states.dut_allocate_spec, core.DutAllocateSpec())
+        self.assertFalse(states.inited)
 
         states = core.BisectStates(self.session_file)
         # failed because the file doesn't exist.
@@ -205,8 +202,7 @@ class TestBisectStates(unittest.TestCase):
 
         states = core.BisectStates(self.session_file)
         states.reset()
-        self.assertEqual(states.data, dict(history=[]))
-        self.assertEqual(states.rev_index, {})
+        self.assertFalse(states.inited)
 
         states = core.BisectStates(self.session_file)
         # failed because the file doesn't exist.

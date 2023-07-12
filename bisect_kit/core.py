@@ -160,18 +160,15 @@ class States:
 
     After an instance is created, there are two ways to initialize the instance.
     1. Define custom initialization functions. By the end of the initialization,
-      init_done() should be called to mark the instance as initialized.
+      _init_done() should be called to mark the instance as initialized.
     2. Load the data from session_file by calling load_states().
-      Subclass should define init_from_dict() to reconstruct the internal states.
-      init_done() should be called in init_from_dict() if the reconstructs is
+      Subclass should define _init_from_dict() to reconstruct the internal states.
+      _init_done() should be called in _init_from_dict() if the reconstructs is
       successful.
 
     To save internal states to session_file, call save().
-    Subclass should define pack_to_dict() which dumps the internal states as a
+    Subclass should define _pack_to_dict() which dumps the internal states as a
     dict to be written to the json file.
-
-    To cleanup the internal states and the saved json file, call reset().
-    Subclass can define reset_states() to cleanup internal states.
     """
 
     def __init__(self, session_file):
@@ -183,34 +180,30 @@ class States:
         self.session_file = session_file
         logger.debug('session file: %s', self.session_file)
 
-        # `inited` means that init_done() has ever been invoked (including the good
+        # `inited` means that _init_done() has ever been invoked (including the good
         # session loaded via load_states()). On the other hand, if the session has
         # never successfully initialized, `inited` will be still False after
         # load_states().
         self.inited = False
 
     def reset(self):
-        """Resets state and deletes saved file."""
-        self.reset_states()
+        """Invalidates the instance and deletes saved file.
+
+        After called, the instance should not be used unless calling initialization methods again.
+        """
+        self.inited = False
         os.unlink(self.session_file)
 
-    def init_done(self):
+    def _init_done(self):
         """Mark the state as initialized."""
         self.inited = True
 
-    def reset_states(self):
-        """Reset internal states.
-
-        Subclass may override this method to cleanup internal states and use it in the initializer.
-        """
-        pass
-
-    def init_from_dict(self, unused_data: dict) -> bool:
+    def _init_from_dict(self, unused_data: dict) -> bool:
         """Reconstruct derived fields from the dict "data".
 
         Subclass should override this method.
 
-        If the reconstruct is successful, self.init_done() should be called.
+        If the reconstruct is successful, self._init_done() should be called.
 
         Args:
             data: the dict to reconstruct from.
@@ -218,10 +211,10 @@ class States:
         Returns:
             Whether the reconstruct is successful.
         """
-        self.init_done()
+        self._init_done()
         return True
 
-    def pack_to_dict(self) -> dict:
+    def _pack_to_dict(self) -> dict:
         """Construct the dict to be stored to json file.
 
         Subclass should override this method.
@@ -240,14 +233,14 @@ class States:
         if not os.path.exists(self.session_file):
             return False
         with open(self.session_file) as f:
-            return self.init_from_dict(json.load(f))
+            return self._init_from_dict(json.load(f))
 
     def save(self):
         dirname = os.path.dirname(self.session_file)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        data = self.pack_to_dict()
+        data = self._pack_to_dict()
 
         tmp_fn = tempfile.mktemp()
         with open(tmp_fn, 'w') as f:
@@ -282,10 +275,6 @@ class DiagnoseStates(States):
 
     def __init__(self, session_file: str):
         super().__init__(session_file)
-        self.reset_states()
-
-    def reset_states(self):
-        """Inherit from States."""
         self._config = {}
         self._history = []
         self._dut_allocate_spec = DutAllocateSpec()
@@ -294,20 +283,19 @@ class DiagnoseStates(States):
         self._config = config
         self._dut_allocate_spec = dut_allocate_spec
 
-        self.init_done()
+        self._init_done()
 
-    def init_from_dict(self, data: dict) -> bool:
+    def _init_from_dict(self, data: dict) -> bool:
         """Inherit from States."""
-
         self._config = data.get('config', {})
         self._history = data.get('history', [])
         self._dut_allocate_spec = DutAllocateSpec(
             **data.get('dut_allocate_spec', {})
         )
-        self.init_done()
+        self._init_done()
         return True
 
-    def pack_to_dict(self) -> dict:
+    def _pack_to_dict(self) -> dict:
         """Inherit from States."""
         return dict(
             config=self._config,
@@ -317,14 +305,17 @@ class DiagnoseStates(States):
 
     @property
     def config(self) -> dict:
+        assert self.inited
         return self._config
 
     @property
     def history(self) -> list:
+        assert self.inited
         return self._history
 
     @property
     def dut_allocate_spec(self) -> DutAllocateSpec:
+        assert self.inited
         return self._dut_allocate_spec
 
     def add_history(self, event, **kwargs):
@@ -347,10 +338,7 @@ class BisectStates(States):
           session_file: path of session file.
         """
         super().__init__(session_file)
-        self.reset_states()
 
-    def reset_states(self):
-        """Inherit from States."""
         self.data = dict(
             # What have been done so far. Each entry contains at least
             # timestamp, rev, and result.
@@ -371,6 +359,7 @@ class BisectStates(States):
 
     @property
     def config(self):
+        assert self.inited
         return self.data.get('config')
 
     @property
@@ -395,9 +384,9 @@ class BisectStates(States):
             revlist=revlist,
             details=details or {},
         )
-        self.init_from_dict(self.data)
+        self._init_from_dict(self.data)
 
-    def init_from_dict(self, data: dict) -> bool:
+    def _init_from_dict(self, data: dict) -> bool:
         """Inherit from States."""
         self.data = data
 
@@ -410,10 +399,10 @@ class BisectStates(States):
 
         for i, rev in enumerate(self.data['revlist']):
             self.rev_index[rev] = i
-        self.init_done()
+        self._init_done()
         return True
 
-    def pack_to_dict(self) -> dict:
+    def _pack_to_dict(self) -> dict:
         """Inherit from States."""
         return self.data
 
