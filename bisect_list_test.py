@@ -31,6 +31,7 @@ class TestListDomain(unittest.TestCase):
         # is testing ListDomain, not bisector. Bisector logic should be tested
         # by its own unit test, not here.
         dut_manager = dut_manager_module.DutManager(
+            'PreAllocate',
             states=None,
             pre_allocated_dut='pre_allocated_dut',
             should_auto_allocate=False,

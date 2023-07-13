@@ -121,7 +121,10 @@ class CrosDiagnoser:
         # Steps 1 to 3 are prebuilt stages. So we can just use the same DUT in
         # stateless bisection.
         dut_manager = dut_manager_module.DutManager(
-            self.states, self.pre_allocated_dut, should_auto_allocate_dut
+            'Prebuilt',
+            self.states,
+            self.pre_allocated_dut,
+            should_auto_allocate_dut,
         )
         with dut_manager.provision() as dut:
             if not self.config.get('board_cpu_arch'):
@@ -214,6 +217,7 @@ class CrosDiagnoser:
                 ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
         dut_manager = dut_manager_module.DutManager(
+            'LocalChrome',
             self.states,
             self.pre_allocated_dut,
             should_auto_allocate_dut,
@@ -242,6 +246,7 @@ class CrosDiagnoser:
 
         # Step 5: Narrowdown chromeos localbuild.
         dut_manager = dut_manager_module.DutManager(
+            'LocalChromeOS',
             self.states,
             self.pre_allocated_dut,
             should_auto_allocate_dut,

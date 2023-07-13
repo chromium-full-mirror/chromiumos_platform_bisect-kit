@@ -95,6 +95,7 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.old_rate = None
         self.new_rate = None
         self.dut_manager = dut_manager_module.DutManager(
+            'PreAllocate',
             states=None,
             pre_allocated_dut='pre_allocated_dut',
             should_auto_allocate=False,

@@ -233,6 +233,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                 not experiment.ID.STATELESS in self.config['experiments']
             )
             dut_manager = dut_manager_module.DutManager(
+                'Global',
                 self.states,
                 self.config['dut'],
                 should_auto_allocate,

@@ -270,6 +270,13 @@ class DutAllocateSpec:
     session: str | None = None
 
 
+@dataclasses.dataclass
+class DiagnoseStatistics:
+    """General bisection Statistics."""
+
+    dut_leases_log_path: str | None = None
+
+
 class DiagnoseStates(States):
     """Diagnose states."""
 
@@ -278,6 +285,7 @@ class DiagnoseStates(States):
         self._config = {}
         self._history = []
         self._dut_allocate_spec = DutAllocateSpec()
+        self._statistics = DiagnoseStatistics()
 
     def init_states(self, config: dict, dut_allocate_spec: DutAllocateSpec):
         self._config = config
@@ -292,6 +300,7 @@ class DiagnoseStates(States):
         self._dut_allocate_spec = DutAllocateSpec(
             **data.get('dut_allocate_spec', {})
         )
+        self._statistics = DiagnoseStatistics(**data.get('statistics', {}))
         self._init_done()
         return True
 
@@ -301,6 +310,7 @@ class DiagnoseStates(States):
             config=self._config,
             history=self._history,
             dut_allocate_spec=dataclasses.asdict(self._dut_allocate_spec),
+            statistics=dataclasses.asdict(self._statistics),
         )
 
     @property
@@ -317,6 +327,10 @@ class DiagnoseStates(States):
     def dut_allocate_spec(self) -> DutAllocateSpec:
         assert self.inited
         return self._dut_allocate_spec
+
+    @property
+    def statistics(self) -> DiagnoseStatistics:
+        return self._statistics
 
     def add_history(self, event, **kwargs):
         entry = dict(timestamp=time.time(), event=event, **kwargs)

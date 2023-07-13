@@ -34,6 +34,7 @@ class TestGitDomain(unittest.TestCase):
     def test_basic(self):
         """Tests basic functionality."""
         dut_manager = dut_manager_module.DutManager(
+            'PreAllocate',
             states=None,
             pre_allocated_dut='pre_allocated_dut',
             should_auto_allocate=False,

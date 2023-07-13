@@ -85,20 +85,46 @@ class TestDiagnoseStates(unittest.TestCase):
         self.assertEqual(states.config, self._fake_config)
         self.assertEqual(states.history, [])
         self.assertEqual(states.dut_allocate_spec, self._fake_dut_allocate_spec)
+        self.assertEqual(states.statistics, core.DiagnoseStatistics())
 
     def test_save_and_load(self):
         states = core.DiagnoseStates(self.session_file)
         states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+
+        states.config['board'] = 'board1'
+        states.dut_allocate_spec.duration = 2000
+        states.statistics.dut_leases_log_path = (
+            '/some/other/path/to/dut_leases_log'
+        )
         states.save()
 
         loaded_states = core.DiagnoseStates(self.session_file)
         loaded_states.load_states()
 
         self.assertTrue(loaded_states.inited)
-        self.assertEqual(loaded_states.config, self._fake_config)
+        self.assertEqual(
+            loaded_states.config,
+            {
+                'session': 'session1',
+                'old_value': 'version_old',
+                'new_value': 'version_new',
+                'board': 'board1',
+            },
+        )
         self.assertEqual(loaded_states.history, [])
         self.assertEqual(
-            loaded_states.dut_allocate_spec, self._fake_dut_allocate_spec
+            loaded_states.dut_allocate_spec,
+            core.DutAllocateSpec(
+                pool='default_pool',
+                board='board1',
+                duration=2000,
+            ),
+        )
+        self.assertEqual(
+            loaded_states.statistics,
+            core.DiagnoseStatistics(
+                dut_leases_log_path='/some/other/path/to/dut_leases_log'
+            ),
         )
 
     def test_load_empty_json(self):
@@ -112,6 +138,7 @@ class TestDiagnoseStates(unittest.TestCase):
         self.assertEqual(states.config, {})
         self.assertEqual(states.history, [])
         self.assertEqual(states.dut_allocate_spec, core.DutAllocateSpec())
+        self.assertEqual(states.statistics, core.DiagnoseStatistics())
 
     def test_add_history(self):
         states = core.DiagnoseStates(self.session_file)

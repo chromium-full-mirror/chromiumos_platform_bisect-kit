@@ -4,7 +4,10 @@
 
 """Test dut_manager module."""
 
+import json
 import logging
+import os
+import tempfile
 import threading
 import unittest
 from unittest import mock
@@ -77,6 +80,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_dut_pre_allocated_should_auto_alloc(self):
         dut_manager = dut_manager_module.DutManager(
+            'PreAllocate',
             self.mock_states,
             'pre_allocated_dut',
             True,
@@ -96,6 +100,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_dut_pre_allocated_should_not_auto_alloc(self):
         dut_manager = dut_manager_module.DutManager(
+            'PreAllocate',
             self.mock_states,
             'pre_allocated_dut',
             False,
@@ -115,6 +120,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_dut_pre_allocated_force_monitoring(self):
         dut_manager = dut_manager_module.DutManager(
+            'PreAllocate',
             self.mock_states,
             'pre_allocated_dut',
             True,
@@ -137,6 +143,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_dut_pre_allocated_only_initailize_once(self):
         dut_manager = dut_manager_module.DutManager(
+            'PreAllocate',
             self.mock_states,
             'pre_allocated_dut',
             True,
@@ -164,6 +171,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_dut_pre_allocated_missing_dut_funcs(self):
         dut_manager = dut_manager_module.DutManager(
+            'PreAllocate',
             self.mock_states,
             'pre_allocated_dut',
             True
@@ -180,6 +188,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_no_pre_allocated_dut_should_auto_alloc(self):
         dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
             self.mock_states,
             cros_lab_util.LAB_DUT,
             True,
@@ -195,7 +204,9 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host.cros')
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host.cros', mock.ANY
+        )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec
@@ -207,6 +218,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_no_pre_allocated_dut_should_not_auto_alloc(self):
         dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
             self.mock_states,
             cros_lab_util.LAB_DUT,
             False,
@@ -225,6 +237,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_no_pre_allocated_dut_auto_allocate_failed(self):
         dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
             self.mock_states,
             cros_lab_util.LAB_DUT,
             True,
@@ -246,6 +259,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_consecutive_auto_allocate_restored_previous_dut(self):
         dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
             self.mock_states,
             cros_lab_util.LAB_DUT,
             True,
@@ -273,7 +287,9 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host.cros')
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host.cros', mock.ANY
+        )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_not_called()
         self.mock_dut_init_func.assert_not_called()
@@ -283,6 +299,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_consecutive_auto_allocate_lease_new_dut(self):
         dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
             self.mock_states,
             cros_lab_util.LAB_DUT,
             True,
@@ -310,7 +327,9 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host2.cros', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host2.cros')
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host2.cros', mock.ANY
+        )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec
@@ -323,6 +342,7 @@ class TestDutManagerAllocation(unittest.TestCase):
     def test_auto_release_on_exception(self):
         self.mock_allocate_dut.return_value = 'host'
         dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
             self.mock_states,
             cros_lab_util.LAB_DUT,
             True,
@@ -342,7 +362,9 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host.cros')
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host.cros', mock.ANY
+        )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec
@@ -355,6 +377,7 @@ class TestDutManagerAllocation(unittest.TestCase):
     def test_dut_leave_context_check_func_failed(self):
         self.mock_allocate_dut.return_value = 'host'
         dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
             self.mock_states,
             cros_lab_util.LAB_DUT,
             True,
@@ -376,7 +399,9 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
-        self.mock_delayed_dut_releaser_cls.assert_called_once_with('host.cros')
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host.cros', mock.ANY
+        )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec
@@ -388,12 +413,12 @@ class TestDutManagerAllocation(unittest.TestCase):
 
     def test_has_pre_allocated_dut(self):
         dut_manager = dut_manager_module.DutManager(
-            self.mock_states, cros_lab_util.LAB_DUT, True
+            'NoPreAllocate', self.mock_states, cros_lab_util.LAB_DUT, True
         )
         self.assertFalse(dut_manager.has_preallocated_dut())
 
         dut_manager = dut_manager_module.DutManager(
-            self.mock_states, 'pre_allocated_dut', True
+            'PreAllocate', self.mock_states, 'pre_allocated_dut', True
         )
         self.assertTrue(dut_manager.has_preallocated_dut())
 
@@ -444,3 +469,149 @@ class TestDelayedDutReleaser(unittest.TestCase):
         func()
 
         self.mock_crosfleet_release_dut.assert_not_called()
+
+
+class TestAddDutLeasesRecord(unittest.TestCase):
+    """Test dut lease record is written when leaving DutManager context manager."""
+
+    def setUp(self):
+        self._mock_dut_leases_log_path = self.enterContext(
+            mock.patch.object(
+                dut_manager_module.DutManager,
+                'dut_leases_log_path',
+                autospec=True,
+            )
+        )
+
+        self.mock_states = self.dummy_mock_states()
+        self.mock_update_dut_alloc_spec = self.enterContext(
+            mock.patch.object(
+                dut_manager_module.DutManager,
+                'update_dut_alloc_spec',
+                autospec=True,
+            )
+        )
+        self.mock_dut_lease_status_monitor = self.enterContext(
+            mock.patch.object(
+                cros_lab_util, 'dut_lease_status_monitor', autospec=True
+            )
+        )
+        self.mock_allocate_dut = self.enterContext(
+            mock.patch.object(dut_allocator, 'allocate_dut', autospec=True)
+        )
+        self.mock_delayed_dut_releaser_cls = self.enterContext(
+            mock.patch.object(
+                dut_manager_module, 'DelayedDutReleaser', autospec=True
+            )
+        )
+
+        # time.time() is called indirectly via other modules, so we can not use
+        # mock.patch.object(time, 'time', autospec=True) directly.
+        # Instead, we only mock the usage via dut_manager_module.
+        self.mock_time_module = self.enterContext(
+            mock.patch.object(dut_manager_module, 'time', autospec=True)
+        )
+
+    def dummy_mock_states(self):
+        dummy_allocate_spec = core.DutAllocateSpec()
+        mock_states = core.DiagnoseStates('dummy_session_file')
+        mock_states.init_states(
+            config={'session': 'stateless'},
+            dut_allocate_spec=dummy_allocate_spec,
+        )
+        return mock_states
+
+    def testWriteToNewFile(self):
+        # The file does not exist yet. It only return a path name.
+        log_file = tempfile.mktemp()
+        self._mock_dut_leases_log_path.return_value = log_file
+
+        self.mock_allocate_dut.return_value = 'host'
+        # start_timestamp
+        self.mock_time_module.time.return_value = 1689179900.1
+
+        dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
+            self.mock_states,
+            cros_lab_util.LAB_DUT,
+            True,
+        )
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host.cros')
+
+        # Trigger the callback function manually.
+        # end_timestamp
+        self.mock_delayed_dut_releaser_cls.call_args.args[1](1689179950.1)
+
+        with open(log_file) as f:
+            records = json.load(f)
+        self.assertEqual(
+            records,
+            [
+                {
+                    'name': 'NoPreAllocate',
+                    'start_timestamp': 1689179900.1,
+                    'end_timestamp': 1689179950.1,
+                    'duration_secs': 50,
+                }
+            ],
+        )
+
+        os.unlink(log_file)
+
+    def testAppendToExistingFile(self):
+        # The file retains after closed.
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+            json.dump(
+                [
+                    {
+                        'name': 'ExistingRecord',
+                        'start_timestamp': 1689179874.5,
+                        'end_timestamp': 1689179974.5,
+                        'duration_secs': 100,
+                    },
+                ],
+                f,
+            )
+            log_file = f.name
+
+        self._mock_dut_leases_log_path.return_value = log_file
+
+        self.mock_allocate_dut.return_value = 'host'
+        # start_timestamp
+        self.mock_time_module.time.return_value = 1689179900.1
+
+        dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
+            self.mock_states,
+            cros_lab_util.LAB_DUT,
+            True,
+        )
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host.cros')
+
+        # Trigger the callback function manually.
+        # end_timestamp
+        self.mock_delayed_dut_releaser_cls.call_args.args[1](1689179950.1)
+
+        with open(log_file) as f:
+            records = json.load(f)
+        self.assertEqual(
+            records,
+            [
+                {
+                    'name': 'ExistingRecord',
+                    'start_timestamp': 1689179874.5,
+                    'end_timestamp': 1689179974.5,
+                    'duration_secs': 100,
+                },
+                {
+                    'name': 'NoPreAllocate',
+                    'start_timestamp': 1689179900.1,
+                    'end_timestamp': 1689179950.1,
+                    'duration_secs': 50,
+                },
+            ],
+        )
+
+        os.unlink(log_file)

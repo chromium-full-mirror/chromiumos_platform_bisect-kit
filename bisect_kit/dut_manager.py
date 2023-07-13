@@ -5,11 +5,19 @@
 """A helper class to encapsulate DUT allocation and monitoring logic."""
 
 import contextlib
+import dataclasses
+import functools
 import inspect
+import json
 import logging
+import os
+import shutil
+import tempfile
 import threading
+import time
 import typing
 
+from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import dut_allocator
@@ -17,6 +25,41 @@ from bisect_kit import errors
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class DutLeaseRecord:
+    """Statistics for a single DUT lease."""
+
+    name: str = ''
+    start_timestamp: float = 0.0
+    end_timestamp: float = 0.0
+    duration_secs: float = 0.0
+
+
+class DutLeasesLogWritter:
+    """A helper class to write dut leases log to a text file."""
+
+    def __init__(self, filename):
+        self._filename = filename
+
+    def add_dut_lease_record(self, record: DutLeaseRecord):
+        dirname = os.path.dirname(self._filename)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        records = []
+        if os.path.exists(self._filename):
+            with open(self._filename) as f:
+                records = json.load(f)
+        records.append(dataclasses.asdict(record))
+
+        tmp_fn = tempfile.mktemp()
+        with open(tmp_fn, 'w') as f:
+            f.write(json.dumps(records, indent=4, sort_keys=True))
+        # Move is an atomic operation, so the file won't be corrupted due
+        # to program terminated by any reason.
+        shutil.move(tmp_fn, self._filename)
 
 
 class DelayedDutReleaser:
@@ -32,8 +75,18 @@ class DelayedDutReleaser:
 
     _DELAYED_SECONDS = 60
 
-    def __init__(self, dut):
+    def __init__(
+        self, dut, callback: typing.Callable[[float], None] | None = None
+    ):
+        """Initializer.
+
+        Args:
+            dut: the DUT.
+            callback: a callback to call when the DUT is released. It accepts an argument as the DUT release timestamp.
+        """
         self._dut = dut
+        self._callback = callback
+
         self._timer = None
 
         self._lock = threading.Lock()
@@ -67,6 +120,9 @@ class DelayedDutReleaser:
             )
             self._has_released = True
 
+        if self._callback:
+            self._callback(time.time())
+
     def get_dut(self):
         return self._dut
 
@@ -87,6 +143,7 @@ class DutManager:
 
     def __init__(
         self,
+        name: str,
         states: typing.Type[core.DiagnoseStates] | None,
         pre_allocated_dut: str | None,
         should_auto_allocate: bool,
@@ -98,6 +155,7 @@ class DutManager:
         """initializer.
 
         Args:
+            name: a name for the DutManager. Useful for logging.
             states: an instance of core.DiagnoseStates which contains the diagnose
                 config and dut allocate spec.
             pre_allocated_dut: a pre-allocated DUT or ':lab:' if no
@@ -113,6 +171,7 @@ class DutManager:
             should_force_monitoring: Whether to spawn a thread to monitor DUT lease
                 status.
         """
+        self._name: str = name
         self._states: typing.Type[core.DiagnoseStates] | None = states
         self._should_auto_allocate: bool = should_auto_allocate
         self._pre_allocated_dut: str | None = None
@@ -126,6 +185,7 @@ class DutManager:
 
         # DUT allocated by this DutManager, if any.
         self._auto_allocated_dut: str | None = None
+        self._auto_allocated_time: float | None = None
 
         # Whether dut_init_func has been called on the auto-allocated DUT.
         self._is_dut_initialized: bool = False
@@ -182,8 +242,9 @@ class DutManager:
         """Allocates a DUT if necessary.
 
         1. If a valid pre-allocated DUT or auto-allocation DUT exists, nothing needs to be done.
-        2. Otherwise, allocate a DUT if `should_auto_allocate` is True.
-        3. Otherwise, the DUT allocation is deferred. No valid DUT is available
+        2. Otherwise, if a DUT is auto leased before and has not been released yet, restore it.
+        3. Otherwise, allocate a DUT if `should_auto_allocate` is True.
+        4. Otherwise, the DUT allocation is deferred. No valid DUT is available
           in the context managed by this manager.
         """
         logger.info(
@@ -223,6 +284,7 @@ class DutManager:
             raise errors.NoDutAvailable('unable to allocate DUT')
         # A DUT is leased at this point successfully.
         self._auto_allocated_dut = cros_lab_util.dut_name_to_address(host)
+        self._auto_allocated_time = time.time()
         self._is_dut_initialized = False
         self._is_restored_dut = False
         return self
@@ -243,15 +305,38 @@ class DutManager:
                 error = e
 
         if self._auto_allocated_dut:
-            logger.info(
-                'scheduling to release DUT %s', self._auto_allocated_dut
-            )
-            self._dut_releaser = DelayedDutReleaser(self._auto_allocated_dut)
-            self._dut_releaser.start()
+            self._schedule_release_dut()
             self._auto_allocated_dut = None
 
         if error:
             raise error
+
+    def _schedule_release_dut(self):
+        """Schedules to release the DUT auto leased by this instance earlier."""
+
+        def add_dut_lease_record(start_timestamp: float, end_timestamp: float):
+            # This function is called as a callback in another thread from
+            # DelayedDutReleaser. To avoid race condition, the records are written
+            # to a separated log file instead of the file backs DiagnoseStates.
+            writer = DutLeasesLogWritter(self.dut_leases_log_path())
+            writer.add_dut_lease_record(
+                DutLeaseRecord(
+                    name=self._name,
+                    start_timestamp=start_timestamp,
+                    end_timestamp=end_timestamp,
+                    duration_secs=end_timestamp - start_timestamp,
+                )
+            )
+
+        logger.info('scheduling to release DUT %s', self._auto_allocated_dut)
+
+        assert self._auto_allocated_time is not None
+
+        self._dut_releaser = DelayedDutReleaser(
+            self._auto_allocated_dut,
+            functools.partial(add_dut_lease_record, self._auto_allocated_time),
+        )
+        self._dut_releaser.start()
 
     def run_init_func(self):
         dut = self._dut
@@ -381,3 +466,19 @@ class DutManager:
         # TODO(cylee): Not sure if this is needed. Remove if not used.
         self.config['allocated_dut'] = dut
         self._states.save()
+
+    def dut_leases_log_path(self):
+        statistics = self._states.statistics
+        if statistics.dut_leases_log_path:
+            return statistics.dut_leases_log_path
+
+        session_dir = common.determine_session_dir(self.config['session'])
+        log_file = 'dut_leases.{timestamp}.json'.format(
+            timestamp=time.strftime('%Y%m%d-%H%M%S'),
+        )
+        log_path = os.path.join(session_dir, 'log', log_file)
+
+        statistics.dut_leases_log_path = log_path
+        self._states.save()
+
+        return log_path
