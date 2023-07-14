@@ -677,3 +677,34 @@ def copy_file_to_log_folder(file_path: str) -> bool:
         return False
     logger.debug('Copied %s -> %s', file_path, destination_file_path)
     return True
+
+
+class MethodTimer:
+    """A tool to measure running time of a method.
+
+    The class is a bit special which aims at measuring the running time of a method.
+    It is parameterized with another method of the same class as a callback.
+    When the measured method is done, the callback is called on the same instance as the one whose method is being measured.
+    """
+
+    def __init__(
+        self, callback: typing.Callable[[typing.Any, float, float], None]
+    ):
+        """Initializer.
+
+        Args:
+          callback: a method which accepts two arguments - the start timestamp and end timestamp.
+        """
+        self._callback = callback
+
+    def __call__(self, func):
+        def wrapper(wrapped_self, *args, **kwargs):
+            start_timestamp = time.time()
+            try:
+                func(wrapped_self, *args, **kwargs)
+            finally:
+                # The callback is called on the same instance as the one being
+                # measured.
+                self._callback(wrapped_self, start_timestamp, time.time())
+
+        return wrapper

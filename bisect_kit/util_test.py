@@ -149,5 +149,73 @@ class TestCopyFileToLogFolder(unittest.TestCase):
             shutil.rmtree(log_folder)
 
 
+class DummyException(Exception):
+    """A dummy exception class used for testing."""
+
+
+class TestMethodTimer(unittest.TestCase):
+    """Test MethodTimer."""
+
+    def setUp(self):
+        # time.time() is called indirectly via other modules, so we can not use
+        # mock.patch.object(time, 'time', autospec=True) directly.
+        # Instead, we only mock the usage via dut_manager_module.
+        self.mock_time_module = self.enterContext(
+            mock.patch.object(util, 'time', autospec=True)
+        )
+
+    def test_wrap_member_function(self):
+        self.mock_time_module.time.side_effect = [
+            1689336888.1,
+            1689336988.1,
+        ]
+
+        mock_callback = mock.Mock()
+
+        class C:
+            """The class being tested."""
+
+            @util.MethodTimer(mock_callback)
+            def dummy_func(
+                s, arg1, arg2, kwarg1, kwarg2
+            ):  # pylint: disable=no-self-argument
+                self.assertEqual(arg1, 2)
+                self.assertEqual(arg2, 5)
+                self.assertEqual(kwarg1, 'blah')
+                self.assertEqual(kwarg2, 'foo')
+
+        c = C()
+        c.dummy_func(2, 5, kwarg1='blah', kwarg2='foo')
+
+        mock_callback.assert_called_once_with(c, 1689336888.1, 1689336988.1)
+
+    def test_execute_with_exception(self):
+        self.mock_time_module.time.side_effect = [
+            1689336888.1,
+            1689336988.1,
+        ]
+
+        mock_callback = mock.Mock()
+
+        class C:
+            """The class being tested."""
+
+            @util.MethodTimer(mock_callback)
+            def dummy_func(
+                s, arg1, arg2, kwarg1, kwarg2
+            ):  # pylint: disable=no-self-argument
+                self.assertEqual(arg1, 2)
+                self.assertEqual(arg2, 5)
+                self.assertEqual(kwarg1, 'blah')
+                self.assertEqual(kwarg2, 'foo')
+                raise DummyException
+
+        c = C()
+        with self.assertRaises(DummyException):
+            c.dummy_func(2, 5, kwarg1='blah', kwarg2='foo')
+
+        mock_callback.assert_called_once_with(c, 1689336888.1, 1689336988.1)
+
+
 if __name__ == '__main__':
     unittest.main()

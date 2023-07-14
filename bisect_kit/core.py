@@ -275,6 +275,9 @@ class DiagnoseStatistics:
     """General bisection Statistics."""
 
     dut_leases_log_path: str | None = None
+    start_timestamp: float | None = None
+    end_timestamp: float | None = None
+    duration_secs: float | None = None
 
 
 class DiagnoseStates(States):

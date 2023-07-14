@@ -221,6 +221,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd,
         )
 
+    @util.MethodTimer(
+        diagnoser_cros.DiagnoseCommandLineBase.write_total_execution_time
+    )
     def cmd_run(self, opts):
         del opts  # unused
 

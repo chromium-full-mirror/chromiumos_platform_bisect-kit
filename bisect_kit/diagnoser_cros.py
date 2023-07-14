@@ -1305,6 +1305,14 @@ class DiagnoseCommandLineBase:
             session=opts.session,
         )
 
+    def write_total_execution_time(self, start_timestamp, end_timestamp):
+        statistics = self.states.statistics
+        statistics.start_timestamp = start_timestamp
+        statistics.end_timestamp = end_timestamp
+        statistics.duration_secs = end_timestamp - start_timestamp
+
+        self.states.save()
+
     def cmd_init(self, opts):
         path_factory = setup_cros_bisect.DefaultProjectPathFactory(
             opts.mirror_base, opts.work_base, opts.session

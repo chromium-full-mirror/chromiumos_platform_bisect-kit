@@ -18,6 +18,7 @@ import logging
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import dut_manager as dut_manager_module
+from bisect_kit import util
 import experiment
 import setup_cros_bisect
 
@@ -134,6 +135,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd,
         )
 
+    @util.MethodTimer(
+        diagnoser_cros.DiagnoseCommandLineBase.write_total_execution_time
+    )
     def cmd_run(self, opts):
         del opts  # unused
 
