@@ -1319,9 +1319,7 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
                 gs_util.cp(path, tmp_dir)
                 local_path = os.path.join(tmp_dir, os.path.basename(path))
                 assert os.path.exists(local_path)
-                util.check_call(
-                    'tar', 'xf', local_path, test_image_filename, cwd=tmp_dir
-                )
+                util.check_call('tar', 'xf', local_path, cwd=tmp_dir)
                 shutil.move(
                     os.path.join(tmp_dir, test_image_filename), cache_path_full
                 )
