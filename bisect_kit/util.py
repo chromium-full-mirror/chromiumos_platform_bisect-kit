@@ -579,6 +579,11 @@ def forward_ssh(from_host: str, to_port: int):
     assert not is_port_in_use(to_port)
     p = None
     try:
+        logger.debug(
+            'creating ssh forwarding connection: from_host: %s, to_port: %d',
+            from_host,
+            to_port,
+        )
         p = Popen(
             [
                 'go',
@@ -591,10 +596,20 @@ def forward_ssh(from_host: str, to_port: int):
             ]
         )
         wait_until(is_port_in_use, 60, 1, to_port)
+        logger.debug(
+            'ssh forwarding connection is established: from_host: %s, to_port: %d',
+            from_host,
+            to_port,
+        )
         yield
     finally:
         if p:
             p.terminate()
+            logger.debug(
+                'ssh forwarding connection is closed: from_host: %s, to_port: %d',
+                from_host,
+                to_port,
+            )
         assert not is_port_in_use(to_port)
 
 
