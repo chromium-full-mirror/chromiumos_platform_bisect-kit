@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from bisect_kit import cli
+from bisect_kit import errors
 from bisect_kit import git_util
 
 
@@ -826,7 +826,7 @@ class TestGitUtil(unittest.TestCase):
     def test_argtype_git_rev(self):
         rev = 'deadbeef'
         self.assertEqual(git_util.argtype_git_rev(rev), rev)
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             git_util.argtype_git_rev('hello')
 
 

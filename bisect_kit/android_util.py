@@ -18,7 +18,6 @@ import os
 import tempfile
 import urllib.request
 
-from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import git_util
@@ -49,7 +48,7 @@ def is_android_build_id(s):
 def argtype_android_build_id(s):
     if not is_android_build_id(s):
         msg = 'invalid android build id (%s)' % s
-        raise cli.ArgTypeError(msg, '9876543')
+        raise errors.ArgTypeError(msg, '9876543')
     return s
 
 

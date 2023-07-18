@@ -22,7 +22,6 @@ import re
 import shutil
 import typing
 
-from bisect_kit import cli
 from bisect_kit import errors
 from bisect_kit import git_util
 
@@ -91,7 +90,7 @@ def argtype_intra_rev(argtype):
         examples = []
         try:
             return argtype(s)
-        except cli.ArgTypeError as e:
+        except errors.ArgTypeError as e:
             examples += e.example
 
         m = re.match(_re_intra_rev, s)
@@ -100,13 +99,13 @@ def argtype_intra_rev(argtype):
                 argtype(m.group(1))
                 argtype(m.group(2))
                 return s
-            except cli.ArgTypeError as e:
+            except errors.ArgTypeError as e:
                 for example in e.example:
                     examples.append(make_intra_rev(example, example, 10))
-                raise cli.ArgTypeError('Invalid intra rev', examples)
+                raise errors.ArgTypeError('Invalid intra rev', examples)
 
         examples.append(make_intra_rev('<rev1>', '<rev2>', 10))
-        raise cli.ArgTypeError('Invalid rev', examples)
+        raise errors.ArgTypeError('Invalid rev', examples)
 
     return argtype_function
 

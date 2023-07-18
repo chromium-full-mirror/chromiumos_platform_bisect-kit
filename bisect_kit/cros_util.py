@@ -37,7 +37,6 @@ import urllib.parse
 
 import bisect_kit
 from bisect_kit import buildbucket_util
-from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import core
 from bisect_kit import errors
@@ -515,7 +514,7 @@ def snapshot_version_split(snapshot_version):
 def argtype_cros_version(s):
     if (not is_cros_version(s)) and (not is_cros_snapshot_version(s)):
         msg = 'invalid cros version'
-        raise cli.ArgTypeError(
+        raise errors.ArgTypeError(
             msg, '9876.0.0, R62-9876.0.0 or R77-12369.0.0-11681'
         )
     return s

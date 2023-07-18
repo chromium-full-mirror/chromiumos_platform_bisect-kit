@@ -8,6 +8,7 @@ import unittest
 
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import errors
 
 
 class TestCodeChange(unittest.TestCase):
@@ -35,10 +36,10 @@ class TestCodeChange(unittest.TestCase):
         self.assertEqual(arg_type('a'), 'a')
         self.assertEqual(arg_type('a~b/10'), 'a~b/10')
 
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             arg_type('a~b/c')
 
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             arg_type('a~g/10')
 
     def test_normalized_repo_url(self):

@@ -28,27 +28,6 @@ EXIT_CODE_FATAL = 128
 EXIT_CODE_VALUE = 0
 
 
-class ArgTypeError(argparse.ArgumentTypeError):
-    """An error for argument validation failure.
-
-    This not only tells users the argument is wrong but also gives correct
-    example. The main purpose of this error is for argtype_multiplexer, which
-    cascades examples from multiple ArgTypeError.
-    """
-
-    def __init__(self, msg, example):
-        self.msg = msg
-        if isinstance(example, list):
-            self.example = example
-        else:
-            self.example = [example]
-        full_msg = '%s (example value: %s)' % (
-            self.msg,
-            ', '.join(self.example),
-        )
-        super().__init__(full_msg)
-
-
 def argtype_notempty(s):
     """Validates argument is not an empty string.
 
@@ -60,7 +39,7 @@ def argtype_notempty(s):
     """
     if not s:
         msg = 'should not be empty'
-        raise ArgTypeError(msg, 'foo')
+        raise errors.ArgTypeError(msg, 'foo')
     return s
 
 
@@ -76,7 +55,7 @@ def argtype_int(s):
     try:
         return str(int(s))
     except ValueError as e:
-        raise ArgTypeError('should be a number', '123') from e
+        raise errors.ArgTypeError('should be a number', '123') from e
 
 
 def argtype_re(pattern, example):
@@ -95,9 +74,9 @@ def argtype_re(pattern, example):
         if re.match(pattern, s):
             return s
         if re.escape(pattern) == pattern:
-            raise ArgTypeError('should be "%s"' % pattern, pattern)
-        raise ArgTypeError(
-            'should match "%s"' % pattern, '"%s" like %s' % (pattern, example)
+            raise errors.ArgTypeError(f'should be "{pattern}"', pattern)
+        raise errors.ArgTypeError(
+            f'should match "{pattern}"', f'"{pattern}" like {example}'
         )
 
     return validate
@@ -131,11 +110,11 @@ def argtype_multiplexer(*args):
         for t in args:
             try:
                 return t(s)
-            except ArgTypeError as e:
+            except errors.ArgTypeError as e:
                 examples += e.example
 
         msg = 'Invalid argument'
-        raise ArgTypeError(msg, examples)
+        raise errors.ArgTypeError(msg, examples)
 
     return validate
 
@@ -159,10 +138,12 @@ def argtype_multiplier(argtype):
             if m:
                 return argtype(m.group(1)), int(m.group(2))
             return argtype(s), 1
-        except ArgTypeError as e:
+        except errors.ArgTypeError as e:
             # It should be okay to gives multiplier example only for the first one
             # because it is just "example", no need to enumerate all possibilities.
-            raise ArgTypeError(e.msg, e.example + [e.example[0] + '*3']) from e
+            raise errors.ArgTypeError(
+                e.msg, e.example + [e.example[0] + '*3']
+            ) from e
 
     return helper
 
@@ -177,11 +158,11 @@ def argtype_dir_path(s):
       ArgTypeError if the path is not a directory.
     """
     if not os.path.exists(s):
-        raise ArgTypeError(
+        raise errors.ArgTypeError(
             'should be an existing directory', '/path/to/somewhere'
         )
     if not os.path.isdir(s):
-        raise ArgTypeError('should be a directory', '/path/to/somewhere')
+        raise errors.ArgTypeError('should be a directory', '/path/to/somewhere')
 
     # Normalize, trim trailing path separators.
     if len(s) > 1 and s[-1] == os.path.sep:
@@ -203,9 +184,9 @@ def argtype_key_value(s):
     """
     split = s.split('=')
     if len(split) != 2:
-        raise ArgTypeError('Invalid key value string: %s' % s, 'key=value')
+        raise errors.ArgTypeError(f'Invalid key value string: {s}', 'key=value')
     if not re.match('^[A-Za-z0-9_.-]+$', split[0]):
-        raise ArgTypeError('Invalid key: %s' % s, 'key=value')
+        raise errors.ArgTypeError(f'Invalid key: {s}', 'key=value')
     return tuple(split)
 
 

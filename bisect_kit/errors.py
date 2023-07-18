@@ -4,6 +4,8 @@
 
 """Exception classes."""
 
+import argparse
+
 
 class ArgumentError(Exception):
     """Bad command line argument."""
@@ -17,6 +19,27 @@ class ArgumentError(Exception):
         if self.argument_name:
             return 'argument %s: %s' % (self.argument_name, self.message)
         return self.message
+
+
+class ArgTypeError(argparse.ArgumentTypeError):
+    """An error for argument validation failure.
+
+    This not only tells users the argument is wrong but also gives correct
+    example. The main purpose of this error is for argtype_multiplexer, which
+    cascades examples from multiple ArgTypeError.
+    """
+
+    def __init__(self, msg, example):
+        self.msg = msg
+        if isinstance(example, list):
+            self.example = example
+        else:
+            self.example = [example]
+        full_msg = '%s (example value: %s)' % (
+            self.msg,
+            ', '.join(self.example),
+        )
+        super().__init__(full_msg)
 
 
 class Uninitialized(Exception):

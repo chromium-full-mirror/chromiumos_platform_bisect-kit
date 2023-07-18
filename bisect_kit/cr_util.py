@@ -16,7 +16,6 @@ import time
 import urllib.request
 
 import bisect_kit
-from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import gclient_util
@@ -130,7 +129,7 @@ def extract_milestone_from_version(rev: str) -> str:
 
 def argtype_chrome_version(s):
     if not is_chrome_version(s):
-        raise cli.ArgTypeError('invalid chrome version', '59.0.3064.0')
+        raise errors.ArgTypeError('invalid chrome version', '59.0.3064.0')
     return s
 
 

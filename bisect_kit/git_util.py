@@ -19,7 +19,7 @@ import time
 import typing
 
 from bisect_kit import cache_util
-from bisect_kit import cli
+from bisect_kit import errors
 from bisect_kit import util
 
 
@@ -133,7 +133,7 @@ def argtype_git_rev(rev: str) -> str:
         msg = (
             'should be git hash, at least %d digits' % GIT_MIN_COMMIT_ID_LENGTH
         )
-        raise cli.ArgTypeError(msg, '1a2b3c4d5e')
+        raise errors.ArgTypeError(msg, '1a2b3c4d5e')
     return rev
 
 

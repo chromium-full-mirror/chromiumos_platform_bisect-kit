@@ -11,7 +11,6 @@ import subprocess
 import unittest
 from unittest import mock
 
-from bisect_kit import cli
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gs_util
@@ -183,7 +182,7 @@ class TestCrosUtil(unittest.TestCase):
         self.assertEqual(
             cros_util.argtype_cros_version('R99-9876.0.0'), 'R99-9876.0.0'
         )
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cros_util.argtype_cros_version('foobar')
 
     def test_lsb_release(self):

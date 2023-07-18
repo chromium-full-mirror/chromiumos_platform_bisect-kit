@@ -17,19 +17,19 @@ class TestCli(unittest.TestCase):
     def test_argtype_int(self):
         self.assertEqual(cli.argtype_int('123456'), '123456')
         self.assertEqual(cli.argtype_int('-123456'), '-123456')
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cli.argtype_int('foobar')
 
     def test_argtype_notempty(self):
         self.assertEqual(cli.argtype_notempty('123456'), '123456')
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cli.argtype_notempty('')
 
     def test_argtype_re(self):
         argtype = cli.argtype_re(r'^r\d+$', 'r123')
         self.assertEqual(argtype('r123'), 'r123')
 
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             argtype('hello')
 
     def test_argtype_multiplexer(self):
@@ -42,7 +42,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(argtype('foobar'), 'foobar')
         self.assertEqual(argtype('r123'), 'r123')
 
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             argtype('hello')
 
     def test_argtype_multiplier(self):
@@ -51,18 +51,18 @@ class TestCli(unittest.TestCase):
         self.assertEqual(argtype('123*5'), ('123', 5))
 
         # Make sure there is multiplier example in the message.
-        with self.assertRaisesRegex(cli.ArgTypeError, r'\d+\*\d+'):
+        with self.assertRaisesRegex(errors.ArgTypeError, r'\d+\*\d+'):
             argtype('hello')
 
     def test_argtype_path(self):
         self.assertEqual(cli.argtype_dir_path('/'), '/')
         self.assertEqual(cli.argtype_dir_path('/etc/'), '/etc')
 
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cli.argtype_dir_path('')
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cli.argtype_dir_path('/foo/bar/not/exist/path')
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cli.argtype_dir_path('/etc/passwd')
 
     def test_check_executable(self):
@@ -99,13 +99,13 @@ class TestCli(unittest.TestCase):
             cli.argtype_key_value('aa_bb-cc.dd='), ('aa_bb-cc.dd', '')
         )
 
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cli.argtype_key_value('key')
 
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cli.argtype_key_value('key=value=value2')
 
-        with self.assertRaises(cli.ArgTypeError):
+        with self.assertRaises(errors.ArgTypeError):
             cli.argtype_key_value('?=value')
 
     def test_fatal_error_handler(self):
