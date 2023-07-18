@@ -94,7 +94,8 @@ def cmd_allocate_dut(opts):
         chromeos_root=opts.chromeos_root,
         session=opts.session,
     )
-    dut_allocator.allocate_dut(spec)  # Ignore the return value.
+    result = dut_allocator.allocate_dut(spec)
+    print(json.dumps(dataclasses.asdict(result)))
 
 
 def cmd_repair_dut(opts):

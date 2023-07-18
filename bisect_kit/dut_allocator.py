@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import collections.abc
+import dataclasses
 import functools
 import logging
 import random
@@ -427,22 +428,30 @@ def _do_allocate_dut(spec: core.DutAllocateSpec):
     return 'wait', None, None
 
 
-def allocate_dut(spec: core.DutAllocateSpec):
-    leased_dut = None
+@dataclasses.dataclass
+class AllocateDutResult:
+    """Result returned by allocate_dut."""
+
+    result: str | None = None
+    leased_dut: str | None = None
+    board: str | None = None
+    exception: str | None = None
+    text: str | None = None
+
+
+def allocate_dut(spec: core.DutAllocateSpec) -> AllocateDutResult:
+    result = AllocateDutResult()
     try:
         todo, host, board = _do_allocate_dut(spec)
-        leased_dut = cros_lab_util.dut_name_to_address(host) if host else None
-        result = {'result': todo, 'leased_dut': leased_dut, 'board': board}
+        result.result = todo
+        if host:
+            result.leased_dut = cros_lab_util.dut_name_to_address(host)
+        result.board = board
         logger.debug('dut allocated: %s', result)
     except Exception as e:
         logger.exception('cmd_allocate_dut failed')
-        exception_name = e.__class__.__name__
-        result = {
-            'result': 'failed',
-            'exception': exception_name,
-            'text': str(e),
-        }
+        result.result = 'failed'
+        result.exception = e.__class__.__name__
+        result.text = str(e)
         logger.warning('failed to allocate dut: %s', result)
-    if not leased_dut:
-        return None
-    return cros_lab_util.dut_host_name(leased_dut)
+    return result
