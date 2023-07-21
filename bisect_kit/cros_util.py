@@ -125,6 +125,12 @@ CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
 FORWARDED_DUT_HOST = 'localhost'
 FORWARDED_DUT_PORT = 2222
 
+DEFAULT_CHECK_GOOD_DUT_ATTEMPTS = 10
+DEFAULT_QUERY_LSB_RELEASE_ATTEMPTS = 10
+DEFAULT_QUERY_OS_RELEASE_ATTEMPTS = 10
+DEFAULT_QUERY_BOOT_ID_ATTEMPTS = 10
+DEFAULT_REPAIR_DUT_ATTEMPTS = 3
+
 
 @dataclasses.dataclass
 class VersionInfo:
@@ -520,11 +526,14 @@ def argtype_cros_version(s):
     return s
 
 
-def query_dut_lsb_release(host):
+def query_dut_lsb_release(
+    host: str, max_attempts: int = DEFAULT_QUERY_LSB_RELEASE_ATTEMPTS
+) -> dict[str, str]:
     """Query /etc/lsb-release of given DUT
 
     Args:
       host: the DUT address
+      max_attempts: the number of attempts to query the DUT
 
     Returns:
       dict for keys and values of /etc/lsb-release.
@@ -534,7 +543,9 @@ def query_dut_lsb_release(host):
       errors.ExternalError: lsb-release file doesn't exist
     """
     try:
-        output = util.ssh_cmd(host, 'cat', '/etc/lsb-release', allow_retry=True)
+        output = util.ssh_cmd(
+            host, 'cat', '/etc/lsb-release', max_attempts=max_attempts
+        )
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError(
             'unable to read /etc/lsb-release; not a DUT'
@@ -542,11 +553,14 @@ def query_dut_lsb_release(host):
     return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
 
 
-def query_dut_os_release(host):
+def query_dut_os_release(
+    host: str, max_attempts: int = DEFAULT_QUERY_OS_RELEASE_ATTEMPTS
+) -> dict[str, str]:
     """Query /etc/os-release of given DUT
 
     Args:
       host: the DUT address
+      max_attempts: the number of attempts to query the DUT
 
     Returns:
       dict for keys and values of /etc/os-release.
@@ -556,7 +570,9 @@ def query_dut_os_release(host):
       errors.ExternalError: lsb-release file doesn't exist
     """
     try:
-        output = util.ssh_cmd(host, 'cat', '/etc/os-release', allow_retry=True)
+        output = util.ssh_cmd(
+            host, 'cat', '/etc/os-release', max_attempts=max_attempts
+        )
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError(
             'unable to read /etc/os-release; not a DUT'
@@ -699,13 +715,24 @@ def is_dut(host):
         return False
 
 
-def is_good_dut(host):
+def is_good_dut(
+    host: str, max_attempts: int = DEFAULT_CHECK_GOOD_DUT_ATTEMPTS
+) -> bool:
+    """Checks if the given DUT is a chromeos device with working python.
+
+    Args:
+      host: the DUT address
+      max_attempts: the number of attempts to query the DUT
+
+    Returns:
+      True if the host is a chromeos device with working python.
+    """
     if not is_dut(host):
         return False
 
     # Sometimes python is broken after 'cros flash'.
     try:
-        util.ssh_cmd(host, 'python', '-c', '1', allow_retry=True)
+        util.ssh_cmd(host, 'python', '-c', '1', max_attempts=max_attempts)
         return True
     except (subprocess.CalledProcessError, errors.SshConnectionError):
         return False
@@ -753,12 +780,17 @@ def query_dut_is_by_official_builder(host):
     return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BUILDER_PATH', '')
 
 
-def query_dut_boot_id(host, connect_timeout=None):
+def query_dut_boot_id(
+    host: str,
+    connect_timeout: int | None = None,
+    max_attempts: int = DEFAULT_QUERY_BOOT_ID_ATTEMPTS,
+) -> str:
     """Query boot id.
 
     Args:
       host: DUT address
       connect_timeout: connection timeout
+      max_attempts: the number of attempts to query the DUT
 
     Returns:
       boot uuid
@@ -768,6 +800,7 @@ def query_dut_boot_id(host, connect_timeout=None):
         'cat',
         '/proc/sys/kernel/random/boot_id',
         connect_timeout=connect_timeout,
+        max_attempts=max_attempts,
     ).strip()
 
 
@@ -785,7 +818,7 @@ def reboot(host, force_reboot_callback=None):
         boot_id = query_dut_boot_id(host)
 
         try:
-            util.ssh_cmd(host, 'reboot')
+            util.ssh_cmd(host, 'reboot', connect_timeout=20)
         except errors.SshConnectionError:
             # Depends on timing, ssh may return failure due to broken pipe, which is
             # working as intended. Ignore such kind of errors.
@@ -809,7 +842,7 @@ def wait_reboot_done(host, boot_id):
             # set a connect timeout. 3 seconds are enough and 2 are not. It's okay to
             # set tight limit because it's inside retry loop.
             assert boot_id != query_dut_boot_id(
-                host, connect_timeout=3
+                host, connect_timeout=5
             ), 'rebooted but boot id intact?'
             return
         except errors.SshConnectionError:
@@ -3039,7 +3072,9 @@ def _prepare_results_stores(src: str, dst: str):
             shutil.rmtree(dst)
 
 
-def repair_dut(chromeos_root: str, dut: str, max_attempts=3) -> bool:
+def repair_dut(
+    chromeos_root: str, dut: str, max_attempts=DEFAULT_REPAIR_DUT_ATTEMPTS
+) -> bool:
     """Repairs the DUT based off the host-info files.
 
     Currently, the host-info file stores are under the stores folders.
@@ -3051,6 +3086,7 @@ def repair_dut(chromeos_root: str, dut: str, max_attempts=3) -> bool:
     Args:
       chromeos_root: the chromeos tree
       dut: the CrOS DUT to repair
+      max_attempts: the number of attempts to repair the DUT
 
     Returns:
       True on success, False otherwise

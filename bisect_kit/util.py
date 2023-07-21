@@ -50,7 +50,7 @@ class Popen:
 
     def __init__(
         self,
-        args,
+        args: str | list[str],
         stdout_callback: typing.Callable | None = None,
         stderr_callback: typing.Callable | None = None,
         log_stdout: bool = True,
@@ -97,7 +97,7 @@ class Popen:
             logger.debug(
                 'cwd=%s, run %r',
                 kwargs.get('cwd'),
-                subprocess.list2cmdline(args),
+                subprocess.list2cmdline(map(str, args)),
             )
         self.p = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs
@@ -301,15 +301,15 @@ def ssh_cmd(
     host: str,
     *args,
     connect_timeout: int | None = None,
-    allow_retry: bool = False,
+    max_attempts: int = 1,
 ) -> str:
     """Runs remote command using ssh.
 
     Args:
       host: remote host address
-      args: command and args running on the remote host
+      *args: command and args running on the remote host
       connect_timeout: connection timeout in seconds (int)
-      allow_retry: if True, retry when ssh connection failed
+      max_attempts: maximum number of attempts to connect to the remote host
 
     Raises:
       subprocess.CalledProcessError if the exit code is non-zero.
@@ -323,9 +323,10 @@ def ssh_cmd(
     cmd.append(host)
     cmd += list(args)
 
-    tries = 0
+    max_attempts = max(max_attempts, 1)
+    attempts = 0
     while True:
-        tries += 1
+        attempts += 1
         try:
             return check_output(*cmd)
         except subprocess.CalledProcessError as e:
@@ -333,25 +334,24 @@ def ssh_cmd(
             # the remote command.
             if e.returncode != 255:
                 raise
-            if allow_retry and tries < 3:
-                # ssh's ConnectionAttempts is not enough because we want to deal with
-                # situations needing several seconds to recover.
-                delay = 60
-                logger.warning(
-                    'ssh connection failed, will retry %d seconds later', delay
+            if attempts >= max_attempts:
+                raise errors.SshConnectionError(
+                    f'ssh connection to {host!r} failed'
                 )
-                time.sleep(delay)
-                continue
-            raise errors.SshConnectionError(
-                f'ssh connection to {host!r} failed'
-            )
+        # ssh's ConnectionAttempts is not enough because we want to deal with
+        # situations needing several seconds to recover.
+        delay = 60
+        logger.warning(
+            'ssh connection failed, will retry %d seconds later', delay
+        )
+        time.sleep(delay)
 
 
 def scp_cmd(
     from_file: str,
     to_file: str,
     connect_timeout: int | None = None,
-    allow_retry: bool = False,
+    max_attempts: int = 1,
 ) -> str:
     """Copies a file through scp.
 
@@ -359,7 +359,7 @@ def scp_cmd(
       from_file: from file name
       to_file: target file name
       connect_timeout: connection timeout in seconds (int)
-      allow_retry: if True, retry when ssh connection failed
+      max_attempts: maximum number of attempts to connect to the remote host
 
     Raises:
       subprocess.CalledProcessError if the exit code is non-zero.
@@ -374,9 +374,10 @@ def scp_cmd(
         to_file,
     ]
 
-    tries = 0
+    max_attempts = max(max_attempts, 1)
+    attempts = 0
     while True:
-        tries += 1
+        attempts += 1
         try:
             return check_output(*cmd)
         except subprocess.CalledProcessError as e:
@@ -384,18 +385,17 @@ def scp_cmd(
             # the remote command.
             if e.returncode != 255:
                 raise
-            if allow_retry and tries < 3:
-                # ssh's ConnectionAttempts is not enough because we want to deal with
-                # situations needing several seconds to recover.
-                delay = 60
-                logger.warning(
-                    'ssh connection failed, will retry %d seconds later', delay
+            if attempts >= max_attempts:
+                raise errors.SshConnectionError(
+                    f'scp {from_file} to {to_file} failed'
                 )
-                time.sleep(delay)
-                continue
-            raise errors.SshConnectionError(
-                f'scp {from_file} to {to_file} failed'
-            )
+        # ssh's ConnectionAttempts is not enough because we want to deal with
+        # situations needing several seconds to recover.
+        delay = 60
+        logger.warning(
+            'ssh connection failed, will retry %d seconds later', delay
+        )
+        time.sleep(delay)
 
 
 def escape_rev(rev: str) -> str:
