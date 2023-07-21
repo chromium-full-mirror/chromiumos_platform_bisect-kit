@@ -15,7 +15,7 @@ cd "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")"
 # Update depot_tools
 update_depot_tools
 
-PYTHON_FILES="*.py bisect_kit/*.py"
+PYTHON_FILES="*.py bisect_kit/*.py bisect_kit/*/*.py"
 
 # Format python files with `cros format` which include isort and black tools.
 cros format ${PYTHON_FILES}

@@ -1642,6 +1642,60 @@ def provision_image_with_retry(
             raise
 
 
+def cros_setup_board(chromeos_root: str, board: str) -> None:
+    """Wrapper for the `setup_board` command.
+
+    Args:
+      chromeos_root: ChromeOS tree root directory
+      board: ChromeOS board name
+    """
+    cros_sdk(chromeos_root, 'setup_board', f'--board={board}')
+
+
+@contextlib.contextmanager
+def cros_workon(
+    chromeos_root: str, board: str, package: str
+) -> typing.Iterator[None]:
+    """Wrapper for the `cros workon` command.
+
+    Args:
+      chromeos_root: ChromeOS tree root directory
+      board: ChromeOS board name
+      package: package name
+    """
+    cros_sdk(
+        chromeos_root, 'cros', 'workon', f'--board={board}', 'start', package
+    )
+    try:
+        yield
+    finally:
+        cros_sdk(
+            chromeos_root, 'cros', 'workon', f'--board={board}', 'stop', package
+        )
+
+
+def cros_emerge(chromeos_root: str, board: str, package: str) -> str:
+    """Wrapper for the `emerge` command.
+
+    Args:
+      chromeos_root: ChromeOS tree root directory
+      board: ChromeOS board name
+      package: package name
+    """
+    return cros_sdk(chromeos_root, f'emerge-{board}', package)
+
+
+def cros_deploy(chromeos_root: str, dut: str, package: str) -> str:
+    """Wrapper for the `cros deploy` command.
+
+    Args:
+      chromeos_root: ChromeOS tree root directory
+      dut: the DUT address
+      package: package name
+    """
+    return cros_sdk(chromeos_root, 'cros', 'deploy', '--debug', dut, package)
+
+
 def fetch_metadata_version_info(board: str, cros_version: str) -> VersionInfo:
     """Query version info of given version of ChromeOS from metadata
 

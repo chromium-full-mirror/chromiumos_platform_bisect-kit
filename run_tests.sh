@@ -16,7 +16,7 @@ cd "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")"
 update_depot_tools
 
 # Check python format with `cros format` which include isort and black tools.
-cros format *.py bisect_kit/*.py --check
+cros format *.py bisect_kit/*.py bisect_kit/*/*.py --check
 
 # Analyze python files with pylint.
 # We manually list all python files in the base folder because pylint only
