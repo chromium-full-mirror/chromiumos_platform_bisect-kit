@@ -137,6 +137,10 @@ class VerifyInitialRangeFailed(VerificationFailed):
         super().__init__(msg)
 
 
+class TooFewRevisionsError(VerificationFailed):
+    """Too few revisions to search."""
+
+
 class UnableToProceed(Exception):
     """Unable to narrow bisect range further due to too many errors."""
 

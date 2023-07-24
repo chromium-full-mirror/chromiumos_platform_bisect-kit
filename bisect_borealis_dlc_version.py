@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+# Copyright 2023 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Borealis DLC bisector to bisect prebuilt versions.
+
+Example:
+  $ ./bisect_borealis_dlc_version.py init --old rev1 --new rev2 --dut DUT \\
+    --chromeos_root ~/chromiumos \\
+    --chromeos_mirror $CHROMEOS_MIRROR
+  $ ./bisect_borealis_dlc_version.py config switch ./switch_cros_borealis_dlc_prebuilt.py
+  $ ./bisect_borealis_dlc_version.py config eval ./eval-manually.sh
+  $ ./bisect_borealis_dlc_version.py run
+
+When running switcher and evaluator, following environment variables
+will be set:
+  BOREALIS_DLC_VERSION (e.g. 2023.02.09.031143), and
+  DUT (e.g. samus-dut, if available),
+  BOARD (e.g. samus, if available) and
+  CHROMEOS_ROOT (e.g. ~/chromiumos).
+"""
+
+import logging
+import os
+
+from bisect_kit import bisector_cli
+from bisect_kit import cli
+from bisect_kit import codechange
+from bisect_kit import core
+from bisect_kit import cros_lab_util
+from bisect_kit import cros_util
+from bisect_kit import errors
+from bisect_kit import repo_util
+from bisect_kit.dlc import borealis_util
+
+
+logger = logging.getLogger(__name__)
+
+
+class BorealisVersionDomain(core.BisectDomain):
+    """BorealisVersionDomain for Borealis DLC versions."""
+
+    revtype = staticmethod(
+        cli.argtype_multiplexer(
+            borealis_util.argtype_borealis_version,
+            cros_util.argtype_cros_version,
+        )
+    )
+    help = __doc__
+
+    @staticmethod
+    def add_init_arguments(parser):
+        parser.add_argument(
+            '--dut',
+            type=cli.argtype_notempty,
+            metavar='DUT',
+            default=os.environ.get('DUT'),
+            help='DUT address',
+        )
+        parser.add_argument(
+            '--board',
+            metavar='BOARD',
+            default=os.environ.get('BOARD', ''),
+            help='ChromeOS board name',
+        )
+        parser.add_argument(
+            '--chromeos_root',
+            metavar='CHROMEOS_ROOT',
+            type=cli.argtype_dir_path,
+            required=True,
+            default=os.environ.get('CHROMEOS_ROOT'),
+            help='ChromeOS tree root',
+        )
+        parser.add_argument(
+            '--chromeos_mirror',
+            type=cli.argtype_dir_path,
+            default=os.environ.get('CHROMEOS_MIRROR', ''),
+            help='ChromeOS repo mirror path',
+        )
+
+    @staticmethod
+    def init(opts):
+        if not opts.dut and not opts.board:
+            raise errors.ArgumentError(
+                '--dut and --board', 'Neither is specified'
+            )
+
+        if opts.dut:
+            if cros_lab_util.is_satlab_dut(opts.dut):
+                cros_lab_util.write_satlab_ssh_config(opts.dut)
+            assert cros_util.is_dut(opts.dut)
+
+        if not opts.board:
+            opts.board = cros_util.query_dut_board(opts.dut)
+
+        is_both_cros_version = cros_util.is_cros_or_snapshot_version(
+            opts.old
+        ) and cros_util.is_cros_or_snapshot_version(opts.new)
+        is_both_borealis_version = borealis_util.is_borealis_version(
+            opts.old
+        ) and borealis_util.is_borealis_version(opts.new)
+
+        if is_both_cros_version:
+            opts.old = cros_util.version_to_full(opts.board, opts.old)
+            opts.new = cros_util.version_to_full(opts.board, opts.new)
+            if not cros_util.is_ancestor_version(opts.old, opts.new):
+                raise errors.ArgumentError(
+                    '--old and --new',
+                    '%s is not ancestor of %s' % (opts.old, opts.new),
+                )
+            spec_manager = cros_util.ChromeOSSpecManager(
+                dict(
+                    board=opts.board,
+                    chromeos_root=opts.chromeos_root,
+                    chromeos_mirror=opts.chromeos_mirror,
+                )
+            )
+            cache = repo_util.RepoMirror(opts.chromeos_mirror)
+            code_manager = codechange.CodeManager(
+                opts.chromeos_root, spec_manager, cache
+            )
+            _, details = code_manager.build_revlist(opts.old, opts.new)
+            revlist, details = borealis_util.extract_revlist(details)
+
+        elif is_both_borealis_version:
+            revlist, details = borealis_util.build_revlist_from_gs(
+                opts.old, opts.new
+            )
+
+        else:
+            raise errors.ArgumentError(
+                '--old and --new',
+                f'must be the same type of version ({opts.old}, {opts.new})',
+            )
+
+        logger.info('borealis rev list: %s', revlist)
+        config = dict(
+            dut=opts.dut,
+            board=opts.board,
+            chromeos_root=opts.chromeos_root,
+            chromeos_mirror=opts.chromeos_mirror,
+        )
+
+        if revlist:
+            config['old'] = revlist[0]
+            config['new'] = revlist[-1]
+        else:
+            raise errors.TooFewRevisionsError(f'Too few revisions: {revlist}')
+
+        return config, {'revlist': revlist, 'details': details}
+
+    def __init__(self, config):
+        self.config = config
+
+    def setenv(self, env, rev):
+        if self.config['dut']:
+            env['DUT'] = self.config['dut']
+        if self.config['board']:
+            env['BOARD'] = self.config['board']
+        env['CHROMEOS_ROOT'] = self.config['chromeos_root']
+        env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
+        env['BOREALIS_DLC_VERSION'] = rev
+
+
+if __name__ == '__main__':
+    bisector_cli.BisectorCommandLine(BorealisVersionDomain).main()

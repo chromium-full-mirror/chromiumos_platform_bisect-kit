@@ -550,7 +550,10 @@ class BisectorCommandLine:
                 config['new'] = opts.new
             if 'old' not in config:
                 config['old'] = opts.old
-            assert len(revlist) >= 2
+            if len(revlist) < 2:
+                raise errors.TooFewRevisionsError(
+                    f'Too few revisions: {revlist}'
+                )
             assert config['new'] in revlist
             assert config['old'] in revlist
             old_idx = revlist.index(config['old'])

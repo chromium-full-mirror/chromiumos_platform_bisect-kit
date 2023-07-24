@@ -137,14 +137,33 @@ class TestCrosUtil(unittest.TestCase):
         )
 
     def test_is_cros_snapshot_version(self):
+        self.assertTrue(
+            cros_util.is_cros_snapshot_version('R99-1234.0.0-23456')
+        )
+
         self.assertFalse(cros_util.is_cros_snapshot_version('1234.0.0'))
         self.assertFalse(cros_util.is_cros_snapshot_version('R99-1234.0.0'))
         self.assertFalse(
             cros_util.is_cros_snapshot_version('1234.0.2018_01_01_1259')
         )
         self.assertFalse(cros_util.is_cros_snapshot_version('1234.0.0-23456'))
+
+    def is_cros_or_snapshot_version(self):
+        self.assertTrue(cros_util.is_cros_or_snapshot_version('1234.0.0'))
+        self.assertTrue(cros_util.is_cros_or_snapshot_version('R99-1234.0.0'))
         self.assertTrue(
-            cros_util.is_cros_snapshot_version('R99-1234.0.0-23456')
+            cros_util.is_cros_or_snapshot_version('R99-1234.0.0-23456')
+        )
+
+        self.assertFalse(cros_util.is_cros_or_snapshot_version('1234.00.0'))
+        self.assertFalse(cros_util.is_cros_or_snapshot_version('R99-1234.00.0'))
+        self.assertFalse(cros_util.is_cros_or_snapshot_version('1234.0.0'))
+        self.assertFalse(cros_util.is_cros_or_snapshot_version('R99-1234.0.0'))
+        self.assertFalse(
+            cros_util.is_cros_or_snapshot_version('1234.0.2018_01_01_1259')
+        )
+        self.assertFalse(
+            cros_util.is_cros_or_snapshot_version('1234.0.0-23456')
         )
 
     def test_make_version_and_split(self):

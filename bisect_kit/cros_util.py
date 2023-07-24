@@ -427,6 +427,11 @@ def is_cros_snapshot_version(version: str) -> bool:
     return bool(PATTERN_CROS_SNAPSHOT_VERSION.match(version))
 
 
+def is_cros_or_snapshot_version(version: str) -> bool:
+    """Determines if `version` is chromeos or snapshot version"""
+    return is_cros_version(version) or is_cros_snapshot_version(version)
+
+
 def is_cros_version_lesseq(ver1, ver2):
     """Determines if ver1 is less or equal to ver2.
 
