@@ -19,7 +19,7 @@ from bisect_kit import util
 _BIN = 'gsutil'
 
 
-def _gsutil(*args, **kwargs):
+def _gsutil(*args, **kwargs) -> str:
     """gsutil command line wrapper.
 
     Args:
@@ -160,28 +160,24 @@ def stat(*args, **kwargs) -> dict[str, dict[str, typing.Any]]:
     """
 
     time_format = '%a, %d %b %Y %H:%M:%S GMT'
-    supported_fields = [
-        'Creation time',
-        'Update time',
-        'Storage class',
-        'Content-Length',
-        'Content-Type',
-        'create_time_seconds',  # metadata
-        'Hash (crc32c)',
-        'Hash (md5)',
-        'ETag',
-        'Generation',
-        'Metageneration',
-    ]
-    datetime_fields = [
-        'Creation time',
-        'Update time',
-    ]
-    int_fields = [
-        'Content-Length',
-        'create_time_seconds',
-        'Generation',
-    ]
+
+    def timestamp_from_date_str(date_str: str) -> int:
+        date = datetime.datetime.strptime(date_str, time_format)
+        return int(calendar.timegm(date.utctimetuple()))
+
+    parsing_func: dict[str, typing.Callable] = {
+        'Creation time': timestamp_from_date_str,
+        'Update time': timestamp_from_date_str,
+        'Storage class': str,
+        'Content-Length': int,
+        'Content-Type': str,
+        'create_time_seconds': int,  # metadata
+        'Hash (crc32c)': str,
+        'Hash (md5)': str,
+        'ETag': str,
+        'Generation': int,
+        'Metageneration': str,
+    }
 
     result = {}
     current_file = None
@@ -206,11 +202,6 @@ def stat(*args, **kwargs) -> dict[str, dict[str, typing.Any]]:
             continue
 
         # find a key we want
-        if key in supported_fields:
-            if key in int_fields:
-                value = int(value)
-            if key in datetime_fields:
-                dt = datetime.datetime.strptime(value, time_format)
-                value = int(calendar.timegm(dt.utctimetuple()))
-            result[current_file][key] = value
+        if key in parsing_func:
+            result[current_file][key] = parsing_func[key](value)
     return result
