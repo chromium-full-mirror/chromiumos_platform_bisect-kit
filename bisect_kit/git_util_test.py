@@ -5,6 +5,7 @@
 """Test git_util module."""
 
 import os
+import pathlib
 import shutil
 import subprocess
 import tempfile
@@ -13,6 +14,9 @@ from unittest import mock
 
 from bisect_kit import errors
 from bisect_kit import git_util
+
+
+PathLike = os.PathLike | str
 
 
 class GitOperation:
@@ -370,7 +374,33 @@ class TestGitOperation(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.git_repo)
 
-    def prepare_merged_repository(self):
+    def _create_file(
+        self, file_path: PathLike, lines: list[str] | None = None
+    ) -> pathlib.Path:
+        file_path = pathlib.Path(self.git_repo) / file_path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.touch(exist_ok=True)
+        if lines:
+            with file_path.open('w') as f:
+                for line in lines:
+                    print(line, file=f)
+        return file_path
+
+    def _touch_files(self, file_list: list[PathLike]) -> list[pathlib.Path]:
+        path_list = []
+        for file_path in file_list:
+            path_list.append(self._create_file(file_path))
+        return path_list
+
+    def _create_gitignore(
+        self, file_list: list[PathLike], *, self_ignore: bool = False
+    ) -> pathlib.Path:
+        gitignore_file = '.gitignore'
+        if self_ignore:
+            file_list = file_list + [gitignore_file]
+        return self._create_file(gitignore_file, file_list)
+
+    def _prepare_merged_repository(self):
         # Generates following commit graph:
         #  |
         #  *  rev C (merge A B)  (2017-02-05)
@@ -520,7 +550,7 @@ class TestGitOperation(unittest.TestCase):
         )
 
     def test_get_rev_by_time_merge(self):
-        rev_a, _, rev_c = self.prepare_merged_repository()
+        rev_a, _, rev_c = self._prepare_merged_repository()
 
         # simple case
         self.assertEqual(
@@ -539,7 +569,7 @@ class TestGitOperation(unittest.TestCase):
         )
 
     def test_get_branches(self):
-        rev_a, rev_b, rev_c = self.prepare_merged_repository()
+        rev_a, rev_b, rev_c = self._prepare_merged_repository()
         self.assertCountEqual(
             git_util.get_branches(self.git_repo),
             ['refs/heads/foo', 'refs/heads/main'],
@@ -581,30 +611,112 @@ class TestGitOperation(unittest.TestCase):
         with open(path) as f:
             self.assertEqual(f.read(), content)
 
+    def test_clean(self):
+        untracked_list = [
+            'untracked-file-1',
+            'untracked-folder/untracked-file-1',
+        ]
+        excluded_list = [
+            'untracked-file-2',
+            'untracked-folder/untracked-file-2',
+        ]
+        ignored_list = [
+            'untracked-file-3',
+            'untracked-folder/untracked-file-3',
+        ]
+
+        # pylint: disable=unbalanced-tuple-unpacking
+        untracked, untracked_in_folder = self._touch_files(untracked_list)
+        excluded, excluded_in_folder = self._touch_files(excluded_list)
+        ignored, ignored_in_folder = self._touch_files(ignored_list)
+        gitignore = self._create_gitignore(ignored_list, self_ignore=True)
+
+        git_util.clean(
+            self.git_repo, is_dry_run=True, exclude_list=excluded_list
+        )
+
+        self.assertTrue(untracked.exists())
+        self.assertTrue(untracked_in_folder.exists())
+        self.assertTrue(excluded.exists())
+        self.assertTrue(excluded_in_folder.exists())
+        self.assertTrue(ignored.exists())
+        self.assertTrue(ignored_in_folder.exists())
+        self.assertTrue(gitignore.exists())
+
+        git_util.clean(
+            self.git_repo,
+            remove_ignored=False,
+            remove_folder=False,
+            is_dry_run=False,
+            exclude_list=excluded_list,
+        )
+
+        self.assertFalse(untracked.exists())
+        self.assertTrue(untracked_in_folder.exists())
+        self.assertTrue(excluded.exists())
+        self.assertTrue(excluded_in_folder.exists())
+        self.assertTrue(ignored.exists())
+        self.assertTrue(ignored_in_folder.exists())
+        self.assertTrue(gitignore.exists())
+
+        git_util.clean(
+            self.git_repo,
+            remove_ignored=False,
+            remove_folder=True,
+            is_dry_run=False,
+            exclude_list=excluded_list,
+        )
+
+        self.assertFalse(untracked.exists())
+        self.assertFalse(untracked_in_folder.exists())
+        self.assertTrue(excluded.exists())
+        self.assertTrue(excluded_in_folder.exists())
+        self.assertTrue(ignored.exists())
+        self.assertTrue(ignored_in_folder.exists())
+        self.assertTrue(gitignore.exists())
+
+        git_util.clean(
+            self.git_repo,
+            remove_ignored=True,
+            remove_folder=True,
+            is_dry_run=False,
+            exclude_list=excluded_list,
+        )
+
+        self.assertFalse(untracked.exists())
+        self.assertFalse(untracked_in_folder.exists())
+        self.assertTrue(excluded.exists())
+        self.assertTrue(excluded_in_folder.exists())
+        self.assertFalse(ignored.exists())
+        self.assertFalse(ignored_in_folder.exists())
+        self.assertFalse(gitignore.exists())
+
     def test_list_untracked(self):
         self.assertEqual(git_util.list_untracked(self.git_repo), [])
 
-        def touch_file(path):
-            dirname = os.path.dirname(path)
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
-            with open(path, 'w') as f:
-                f.write('foobar')
+        untracked_list = [
+            'untracked-file-1',
+            'untracked-folder/untracked-file-1',
+        ]
+        excluded_list = [
+            'untracked-file-2',
+            'untracked-folder/untracked-file-2',
+        ]
+        ignored_list = [
+            'untracked-file-3',
+            'untracked-folder/untracked-file-3',
+        ]
 
-        file_untracked_1 = 'untracked-file'
-        file_untracked_2 = 'untracked-dir/untracked-file'
-        file_to_ignore = 'untracked-file-to-ignore'
-        touch_file(os.path.join(self.git_repo, file_untracked_1))
-        touch_file(os.path.join(self.git_repo, file_untracked_2))
-        touch_file(os.path.join(self.git_repo, file_to_ignore))
+        self._touch_files(untracked_list + excluded_list + ignored_list)
+        self._create_gitignore(ignored_list, self_ignore=True)
 
-        self.assertEqual(
+        self.assertSetEqual(
             set(
                 git_util.list_untracked(
-                    self.git_repo, excludes=[file_to_ignore]
+                    self.git_repo, exclude_list=excluded_list
                 )
             ),
-            set([file_untracked_1, file_untracked_2]),
+            set(untracked_list),
         )
 
     def test_get_history_rebirth(self):

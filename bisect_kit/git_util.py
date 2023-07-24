@@ -11,7 +11,6 @@ import dataclasses
 import logging
 import os
 import re
-import shutil
 import stat
 import subprocess
 import tempfile
@@ -158,6 +157,13 @@ def is_git_bare_dir(path: str) -> bool:
 
 
 def clone(git_repo: str, repo_url: str, reference: str | None = None) -> None:
+    """Clone a git repo.
+
+    Args:
+      git_repo: path of git repo.
+      repo_url: url of git repo.
+      reference: optional git reference.
+    """
     if not os.path.exists(git_repo):
         os.makedirs(git_repo)
     cmd = ['git', 'clone', repo_url, '.']
@@ -292,10 +298,7 @@ def fetch(git_repo: str, *args, retry_prune_if_conflict: bool = False) -> None:
                 and '--prune' not in args
             ):
                 logger.warning(
-                    (
-                        'git fetch failed due to conflicting references; try again with'
-                        ' --prune'
-                    )
+                    'git fetch failed due to conflicting references; try again with --prune'
                 )
                 args = '--prune', *args
                 continue
@@ -801,21 +804,54 @@ def reset_hard(git_repo: str) -> None:
     util.check_call('git', 'reset', '--hard', cwd=git_repo)
 
 
+def clean(
+    git_repo: str,
+    remove_ignored: bool = False,
+    remove_folder: bool = True,
+    is_dry_run: bool = False,
+    exclude_list: list[str] | None = None,
+) -> None:
+    """Clean up git repo directory.
+
+    Args:
+      git_repo: path of git repo.
+      remove_ignored: remove files ignore by `.gitignore`.
+      remove_folder: remove folders.
+      is_dry_run: dry run.
+      exclude_list: files and/or directories to ignore, relative to git_repo
+    """
+    args = []
+    if remove_ignored:
+        args.append('-x')
+    if remove_folder:
+        args.append('-d')
+    if is_dry_run:
+        args.append('-n')
+    else:
+        args.append('-f')
+    if exclude_list is None:
+        exclude_list = []
+    for exclude_pattern in exclude_list:
+        args.append('--exclude')
+        args.append(exclude_pattern)
+    util.check_call('git', 'clean', *args, cwd=git_repo)
+
+
 def list_untracked(
-    git_repo: str, excludes: list[str] | None = None
+    git_repo: str, exclude_list: list[str] | None = None
 ) -> list[str]:
     """List untracked files and directories.
 
     Args:
       git_repo: path of git repo.
-      excludes: files and/or directories to ignore, relative to git_repo
+      exclude_list: files and/or directories to ignore, relative to git_repo
 
     Returns:
       list of paths, relative to git_repo
     """
     exclude_flags = []
-    if excludes:
-        for exclude in excludes:
+    if exclude_list:
+        for exclude in exclude_list:
             assert not os.path.isabs(exclude), 'should be relative'
             exclude_flags += ['--exclude', '/' + re.escape(exclude)]
 
@@ -848,28 +884,18 @@ def remove_lock(git_repo: str) -> None:
             logger.warning('git lock file deleted: %s', lock_path)
 
 
-def distclean(git_repo: str, excludes: list[str] | None = None) -> None:
+def distclean(git_repo: str, exclude_list: list[str] | None = None) -> None:
     """Clean up git repo directory.
 
     Restore modified and deleted files. Delete untracked files and lock files.
 
     Args:
       git_repo: path of git repo.
-      excludes: files and/or directories to ignore, relative to git_repo
+      exclude_list: files and/or directories to ignore, relative to git_repo
     """
     remove_lock(git_repo)
     reset_hard(git_repo)
-
-    # Delete untracked files.
-    for untracked in list_untracked(git_repo, excludes=excludes):
-        path = os.path.join(git_repo, untracked)
-        logger.debug('delete untracked: %s', path)
-        if os.path.islink(path):
-            os.unlink(path)
-        elif os.path.isdir(path):
-            shutil.rmtree(path)
-        else:
-            os.unlink(path)
+    clean(git_repo, exclude_list=exclude_list)
 
 
 def get_history(
