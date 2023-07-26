@@ -118,7 +118,7 @@ class CrosDiagnoser:
         should_auto_allocate_dut = (
             experiment.ID.STATELESS in self.config['experiments']
         )
-        # Steps 1 to 3 are prebuilt stages. So we can just use the same DUT in
+        # Steps 1 to 4 are prebuilt stages. So we can just use the same DUT in
         # stateless bisection.
         dut_manager = dut_manager_module.DutManager(
             'Prebuilt',
@@ -217,7 +217,28 @@ class CrosDiagnoser:
                 dut
             ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
-        # Step 4: Narrows down Chrome local build. If the error can be reproduced,
+            # Step 4: Narrows down DLC prebuilt.
+            try:
+                self.narrow_down_dlc_prebuilt(
+                    dut_manager,
+                    self.config['old'],
+                    self.config['new'],
+                    cros_prebuilt_eval_cmd,
+                )
+            except errors.DiagnoseContradiction:
+                raise
+            except Exception:
+                self.make_decision(
+                    'Exception in DLC bisector before verification; '
+                    'assume the culprit is not inside DLC and continue'
+                )
+            # Assume it's ok to leave random version of DLC prebuilt on DUT.
+            # Sanity check. The OS version should not change after DLC bisect.
+            assert dut_os_version == cros_util.query_dut_short_version(
+                dut
+            ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+
+        # Step 5: Narrows down Chrome local build. If the error can be reproduced,
         # returns the result and skips other steps.
 
         def bisect_local_chrome_dut_init_func(dut):
@@ -264,7 +285,7 @@ class CrosDiagnoser:
                 'assume the culprit is not inside Chrome and continue'
             )
 
-        # Step 5: Narrowdown chromeos localbuild.
+        # Step 6: Narrowdown chromeos localbuild.
         dut_manager = dut_manager_module.DutManager(
             'LocalChromeOS',
             self.states,
@@ -451,10 +472,7 @@ class CrosDiagnoser:
         """
         if self.config['bisect_chrome']:
             self.make_decision(
-                (
-                    'The Android prebuilt bisection is bypassed since --bisect_chrome'
-                    ' is on'
-                )
+                'The Android prebuilt bisection is bypassed since --bisect_chrome is on'
             )
             return False
 
@@ -798,6 +816,100 @@ class CrosDiagnoser:
             return False
         return True
 
+    def narrow_down_dlc_prebuilt(
+        self,
+        dut_manager: dut_manager_module.DutManager,
+        old: str,
+        new: str,
+        eval_cmd: list[str],
+    ) -> bool:
+        """Bisect ChromeOS DLC prebuilt.
+
+        Args:
+          dut_manager: a DutManager object.
+          old: the old version of the prebuilt.
+          new: the new version of the prebuilt.
+          eval_cmd: command to reproduce the regression.
+
+        Returns:
+          True if the bisection is successful.
+        """
+
+        if self.config['bisect_android']:
+            self.make_decision(
+                'The bisection with DLC is bypassed since --bisect_android is on'
+            )
+            return False
+
+        if self.config['bisect_chrome']:
+            self.make_decision(
+                'The bisection with DLC is bypassed since --bisect_chrome is on'
+            )
+            return False
+
+        if self.config['bypass_dlc_prebuilt']:
+            self.make_decision(
+                'The bisection with DLC is bypassed since --bypass_dlc_prebuilt is on'
+            )
+            return False
+
+        self.states.add_history(
+            'bisect',
+            text='bisect borealis dlc prebuilt',
+            bisector='bisect_borealis_dlc_version',
+            session=self.config['session'],
+        )
+        switch_cmd = [
+            './switch_cros_borealis_dlc_prebuilt.py',
+            '--rich_result',
+            '--session',
+            self.config['session'],
+            '--chromeos_root',
+            self.config['chromeos_root'],
+        ]
+        init_args = [
+            '--board',
+            self.config['board'],
+            '--chromeos_root',
+            self.config['chromeos_root'],
+            '--chromeos_mirror',
+            self.config['chromeos_mirror'],
+        ]
+
+        bisector = wrapper.BisectorWrapper(
+            'bisect_borealis_dlc_version', self.config['session'], dut_manager
+        )
+        bisector.init_if_necessary(
+            old,
+            new,
+            init_args=init_args,
+            switch_cmd=switch_cmd,
+            eval_cmd=eval_cmd,
+            old_value=self.config['old_value'],
+            new_value=self.config['new_value'],
+            term_old=self.config['term_old'],
+            term_new=self.config['term_new'],
+            recompute_init_values=self.config['recompute_init_values'],
+            noisy=self.noisy,
+            endpoint_verification=self.config['endpoint_verification'],
+        )
+
+        try:
+            bisector.narrow_down()
+        except errors.VerifyOldBehaviorFailed:
+            self.make_decision(
+                f'Unable to reproduce the old behavior ({self.config["term_old"]}). '
+                f'The culprit is not in borealis-dlc.'
+            )
+            return False
+        except errors.VerifyNewBehaviorFailed:
+            self.make_decision(
+                f'Unable to reproduce the new behavior ({self.config["term_new"]}). '
+                f'The culprit is not in borealis-dlc.'
+            )
+            return False
+        return True
+
     def narrow_down_chrome(
         self,
         dut_manager: dut_manager_module.DutManager,
@@ -824,10 +936,7 @@ class CrosDiagnoser:
 
         if self.config['bisect_android']:
             self.make_decision(
-                (
-                    'The bisection with Chrome local build is bypassed since '
-                    '--bisect_android is on'
-                )
+                'The bisection with Chrome local build is bypassed since --bisect_android is on'
             )
             return False
 
@@ -1412,6 +1521,7 @@ class DiagnoseCommandLineBase:
             bypass_chrome_build=opts.bypass_chrome_build,
             bypass_android_prebuilt=opts.bypass_android_prebuilt,
             bypass_android_build=opts.bypass_android_build,
+            bypass_dlc_prebuilt=opts.bypass_dlc_prebuilt,
             disable_rootfs_verification=opts.disable_rootfs_verification,
             chrome_deploy_image=opts.chrome_deploy_image,
             disable_snapshot=opts.disable_snapshot,
@@ -1649,6 +1759,11 @@ class DiagnoseCommandLineBase:
             '--bypass_android_build',
             action='store_true',
             help='Bypass chromeos local build bisect',
+        )
+        group.add_argument(
+            '--bypass_dlc_prebuilt',
+            action='store_true',
+            help='Bypass DLC prebuilt',
         )
         group.add_argument(
             '--no-disable-rootfs-verification',
