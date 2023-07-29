@@ -736,17 +736,17 @@ class BisectorCommandLine:
         sample = {'rev': rev, 'index': self.states.rev2idx(rev)}
 
         assert self.dut_manager, 'dut_manager must not be None'
-        if self.dut_manager.has_preallocated_dut():
-            # DUT is already allocated. Do switch (build + deploy) all at
-            # once and only when prev_rev is not rev.
-            with self.dut_manager.provision() as dut:
-                if prev_rev != rev:
-                    if not self._switch(
-                        rev, sample, _SwitchAction.BUILD_AND_DEPLOY, dut
-                    ):
-                        return 'switch', sample
-                self._evaluate(rev, sample, dut)
-                return 'eval', sample
+        dut = self.dut_manager.dut
+        # DUT is already allocated. Do switch (build + deploy) all at
+        # once if needed.
+        if dut:
+            if prev_rev != rev:
+                if not self._switch(
+                    rev, sample, _SwitchAction.BUILD_AND_DEPLOY, dut
+                ):
+                    return 'switch', sample
+            self._evaluate(rev, sample, dut)
+            return 'eval', sample
 
         # DUT is not allocated yet. Do switch in two steps (build then
         # deploy). Auto allocate a DUT at the deploy step.

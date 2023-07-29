@@ -427,16 +427,30 @@ class TestDutManagerAllocation(unittest.TestCase):
             'host.cros'
         )
 
-    def test_has_pre_allocated_dut(self):
+    def test_dut(self):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate', self.mock_states, cros_lab_util.LAB_DUT, True
         )
-        self.assertFalse(dut_manager.has_preallocated_dut())
+        self.assertEqual(dut_manager.dut, None)
 
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate', self.mock_states, 'pre_allocated_dut', True
         )
-        self.assertTrue(dut_manager.has_preallocated_dut())
+        self.assertEqual(dut_manager.dut, 'pre_allocated_dut')
+
+        dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
+            self.mock_states,
+            cros_lab_util.LAB_DUT,
+            True,
+        )
+        self.assertEqual(dut_manager.dut, None)
+        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
+            leased_dut='host.cros'
+        )
+        with dut_manager.provision():
+            self.assertEqual(dut_manager.dut, 'host.cros')
+        self.assertEqual(dut_manager.dut, None)
 
 
 class TestDelayedDutReleaser(unittest.TestCase):

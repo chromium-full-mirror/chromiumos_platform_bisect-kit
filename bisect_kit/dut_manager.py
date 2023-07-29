@@ -205,15 +205,12 @@ class DutManager:
     def dut_allocate_spec(self):
         return self._states.dut_allocate_spec
 
-    def has_preallocated_dut(self) -> bool:
-        return self._pre_allocated_dut is not None
-
     def is_restored_dut(self):
         logger.info('is_restored_dut: %s', self._is_restored_dut)
         return self._is_restored_dut
 
     @property
-    def _dut(self) -> str:
+    def dut(self) -> str:
         """Returns the DUT managed by this DutManager.
 
         If a pre-allocated DUT exists, there should be no auto-allocated DUT.
@@ -252,7 +249,7 @@ class DutManager:
             self._should_auto_allocate,
         )
         # Do nothing if a DUT is already available.
-        dut = self._dut
+        dut = self.dut
         if dut:
             return self
 
@@ -296,7 +293,7 @@ class DutManager:
         logger.info('leaving DutManager context')
 
         error = None
-        dut = self._dut
+        dut = self.dut
         if dut and self._dut_leave_context_check_func:
             logger.info(
                 'calling dut leave context check function for dut %s', dut
@@ -341,7 +338,7 @@ class DutManager:
         self._dut_releaser.start()
 
     def run_init_func(self):
-        dut = self._dut
+        dut = self.dut
         if not dut:
             logger.info('no dut allocated yet, can not run init func')
             return
@@ -371,7 +368,7 @@ class DutManager:
           is deffered.
         """
         with self:
-            dut = self._dut
+            dut = self.dut
             if not dut:
                 yield None
                 return
