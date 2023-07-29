@@ -44,8 +44,6 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             '--rich_result',
             '--chromeos_root',
             self.config['chromeos_root'],
-            '--board',
-            self.config['board'],
         ]
         common_eval_cmd = [
             './eval_cros_tast.py',
@@ -85,19 +83,11 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         common_switch_cmd, common_eval_cmd = self._build_cmds()
 
-        cros_prebuilt_extra_switch_cmd = common_switch_cmd
-        # So far only the `release` images support the `--prebuilt` option
-        if cros_util.has_release_prebuilt(
-            self.config['board'], self.config['old']
-        ):
-            cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
-            lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
-        else:
-            cros_prebuilt_eval_cmd = common_eval_cmd + ['--tast_build']
-            lacros_prebuilt_eval_cmd = common_eval_cmd + ['--tast_build']
+        cros_prebuilt_extra_switch_cmd = common_switch_cmd[:]
 
+        cros_prebuilt_eval_cmd = common_eval_cmd[:]
         lacros_prebuilt_eval_cmd = (
-            lacros_prebuilt_eval_cmd
+            common_eval_cmd
             + ['--args']
             + ['lacros.DeployedBinary=/usr/local/lacros-chrome']
         )
@@ -122,7 +112,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cros_localbuild_extra_switch_cmd = None
         else:
             cros_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
-            cros_localbuild_extra_switch_cmd = common_switch_cmd
+            cros_localbuild_extra_switch_cmd = common_switch_cmd[:]
 
         diagnoser.diagnose(
             is_autotest=False,

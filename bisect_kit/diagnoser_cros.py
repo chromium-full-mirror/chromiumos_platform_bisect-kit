@@ -127,11 +127,31 @@ class CrosDiagnoser:
             should_auto_allocate_dut,
         )
         with dut_manager.provision() as dut:
-            if not self.config.get('board_cpu_arch'):
+            if not self.config.get('board') or not self.config.get(
+                'board_cpu_arch'
+            ):
+                self.config['board'] = cros_util.query_dut_board(dut)
                 self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(
                     dut
                 )
                 self.states.save()
+
+            # Fix cmd which depends on "board".
+            cros_prebuilt_extra_switch_cmd += ['--board', self.config['board']]
+            cros_localbuild_extra_switch_cmd += [
+                '--board',
+                self.config['board'],
+            ]
+            # So far only the `release` images support the `--prebuilt` option
+            if cros_util.has_release_prebuilt(
+                self.config['board'], self.config['old']
+            ):
+                cros_prebuilt_eval_cmd.append('--prebuilt')
+                lacros_prebuilt_eval_cmd.append('--prebuilt')
+            else:
+                cros_prebuilt_eval_cmd.append('--tast_build')
+                lacros_prebuilt_eval_cmd.append('--tast_build')
+
             # Step 1: Narrows down ChromeOS prebuilt.
             self.narrow_down_chromeos_prebuilt(
                 dut_manager,
@@ -1118,6 +1138,8 @@ class DiagnoseCommandLineBase:
     ) -> str:
         """Raises error if an image could not be found.
 
+        If board does not present, the check always passes.
+
         Args:
           board: ChromeOS board name.
           cros_version: ChromeOS version.
@@ -1130,6 +1152,10 @@ class DiagnoseCommandLineBase:
         cros_util.argtype_cros_version(cros_version)
         if cros_util.is_cros_short_version(cros_version):
             cros_version = cros_util.version_to_full(board, cros_version)
+
+        if not board:
+            return cros_version
+
         if not cros_util.has_test_image(board, cros_version):
             self.argument_parser.error(
                 '%s: %s has no image for %s'
@@ -1207,19 +1233,12 @@ class DiagnoseCommandLineBase:
                     'need to be specified if DUT is missing or "%s"'
                     % cros_lab_util.LAB_DUT
                 )
-            # Board name cannot be deduced from auto allocated devices because they
-            # may be provisioned with image of unexpected board.
-            if not opts.board:
-                self.argument_parser.error(
-                    '--board need to be specified if DUT is "%s"'
-                    % cros_lab_util.LAB_DUT
-                )
         else:
             if not opts.board:
                 opts.board = cros_util.query_dut_board(opts.dut)
 
         names = cros_util.list_board_names(opts.chromeos_root)
-        if opts.board not in names:
+        if opts.board and opts.board not in names:
             util.report_similar_candidates('board name', opts.board, names)
             assert 0  # unreachable
 

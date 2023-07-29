@@ -115,8 +115,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             '--rich_result',
             '--chromeos_root',
             self.config['chromeos_root'],
-            '--board',
-            self.config['board'],
         ]
         if self.config['test_name'] and not self.config['cts_test']:
             common_switch_cmd += ['--test_name', self.config['test_name']]
@@ -165,18 +163,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         return common_switch_cmd, common_eval_cmd
 
     def do_run(self, dut):
-        util.check_call(
-            './switch_cros_localbuild.py',
-            '--sync_code_only',
-            '--chromeos_root',
-            self.config['chromeos_root'],
-            '--chromeos_mirror',
-            self.config['chromeos_mirror'],
-            '--board',
-            self.config['board'],
-            self.config['cros_prebuilt_new'],
-        )
-
         path_factory = setup_cros_bisect.DefaultProjectPathFactory(
             self.config['mirror_base'],
             self.config['work_base'],
@@ -192,7 +178,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         # is that version number is obtained via bisector's environment variable
         # CROS_VERSION.
         cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
-        cros_prebuilt_extra_switch_cmd = common_switch_cmd
+        cros_prebuilt_extra_switch_cmd = common_switch_cmd[:]
         android_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
@@ -204,11 +190,11 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             and not self.config['disable_buildbucket_chromeos']
         )
         if not cros_buildbucket_build:
-            cros_localbuild_eval_cmd = common_eval_cmd
+            cros_localbuild_eval_cmd = common_eval_cmd[:]
             cros_localbuild_extra_switch_cmd = None
         else:
             cros_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
-            cros_localbuild_extra_switch_cmd = common_switch_cmd
+            cros_localbuild_extra_switch_cmd = common_switch_cmd[:]
 
         diagnoser.diagnose(
             is_autotest=True,
