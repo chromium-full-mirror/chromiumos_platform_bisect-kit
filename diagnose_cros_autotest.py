@@ -16,7 +16,6 @@ will cut down the search range as narrow as it can.
 import logging
 import os
 
-from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import dut_manager as dut_manager_module
@@ -92,21 +91,6 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             cts_test=opts.cts_test,
             cts_timeout=opts.cts_timeout,
         )
-
-        if opts.dut != cros_lab_util.LAB_DUT:
-            # NOTE(cylee): Not sure why this is needed in "init" phase. This step is
-            # skipped if a DUT is auto allocated in the "run" phase.
-            # Unpack old autotest prebuilt, assume following information don't change
-            # between versions:
-            #  - what chrome binaries to run
-            #  - dependency labels for DUT allocation
-            common_switch_cmd, _common_eval_cmd = self._build_cmds()
-            util.check_call(
-                *(
-                    common_switch_cmd
-                    + [self.config['cros_prebuilt_old'], '--dut', opts.dut]
-                )
-            )
 
     def _build_cmds(self):
         # prebuilt version will be specified later.
