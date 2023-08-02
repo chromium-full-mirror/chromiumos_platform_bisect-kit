@@ -137,6 +137,7 @@ class CrosDiagnoser:
                 self.states.save()
 
             # Fix cmd which depends on "board".
+            common_switch_cmd += ['--board', self.config['board']]
             cros_prebuilt_extra_switch_cmd += ['--board', self.config['board']]
             cros_localbuild_extra_switch_cmd += [
                 '--board',
