@@ -474,9 +474,12 @@ def switch(opts) -> core.StepResult:
         wait_for_build_completion(opts, buildbucket_id)
 
     if opts.no_deploy:
-        msg = '--no_deploy is True'
-        logger.info(msg)
-        return core.StepResult('skip', reason=msg)
+        return core.StepResult(
+            'old',
+            reason=buildbucket_util.get_luci_link(
+                opts.board, buildbucket_id, bucket=opts.bucket
+            ),
+        )
 
     image_info = search_build_image(buildbucket_id)
 
