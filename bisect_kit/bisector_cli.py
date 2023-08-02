@@ -758,9 +758,7 @@ class BisectorCommandLine:
             # has been allocated. If it's the same version and the same DUT,
             # we don't need to deploy again.
             if prev_rev != rev or not self.dut_manager.is_restored_dut():
-                if not self._switch(
-                    rev, sample, self._SwitchAction.DEPLOY, dut
-                ):
+                if not self._switch(rev, sample, _SwitchAction.DEPLOY, dut):
                     return 'switch', sample
             self._evaluate(rev, sample, dut)
             return 'eval', sample
