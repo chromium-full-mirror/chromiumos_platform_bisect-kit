@@ -195,9 +195,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_init_func,
             self.mock_dut_leave_context_check_func,
         )
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host.cros')
         self.mock_update_dut_alloc_spec.assert_called_once_with(
@@ -227,9 +225,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_init_func,
             self.mock_dut_leave_context_check_func,
         )
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, None)
         self.mock_update_dut_alloc_spec.assert_not_called()
@@ -239,7 +235,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_init_func.assert_not_called()
         self.mock_dut_leave_context_check_func.assert_not_called()
 
-    def test_no_pre_allocated_dut_auto_allocate_failed(self):
+    def test_no_pre_allocated_dut_auto_allocate_thorws_exception(self):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -248,10 +244,30 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_init_func,
             self.mock_dut_leave_context_check_func,
         )
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut=None
+        self.mock_allocate_dut.side_effect = errors.DutLeaseTimeout('timeout')
+        with self.assertRaises(errors.DutLeaseTimeout):
+            with dut_manager.provision():
+                pass
+        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_dut_lease_status_monitor.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
+        self.mock_allocate_dut.assert_called_once_with(
+            dut_manager.dut_allocate_spec
         )
-        with self.assertRaises(errors.NoDutAvailable):
+        self.mock_dut_init_func.assert_not_called()
+        self.mock_dut_leave_context_check_func.assert_not_called()
+
+    def test_no_pre_allocated_dut_auto_allocate_no_host_returned(self):
+        dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
+            self.mock_states,
+            cros_lab_util.LAB_DUT,
+            True,
+            self.mock_dut_init_func,
+            self.mock_dut_leave_context_check_func,
+        )
+        self.mock_allocate_dut.return_value = None, None
+        with self.assertRaises(errors.InternalError):
             with dut_manager.provision():
                 pass
         self.mock_update_dut_alloc_spec.assert_not_called()
@@ -273,9 +289,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_leave_context_check_func,
         )
         # First lease.
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host.cros')
 
@@ -315,9 +329,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_leave_context_check_func,
         )
         # First lease.
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host.cros')
 
@@ -326,9 +338,7 @@ class TestDutManagerAllocation(unittest.TestCase):
 
         # Second lease.
         self.mock_dut_releaser.cancel.return_value = False
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host2.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host2', 'board'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host2.cros')
             self.assertFalse(dut_manager.is_restored_dut())
@@ -352,9 +362,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_auto_release_on_exception(self):
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -389,9 +397,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_dut_leave_context_check_func_failed(self):
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -445,9 +451,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             True,
         )
         self.assertEqual(dut_manager.dut, None)
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         with dut_manager.provision():
             self.assertEqual(dut_manager.dut, 'host.cros')
         self.assertEqual(dut_manager.dut, None)
@@ -556,9 +560,7 @@ class TestAddDutLeasesRecord(unittest.TestCase):
         log_file = tempfile.mktemp()
         self._mock_dut_leases_log_path.return_value = log_file
 
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         # start_timestamp
         self.mock_time_module.time.return_value = 1689179900.1
 
@@ -609,9 +611,7 @@ class TestAddDutLeasesRecord(unittest.TestCase):
 
         self._mock_dut_leases_log_path.return_value = log_file
 
-        self.mock_allocate_dut.return_value = dut_allocator.AllocateDutResult(
-            leased_dut='host.cros'
-        )
+        self.mock_allocate_dut.return_value = 'host', 'board'
         # start_timestamp
         self.mock_time_module.time.return_value = 1689179900.1
 

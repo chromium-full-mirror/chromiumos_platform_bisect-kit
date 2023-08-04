@@ -9,10 +9,6 @@ from bisect_kit import dut_allocator
 from bisect_kit import errors
 
 
-class DummyException(Exception):
-    """A dummy exception class for testing."""
-
-
 class TestSampleAvailableBots(unittest.TestCase):
     """Test _sample_available_bots() and _sample_available_bots_with_retry() functions"""
 
@@ -242,27 +238,3 @@ class TestSampleAvailableBots(unittest.TestCase):
 
         mock_sleep.assert_called()
         mock_sample_available_bots.assert_called()
-
-    @mock.patch.object(dut_allocator, '_do_allocate_dut')
-    def test_populate_allocate_dut_result(self, mock_do_allocate_dut):
-        mock_do_allocate_dut.return_value = ('ready', 'host', 'board1')
-        result = dut_allocator.allocate_dut(None)
-        self.assertEqual(
-            result,
-            dut_allocator.AllocateDutResult(
-                result='ready',
-                leased_dut='host.cros',
-                board='board1',
-            ),
-        )
-
-        mock_do_allocate_dut.side_effect = DummyException('blah')
-        result = dut_allocator.allocate_dut(None)
-        self.assertEqual(
-            result,
-            dut_allocator.AllocateDutResult(
-                result='failed',
-                exception='DummyException',
-                text='blah',
-            ),
-        )

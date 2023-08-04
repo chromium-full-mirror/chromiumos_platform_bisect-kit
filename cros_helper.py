@@ -77,6 +77,35 @@ def cmd_release_dut(opts):
     logger.info('%s released', host)
 
 
+@dataclasses.dataclass
+class AllocateDutResult:
+    """Result of allocate_dut."""
+
+    result: str | None = None
+    leased_dut: str | None = None
+    board: str | None = None
+    exception: str | None = None
+    text: str | None = None
+
+
+def allocate_dut(spec: core.DutAllocateSpec):
+    result = AllocateDutResult()
+    try:
+        host, board = dut_allocator.allocate_dut(spec)
+        result.result = 'ready'
+        if host:
+            result.leased_dut = cros_lab_util.dut_name_to_address(host)
+        result.board = board
+        logger.debug('dut allocated: %s', result)
+    except Exception as e:
+        logger.exception('cmd_allocate_dut failed')
+        result.result = 'failed'
+        result.exception = e.__class__.__name__
+        result.text = str(e)
+        logger.warning('failed to allocate dut: %s', result)
+    return result
+
+
 def cmd_allocate_dut(opts):
     spec = core.DutAllocateSpec(
         pool=opts.pool,
@@ -94,7 +123,8 @@ def cmd_allocate_dut(opts):
         chromeos_root=opts.chromeos_root,
         session=opts.session,
     )
-    result = dut_allocator.allocate_dut(spec)
+
+    result = allocate_dut(spec)
     print(json.dumps(dataclasses.asdict(result)))
 
 

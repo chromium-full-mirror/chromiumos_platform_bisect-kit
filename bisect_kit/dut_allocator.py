@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import collections.abc
-import dataclasses
 import functools
 import logging
 import random
 import time
+import typing
 
 from bisect_kit import core
 from bisect_kit import cros_lab_util
@@ -227,14 +227,20 @@ def _normalize_board_name(chromeos_root, board):
     return boards_info[board]
 
 
-def _do_allocate_dut(spec: core.DutAllocateSpec):
+def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
     """Helper of cmd_allocate_dut.
 
     Returns:
-      (todo, host, board_to_build)
-        todo: 'ready' or 'wait'
+      (host, board_to_build)
         host: leased host name
         board_to_build: board name for building image
+
+    Raises:
+        errors.ArgumentError if the input DutAllocateSpec is invalid.
+        errors.NoDutAvailable if the DutAllocateSpec could not match any device
+          in lab.
+        errors.DutLeaseTimeout if the DUT lease take too long.
+        errors.DutLeaseException if other exception happens.
     """
     if spec.dut_name:
         # If dut_name is specified, pool is ignored.
@@ -421,37 +427,10 @@ def _do_allocate_dut(spec: core.DutAllocateSpec):
             else:
                 board_to_build = host_board
 
-            return 'ready', host, board_to_build
+            return host, board_to_build
         time.sleep(1)
 
     logger.warning('unable to lease DUT in time limit')
-    return 'wait', None, None
-
-
-@dataclasses.dataclass
-class AllocateDutResult:
-    """Result returned by allocate_dut."""
-
-    result: str | None = None
-    leased_dut: str | None = None
-    board: str | None = None
-    exception: str | None = None
-    text: str | None = None
-
-
-def allocate_dut(spec: core.DutAllocateSpec) -> AllocateDutResult:
-    result = AllocateDutResult()
-    try:
-        todo, host, board = _do_allocate_dut(spec)
-        result.result = todo
-        if host:
-            result.leased_dut = cros_lab_util.dut_name_to_address(host)
-        result.board = board
-        logger.debug('dut allocated: %s', result)
-    except Exception as e:
-        logger.exception('cmd_allocate_dut failed')
-        result.result = 'failed'
-        result.exception = e.__class__.__name__
-        result.text = str(e)
-        logger.warning('failed to allocate dut: %s', result)
-    return result
+    raise errors.DutLeaseTimeout(
+        'Unable to lease DUT in %s seconds' % spec.time_limit
+    )

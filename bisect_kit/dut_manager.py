@@ -276,11 +276,11 @@ class DutManager:
             return self
 
         # Try allocating a DUT now.
-        leased_dut = dut_allocator.allocate_dut(
-            self.dut_allocate_spec
-        ).leased_dut
-        if not leased_dut:
-            raise errors.NoDutAvailable('unable to allocate DUT')
+        host, _ = dut_allocator.allocate_dut(self.dut_allocate_spec)
+        if not host:
+            # This should not happen.
+            raise errors.InternalError('Leased DUT invalid: %s' % host)
+        leased_dut = cros_lab_util.dut_name_to_address(host)
         # A DUT is leased at this point successfully.
         self._auto_allocated_dut = leased_dut
         self._auto_allocated_time = time.time()

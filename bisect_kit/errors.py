@@ -54,7 +54,14 @@ class ExecutionFatalError(Exception):
 
 
 class NoDutAvailable(Exception):
-    """Unable to allocate DUT from lab."""
+    """There is no DUT which satisfy the DutAllocateSpec in lab."""
+
+
+class DutLeaseTimeout(Exception):
+    """Unable to allocate DUT in a predefined time period.
+
+    The DutAllocateSpec is valid, but the lease takes too much time.
+    """
 
 
 class DutLeaseException(Exception):
