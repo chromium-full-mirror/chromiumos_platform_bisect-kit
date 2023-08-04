@@ -127,14 +127,10 @@ class CrosDiagnoser:
             should_auto_allocate_dut,
         )
         with dut_manager.provision() as dut:
-            if not self.config.get('board') or not self.config.get(
-                'board_cpu_arch'
-            ):
-                self.config['board'] = cros_util.query_dut_board(dut)
-                self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(
-                    dut
-                )
-                self.states.save()
+            # Query DUT dependent properties.
+            self.config['board'] = cros_util.query_dut_board(dut)
+            self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(dut)
+            self.states.save()
 
             # Fix cmd which depends on "board".
             common_switch_cmd += ['--board', self.config['board']]
