@@ -474,8 +474,9 @@ def switch(opts) -> core.StepResult:
         wait_for_build_completion(opts, buildbucket_id)
 
     if opts.no_deploy:
+        status = 'skip' if opts.no_wait_for_build_completion else 'old'
         return core.StepResult(
-            'old',
+            status,
             reason=buildbucket_util.get_luci_link(
                 opts.board, buildbucket_id, bucket=opts.bucket
             ),
