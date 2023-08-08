@@ -102,8 +102,10 @@ class BorealisVersionDomain(core.BisectDomain):
         ) and borealis_util.is_borealis_version(opts.new)
 
         if is_both_cros_version:
-            opts.old = cros_util.version_to_full(opts.board, opts.old)
-            opts.new = cros_util.version_to_full(opts.board, opts.new)
+            if cros_util.is_cros_short_version(opts.old):
+                opts.old = cros_util.version_to_full(opts.board, opts.old)
+            if cros_util.is_cros_short_version(opts.new):
+                opts.new = cros_util.version_to_full(opts.board, opts.new)
             if not cros_util.is_ancestor_version(opts.old, opts.new):
                 raise errors.ArgumentError(
                     '--old and --new',
