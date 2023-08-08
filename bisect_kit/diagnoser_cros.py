@@ -25,6 +25,7 @@ from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
 from bisect_kit import util
 from bisect_kit import wrapper
+from bisect_kit.dlc import borealis_util
 import cros_helper
 import experiment
 import setup_cros_bisect
@@ -858,6 +859,13 @@ class CrosDiagnoser:
         if self.config['bypass_dlc_prebuilt']:
             self.make_decision(
                 'The bisection with DLC is bypassed since --bypass_dlc_prebuilt is on'
+            )
+            return False
+
+        if not borealis_util.is_installable(self.config['dut']):
+            self.make_decision(
+                'The bisection with borealis DLC is bypassed because '
+                'it is not supported by the board/model/version of the DUT.'
             )
             return False
 

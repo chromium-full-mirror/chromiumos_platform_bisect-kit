@@ -11,6 +11,7 @@ import re
 from bisect_kit import errors
 from bisect_kit import gs_util
 from bisect_kit import util
+from bisect_kit.dlc import dlc_util
 
 
 PathLike = os.PathLike | str
@@ -34,6 +35,10 @@ VERSION_PIN_SUMMARY_PREFIX_LIST = [
 
 def is_borealis_version(version) -> bool:
     return bool(_VERSION_PATTERN.match(version))
+
+
+def is_installable(dut: str) -> bool:
+    return dlc_util.is_installable(DLC_NAME, dut)
 
 
 def argtype_borealis_version(version: str) -> str:

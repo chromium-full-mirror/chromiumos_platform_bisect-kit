@@ -5,10 +5,25 @@
 """Utility functions for CrOS DLCs."""
 
 import pathlib
+import subprocess
 import tempfile
 
 from bisect_kit import cros_util
 from bisect_kit import util
+
+
+DLC_OPT_PATH = pathlib.Path('/opt/google/dlc')
+
+
+def is_installable(dlc_name: str, dut: str) -> bool:
+    """Check if the DLC package is installable supported on the DUT."""
+    try:
+        ls_output = util.ssh_cmd(
+            dut, 'ls', str(DLC_OPT_PATH / dlc_name), max_attempts=5
+        )
+        return ls_output.strip() != ''
+    except subprocess.CalledProcessError:
+        return False
 
 
 def fix_missing_files(chromeos_root: str, board: str, dut: str) -> None:
