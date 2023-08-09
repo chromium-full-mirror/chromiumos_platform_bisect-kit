@@ -125,10 +125,14 @@ CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
 FORWARDED_DUT_HOST = 'localhost'
 FORWARDED_DUT_PORT = 2222
 
-DEFAULT_CHECK_GOOD_DUT_ATTEMPTS = 10
-DEFAULT_QUERY_LSB_RELEASE_ATTEMPTS = 10
-DEFAULT_QUERY_OS_RELEASE_ATTEMPTS = 10
-DEFAULT_QUERY_BOOT_ID_ATTEMPTS = 10
+DEFAULT_SSH_ATTEMPTS = 10
+DEFAULT_QUERY_LSB_RELEASE_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
+DEFAULT_QUERY_OS_RELEASE_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
+DEFAULT_QUERY_CPU_ARCH_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
+DEFAULT_QUERY_ROOT_PARTITION_ATTPEMPTS = DEFAULT_SSH_ATTEMPTS
+DEFAULT_CHECK_KERNEL_READY_ATTPEMPTS = DEFAULT_SSH_ATTEMPTS
+DEFAULT_CHECK_GOOD_DUT_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
+DEFAULT_QUERY_BOOT_ID_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_REPAIR_DUT_ATTEMPTS = 3
 
 
@@ -585,7 +589,9 @@ def query_dut_os_release(
     return dict(re.findall(r'^(\w+)=(.*)$', output, re.M))
 
 
-def query_dut_cpu_arch(host: str):
+def query_dut_cpu_arch(
+    host: str, max_attempts: int = DEFAULT_QUERY_CPU_ARCH_ATTEMPTS
+) -> str:
     """Query CPU architecture of the given DUT.
 
     Args:
@@ -593,13 +599,16 @@ def query_dut_cpu_arch(host: str):
 
     Returns:
       CPU architecture in string.
+      max_attempts: the number of attempts to query the DUT
 
     Raise:
       errors.SshConnectionError: cannot connect to host.
       errors.ExternalError: failed to run 'uname -m' on the given DUT.
     """
     try:
-        arch = util.ssh_cmd(host, 'uname', '-m').strip()
+        arch = util.ssh_cmd(
+            host, 'uname', '-m', max_attempts=max_attempts
+        ).strip()
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError(
             'unable to get DUT architecture by "uname -m"'
@@ -607,11 +616,14 @@ def query_dut_cpu_arch(host: str):
     return arch
 
 
-def query_dut_root_partition(host: str) -> PartitionInfo:
+def query_dut_root_partition(
+    host: str, max_attempts: int = DEFAULT_QUERY_ROOT_PARTITION_ATTPEMPTS
+) -> PartitionInfo:
     """Query partition of the given DUT.
 
     Args:
         host: the DUT address.
+        max_attempts: the number of attempts to query the DUT
 
     Returns:
         A PartitionInfo object indicates the partition used on the DUT.
@@ -628,10 +640,14 @@ def query_dut_root_partition(host: str) -> PartitionInfo:
     try:
         # Example1: "/dev/mmcblk0"
         # Example2: "/dev/sdb"
-        root_disk = util.ssh_cmd(host, 'rootdev', '-s', '-d').strip()
+        root_disk = util.ssh_cmd(
+            host, 'rootdev', '-s', '-d', max_attempts=max_attempts
+        ).strip()
         # Example1: "/dev/mmcblk0p5"
         # Example2: "/dev/sdb2"
-        cur_root_partition = util.ssh_cmd(host, 'rootdev', '-s').strip()
+        cur_root_partition = util.ssh_cmd(
+            host, 'rootdev', '-s', max_attempts=max_attempts
+        ).strip()
         # Example1: "/dev/mmcblk0p5" => 5
         # Example2: "/dev/sdb2" => 2
         match = re.match(r'.*([0-9]+)', cur_root_partition)
@@ -659,11 +675,14 @@ def query_dut_root_partition(host: str) -> PartitionInfo:
         raise errors.ExternalError('unable to query dut root partition') from e
 
 
-def is_dut_kernel_ready(host: str) -> bool:
+def is_dut_kernel_ready(
+    host: str, max_attempts: int = DEFAULT_CHECK_KERNEL_READY_ATTPEMPTS
+) -> bool:
     """Query if the kernel partition is ready on the given DUT.
 
     Args:
         host: the DUT address.
+        max_attempts: the number of attempts to query the DUT
 
     Returns:
         A boolean, indicates if the dut partition is ready.
@@ -683,6 +702,7 @@ def is_dut_kernel_ready(host: str) -> bool:
             '-i',
             str(info.active_kernel_partition),
             info.disk,
+            max_attempts=max_attempts,
         ).strip()
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError(
