@@ -66,6 +66,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
 
 def switch(chromeos_root: str, board: str, dut: str, version: str) -> None:
+    borealis_util.uninstall(dut)
     repo_util.cleanup_unexpected_files(chromeos_root)
     borealis_util.download_rootfs_and_kernel(chromeos_root, version)
 

@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 
 from bisect_kit import cros_util
+from bisect_kit import errors
 from bisect_kit import util
 
 
@@ -23,6 +24,36 @@ def is_installable(dlc_name: str, dut: str) -> bool:
         )
         return ls_output.strip() != ''
     except subprocess.CalledProcessError:
+        return False
+
+
+def install(dlc_name: str, dut: str) -> bool:
+    """Install DLC package on the DUT."""
+    try:
+        util.ssh_cmd(
+            dut,
+            'dlcservice_util',
+            '--install',
+            f'--id={dlc_name}',
+            max_attempts=5,
+        )
+        return True
+    except (subprocess.CalledProcessError, errors.SshConnectionError):
+        return False
+
+
+def uninstall(dlc_name: str, dut: str) -> bool:
+    """Uninstall DLC package on the DUT."""
+    try:
+        util.ssh_cmd(
+            dut,
+            'dlcservice_util',
+            '--uninstall',
+            f'--id={dlc_name}',
+            max_attempts=5,
+        )
+        return True
+    except (subprocess.CalledProcessError, errors.SshConnectionError):
         return False
 
 

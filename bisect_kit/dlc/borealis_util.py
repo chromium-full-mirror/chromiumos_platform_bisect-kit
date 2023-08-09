@@ -61,6 +61,14 @@ def create_gs_path(version: str) -> str:
     return f'{GS_PATH_PREFIX}{version}{GS_PATH_SUFFIX}'
 
 
+def install(dut: str) -> bool:
+    return dlc_util.install(DLC_NAME, dut)
+
+
+def uninstall(dut: str) -> bool:
+    return dlc_util.uninstall(DLC_NAME, dut)
+
+
 def download_rootfs_and_kernel(chromeos_root: PathLike, version: str) -> None:
     file_name = create_package_name(version)
     dlc_cache_folder = pathlib.Path(chromeos_root) / CACHE_PATH
