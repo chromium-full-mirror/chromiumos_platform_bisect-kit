@@ -79,14 +79,14 @@ class CrosDiagnoser:
         self,
         is_autotest: bool,
         common_switch_cmd: list[str],
-        cros_prebuilt_extra_switch_cmd: list[str],
+        cros_prebuilt_extra_switch_cmd: list[str] | None,
         cros_prebuilt_eval_cmd: list[str],
         android_prebuilt_eval_cmd: list[str],
         lacros_prebuilt_eval_cmd: list[str],
         chrome_localbuild_eval_cmd: list[str],
         should_build_chrome_localbuild_with_tests: bool,
         cros_localbuild_eval_cmd: list[str],
-        cros_localbuild_extra_switch_cmd: list[str],
+        cros_localbuild_extra_switch_cmd: list[str] | None,
     ):
         def init_dut_to_old_cros(dut):
             logger.info('init dut %s to old cros', dut)
@@ -115,6 +115,11 @@ class CrosDiagnoser:
             else:
                 logger.info('no need to init autotest deps')
 
+        if cros_prebuilt_extra_switch_cmd is None:
+            cros_prebuilt_extra_switch_cmd = []
+        if cros_localbuild_extra_switch_cmd is None:
+            cros_localbuild_extra_switch_cmd = []
+
         should_auto_allocate_dut = (
             experiment.ID.STATELESS in self.config['experiments']
         )
@@ -133,12 +138,18 @@ class CrosDiagnoser:
             self.states.save()
 
             # Fix cmd which depends on "board".
-            common_switch_cmd += ['--board', self.config['board']]
-            cros_prebuilt_extra_switch_cmd += ['--board', self.config['board']]
-            cros_localbuild_extra_switch_cmd += [
+            common_switch_cmd = common_switch_cmd + [
                 '--board',
                 self.config['board'],
             ]
+            cros_prebuilt_extra_switch_cmd = cros_prebuilt_extra_switch_cmd + [
+                '--board',
+                self.config['board'],
+            ]
+            cros_localbuild_extra_switch_cmd = (
+                cros_localbuild_extra_switch_cmd
+                + ['--board', self.config['board']]
+            )
             # So far only the `release` images support the `--prebuilt` option
             if cros_util.has_release_prebuilt(
                 self.config['board'], self.config['old']
