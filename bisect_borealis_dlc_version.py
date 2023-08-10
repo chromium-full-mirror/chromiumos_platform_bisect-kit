@@ -38,6 +38,12 @@ from bisect_kit.dlc import borealis_util
 logger = logging.getLogger(__name__)
 
 
+def generate_action_link(action):
+    if action['action_type'] == 'commit':
+        repo_url = action['repo_url']
+        action['link'] = repo_url + '/+/' + action['rev']
+
+
 class BorealisVersionDomain(core.BisectDomain):
     """BorealisVersionDomain for Borealis DLC versions."""
 
@@ -149,6 +155,10 @@ class BorealisVersionDomain(core.BisectDomain):
             config['new'] = revlist[-1]
         else:
             raise errors.TooFewRevisionsError(f'Too few revisions: {revlist}')
+
+        for detail in details.values():
+            for action in detail.get('actions', []):
+                generate_action_link(action)
 
         return config, {'revlist': revlist, 'details': details}
 
