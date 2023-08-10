@@ -88,15 +88,17 @@ class CrosDiagnoser:
         should_build_chrome_localbuild_with_tests: bool,
         cros_localbuild_eval_cmd: list[str],
         cros_localbuild_extra_switch_cmd: list[str] | None,
+        is_custom_eval: bool = False,
     ):
         def init_dut_to_old_cros(dut):
             logger.info('init dut %s to old cros', dut)
             self._switch_chromeos_to_old(
                 dut, should_always_reflash=self.config['always_reflash']
             )
-            util.check_call(
-                *(common_switch_cmd + [self.cros_old, '--dut', dut])
-            )
+            if not is_custom_eval:
+                util.check_call(
+                    *(common_switch_cmd + [self.cros_old, '--dut', dut])
+                )
 
         def init_autotest_deps_workaround(dut):
             """A workaround initialization for autotest.
@@ -151,15 +153,17 @@ class CrosDiagnoser:
                 cros_localbuild_extra_switch_cmd
                 + ['--board', self.config['board']]
             )
-            # So far only the `release` images support the `--prebuilt` option
-            if cros_util.has_release_prebuilt(
-                self.config['board'], self.config['old']
-            ):
-                cros_prebuilt_eval_cmd.append('--prebuilt')
-                lacros_prebuilt_eval_cmd.append('--prebuilt')
-            else:
-                cros_prebuilt_eval_cmd.append('--tast_build')
-                lacros_prebuilt_eval_cmd.append('--tast_build')
+
+            if not is_custom_eval:
+                # So far only the `release` images support the `--prebuilt` option
+                if cros_util.has_release_prebuilt(
+                    self.config['board'], self.config['old']
+                ):
+                    cros_prebuilt_eval_cmd.append('--prebuilt')
+                    lacros_prebuilt_eval_cmd.append('--prebuilt')
+                else:
+                    cros_prebuilt_eval_cmd.append('--tast_build')
+                    lacros_prebuilt_eval_cmd.append('--tast_build')
 
             # Step 1: Narrows down ChromeOS prebuilt.
             self.narrow_down_chromeos_prebuilt(
