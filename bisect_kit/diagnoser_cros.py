@@ -862,7 +862,8 @@ class CrosDiagnoser:
             )
             return False
 
-        if not borealis_util.is_installable(self.config['dut']):
+        dut = dut_manager.dut or self.config['dut']
+        if not borealis_util.is_installable(dut):
             self.make_decision(
                 'The bisection with borealis DLC is bypassed because '
                 'it is not supported by the board/model/version of the DUT.'
