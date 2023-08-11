@@ -79,15 +79,13 @@ class CrosDiagnoser:
     def diagnose(
         self,
         is_autotest: bool,
-        common_switch_cmd: list[str],
-        cros_prebuilt_extra_switch_cmd: list[str] | None,
+        switch_test_harness_cmd: list[str] | None,
         cros_prebuilt_eval_cmd: list[str],
         android_prebuilt_eval_cmd: list[str],
         lacros_prebuilt_eval_cmd: list[str],
         chrome_localbuild_eval_cmd: list[str],
         should_build_chrome_localbuild_with_tests: bool,
         cros_localbuild_eval_cmd: list[str],
-        cros_localbuild_extra_switch_cmd: list[str] | None,
         is_custom_eval: bool = False,
     ):
         def init_dut_to_old_cros(dut):
@@ -95,10 +93,6 @@ class CrosDiagnoser:
             self._switch_chromeos_to_old(
                 dut, should_always_reflash=self.config['always_reflash']
             )
-            if not is_custom_eval:
-                util.check_call(
-                    *(common_switch_cmd + [self.cros_old, '--dut', dut])
-                )
 
         def init_autotest_deps_workaround(dut):
             """A workaround initialization for autotest.
@@ -118,11 +112,6 @@ class CrosDiagnoser:
             else:
                 logger.info('no need to init autotest deps')
 
-        if cros_prebuilt_extra_switch_cmd is None:
-            cros_prebuilt_extra_switch_cmd = []
-        if cros_localbuild_extra_switch_cmd is None:
-            cros_localbuild_extra_switch_cmd = []
-
         should_auto_allocate_dut = (
             experiment.ID.STATELESS in self.config['experiments']
         )
@@ -140,30 +129,30 @@ class CrosDiagnoser:
             self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(dut)
             self.states.save()
 
-            # Fix cmd which depends on "board".
-            common_switch_cmd = common_switch_cmd + [
-                '--board',
-                self.config['board'],
-            ]
-            cros_prebuilt_extra_switch_cmd = cros_prebuilt_extra_switch_cmd + [
-                '--board',
-                self.config['board'],
-            ]
-            cros_localbuild_extra_switch_cmd = (
-                cros_localbuild_extra_switch_cmd
-                + ['--board', self.config['board']]
-            )
-
+            # Fix commands which depend on "board".
+            if switch_test_harness_cmd:
+                switch_test_harness_cmd = switch_test_harness_cmd + [
+                    '--board',
+                    self.config['board'],
+                ]
             if not is_custom_eval:
                 # So far only the `release` images support the `--prebuilt` option
                 if cros_util.has_release_prebuilt(
                     self.config['board'], self.config['old']
                 ):
-                    cros_prebuilt_eval_cmd.append('--prebuilt')
-                    lacros_prebuilt_eval_cmd.append('--prebuilt')
+                    cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + [
+                        '--prebuilt'
+                    ]
+                    lacros_prebuilt_eval_cmd = lacros_prebuilt_eval_cmd + [
+                        '--prebuilt'
+                    ]
                 else:
-                    cros_prebuilt_eval_cmd.append('--tast_build')
-                    lacros_prebuilt_eval_cmd.append('--tast_build')
+                    cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + [
+                        '--tast_build'
+                    ]
+                    lacros_prebuilt_eval_cmd = lacros_prebuilt_eval_cmd + [
+                        '--tast_build'
+                    ]
 
             # Step 1: Narrows down ChromeOS prebuilt.
             self.narrow_down_chromeos_prebuilt(
@@ -171,7 +160,7 @@ class CrosDiagnoser:
                 self.config['cros_prebuilt_old'],
                 self.config['cros_prebuilt_new'],
                 cros_prebuilt_eval_cmd,
-                extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
+                switch_test_harness_cmd=switch_test_harness_cmd,
             )
 
             # Switches CrOS repository and DUT to narrowed down old version.
@@ -187,6 +176,10 @@ class CrosDiagnoser:
                 '--sync_code_only',
                 self.cros_old,
             )
+            if switch_test_harness_cmd:
+                util.check_call(
+                    *(switch_test_harness_cmd + [self.cros_old, '--dut', dut])
+                )
             init_dut_to_old_cros(dut)
             dut_os_version = cros_util.query_dut_short_version(dut)
 
@@ -311,7 +304,7 @@ class CrosDiagnoser:
             cros_localbuild_eval_cmd,
             buildbucket_buildable
             and not self.config['disable_buildbucket_chromeos'],
-            extra_switch_cmd=cros_localbuild_extra_switch_cmd,
+            switch_test_harness_cmd=switch_test_harness_cmd,
         )
 
     def narrow_down_chromeos_prebuilt(
@@ -320,7 +313,7 @@ class CrosDiagnoser:
         old: str,
         new: str,
         eval_cmd: list[str],
-        extra_switch_cmd: list[str] | None = None,
+        switch_test_harness_cmd: list[str] | None = None,
     ) -> None:
         """Bisect with ChromeOS prebuilt.
 
@@ -329,7 +322,7 @@ class CrosDiagnoser:
           old: old ChromeOS version
           new: new ChromeOS version
           eval_cmd: command to reproduce the regression
-          extra_switch_cmd: additional command to run when switch chromeos version
+          switch_test_harness_cmd: command to switch test harness
         """
         if self.config['bisect_chrome']:
             self.make_decision(
@@ -378,6 +371,7 @@ class CrosDiagnoser:
                 init_args=init_args,
                 switch_cmd=switch_cmd,
                 eval_cmd=eval_cmd,
+                switch_test_harness_cmd=switch_test_harness_cmd,
                 old_value=self.config['old_value'],
                 new_value=self.config['new_value'],
                 term_old=self.config['term_old'],
@@ -386,8 +380,6 @@ class CrosDiagnoser:
                 noisy=self.noisy,
                 endpoint_verification=self.config['endpoint_verification'],
             )
-            if extra_switch_cmd:
-                bisector.append_switch_command(extra_switch_cmd)
 
             self.cros_old, self.cros_new, self.noisy = bisector.narrow_down()
 
@@ -532,7 +524,6 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
-        extra_switch_cmd: list[str] | None = None,
     ) -> bool:
         """Bisect with Android prebuilt and localbuild.
 
@@ -541,7 +532,6 @@ class CrosDiagnoser:
         Args:
           dut_manager: a DutManager instance.
           eval_cmd: command to reproduce the regression
-          extra_switch_cmd: additional command to run when switch android version
 
         Returns:
           True: culprit is inside Android
@@ -600,8 +590,6 @@ class CrosDiagnoser:
                     noisy=self.noisy,
                     endpoint_verification=self.config['endpoint_verification'],
                 )
-                if extra_switch_cmd:
-                    bisector.append_switch_command(extra_switch_cmd)
 
                 android_old, android_new, self.noisy = bisector.narrow_down()
                 verified = True
@@ -691,8 +679,6 @@ class CrosDiagnoser:
                 noisy=self.noisy,
                 endpoint_verification=self.config['endpoint_verification'],
             )
-            if extra_switch_cmd:
-                bisector.append_switch_command(extra_switch_cmd)
 
             android_old, android_new, self.noisy = bisector.narrow_down()
             verified = True
@@ -726,7 +712,6 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
-        extra_switch_cmd: list[str] | None = None,
     ) -> bool:
         """Bisect with Lacros Prebuilt.
 
@@ -735,7 +720,6 @@ class CrosDiagnoser:
         Args:
           dut_manager: a DutManager instance.
           eval_cmd: command to reproduce the regression
-          extra_switch_cmd: additional command to run when switch lacros version
 
         Returns:
           True: culprit is inside Lacros
@@ -803,8 +787,6 @@ class CrosDiagnoser:
                 noisy=self.noisy,
                 endpoint_verification=self.config['endpoint_verification'],
             )
-            if extra_switch_cmd:
-                bisector.append_switch_command(extra_switch_cmd)
 
             lacros_old, lacros_new, self.noisy = bisector.narrow_down()
 
@@ -937,7 +919,6 @@ class CrosDiagnoser:
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
         buildbucket_build: bool = False,
-        extra_switch_cmd: list[str] | None = None,
         should_build_with_tests: bool = True,
     ) -> bool:
         """Bisect with Chrome localbuild.
@@ -948,7 +929,6 @@ class CrosDiagnoser:
           dut_manager: a DutManager instance
           eval_cmd: command to reproduce the regression
           buildbucket_build: to build Chrome image on buildbucket
-          extra_switch_cmd: additional command to run when switch chrome version
           should_build_with_tests: build test binaries as well
 
         Returns:
@@ -1041,8 +1021,6 @@ class CrosDiagnoser:
                 noisy=self.noisy,
                 endpoint_verification=self.config['endpoint_verification'],
             )
-            if extra_switch_cmd:
-                bisector.append_switch_command(extra_switch_cmd)
 
             bisector.narrow_down()
         except errors.VerifyOldBehaviorFailed as e:
@@ -1071,7 +1049,7 @@ class CrosDiagnoser:
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
         buildbucket_build: bool = False,
-        extra_switch_cmd: list[str] | None = None,
+        switch_test_harness_cmd: list[str] | None = None,
     ) -> None:
         """Bisect with ChromeOS localbuild.
 
@@ -1079,7 +1057,7 @@ class CrosDiagnoser:
           dut_manager: a DutManager instance
           eval_cmd: command to reproduce the regression
           buildbucket_build: to build ChromeOS image on buildbucket
-          extra_switch_cmd: additional command to run when switch ChromeOS version
+          switch_test_harness_cmd: command to switch test harness
         """
         if self.config['bisect_chrome']:
             self.make_decision(
@@ -1144,6 +1122,11 @@ class CrosDiagnoser:
             switch_cmd=switch_cmd,
             eval_cmd=eval_cmd,
             future_build_cmd=future_build_cmd,
+            # If using build bucket, we still need to setup test harness on the
+            # bisect runner.
+            switch_test_harness_cmd=switch_test_harness_cmd
+            if buildbucket_build
+            else None,
             old_value=self.config['old_value'],
             new_value=self.config['new_value'],
             term_old=self.config['term_old'],
@@ -1152,8 +1135,6 @@ class CrosDiagnoser:
             noisy=self.noisy,
             endpoint_verification=self.config['endpoint_verification'],
         )
-        if extra_switch_cmd:
-            bisector.append_switch_command(extra_switch_cmd)
 
         try:
             bisector.narrow_down()

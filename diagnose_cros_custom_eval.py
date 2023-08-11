@@ -55,7 +55,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         return self.argument_parser.error('argument --eval_script is not valid')
 
     def _build_cmds(self):
-        common_switch_cmd = []
+        switch_test_harness_cmd = None
         eval_script = self.config['eval_script']
         eval_script_filename = self._get_eval_script_file_name(eval_script)
         common_eval_cmd = [
@@ -63,7 +63,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             '--rich_result',
         ]
 
-        return common_switch_cmd, common_eval_cmd
+        return switch_test_harness_cmd, common_eval_cmd
 
     def do_run(self, dut):
         path_factory = setup_cros_bisect.DefaultProjectPathFactory(
@@ -75,19 +75,17 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             self.states, path_factory, self.config, dut
         )
 
-        common_switch_cmd, common_eval_cmd = self._build_cmds()
+        switch_test_harness_cmd, common_eval_cmd = self._build_cmds()
 
         diagnoser.diagnose(
             is_autotest=False,
-            common_switch_cmd=common_switch_cmd,
-            cros_prebuilt_extra_switch_cmd=common_switch_cmd,
+            switch_test_harness_cmd=switch_test_harness_cmd,
             cros_prebuilt_eval_cmd=common_eval_cmd,
             android_prebuilt_eval_cmd=common_eval_cmd,
             lacros_prebuilt_eval_cmd=common_eval_cmd,
             chrome_localbuild_eval_cmd=common_eval_cmd,
             should_build_chrome_localbuild_with_tests=False,
             cros_localbuild_eval_cmd=common_eval_cmd,
-            cros_localbuild_extra_switch_cmd=common_switch_cmd,
             is_custom_eval=True,
         )
 

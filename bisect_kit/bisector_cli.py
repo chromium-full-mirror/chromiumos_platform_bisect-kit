@@ -224,9 +224,28 @@ def do_evaluate(
 
 
 class _SwitchAction(enum.StrEnum):
-    BUILD_AND_DEPLOY = 'build_and_deploy'
+    """The action to perform for a "switch" step.
+
+    There are two sets of switch targets.
+    1. The binary under testing. It could be ChromeOS, Chrome, Lacros, and so
+      on. Bisections are performed to identify different behaviors in different
+      binary versions.
+    2. Test harness. It could be Autotest, Tast, and so on. They are frameworks
+      to drive test on the binaries under testing. In general we switch the
+      version of test harness to match the version of binaries under testing.
+    """
+
+    # Build the binary under testing.
     BUILD = 'build'
+
+    # Deploy the binary under testing.
     DEPLOY = 'deploy'
+
+    # Build and Deploy the binary under testing.
+    BUILD_AND_DEPLOY = 'build_and_deploy'
+
+    # Switch the test harness only but not the binary under testing.
+    TEST_HARNESS = 'test_harness'
 
 
 def do_switch(
@@ -258,15 +277,15 @@ def do_switch(
       'fatal'.
     """
     env = os.environ.copy()
-    if action == _SwitchAction.BUILD_AND_DEPLOY:
-        assert dut, 'dut must not be None when switching'
+    if action != _SwitchAction.BUILD:
+        assert dut, 'dut must not be None'
         env['DUT'] = dut
-    elif action == _SwitchAction.BUILD:
+
+    if action == _SwitchAction.BUILD:
         env['NO_DEPLOY'] = 'true'
     elif action == _SwitchAction.DEPLOY:
-        assert dut, 'dut must not be None when deploying'
-        env['DUT'] = dut
         env['DEPLOY_ONLY'] = 'true'
+
     env['BISECT_REV'] = rev
     domain.setenv(env, rev)
 
@@ -655,6 +674,7 @@ class BisectorCommandLine:
         rev: str,
         sample: dict,
         action: _SwitchAction,
+        log_path: str,
         dut: str | None = None,
     ) -> bool:
         """Switch to a specific rev.
@@ -662,36 +682,37 @@ class BisectorCommandLine:
         Args:
           rev: the revision.
           sample: the dict to append result to. See _switch_and_eval() for details.
-          action: BUILD for build only, DEPLOY for deploy only, BUILD_AND_DEPLOY for build + deploy.
+          action: see _SwitchAction for details.
+          log_path: the path to switch log.
           dut: the DUT.
         Returns
           Successful or not.
         """
-        switch_log = self._step_log_path(rev, 'switch')
-        switch_log_fullpath = os.path.join(self.session_dir, switch_log)
         logger.debug('switch (%s) to rev=%s', action, rev)
 
+        script = self.config['switch']
+        if action == _SwitchAction.TEST_HARNESS:
+            script = self.config.get('switch_test_harness')
+            if not script:
+                logger.debug(
+                    'nothing to do for setting up test harness to rev %s', rev
+                )
+                return True
+
         t0 = time.time()
-        result = do_switch(
-            self.config['switch'],
-            self.domain,
-            rev,
-            switch_log_fullpath,
-            action,
-            dut,
-        )
+        result = do_switch(script, self.domain, rev, log_path, action, dut)
         t1 = time.time()
 
-        sample['switch_time'] = sample.get('switch_time', 0) + t1 - t0
-        if action == _SwitchAction.BUILD:
-            sample['build_time'] = t1 - t0
-        elif action == _SwitchAction.DEPLOY:
-            sample['deploy_time'] = t1 - t0
+        duration = t1 - t0
+        sample['switch_time'] = sample.get('switch_time', 0) + duration
+        sample['switch_%s_time' % action] = duration
 
+        # Note: the following field may already exist in "sample" so they may be
+        # overwritten.
         status = result.data['status'] if result else None
         sample['status'] = status
-        if os.path.exists(switch_log_fullpath):
-            sample['switch_log'] = switch_log
+        if os.path.exists(log_path):
+            sample['switch_log'] = log_path
         if result and 'reason' in result.data:
             sample['reason'] = result.data['reason']
         if status in ('skip', 'fatal'):
@@ -735,6 +756,10 @@ class BisectorCommandLine:
         # informative.
         sample = {'rev': rev, 'index': self.states.rev2idx(rev)}
 
+        # if _switch() is called multiple times, the same log file is appended.
+        switch_log = self._step_log_path(rev, 'switch')
+        switch_log_fullpath = os.path.join(self.session_dir, switch_log)
+
         assert self.dut_manager, 'dut_manager must not be None'
         dut = self.dut_manager.dut
         # DUT is already allocated. Do switch (build + deploy) all at
@@ -742,7 +767,19 @@ class BisectorCommandLine:
         if dut:
             if prev_rev != rev:
                 if not self._switch(
-                    rev, sample, _SwitchAction.BUILD_AND_DEPLOY, dut
+                    rev,
+                    sample,
+                    _SwitchAction.BUILD_AND_DEPLOY,
+                    switch_log_fullpath,
+                    dut,
+                ):
+                    return 'switch', sample
+                if not self._switch(
+                    rev,
+                    sample,
+                    _SwitchAction.TEST_HARNESS,
+                    switch_log_fullpath,
+                    dut,
                 ):
                     return 'switch', sample
             self._evaluate(rev, sample, dut)
@@ -751,14 +788,29 @@ class BisectorCommandLine:
         # DUT is not allocated yet. Do switch in two steps (build then
         # deploy). Auto allocate a DUT at the deploy step.
         if prev_rev != rev:
-            if not self._switch(rev, sample, _SwitchAction.BUILD):
+            if not self._switch(
+                rev, sample, _SwitchAction.BUILD, switch_log_fullpath
+            ):
                 return 'switch', sample
         with self.dut_manager.provision() as dut:
             # Deploy is needed if a new version is to be deployed, or a new DUT
             # has been allocated. If it's the same version and the same DUT,
             # we don't need to deploy again.
             if prev_rev != rev or not self.dut_manager.is_restored_dut():
-                if not self._switch(rev, sample, _SwitchAction.DEPLOY, dut):
+                if not self._switch(
+                    rev, sample, _SwitchAction.DEPLOY, switch_log_fullpath, dut
+                ):
+                    return 'switch', sample
+                # Though test harness is setup on the test server (i.e., the
+                # bisector runner) instead of on the DUT, the scripts queries
+                # some config from DUT for now. So DUT is required.
+                if not self._switch(
+                    rev,
+                    sample,
+                    _SwitchAction.TEST_HARNESS,
+                    switch_log_fullpath,
+                    dut,
+                ):
                     return 'switch', sample
             self._evaluate(rev, sample, dut)
             return 'eval', sample
@@ -1187,31 +1239,6 @@ class BisectorCommandLine:
         rev = self.states.idx2rev(idx)
         print(rev)
 
-    def cmd_switch(self, opts):
-        """Switches to given rev without eval."""
-        assert self.config.get('switch')
-
-        if opts.rev == 'next':
-            idx = self.strategy.next_idx(self.estimate_cost(opts.current_rev))
-            rev = self.states.idx2rev(idx)
-        else:
-            rev = self.domain_cls.intra_revtype(opts.rev)
-        assert rev
-
-        switch_log = self._step_log_path(rev, 'switch')
-        logger.info('switch to %s', rev)
-        with self.dut_manager.provision() as dut:
-            result = do_switch(
-                self.config['switch'],
-                self.domain,
-                rev,
-                switch_log,
-                _SwitchAction.BUILD_AND_DEPLOY,
-                dut,
-            )
-        if result:
-            print('switch failed')
-
     def _add_revs_status_helper(self, revs, status):
         if self.strategy.is_value_bisection():
             assert status not in ('old', 'new')
@@ -1262,7 +1289,12 @@ class BisectorCommandLine:
             print(self.states.config[opts.key])
             return
 
-        if opts.key in ['switch', 'eval', 'future_build']:
+        if opts.key in [
+            'switch',
+            'eval',
+            'future_build',
+            'switch_test_harness',
+        ]:
             exec_opts = step_command_parser.parse_args(opts.value)
             result = cli.check_executable(exec_opts.command[0])
             if result:
@@ -1423,6 +1455,7 @@ class BisectorCommandLine:
                 'term_old',
                 'term_new',
                 'future_build',
+                'switch_test_harness',
             ],
             metavar='key',
             help='What config to change. choices=[%(choices)s]',
@@ -1478,22 +1511,6 @@ class BisectorCommandLine:
             'default is calculating automatically and run until done',
         )
         parser_run.set_defaults(func=self.cmd_run)
-
-        parser_switch = subparsers.add_parser(
-            'switch', help='Switch to given rev without eval', parents=parents
-        )
-        parser_switch.add_argument(
-            'rev',
-            type=cli.argtype_multiplexer(
-                self.domain_cls.intra_revtype, cli.argtype_re('next', 'next')
-            ),
-        )
-        parser_switch.add_argument(
-            '--current_rev',
-            type=self.domain_cls.intra_revtype,
-            help='if rev="next", give hint the current rev',
-        )
-        parser_switch.set_defaults(func=self.cmd_switch)
 
         parser_old = subparsers.add_parser(
             'old',

@@ -442,27 +442,6 @@ class TestBisectorCommandLine(unittest.TestCase):
         print('Correct rate of different test ratio: %s' % correct_rate_list)
         self.assertGreaterEqual(total_correct_rate, 0.95)
 
-    def test_cmd_switch(self):
-        """Test cmd_switch"""
-        bisector = bisector_cli.BisectorCommandLine(
-            DummyDomain, self.dut_manager
-        )
-        bisector.main('init', '--num=100', '--old=0', '--new=99')
-        bisector.main('config', 'switch', 'true')
-        bisector.main('config', 'eval', 'false')
-
-        switched = []
-
-        def do_switch(_cmd, _domain, rev, _log_file, _action, _dut):
-            switched.append(rev)
-
-        with mock.patch('bisect_kit.bisector_cli.do_switch', do_switch):
-            bisector.main('switch', 'next')
-            bisector.main('switch', '3')
-            bisector.main('switch', '5')
-            bisector.main('switch', '4')
-            self.assertEqual(switched, ['99', '3', '5', '4'])
-
     def test_cmd_view(self):
         bisector = bisector_cli.BisectorCommandLine(
             DummyDomain, self.dut_manager

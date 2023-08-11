@@ -7,7 +7,6 @@
 import contextlib
 import importlib
 import logging
-import subprocess
 import sys
 
 from bisect_kit import bisector_cli
@@ -24,7 +23,6 @@ class BisectorWrapper:
         self.name = name
         self.module = importlib.import_module(name)
         self.session = session
-        self.switch_cmds: list[list[str]] = []
         self.dut_manager = dut_manager
 
         self.domain_cls = None
@@ -55,6 +53,7 @@ class BisectorWrapper:
         switch_cmd: list[str],
         eval_cmd: list[str],
         future_build_cmd: list[str] | None = None,
+        switch_test_harness_cmd: list[str] | None = None,
         old_value: float | None = None,
         new_value: float | None = None,
         term_old: str | None = None,
@@ -85,23 +84,19 @@ class BisectorWrapper:
             # diagnoser's log.
             self.call('init', *(common_init_args + init_args))
 
-        self.switch_cmds = [switch_cmd]
         self.call('config', 'switch', '--mode=bisectkit', *switch_cmd)
         self.call('config', 'eval', '--mode=bisectkit', *eval_cmd)
         if future_build_cmd:
             self.call(
                 'config', 'future_build', '--mode=bisectkit', *future_build_cmd
             )
-
-    def _set_switch_commands(self):
-        cmdline = ' && '.join(
-            subprocess.list2cmdline(cmd) for cmd in self.switch_cmds
-        )
-        self.call('config', 'switch', '--mode=bisectkit', 'sh', '-c', cmdline)
-
-    def append_switch_command(self, cmd: list[str]) -> None:
-        self.switch_cmds.append(cmd)
-        self._set_switch_commands()
+        if switch_test_harness_cmd:
+            self.call(
+                'config',
+                'switch_test_harness',
+                '--mode=bisectkit',
+                *switch_test_harness_cmd,
+            )
 
     def narrow_down(self) -> tuple[str, str, str | None]:
         status = self.current_status()

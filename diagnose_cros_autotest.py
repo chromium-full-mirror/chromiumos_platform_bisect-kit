@@ -94,14 +94,14 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
     def _build_cmds(self):
         # prebuilt version will be specified later.
-        common_switch_cmd = [
+        switch_test_harness_cmd = [
             './switch_autotest_prebuilt.py',
             '--rich_result',
             '--chromeos_root',
             self.config['chromeos_root'],
         ]
         if self.config['test_name'] and not self.config['cts_test']:
-            common_switch_cmd += ['--test_name', self.config['test_name']]
+            switch_test_harness_cmd += ['--test_name', self.config['test_name']]
 
         common_eval_cmd = [
             './eval_cros_autotest.py',
@@ -144,7 +144,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         if self.config['consider_test_crash_as_failure']:
             common_eval_cmd.append('--consider_test_crash_as_failure')
 
-        return common_switch_cmd, common_eval_cmd
+        return switch_test_harness_cmd, common_eval_cmd
 
     def do_run(self, dut):
         path_factory = setup_cros_bisect.DefaultProjectPathFactory(
@@ -156,13 +156,12 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             self.states, path_factory, self.config, dut
         )
 
-        common_switch_cmd, common_eval_cmd = self._build_cmds()
+        switch_test_harness_cmd, common_eval_cmd = self._build_cmds()
 
         # Do not specify version for autotest prebuilt switching here. The trick
         # is that version number is obtained via bisector's environment variable
         # CROS_VERSION.
         cros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
-        cros_prebuilt_extra_switch_cmd = common_switch_cmd[:]
         android_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
@@ -175,22 +174,18 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         )
         if not cros_buildbucket_build:
             cros_localbuild_eval_cmd = common_eval_cmd[:]
-            cros_localbuild_extra_switch_cmd = None
         else:
             cros_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
-            cros_localbuild_extra_switch_cmd = common_switch_cmd[:]
 
         diagnoser.diagnose(
             is_autotest=True,
-            common_switch_cmd=common_switch_cmd,
-            cros_prebuilt_extra_switch_cmd=cros_prebuilt_extra_switch_cmd,
+            switch_test_harness_cmd=switch_test_harness_cmd,
             cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
             android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
             lacros_prebuilt_eval_cmd=lacros_prebuilt_eval_cmd,
             chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
             should_build_chrome_localbuild_with_tests=should_build_chrome_localbuild_with_tests,
             cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,
-            cros_localbuild_extra_switch_cmd=cros_localbuild_extra_switch_cmd,
         )
 
     @util.MethodTimer(
