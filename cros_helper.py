@@ -66,7 +66,7 @@ def cmd_lease_dut(opts):
     if cros_lab_util.crosfleet_lease_dut(host, reason, opts.duration):
         logger.info('leased %s', host)
     else:
-        raise Exception('unable to lease %s' % host)
+        raise errors.DutLeaseException('unable to lease %s' % host)
 
 
 def cmd_release_dut(opts):

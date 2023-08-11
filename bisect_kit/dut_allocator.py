@@ -43,7 +43,7 @@ def _filter_dimensions_by_lab(
             continue
         msg = f'dimension={dimension} is unknown in the lab, typo? ignored'
         if raise_unknown:
-            raise Exception(msg)
+            raise errors.DutLeaseException(msg)
         logger.warning(msg)
     return result
 
