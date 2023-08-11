@@ -232,12 +232,13 @@ class CrosDiagnoser:
 
             # Step 4: Narrows down DLC prebuilt.
             try:
-                self.narrow_down_dlc_prebuilt(
+                if self.narrow_down_dlc_prebuilt(
                     dut_manager,
                     self.config['old'],
                     self.config['new'],
                     cros_prebuilt_eval_cmd,
-                )
+                ):
+                    return
             except errors.DiagnoseContradiction:
                 raise
             except Exception:
