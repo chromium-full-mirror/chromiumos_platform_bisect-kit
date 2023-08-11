@@ -52,7 +52,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         if eval_script == 'eval_custom_dut_bootable':
             return 'eval_custom_dut_bootable.py'
 
-        self.argument_parser.error('argument --eval_script is is not valid')
+        return self.argument_parser.error('argument --eval_script is not valid')
 
     def _build_cmds(self):
         common_switch_cmd = []
