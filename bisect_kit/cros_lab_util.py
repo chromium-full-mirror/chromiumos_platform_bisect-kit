@@ -631,8 +631,8 @@ class AsyncDutLeaser:
                     cancel_pending_lease(pending_lease)
                 self._is_dut_leased = True
 
-            pending_lease = None
-            return dut_name
+                pending_lease = None
+                return dut_name
         except asyncio.CancelledError:
             logger.debug('lease(%s): got CancelledError', dut_name)
             raise
