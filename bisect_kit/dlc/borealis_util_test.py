@@ -11,6 +11,7 @@ import unittest
 from unittest import mock
 
 from bisect_kit import errors
+from bisect_kit import git_util
 from bisect_kit.dlc import borealis_util
 
 
@@ -71,6 +72,134 @@ class TestBorealisUtil(unittest.TestCase):
                 dummy_chromeos_root / 'src/platform/borealis',
                 cwd=(dummy_chromeos_root / 'tmp/images-borealis-dlc'),
             )
+
+    @mock.patch('bisect_kit.git_util.get_history')
+    def test_build_revlist_from_overlay_history(self, mock_get_history):
+        mock_get_history.side_effect = [
+            [
+                git_util.Commit(
+                    timestamp=400,
+                    rev='dummy_rev_01',
+                    subject='VERSION-PIN: updating version pin borealis-dlc to 2023.02.08.031141',
+                ),
+                git_util.Commit(
+                    timestamp=410,
+                    rev='dummy_rev_02',
+                    subject='VERSION-PIN: updating version pin borealis-dlc to 2023.02.08.031142',
+                ),
+                git_util.Commit(
+                    timestamp=430,
+                    rev='dummy_rev_03',
+                    subject='VERSION-PIN: updating version pin borealis-dlc to 2023.02.08.031143',
+                ),
+                git_util.Commit(
+                    timestamp=440,
+                    rev='dummy_rev_04',
+                    subject='borealis-dlc: Automatic uprev to 2023.02.08.031140-r1.',
+                ),
+                git_util.Commit(
+                    timestamp=450,
+                    rev='dummy_rev_05',
+                    subject='borealis-dlc: Automatic uprev to 2023.02.08.031141-r1.',
+                ),
+                git_util.Commit(
+                    timestamp=490,
+                    rev='dummy_rev_06',
+                    subject='VERSION-PIN: updating version pin borealis-dlc to 2023.02.08.031144',
+                ),
+                git_util.Commit(
+                    timestamp=510,
+                    rev='dummy_rev_07',
+                    subject='borealis-dlc: Automatic uprev to 2023.02.08.031143-r1.',
+                ),
+                git_util.Commit(
+                    timestamp=590,
+                    rev='dummy_rev_08',
+                    subject='borealis-dlc: Automatic uprev to 2023.02.08.031144-r1.',
+                ),
+                git_util.Commit(
+                    timestamp=600,
+                    rev='dummy_rev_09',
+                    subject='VERSION-PIN: updating version pin borealis-dlc to 2023.02.08.031145',
+                ),
+            ]
+        ]
+
+        revlist, details = borealis_util.build_revlist_from_overlay_history(
+            'dummy/chromeos/root', 500, 600
+        )
+
+        self.assertListEqual(
+            revlist,
+            [
+                '2023.02.08.031141',
+                '2023.02.08.031142',
+                '2023.02.08.031143',
+                '2023.02.08.031144',
+            ],
+        )
+        self.assertDictEqual(
+            details,
+            {
+                '2023.02.08.031141': {
+                    'actions': [
+                        {
+                            'uprev_timestamp': 450,
+                            'uprev_rev': 'dummy_rev_05',
+                            'uprev_commit_summary': 'borealis-dlc: Automatic uprev to 2023.02.08.031141-r1.',
+                            'timestamp': 400,
+                            'action_type': 'commit',
+                            'path': 'src/private-overlays/chromeos-partner-overlay',
+                            'repo_url': 'https://chrome-internal.googlesource.com/chromeos/overlays/chromeos-partner-overlay',
+                            'rev': 'dummy_rev_01',
+                            'text': 'commit dummy_rev_ src/private-overlays/chromeos-partner-overlay',
+                        }
+                    ]
+                },
+                '2023.02.08.031142': {
+                    'actions': [
+                        {
+                            'timestamp': 410,
+                            'action_type': 'commit',
+                            'path': 'src/private-overlays/chromeos-partner-overlay',
+                            'repo_url': 'https://chrome-internal.googlesource.com/chromeos/overlays/chromeos-partner-overlay',
+                            'rev': 'dummy_rev_02',
+                            'text': 'commit dummy_rev_ src/private-overlays/chromeos-partner-overlay',
+                        }
+                    ]
+                },
+                '2023.02.08.031143': {
+                    'actions': [
+                        {
+                            'uprev_timestamp': 510,
+                            'uprev_rev': 'dummy_rev_07',
+                            'uprev_commit_summary': 'borealis-dlc: Automatic uprev to 2023.02.08.031143-r1.',
+                            'timestamp': 430,
+                            'action_type': 'commit',
+                            'path': 'src/private-overlays/chromeos-partner-overlay',
+                            'repo_url': 'https://chrome-internal.googlesource.com/chromeos/overlays/chromeos-partner-overlay',
+                            'rev': 'dummy_rev_03',
+                            'text': 'commit dummy_rev_ src/private-overlays/chromeos-partner-overlay',
+                        }
+                    ]
+                },
+                '2023.02.08.031144': {
+                    'actions': [
+                        {
+                            'uprev_timestamp': 590,
+                            'uprev_rev': 'dummy_rev_08',
+                            'uprev_commit_summary': 'borealis-dlc: Automatic uprev to 2023.02.08.031144-r1.',
+                            'timestamp': 490,
+                            'action_type': 'commit',
+                            'path': 'src/private-overlays/chromeos-partner-overlay',
+                            'repo_url': 'https://chrome-internal.googlesource.com/chromeos/overlays/chromeos-partner-overlay',
+                            'rev': 'dummy_rev_06',
+                            'text': 'commit dummy_rev_ src/private-overlays/chromeos-partner-overlay',
+                        }
+                    ]
+                },
+            },
+        )
 
     @mock.patch('bisect_kit.gs_util.ls')
     def test_build_revlist_from_gs(self, mock_gs_ls):

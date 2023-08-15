@@ -26,12 +26,10 @@ import os
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
-from bisect_kit import codechange
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
-from bisect_kit import repo_util
 from bisect_kit.dlc import borealis_util
 
 
@@ -124,12 +122,12 @@ class BorealisVersionDomain(core.BisectDomain):
                     chromeos_mirror=opts.chromeos_mirror,
                 )
             )
-            cache = repo_util.RepoMirror(opts.chromeos_mirror)
-            code_manager = codechange.CodeManager(
-                opts.chromeos_root, spec_manager, cache
+            fixed_specs = spec_manager.collect_fixed_spec(opts.old, opts.new)
+            old_timestamp = fixed_specs[0].timestamp
+            new_timestamp = fixed_specs[-1].timestamp
+            revlist, details = borealis_util.build_revlist_from_overlay_history(
+                opts.chromeos_root, old_timestamp, new_timestamp
             )
-            _, details = code_manager.build_revlist(opts.old, opts.new)
-            revlist, details = borealis_util.extract_revlist(details)
 
         elif is_both_borealis_version:
             revlist, details = borealis_util.build_revlist_from_gs(

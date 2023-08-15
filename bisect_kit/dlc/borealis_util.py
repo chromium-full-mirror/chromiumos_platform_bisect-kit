@@ -4,15 +4,20 @@
 
 """Borealis related utility functions."""
 
+import logging
 import os
 import pathlib
 import re
 
+from bisect_kit import codechange
 from bisect_kit import errors
+from bisect_kit import git_util
 from bisect_kit import gs_util
 from bisect_kit import util
 from bisect_kit.dlc import dlc_util
 
+
+logger = logging.getLogger(__name__)
 
 PathLike = os.PathLike | str
 
@@ -23,14 +28,17 @@ GS_PATH_LS_PATTERN = f'{GS_PATH_PREFIX}*{GS_PATH_SUFFIX}'
 
 CACHE_PATH = 'tmp/images-borealis-dlc'
 SRC_PATH = 'src/platform/borealis'
+
+REPO_URL = 'https://chrome-internal.googlesource.com/chromeos/overlays/chromeos-partner-overlay'
 OVERLAY_REPO_PATH = 'src/private-overlays/chromeos-partner-overlay'
+OVERLAY_DLC_PATH = 'chromeos-base/borealis-dlc'
+OVERLAY_BRANCH = 'cros-internal/main'
 
 _VERSION_PATTERN = re.compile(r'^(\d+\.)??\d{4}\.\d{2}\.\d{2}(\.\d{6})?$')
 VERSION_EXAMPLES = '2023.02.09, 2023.02.09.031143, or 111.2023.02.09.031143'
-VERSION_PIN_SUMMARY_PREFIX_LIST = [
-    'borealis-dlc: Automatic uprev to ',
-    'VERSION-PIN: updating version pin borealis-dlc to ',
-]
+SUMMARY_PREFIX_UPREV = 'borealis-dlc: Automatic uprev to '
+SUMMARY_PREFIX_BUILD = 'VERSION-PIN: updating version pin borealis-dlc to '
+SUMMARY_PREVIX_LIST = [SUMMARY_PREFIX_UPREV, SUMMARY_PREFIX_BUILD]
 
 
 def is_borealis_version(version) -> bool:
@@ -84,6 +92,73 @@ def download_rootfs_and_kernel(chromeos_root: PathLike, version: str) -> None:
     )
 
 
+def build_revlist_from_overlay_history(
+    chromeos_root: PathLike,
+    old_timestamp: int,
+    new_timestamp: int,
+) -> tuple[list[str], dict]:
+    history = git_util.get_history(
+        pathlib.Path(chromeos_root) / OVERLAY_REPO_PATH,
+        OVERLAY_DLC_PATH,
+        OVERLAY_BRANCH,
+        after=old_timestamp - 24 * 60 * 60,
+        before=new_timestamp,
+        grep=DLC_NAME,
+        with_subject=True,
+    )
+
+    build_history = []
+    details = {}
+
+    # Determine the rev range of the uprev commits.
+    uprev_old, uprev_new = None, None
+    for commit in reversed(history):  # iterate from latest to oldest
+        rev = extract_version_from_commit_summary(commit.subject)
+        if rev is None:
+            logger.warning('unexpected borealis commit %s', commit)
+            continue
+        if commit.subject.startswith(SUMMARY_PREFIX_BUILD):
+            if uprev_new is None:
+                continue
+            if uprev_old is not None and rev < uprev_old:
+                break
+            build_history.append(commit)
+            continue
+        if not commit.subject.startswith(SUMMARY_PREFIX_UPREV):
+            logger.warning('unexpected borealis commit %s', commit)
+            continue
+        if uprev_new is None:
+            uprev_new = rev
+        if uprev_old is None:
+            if commit.timestamp < old_timestamp:
+                uprev_old = rev
+            details[rev] = {
+                'actions': [
+                    {
+                        'uprev_timestamp': commit.timestamp,
+                        'uprev_rev': commit.rev,
+                        'uprev_commit_summary': commit.subject,
+                    },
+                ],
+            }
+
+    for commit in build_history:
+        rev = extract_version_from_commit_summary(commit.subject)
+
+        action = {}
+        if rev in details:
+            action = details[rev]['actions'][0]
+        else:
+            details[rev] = {'actions': [action]}
+
+        checkout_commit = codechange.GitCheckoutCommit(
+            commit.timestamp, OVERLAY_REPO_PATH, REPO_URL, commit.rev
+        )
+        action.update(checkout_commit.summary())
+
+    return list(sorted(details.keys())), details
+
+
 def build_revlist_from_gs(old: str, new: str) -> tuple[list[str], dict]:
     gs_list = gs_util.ls(GS_PATH_LS_PATTERN)
     revlist = [
@@ -100,7 +175,7 @@ def build_revlist_from_gs(old: str, new: str) -> tuple[list[str], dict]:
 
 def extract_version_from_commit_summary(summary: str) -> str | None:
     summary = summary.strip().rstrip('.')
-    for prefix in VERSION_PIN_SUMMARY_PREFIX_LIST:
+    for prefix in SUMMARY_PREVIX_LIST:
         summary = summary.removeprefix(prefix)
     rev = summary.split('-', 1)[0]  # remove suffix like '-r2'
     if not is_borealis_version(rev):

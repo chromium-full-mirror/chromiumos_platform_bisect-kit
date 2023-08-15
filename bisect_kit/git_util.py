@@ -904,6 +904,7 @@ def get_history(
     branch: str | None = None,
     after: int | None = None,
     before: int | None = None,
+    grep: str | None = None,
     padding_begin: bool = False,
     padding_end: bool = False,
     with_subject: bool = False,
@@ -919,6 +920,7 @@ def get_history(
       branch: branch name or ref name
       after: limit history after given time (inclusive)
       before: limit history before given time (inclusive)
+      grep: limit history that matches the specified regular expression
       padding_begin: If True, pads returned result with dummy record at exact
           'after' time, if 'path' existed at that time.
       padding_end: If True, pads returned result with dummy record at exact
@@ -948,6 +950,8 @@ def get_history(
         cmd += ['--after', str(after)]
     if before:
         cmd += ['--before', str(before)]
+    if grep:
+        cmd += ['--grep', grep]
     if branch:
         assert not is_git_rev(branch)
         cmd += [branch]
