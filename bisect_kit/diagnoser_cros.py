@@ -112,8 +112,8 @@ class CrosDiagnoser:
             else:
                 logger.info('no need to init autotest deps')
 
-        should_auto_allocate_dut = (
-            experiment.ID.STATELESS in self.config['experiments']
+        should_auto_allocate_dut = experiment.is_in_experiment(
+            self.config.get('experiments'), experiment.ID.STATELESS
         )
         # Steps 1 to 4 are prebuilt stages. So we can just use the same DUT in
         # stateless bisection.

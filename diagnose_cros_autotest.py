@@ -199,8 +199,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         try:
             # Allocate a DUT globally only if not performing a stateless bisect.
             logger.info('experiments: %s', self.config['experiments'])
-            should_auto_allocate = (
-                not experiment.ID.STATELESS in self.config['experiments']
+            should_auto_allocate = not experiment.is_in_experiment(
+                self.config.get('experiments'), experiment.ID.STATELESS
             )
             dut_manager = dut_manager_module.DutManager(
                 'Global',
