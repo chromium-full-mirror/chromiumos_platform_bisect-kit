@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import dataclasses
+import importlib
 import json
 import logging
 import os
@@ -155,6 +156,44 @@ class RevInfo:
             self[status] += 1
 
 
+class StatesEncoder(json.JSONEncoder):
+    """Special handling of dataclasses when serializing to json.
+
+    So dataclasses can be reconstructed from json later.
+    See rebuild_from_json().
+    """
+
+    def default(self, o):
+        if dataclasses.is_dataclass(o):
+            d = dataclasses.asdict(o)
+            d['__class__'] = {
+                '__module__': o.__class__.__module__,
+                '__name__': o.__class__.__name__,
+            }
+            return d
+
+        return json.JSONEncoder.default(self, o)
+
+
+def rebuild_from_json(config):
+    """Reconstruct a dict which may contain dataclasses from serialized json."""
+    if isinstance(config, dict):
+        if '__class__' in config:
+            cls = getattr(
+                importlib.import_module(config['__class__']['__module__']),
+                config['__class__']['__name__'],
+            )
+            del config['__class__']
+            return cls(**config)
+        for key, value in config.items():
+            config[key] = rebuild_from_json(value)
+    elif isinstance(config, list):
+        for i, item in enumerate(config):
+            config[i] = rebuild_from_json(item)
+
+    return config
+
+
 class States:
     """Base class for serializing program state to disk.
 
@@ -244,7 +283,9 @@ class States:
 
         tmp_fn = tempfile.mktemp()
         with open(tmp_fn, 'w') as f:
-            f.write(json.dumps(data, indent=4, sort_keys=True))
+            f.write(
+                json.dumps(data, indent=4, sort_keys=True, cls=StatesEncoder)
+            )
         # Move is an atomic operation, so the session file won't be corrupted due
         # to program terminated by any reason.
         shutil.move(tmp_fn, self.session_file)
@@ -285,59 +326,57 @@ class DiagnoseStates(States):
 
     def __init__(self, session_file: str):
         super().__init__(session_file)
-        self._config = {}
-        self._history = []
-        self._dut_allocate_spec = DutAllocateSpec()
-        self._statistics = DiagnoseStatistics()
+        self._data = {}
 
     def init_states(self, config: dict, dut_allocate_spec: DutAllocateSpec):
-        self._config = config
-        self._dut_allocate_spec = dut_allocate_spec
+        self._data = {
+            'config': config,
+            'history': [],
+            'dut_allocate_spec': dut_allocate_spec,
+            'statistics': DiagnoseStatistics(),
+        }
 
         self._init_done()
 
     def _init_from_dict(self, data: dict) -> bool:
         """Inherit from States."""
-        self._config = data.get('config', {})
-        self._history = data.get('history', [])
-        self._dut_allocate_spec = DutAllocateSpec(
-            **data.get('dut_allocate_spec', {})
-        )
-        self._statistics = DiagnoseStatistics(**data.get('statistics', {}))
-        self._init_done()
-        return True
+        self._data = rebuild_from_json(data)
+        if (
+            'config' in self._data
+            and 'history' in self._data
+            and 'dut_allocate_spec' in self._data
+            and 'statistics' in self._data
+        ):
+            self._init_done()
+            return True
+        return False
 
     def _pack_to_dict(self) -> dict:
         """Inherit from States."""
-        return dict(
-            config=self._config,
-            history=self._history,
-            dut_allocate_spec=dataclasses.asdict(self._dut_allocate_spec),
-            statistics=dataclasses.asdict(self._statistics),
-        )
+        return self._data
 
     @property
     def config(self) -> dict:
         assert self.inited
-        return self._config
+        return self._data['config']
 
     @property
     def history(self) -> list:
         assert self.inited
-        return self._history
+        return self._data['history']
 
     @property
     def dut_allocate_spec(self) -> DutAllocateSpec:
         assert self.inited
-        return self._dut_allocate_spec
+        return self._data['dut_allocate_spec']
 
     @property
     def statistics(self) -> DiagnoseStatistics:
-        return self._statistics
+        return self._data['statistics']
 
     def add_history(self, event, **kwargs):
         entry = dict(timestamp=time.time(), event=event, **kwargs)
-        self._history.append(entry)
+        self.history.append(entry)
         self.save()
 
 

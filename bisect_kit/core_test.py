@@ -127,18 +127,13 @@ class TestDiagnoseStates(unittest.TestCase):
             ),
         )
 
-    def test_load_empty_json(self):
+    def test_load_empty_json_failed(self):
         with open(self.session_file, 'w') as f:
             f.write(json.dumps({}, indent=4, sort_keys=True))
         states = core.DiagnoseStates(self.session_file)
         states.load_states()
 
-        self.assertTrue(states.inited)
-        # asserts the member variables is equal to the default values.
-        self.assertEqual(states.config, {})
-        self.assertEqual(states.history, [])
-        self.assertEqual(states.dut_allocate_spec, core.DutAllocateSpec())
-        self.assertEqual(states.statistics, core.DiagnoseStatistics())
+        self.assertFalse(states.inited)
 
     def test_add_history(self):
         states = core.DiagnoseStates(self.session_file)
