@@ -674,7 +674,7 @@ class BisectorCommandLine:
         rev: str,
         sample: dict,
         action: _SwitchAction,
-        log_path: str,
+        log_file: str,
         dut: str | None = None,
     ) -> bool:
         """Switch to a specific rev.
@@ -683,7 +683,7 @@ class BisectorCommandLine:
           rev: the revision.
           sample: the dict to append result to. See _switch_and_eval() for details.
           action: see _SwitchAction for details.
-          log_path: the path to switch log.
+          log_file: the path to switch log.
           dut: the DUT.
         Returns
           Successful or not.
@@ -699,8 +699,10 @@ class BisectorCommandLine:
                 )
                 return True
 
+        log_full_path = os.path.join(self.session_dir, log_file)
+
         t0 = time.time()
-        result = do_switch(script, self.domain, rev, log_path, action, dut)
+        result = do_switch(script, self.domain, rev, log_full_path, action, dut)
         t1 = time.time()
 
         duration = t1 - t0
@@ -711,8 +713,8 @@ class BisectorCommandLine:
         # overwritten.
         status = result.data['status'] if result else None
         sample['status'] = status
-        if os.path.exists(log_path):
-            sample['switch_log'] = log_path
+        if os.path.exists(log_full_path):
+            sample['switch_log'] = log_file
         if result and 'reason' in result.data:
             sample['reason'] = result.data['reason']
         if status in ('skip', 'fatal'):
@@ -758,7 +760,6 @@ class BisectorCommandLine:
 
         # if _switch() is called multiple times, the same log file is appended.
         switch_log = self._step_log_path(rev, 'switch')
-        switch_log_fullpath = os.path.join(self.session_dir, switch_log)
 
         assert self.dut_manager, 'dut_manager must not be None'
         dut = self.dut_manager.dut
@@ -770,7 +771,7 @@ class BisectorCommandLine:
                     rev,
                     sample,
                     _SwitchAction.BUILD_AND_DEPLOY,
-                    switch_log_fullpath,
+                    switch_log,
                     dut,
                 ):
                     return 'switch', sample
@@ -778,7 +779,7 @@ class BisectorCommandLine:
                     rev,
                     sample,
                     _SwitchAction.TEST_HARNESS,
-                    switch_log_fullpath,
+                    switch_log,
                     dut,
                 ):
                     return 'switch', sample
@@ -788,9 +789,7 @@ class BisectorCommandLine:
         # DUT is not allocated yet. Do switch in two steps (build then
         # deploy). Auto allocate a DUT at the deploy step.
         if prev_rev != rev:
-            if not self._switch(
-                rev, sample, _SwitchAction.BUILD, switch_log_fullpath
-            ):
+            if not self._switch(rev, sample, _SwitchAction.BUILD, switch_log):
                 return 'switch', sample
         with self.dut_manager.provision() as dut:
             # Deploy is needed if a new version is to be deployed, or a new DUT
@@ -798,7 +797,7 @@ class BisectorCommandLine:
             # we don't need to deploy again.
             if prev_rev != rev or not self.dut_manager.is_restored_dut():
                 if not self._switch(
-                    rev, sample, _SwitchAction.DEPLOY, switch_log_fullpath, dut
+                    rev, sample, _SwitchAction.DEPLOY, switch_log, dut
                 ):
                     return 'switch', sample
                 # Though test harness is setup on the test server (i.e., the
@@ -808,7 +807,7 @@ class BisectorCommandLine:
                     rev,
                     sample,
                     _SwitchAction.TEST_HARNESS,
-                    switch_log_fullpath,
+                    switch_log,
                     dut,
                 ):
                     return 'switch', sample
