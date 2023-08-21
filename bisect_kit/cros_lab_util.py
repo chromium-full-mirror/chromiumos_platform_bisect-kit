@@ -519,7 +519,7 @@ class AsyncDutLeaser:
         self._lock = asyncio.Lock()
 
         # This variable is guarded by self._lock
-        self._is_dut_leased: bool = False
+        self._leased_dut_name: str | None = None
 
     async def lease_parallelly(self):
         tasks = []
@@ -528,10 +528,15 @@ class AsyncDutLeaser:
         logger.info(
             'trying to lease %d DUTs: %s', len(self._hosts), self._hosts
         )
-        done, _ = await asyncio.wait(
+        # b/296872055: The returned value of asyncio.wait are sets, so if
+        # multiple coroutines are completed at the same time, we don't know
+        # which one is completed first. As a result, we record the first
+        # leased dut in a member variable instead of relying on the return
+        # values.
+        await asyncio.wait(
             tasks, timeout=self._timeout, return_when=asyncio.FIRST_COMPLETED
         )
-        if len(done) == 0:
+        if not self._leased_dut_name:
             # Timeout happens.
             logger.info(
                 'timeout, failed to lease %d DUTs: %s',
@@ -539,11 +544,10 @@ class AsyncDutLeaser:
                 self._hosts,
             )
             return None
-        host = done.pop().result()
-        logger.info('leased %s', host)
+        logger.info('leased %s', self._leased_dut_name)
         # Unfinished lease tasks will be cancelled when asyncio.run is
         # finishing.
-        return host
+        return self._leased_dut_name
 
     async def _lease(self, dut_name):
         args = [
@@ -622,16 +626,19 @@ class AsyncDutLeaser:
             # both of them got completely soon. The later task has no chance to
             # receive the CancelledError before returning. In that case, the
             # second task would not return the leased DUT to lab.
-            # Using a variable self._is_dut_leaseda to fix the issue.
+            # Using a variable self._leased_dut_name to fix the issue.
             async with self._lock:
-                if self._is_dut_leased:
+                if self._leased_dut_name:
                     logger.debug(
-                        'a dut has been leased, canceling %s', dut_name
+                        'a dut %s has been leased, %s will be released',
+                        self._leased_dut_name,
+                        dut_name,
                     )
-                    cancel_pending_lease(pending_lease)
-                self._is_dut_leased = True
+                else:
+                    logger.debug('first leased dut: %s', dut_name)
+                    self._leased_dut_name = dut_name
+                    pending_lease = None
 
-                pending_lease = None
                 return dut_name
         except asyncio.CancelledError:
             logger.debug('lease(%s): got CancelledError', dut_name)
