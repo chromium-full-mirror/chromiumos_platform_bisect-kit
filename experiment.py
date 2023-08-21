@@ -64,7 +64,7 @@ def experiment_type(s: str):
     try:
         name = ID(name)
     except ValueError as e:
-        raise argparse.ArgumentParser(e)
+        raise argparse.ArgumentTypeError(e)
 
     return Experiment(name, version)
 

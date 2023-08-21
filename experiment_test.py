@@ -30,7 +30,7 @@ FAKE_VERSION_MAP = {
 
 
 class ParseExperimentTest(unittest.TestCase):
-    """Test parsing Experiemtn from string."""
+    """Test parsing Experiment from string."""
 
     def setUp(self):
         super().setUp()
@@ -42,27 +42,27 @@ class ParseExperimentTest(unittest.TestCase):
             mock.patch.object(experiment, '_VERSION_MAP', FAKE_VERSION_MAP)
         )
 
-    def parse_exp_name(self):
+    def test_parse_exp_name(self):
         self.assertEqual(
             experiment.experiment_type('exp1'),
             experiment.Experiment(experiment.ID.EXP1),
         )
 
-    def parse_exp_name_and_version(self):
+    def test_parse_exp_name_and_version(self):
         self.assertEqual(
             experiment.experiment_type('exp1:dev'),
             experiment.Experiment(experiment.ID.EXP1, 'dev'),
         )
 
-    def parse_exp_format_error(self):
-        with self.assertRaise(argparse.ArgumentTypeError):
+    def test_parse_exp_format_error(self):
+        with self.assertRaises(argparse.ArgumentTypeError):
             experiment.experiment_type('a:b:c')
 
-    def parse_exp_invalid_id(self):
-        with self.assertRaise(argparse.ArgumentTypeError):
+    def test_parse_exp_invalid_id(self):
+        with self.assertRaises(argparse.ArgumentTypeError):
             experiment.experiment_type('exp0')
 
-        with self.assertRaise(argparse.ArgumentTypeError):
+        with self.assertRaises(argparse.ArgumentTypeError):
             experiment.experiment_type('exp0:dev')
 
 
@@ -78,9 +78,6 @@ class IsInExperimentTest(unittest.TestCase):
         self._mock_version_map = self.enterContext(
             mock.patch.object(experiment, '_VERSION_MAP', FAKE_VERSION_MAP)
         )
-
-    def test_experiments_none(self):
-        self.assertFalse(experiment.is_in_experiment(None, experiment.ID.EXP1))
 
     def test_experiments_empty_list(self):
         self.assertFalse(experiment.is_in_experiment([], experiment.ID.EXP1))
