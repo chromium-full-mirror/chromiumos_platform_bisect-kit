@@ -899,7 +899,7 @@ class TestCrosUtil(unittest.TestCase):
                 cros_util.convert_path_outside_chroot(
                     '/path/to/root', '~/path/to/file'
                 ),
-                '/path/to/root/chroot/home/foouser/path/to/file',
+                '/path/to/root/out/home/foouser/path/to/file',
             )
 
     def test_parse_snapshot_path(self):

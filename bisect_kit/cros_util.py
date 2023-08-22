@@ -1908,6 +1908,9 @@ def convert_path_outside_chroot(chromeos_root, path):
     """
     if path.startswith('~/'):
         path = path.replace('~', '/home/' + os.environ['USER'])
+        # http://crrev/c/4522314
+        # e.g. /home/user1/bisect-workdir/template/chromeos/out/home/user1
+        return os.path.join(chromeos_root, 'out', path[1:])
     assert '~' not in path, 'tilde (~) character is not fully supported'
 
     assert os.path.isabs(path)
@@ -2100,14 +2103,14 @@ def prepare_chroot(chromeos_root):
         os.path.join(
             bisect_kit.BISECT_KIT_ROOT, 'cros_template_files', 'at_home'
         ),
-        os.path.join(chromeos_root, 'chroot', 'home', os.environ['USER']),
+        os.path.join(chromeos_root, 'out', 'home', os.environ['USER']),
     )
 
     # Copy local ssh configs into chromeos root.
     for name in ['config', 'chromeos_ssh_proxy']:
         path = os.path.expanduser(os.path.join('~/.ssh', name))
         to_folder = os.path.join(
-            chromeos_root, 'chroot', 'home', os.environ['USER'], '.ssh'
+            chromeos_root, 'out', 'home', os.environ['USER'], '.ssh'
         )
         to_file = os.path.join(to_folder, name)
         if not os.path.exists(path):
@@ -2147,7 +2150,7 @@ def prepare_chroot(chromeos_root):
             os.path.expanduser(os.path.join('~/.ssh', name)),
         ]
         to_folder = os.path.join(
-            chromeos_root, 'chroot', 'home', os.environ['USER'], '.ssh'
+            chromeos_root, 'out', 'home', os.environ['USER'], '.ssh'
         )
         to_file = os.path.join(to_folder, name)
         if os.path.isfile(to_file):
@@ -2167,7 +2170,7 @@ def prepare_chroot(chromeos_root):
             'o-r,g-r',
             os.path.join(
                 chromeos_root,
-                'chroot',
+                'out',
                 'home',
                 os.environ['USER'],
                 '.ssh',
