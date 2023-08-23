@@ -2118,6 +2118,9 @@ def prepare_chroot(chromeos_root):
             continue
         if os.path.isfile(to_file):
             os.remove(to_file)
+        if os.path.isfile(to_folder):
+            os.remove(to_folder)
+        os.makedirs(to_folder, mode=0o700, exist_ok=True)
         shutil.copy(path, to_folder)
 
     # Copy ssh keys into chromeos root.
