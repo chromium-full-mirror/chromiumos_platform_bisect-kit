@@ -135,7 +135,7 @@ class CrosDiagnoser:
                     '--board',
                     self.config['board'],
                 ]
-            if not is_custom_eval:
+            if not is_custom_eval and not is_autotest:
                 # So far only the `release` images support the `--prebuilt` option
                 if cros_util.has_release_prebuilt(
                     self.config['board'], self.config['old']
