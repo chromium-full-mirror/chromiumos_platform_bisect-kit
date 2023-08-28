@@ -2096,11 +2096,6 @@ def prepare_chroot(chromeos_root):
     # quick-provision requires special config for autotest.
     override_autotest_config(os.path.join(chromeos_root, in_tree_autotest_dir))
 
-    # The directory where chroot mount its home directory to.
-    home_mount_point = os.path.join(
-        chromeos_root, 'out', 'home', os.environ['USER']
-    )
-
     # Copy optional configure files into the home directory inside chromeos
     # chroot. For example, quick-provision may need special ssh config.
     assert os.environ.get('USER')
@@ -2108,13 +2103,15 @@ def prepare_chroot(chromeos_root):
         os.path.join(
             bisect_kit.BISECT_KIT_ROOT, 'cros_template_files', 'at_home'
         ),
-        home_mount_point,
+        os.path.join(chromeos_root, 'out', 'home', os.environ['USER']),
     )
 
     # Copy local ssh configs into chromeos root.
     for name in ['config', 'chromeos_ssh_proxy']:
         path = os.path.expanduser(os.path.join('~/.ssh', name))
-        to_folder = os.path.join(home_mount_point, '.ssh')
+        to_folder = os.path.join(
+            chromeos_root, 'out', 'home', os.environ['USER'], '.ssh'
+        )
         to_file = os.path.join(to_folder, name)
         if not os.path.exists(path):
             logger.warning('File %s not found, ignored copying to chroot', name)
@@ -2155,7 +2152,9 @@ def prepare_chroot(chromeos_root):
             ),
             os.path.expanduser(os.path.join('~/.ssh', name)),
         ]
-        to_folder = os.path.join(home_mount_point, '.ssh')
+        to_folder = os.path.join(
+            chromeos_root, 'out', 'home', os.environ['USER'], '.ssh'
+        )
         to_file = os.path.join(to_folder, name)
         if os.path.isfile(to_file):
             os.remove(to_file)
@@ -2173,31 +2172,14 @@ def prepare_chroot(chromeos_root):
             'chmod',
             'o-r,g-r',
             os.path.join(
-                home_mount_point,
+                chromeos_root,
+                'out',
+                'home',
+                os.environ['USER'],
                 '.ssh',
                 name,
             ),
         )
-
-    # Workaround b/297481113.
-    # During the home directory path transition period, if we sync chromeos_root
-    # to some old version, the chroot home directory would not setup correctly
-    # because old code still uses the old mount point, while config and credential
-    # files are setup in the new mount point. As a result, we bind the old
-    # mount point to the new mount point to workaround it.
-    legacy_home_mount_point = os.path.join(
-        chromeos_root, 'chroot', 'home', os.environ['USER']
-    )
-    if not os.path.exists(legacy_home_mount_point):
-        util.check_call('sudo', 'mkdir', '-p', legacy_home_mount_point)
-    util.check_call(
-        'sudo',
-        'mount',
-        '--bind',
-        '--verbose',
-        home_mount_point,
-        legacy_home_mount_point,
-    )
 
 
 def check_if_need_recreate_chroot(stdout, stderr):
