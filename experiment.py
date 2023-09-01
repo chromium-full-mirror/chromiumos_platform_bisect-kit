@@ -28,7 +28,7 @@ class ID(StrEnum):
 
 
 _VERSION_MAP = {
-    ID.STATELESS: 'alpha',
+    ID.STATELESS: '20230901',
 }
 
 
