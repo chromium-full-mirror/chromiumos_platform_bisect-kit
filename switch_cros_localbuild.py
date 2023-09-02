@@ -224,14 +224,12 @@ def _do_build(opts, do_mark_as_stable=True):
 
 def build(opts):
     logger.info('build')
-    try:
-        _do_build(opts, do_mark_as_stable=opts.mark_as_stable)
-    except cros_util.NeedRecreateChrootException as e:
-        logger.warning('recreate chroot and retry again, reason: %s', e)
-        util.check_output(
-            'chromite/bin/cros_sdk', '--delete', cwd=opts.chromeos_root
-        )
-        _do_build(opts, do_mark_as_stable=opts.mark_as_stable)
+
+    @cros_util.recreate_chroot_and_retry_if_needed(opts.chromeos_root)
+    def _build_with_retry(*args, **kwargs):
+        _do_build(*args, **kwargs)
+
+    _build_with_retry(opts, do_mark_as_stable=opts.mark_as_stable)
 
 
 def deploy(opts):

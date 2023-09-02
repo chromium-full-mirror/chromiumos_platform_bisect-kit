@@ -1919,21 +1919,23 @@ def convert_path_outside_chroot(chromeos_root, path):
 
 
 def cros_sdk(
-    chromeos_root,
-    *args,
-    chrome_root=None,
-    env=None,
-    log_stdout=True,
-    stdin=None,
-    stderr_callback=None,
-    goma_dir=None,
-    forward_host='',
-):
-    """Run commands inside chromeos chroot.
+    chromeos_root: str,
+    *args: str,
+    replace: bool = False,
+    chrome_root: str | None = None,
+    env: dict[str, str] | None = None,
+    log_stdout: bool = True,
+    stdin: typing.Any = None,
+    stderr_callback: typing.Callable | None = None,
+    goma_dir: str | None = None,
+    forward_host: str = '',
+) -> str:
+    """Runs commands inside chromeos chroot.
 
     Args:
       chromeos_root: chromeos tree root
       *args: command to run
+      replace: whether replace an existing chroot
       chrome_root: pass to cros_sdk; mount this path into the SDK chroot
       env: (dict) environment variables for the command
       log_stdout: Whether write the stdout output of the child process to log.
@@ -1957,6 +1959,8 @@ def cros_sdk(
         prefix += ['--chrome_root', chrome_root]
     if goma_dir:
         prefix += ['--goma_dir', goma_dir]
+    if replace:
+        prefix += ['--replace']
 
     prefix += envs + ['--']
 
@@ -1972,6 +1976,8 @@ def cros_sdk(
         logger.exception('cros_sdk init/update failed')
         raise
 
+    if not args:
+        return ''
     cmd = prefix + list(args)
     if forward_host:
         with util.forward_ssh(forward_host, FORWARDED_DUT_PORT):
@@ -1992,35 +1998,19 @@ def cros_sdk(
         )
 
 
-def create_chroot(chromeos_root):
+def mount_chroot(chromeos_root, replace=False):
     """Creates ChromeOS chroot if necessary.
 
     Args:
       chromeos_root: chromeos tree root
+      replace: whether replace an existing chroot
     """
-    if os.path.exists(os.path.join(chromeos_root, 'chroot')):
-        return
-    if os.path.exists(os.path.join(chromeos_root, 'chroot.img')):
-        return
 
-    util.check_output('chromite/bin/cros_sdk', '--create', cwd=chromeos_root)
+    # Please refer https://crrev.com/c/2515959 for the new mount behavior.
+    cros_sdk(chromeos_root, replace=replace)
 
-
-def mount_chroot(chromeos_root):
-    """Creates ChromeOS chroot if necessary.
-
-    Args:
-      chromeos_root: chromeos tree root
-    """
-    # An arbitrary file must exist in chroot.
     path = convert_path_outside_chroot(chromeos_root, '/bin/ls')
-
-    # Not created or mounted yet.
-    if not os.path.exists(path):
-        create_chroot(chromeos_root)
-        # After this command, the chroot is mounted.
-        cros_sdk(chromeos_root, 'true')
-        assert os.path.exists(path)
+    assert os.path.exists(path)
 
 
 def copy_into_chroot(chromeos_root, src, dst, overwrite=True):
@@ -2083,8 +2073,14 @@ def override_autotest_config(autotest_dir):
         f.write(get_autotest_shadow_config())
 
 
-def prepare_chroot(chromeos_root):
-    mount_chroot(chromeos_root)
+def prepare_chroot(chromeos_root, replace=False):
+    """Creates and prepares chromeos chroot.
+
+    Args:
+      chromeos_root: chromeos tree root
+      replace: whether replace an existing chroot
+    """
+    mount_chroot(chromeos_root, replace=replace)
 
     # Work around b/149077936:
     # The creds file is copied into the chroot since 12866.0.0.
@@ -2224,7 +2220,40 @@ def prepare_chroot(chromeos_root):
         )
 
 
-def check_if_need_recreate_chroot(stdout, stderr):
+@contextlib.contextmanager
+def raise_if_chroot_recreation_needed():
+    stderr_lines = []
+    stderr_callback = stderr_lines.append
+    try:
+        yield stderr_callback
+    except subprocess.CalledProcessError as e:
+        # Detect failures due to incompatibility between chroot and source tree.
+        # If so, notify the caller to recreate chroot and retry.
+        if reason := get_chroot_recreation_reason(
+            e.output, ''.join(stderr_lines)
+        ):
+            raise NeedRecreateChrootException(reason) from e
+
+        # For other failures, don't know how to handle. Just bail out.
+        raise
+
+
+def recreate_chroot_and_retry_if_needed(chromeos_root: str):
+    def _decorator(func):
+        def _wrapped(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except NeedRecreateChrootException as e:
+                logger.warning('recreate chroot and retry again, reason: %s', e)
+                prepare_chroot(chromeos_root, replace=True)
+                return func(*args, **kwargs)
+
+        return _wrapped
+
+    return _decorator
+
+
+def get_chroot_recreation_reason(stdout: str, stderr: str) -> str | None:
     """Analyze build log and determine if chroot should be recreated.
 
     Args:
@@ -2299,8 +2328,7 @@ def build_packages(
         'USE': '-cros-debug chrome_internal',
         'FEATURES': 'separatedebug',
     }
-    stderr_lines = []
-    try:
+    with raise_if_chroot_recreation_needed() as stderr_callback:
         with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
             env = common_env.copy()
             env['FEATURES'] += ' -separatedebug splitdebug'
@@ -2310,7 +2338,7 @@ def build_packages(
                 '--toolchain_boards',
                 board,
                 env=env,
-                stderr_callback=stderr_lines.append,
+                stderr_callback=stderr_callback,
             )
 
             env = common_env.copy()
@@ -2338,18 +2366,9 @@ def build_packages(
                 *cmd,
                 env=env,
                 chrome_root=chrome_root,
-                stderr_callback=stderr_lines.append,
+                stderr_callback=stderr_callback,
                 goma_dir=goma_dir,
             )
-    except subprocess.CalledProcessError as e:
-        # Detect failures due to incompatibility between chroot and source tree. If
-        # so, notify the caller to recreate chroot and retry.
-        reason = check_if_need_recreate_chroot(e.output, ''.join(stderr_lines))
-        if reason:
-            raise NeedRecreateChrootException(reason) from e
-
-        # For other failures, don't know how to handle. Just bail out.
-        raise
 
 
 def build_image(chromeos_root, board):
@@ -2362,8 +2381,7 @@ def build_image(chromeos_root, board):
     Returns:
       image folder; relative to chromeos_root
     """
-    stderr_lines = []
-    try:
+    with raise_if_chroot_recreation_needed() as stderr_callback:
         with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
             cros_sdk(
                 chromeos_root,
@@ -2376,17 +2394,8 @@ def build_image(chromeos_root, board):
                     'USE': '-cros-debug chrome_internal',
                     'FEATURES': 'separatedebug',
                 },
-                stderr_callback=stderr_lines.append,
+                stderr_callback=stderr_callback,
             )
-    except subprocess.CalledProcessError as e:
-        # Detect failures due to incompatibility between chroot and source tree. If
-        # so, notify the caller to recreate chroot and retry.
-        reason = check_if_need_recreate_chroot(e.output, ''.join(stderr_lines))
-        if reason:
-            raise NeedRecreateChrootException(reason) from e
-
-        # For other failures, don't know how to handle. Just bail out.
-        raise
 
     image_symlink = os.path.join(
         chromeos_root, build_images_dir, board, 'latest'
