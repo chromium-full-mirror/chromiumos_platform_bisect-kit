@@ -1674,7 +1674,13 @@ def cros_setup_board(chromeos_root: str, board: str) -> None:
       chromeos_root: ChromeOS tree root directory
       board: ChromeOS board name
     """
-    cros_sdk(chromeos_root, 'setup_board', f'--board={board}')
+    with raise_if_chroot_recreation_needed() as stderr_callback:
+        cros_sdk(
+            chromeos_root,
+            'setup_board',
+            f'--board={board}',
+            stderr_callback=stderr_callback,
+        )
 
 
 @contextlib.contextmanager

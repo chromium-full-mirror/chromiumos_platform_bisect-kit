@@ -70,8 +70,13 @@ def switch(chromeos_root: str, board: str, dut: str, version: str) -> None:
     repo_util.cleanup_unexpected_files(chromeos_root)
     borealis_util.download_rootfs_and_kernel(chromeos_root, version)
 
+    @cros_util.recreate_chroot_and_retry_if_needed(chromeos_root)
+    def _cros_setup_board_with_retry(chromeos_root, board):
+        return cros_util.cros_setup_board(chromeos_root, board)
+
+    _cros_setup_board_with_retry(chromeos_root, board)
+
     dlc_name = borealis_util.DLC_NAME
-    cros_util.cros_setup_board(chromeos_root, board)
     with cros_util.cros_workon(chromeos_root, board, dlc_name):
         cros_util.cros_emerge(chromeos_root, board, dlc_name)
         dlc_util.fix_missing_files(chromeos_root, board, dut)
