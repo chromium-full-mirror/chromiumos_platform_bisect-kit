@@ -36,9 +36,14 @@ OVERLAY_BRANCH = 'cros-internal/main'
 
 _VERSION_PATTERN = re.compile(r'^(\d+\.)??\d{4}\.\d{2}\.\d{2}(\.\d{6})?$')
 VERSION_EXAMPLES = '2023.02.09, 2023.02.09.031143, or 111.2023.02.09.031143'
-SUMMARY_PREFIX_UPREV = 'borealis-dlc: Automatic uprev to '
-SUMMARY_PREFIX_BUILD = 'VERSION-PIN: updating version pin borealis-dlc to '
-SUMMARY_PREVIX_LIST = [SUMMARY_PREFIX_UPREV, SUMMARY_PREFIX_BUILD]
+SUMMARY_PREFIX_UPREV_LIST = [
+    'borealis-dlc: Automatic uprev to ',
+]
+SUMMARY_PREFIX_BUILD_LIST = [
+    'VERSION-PIN: updating version pin borealis-dlc to ',
+    'borealis-dlc: updating version pin to latest - ',
+]
+SUMMARY_PREFIX_LIST = SUMMARY_PREFIX_UPREV_LIST + SUMMARY_PREFIX_BUILD_LIST
 
 
 def is_borealis_version(version) -> bool:
@@ -117,14 +122,14 @@ def build_revlist_from_overlay_history(
         if rev is None:
             logger.warning('unexpected borealis commit %s', commit)
             continue
-        if commit.subject.startswith(SUMMARY_PREFIX_BUILD):
+        if commit.subject.startswith(tuple(SUMMARY_PREFIX_BUILD_LIST)):
             if uprev_new is None:
                 continue
             if uprev_old is not None and rev < uprev_old:
                 break
             build_history.append(commit)
             continue
-        if not commit.subject.startswith(SUMMARY_PREFIX_UPREV):
+        if not commit.subject.startswith(tuple(SUMMARY_PREFIX_UPREV_LIST)):
             logger.warning('unexpected borealis commit %s', commit)
             continue
         if uprev_new is None:
@@ -175,7 +180,7 @@ def build_revlist_from_gs(old: str, new: str) -> tuple[list[str], dict]:
 
 def extract_version_from_commit_summary(summary: str) -> str | None:
     summary = summary.strip().rstrip('.')
-    for prefix in SUMMARY_PREVIX_LIST:
+    for prefix in SUMMARY_PREFIX_LIST:
         summary = summary.removeprefix(prefix)
     rev = summary.split('-', 1)[0]  # remove suffix like '-r2'
     if not is_borealis_version(rev):
