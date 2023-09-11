@@ -102,11 +102,12 @@ def build_revlist_from_overlay_history(
     old_timestamp: int,
     new_timestamp: int,
 ) -> tuple[list[str], dict]:
+    DAY_IN_SECS = 24 * 60 * 60
     history = git_util.get_history(
         pathlib.Path(chromeos_root) / OVERLAY_REPO_PATH,
         OVERLAY_DLC_PATH,
         OVERLAY_BRANCH,
-        after=old_timestamp - 24 * 60 * 60,
+        after=old_timestamp - 60 * DAY_IN_SECS,
         before=new_timestamp,
         grep=DLC_NAME,
         with_subject=True,
