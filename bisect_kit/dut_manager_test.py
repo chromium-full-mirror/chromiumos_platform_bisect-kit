@@ -4,6 +4,7 @@
 
 """Test dut_manager module."""
 
+import contextlib
 import json
 import logging
 import os
@@ -33,10 +34,10 @@ class TestDutManagerAllocation(unittest.TestCase):
         super().setUp()
         self.mock_states = self.dummy_mock_states()
 
-        self.mock_update_dut_alloc_spec = self.enterContext(
+        self.mock_update_states = self.enterContext(
             mock.patch.object(
                 dut_manager_module.DutManager,
-                'update_dut_alloc_spec',
+                '_update_states',
                 autospec=True,
             )
         )
@@ -58,7 +59,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser = self.mock_delayed_dut_releaser_cls.return_value
 
     def reset_all_mocks(self):
-        self.mock_update_dut_alloc_spec.reset_mock()
+        self.mock_update_states.reset_mock()
         self.mock_dut_lease_status_monitor.reset_mock()
         self.mock_allocate_dut.reset_mock()
         self.mock_dut_init_func.reset_mock()
@@ -89,7 +90,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
-        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
@@ -109,7 +110,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
-        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
@@ -130,7 +131,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
-        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'pre_allocated_dut', cros_lab_util.make_lease_reason('stateless')
         )
@@ -160,7 +161,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
 
-        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
@@ -179,7 +180,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
-        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
@@ -198,7 +199,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_allocate_dut.return_value = 'host', 'board'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host.cros')
-        self.mock_update_dut_alloc_spec.assert_called_once_with(
+        self.mock_update_states.assert_called_once_with(
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
@@ -225,10 +226,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_dut_init_func,
             self.mock_dut_leave_context_check_func,
         )
-        self.mock_allocate_dut.return_value = 'host', 'board'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, None)
-        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
@@ -248,7 +248,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         with self.assertRaises(errors.DutLeaseTimeout):
             with dut_manager.provision():
                 pass
-        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_called_once_with(
@@ -270,7 +270,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         with self.assertRaises(errors.InternalError):
             with dut_manager.provision():
                 pass
-        self.mock_update_dut_alloc_spec.assert_not_called()
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_called_once_with(
@@ -303,7 +303,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.assertEqual(dut, 'host.cros')
             self.assertTrue(dut_manager.is_restored_dut())
 
-        self.mock_update_dut_alloc_spec.assert_called_once_with(
+        self.mock_update_states.assert_called_once_with(
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
@@ -338,12 +338,12 @@ class TestDutManagerAllocation(unittest.TestCase):
 
         # Second lease.
         self.mock_dut_releaser.cancel.return_value = False
-        self.mock_allocate_dut.return_value = 'host2', 'board'
+        self.mock_allocate_dut.return_value = 'host2', 'board2'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host2.cros')
             self.assertFalse(dut_manager.is_restored_dut())
 
-        self.mock_update_dut_alloc_spec.assert_called_once_with(
+        self.mock_update_states.assert_called_once_with(
             dut_manager, 'host2.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
@@ -378,7 +378,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         except DummyException:
             pass
 
-        self.mock_update_dut_alloc_spec.assert_called_once_with(
+        self.mock_update_states.assert_called_once_with(
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
@@ -415,7 +415,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             with dut_manager.provision() as dut:
                 self.assertEqual(dut, 'host.cros')
 
-        self.mock_update_dut_alloc_spec.assert_called_once_with(
+        self.mock_update_states.assert_called_once_with(
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
@@ -518,10 +518,10 @@ class TestAddDutLeasesRecord(unittest.TestCase):
         )
 
         self.mock_states = self.dummy_mock_states()
-        self.mock_update_dut_alloc_spec = self.enterContext(
+        self.mock_update_states = self.enterContext(
             mock.patch.object(
                 dut_manager_module.DutManager,
-                'update_dut_alloc_spec',
+                '_update_states',
                 autospec=True,
             )
         )
@@ -649,3 +649,180 @@ class TestAddDutLeasesRecord(unittest.TestCase):
         )
 
         os.unlink(log_file)
+
+
+class TestConfigUpdated(unittest.TestCase):
+    """Test the states is updated correctly on provision."""
+
+    @contextlib.contextmanager
+    def fake_states(self, config, dut_allocate_spec):
+        """Returns a fake DiagnoseStates() backed by a temporary file."""
+        # The temporary file is removed automatically.
+        with tempfile.NamedTemporaryFile() as f:
+            fake_states = core.DiagnoseStates(f.name)
+            fake_states.init_states(
+                config=config,
+                dut_allocate_spec=dut_allocate_spec,
+            )
+            yield fake_states
+
+    def setUp(self):
+        super().setUp()
+        # Mocks relevant to the functionality under testing.
+        self.mock_swarming_bot_list = self.enterContext(
+            mock.patch.object(
+                cros_lab_util,
+                'swarming_bots_list',
+                autospec=True,
+            )
+        )
+        self.mock_swarming_bot_info = self.enterContext(
+            mock.patch.object(
+                cros_lab_util,
+                'swarming_bot_info',
+                autospec=True,
+            )
+        )
+        self.mock_allocate_dut = self.enterContext(
+            mock.patch.object(dut_allocator, 'allocate_dut', autospec=True)
+        )
+
+        # Supplementary mocks which make provision() work.
+        self.mock_dut_lease_status_monitor = self.enterContext(
+            mock.patch.object(
+                cros_lab_util, 'dut_lease_status_monitor', autospec=True
+            )
+        )
+        self.mock_delayed_dut_releaser_cls = self.enterContext(
+            mock.patch.object(
+                dut_manager_module, 'DelayedDutReleaser', autospec=True
+            )
+        )
+        self.mock_dut_releaser = self.mock_delayed_dut_releaser_cls.return_value
+
+    def testFunctionalBisect(self):
+        self.mock_swarming_bot_list.return_value = [
+            {'bot_id': 'bot_id_1'},
+        ]
+        self.mock_swarming_bot_info.return_value = {
+            'dimensions': {
+                'label-model': [
+                    'model1',
+                    'model2',
+                ]
+            },
+        }
+        self.mock_allocate_dut.return_value = 'host', 'board1'
+
+        config = {
+            'session': 'stateless',
+        }
+        dut_allocate_spec = core.DutAllocateSpec(board='board1')
+        with self.fake_states(config, dut_allocate_spec) as states:
+            dut_manager = dut_manager_module.DutManager(
+                'NoPreAllocate',
+                states,
+                cros_lab_util.LAB_DUT,
+                True,
+            )
+            # _update_states() is called in provision().
+            with dut_manager.provision():
+                pass
+
+            # 'board1' has been cleared.
+            expected_dut_allocate_spec = core.DutAllocateSpec(model='model1')
+            expected_config = config | {
+                'board': 'board1',
+                'allocated_dut': 'host.cros',
+            }
+            self.assertEqual(
+                states.dut_allocate_spec, expected_dut_allocate_spec
+            )
+            self.assertEqual(states.config, expected_config)
+
+            # Verify the states is saved to file.
+            loaded_states = core.DiagnoseStates(states.session_file)
+            loaded_states.load_states()
+            self.assertEqual(
+                loaded_states.dut_allocate_spec, expected_dut_allocate_spec
+            )
+            self.assertEqual(loaded_states.config, expected_config)
+
+        self.mock_swarming_bot_list.assert_called_once_with(['dut_name:host'])
+        self.mock_swarming_bot_info.assert_called_once_with('bot_id_1')
+
+    def testPerfBisect(self):
+        self.mock_swarming_bot_list.return_value = [
+            {'bot_id': 'bot_id_1'},
+        ]
+        self.mock_swarming_bot_info.return_value = {
+            'dimensions': {
+                'label-hwid_sku': [
+                    'sku1',
+                    'sku2',
+                ]
+            },
+        }
+        self.mock_allocate_dut.return_value = 'host', 'board1'
+
+        config = {
+            'session': 'stateless',
+            'metric': 'some_metric',
+        }
+        dut_allocate_spec = core.DutAllocateSpec(model='model1')
+        with self.fake_states(config, dut_allocate_spec) as states:
+            dut_manager = dut_manager_module.DutManager(
+                'NoPreAllocate',
+                states,
+                cros_lab_util.LAB_DUT,
+                True,
+            )
+            # _update_states() is called in provision().
+            with dut_manager.provision():
+                pass
+
+            # 'model1' has been cleared.
+            expected_dut_allocate_spec = core.DutAllocateSpec(sku='sku1')
+            expected_config = config | {
+                'board': 'board1',
+                'allocated_dut': 'host.cros',
+            }
+            self.assertEqual(
+                states.dut_allocate_spec, expected_dut_allocate_spec
+            )
+            self.assertEqual(states.config, expected_config)
+
+            # Verify the states is saved to file.
+            loaded_states = core.DiagnoseStates(states.session_file)
+            loaded_states.load_states()
+            self.assertEqual(
+                loaded_states.dut_allocate_spec, expected_dut_allocate_spec
+            )
+            self.assertEqual(loaded_states.config, expected_config)
+
+        self.mock_swarming_bot_list.assert_called_once_with(['dut_name:host'])
+        self.mock_swarming_bot_info.assert_called_once_with('bot_id_1')
+
+    def testNoAutoAllocate(self):
+        config = {
+            'session': 'stateless',
+            'board': 'board1',
+        }
+        dut_allocate_spec = core.DutAllocateSpec(model='model1')
+        with self.fake_states(config, dut_allocate_spec) as states:
+            dut_manager = dut_manager_module.DutManager(
+                'PreAllocate',
+                states,
+                'pre_allocated_dut',
+                True,
+            )
+            # _update_states() is NOT called in provision().
+            with dut_manager.provision():
+                pass
+
+            # Verify the configs are left intact.
+            self.assertEqual(states.dut_allocate_spec, dut_allocate_spec)
+            self.assertEqual(states.config, config)
+
+        self.mock_swarming_bot_list.assert_not_called()
+        self.mock_swarming_bot_info.assert_not_called()

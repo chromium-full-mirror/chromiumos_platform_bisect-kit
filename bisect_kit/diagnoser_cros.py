@@ -125,8 +125,6 @@ class CrosDiagnoser:
         )
         with dut_manager.provision() as dut:
             # Query DUT dependent properties.
-            if not self.config.get('board'):
-                self.config['board'] = cros_util.query_dut_board(dut)
             self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(dut)
             self.states.save()
 

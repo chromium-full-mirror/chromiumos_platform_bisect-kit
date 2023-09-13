@@ -185,6 +185,7 @@ class DutManager:
 
         # DUT allocated by this DutManager, if any.
         self._auto_allocated_dut: str | None = None
+        self._builder_of_auto_allocated_dut: str | None = None
         self._auto_allocated_time: float | None = None
 
         # Whether dut_init_func has been called on the auto-allocated DUT.
@@ -276,13 +277,15 @@ class DutManager:
             return self
 
         # Try allocating a DUT now.
-        host, _ = dut_allocator.allocate_dut(self.dut_allocate_spec)
+        host, builder = dut_allocator.allocate_dut(self.dut_allocate_spec)
+        logger.debug('Leased DUT %s with builder %s', host, builder)
         if not host:
             # This should not happen.
             raise errors.InternalError('Leased DUT invalid: %s' % host)
         leased_dut = cros_lab_util.dut_name_to_address(host)
         # A DUT is leased at this point successfully.
         self._auto_allocated_dut = leased_dut
+        self._builder_of_auto_allocated_dut = builder
         self._auto_allocated_time = time.time()
         self._is_dut_initialized = False
         self._is_restored_dut = False
@@ -374,7 +377,7 @@ class DutManager:
                 return
 
             if dut == self._auto_allocated_dut:
-                self.update_dut_alloc_spec(dut)
+                self._update_states(dut)
 
             self.run_init_func()
 
@@ -391,8 +394,8 @@ class DutManager:
                     return
             yield dut
 
-    def update_dut_alloc_spec(self, dut):
-        """Updates dut allocate spec by the actual leased dut.
+    def _update_states(self, dut):
+        """Updates states by the leased dut.
 
         In stateless bisection, we must guarantee that the DUTs leased in
         different rounds are compatible.
@@ -404,7 +407,7 @@ class DutManager:
         Args:
           dut: dut address
         """
-        logger.info('updating dut alloc spec by %s', dut)
+        logger.info('updating states by %s', dut)
 
         host = cros_lab_util.dut_host_name(dut)
 
@@ -439,7 +442,7 @@ class DutManager:
                 )
             return d[k][0]
 
-        if self.config['metric']:
+        if self.config.get('metric'):
             self.dut_allocate_spec.board = None
             self.dut_allocate_spec.model = None
             self.dut_allocate_spec.sku = get_first_element_at_key(
@@ -462,6 +465,11 @@ class DutManager:
                 self.dut_allocate_spec.model,
             )
 
+        # If DUT is pre-alllocated, config['board'] would have been populated
+        # with the corresponding builder and this code path should not be
+        # executed. On the other hand, if DUT is auto-allocated, this code path
+        # is executed and we should update config['board'] accordingly.
+        self.config['board'] = self._builder_of_auto_allocated_dut
         # TODO(cylee): Not sure if this is needed. Remove if not used.
         self.config['allocated_dut'] = dut
         self._states.save()
