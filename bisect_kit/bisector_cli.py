@@ -761,8 +761,16 @@ class BisectorCommandLine:
         # if _switch() is called multiple times, the same log file is appended.
         switch_log = self._step_log_path(rev, 'switch')
 
-        assert self.dut_manager, 'dut_manager must not be None'
-        dut = self.dut_manager.dut
+        # A DUT can be specified via "--dut" flag when running domain_cls
+        # scripts with "init" sub command, either via command line execution or
+        # through wrapper.py. If the config presents, it takes precedence over
+        # dut_manager. In the way the domain_cls scripts can be executed alone
+        # from the command line (b/299388823).
+        dut = self.config.get('dut')
+        logger.debug('pre-configured DUT: %s', dut)
+        if not dut and self.dut_manager:
+            dut = self.dut_manager.dut
+            logger.debug('DUT from dut_maanger: %s', dut)
         # DUT is already allocated. Do switch (build + deploy) all at
         # once if needed.
         if dut:
@@ -786,7 +794,15 @@ class BisectorCommandLine:
             self._evaluate(rev, sample, dut)
             return 'eval', sample
 
-        # DUT is not allocated yet. Do switch in two steps (build then
+        logger.debug(
+            'DUT has not been allocated yet, defer allocation to dut_manager'
+        )
+        # If dut has not been allocated, dut_manager must exist.
+        assert (
+            self.dut_manager
+        ), 'dut_manager must not be None if DUT is not pre-configured'
+
+        # A DUT has not been allocated yet. Do switch in two steps (build then
         # deploy). Auto allocate a DUT at the deploy step.
         if prev_rev != rev:
             if not self._switch(rev, sample, _SwitchAction.BUILD, switch_log):
