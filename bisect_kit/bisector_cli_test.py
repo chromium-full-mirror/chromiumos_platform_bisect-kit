@@ -28,6 +28,7 @@ class DummyDomain(core.BisectDomain):
         parser.add_argument('--ans', type=int)
         parser.add_argument('--old_p', type=float, default=0.0)
         parser.add_argument('--new_p', type=float, default=1.0)
+        parser.add_argument('--dut', type=str)
 
     @staticmethod
     def init(opts):
@@ -37,6 +38,7 @@ class DummyDomain(core.BisectDomain):
             new_p=opts.new_p,
             old=opts.old,
             new=opts.new,
+            dut=opts.dut,
         )
 
         revlist = [str(i) for i in range(opts.num)]
@@ -453,6 +455,27 @@ class TestBisectorCommandLine(unittest.TestCase):
             bisector.main('view')
             mock_view.assert_called()
 
+    def test_cmd_config_clear_switch(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'true')
+        bisector.main('config', 'switch', 'true')
+        bisector.main('config', 'eval', 'false')
+
+        self.assertEqual(bisector.states.config['switch'], [['true'], ['true']])
+        self.assertEqual(bisector.states.config['eval'], ['false'])
+
+        # 'future_build' was not set previously. Make sure it doesn' break.
+        bisector.main('config', 'clear', 'switch', 'eval', 'future_build')
+        self.assertFalse('switch' in bisector.states.config)
+        self.assertFalse('eval' in bisector.states.config)
+
+        bisector.main('config', 'switch', 'true')
+        self.assertEqual(bisector.states.config['switch'], [['true']])
+        self.assertFalse('eval' in bisector.states.config)
+
     def test_cmd_config_confidence(self):
         bisector = bisector_cli.BisectorCommandLine(
             DummyDomain, self.dut_manager
@@ -543,6 +566,711 @@ class TestBisectorCommandLine(unittest.TestCase):
             bisector.states.add_history('sample', **sample2)
             bisector.strategy.add_sample(0, **sample2)
             self.assertEqual(bisector.future_switch_versions('0', 0), [])
+
+
+# Shorthand for testing.
+SwitchAction = bisector_cli.SwitchAction
+EvalAction = bisector_cli.EvalAction
+
+
+@mock.patch('bisect_kit.common.config_logging', mock.Mock())
+class TestSwitchAndEval(unittest.TestCase):
+    """Test BisectorCommandLine._switch_and_eval()."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_do_switch = self.enterContext(
+            mock.patch.object(
+                bisector_cli,
+                'do_switch',
+                autospec=True,
+            )
+        )
+        self.mock_do_evaluate = self.enterContext(
+            mock.patch.object(
+                bisector_cli,
+                'do_evaluate',
+                autospec=True,
+            )
+        )
+        self.mock_switch_eval_script_action = self.enterContext(
+            mock.patch.object(
+                bisector_cli,
+                'switch_eval_script_action',
+                autospec=True,
+            )
+        )
+        self.mock_check_executable = self.enterContext(
+            mock.patch.object(
+                cli,
+                'check_executable',
+                autospec=True,
+            )
+        )
+        # Always successful.
+        self.mock_check_executable.return_value = None
+
+        self.mock_dut_manager = mock.MagicMock()
+
+    def run_test(self, bisector: bisector_cli.BisectorCommandLine):
+        # Workaround to initialize the instance so bisector._switch_and_eval()
+        # can be run.
+        bisector.domain = bisector.domain_cls(bisector.states.config)
+        # pylint: disable=protected-access
+        bisector.strategy = bisector._strategy_factory()
+        # pylint: disable=protected-access
+        return bisector._switch_and_eval('3')
+
+    def test_no_dut_manager_switch_without_dut_eval_without_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=None
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_do_evaluate.return_value = core.StepResult('old')
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITHOUT_DUT,
+            EvalAction.WITHOUT_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'eval')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_without_dut_time',
+                    'eval_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_called_once_with(
+            ['switch_cmd'], bisector.domain, '3', mock.ANY
+        )
+        self.mock_do_evaluate.assert_called_once_with(
+            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
+        )
+
+    def test_preset_dut_switch_dut_eval_with_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=None
+        )
+        bisector.main(
+            'init', '--num=10', '--old=0', '--new=9', '--dut=dut_name'
+        )
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_do_evaluate.return_value = core.StepResult('old')
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITH_DUT,
+            EvalAction.WITH_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'eval')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_with_dut_time',
+                    'eval_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_called_once_with(
+            ['switch_cmd', '--dut', 'dut_name'], bisector.domain, '3', mock.ANY
+        )
+        self.mock_do_evaluate.assert_called_once_with(
+            ['eval_cmd', 'dut_name'], bisector.domain, '3', mock.ANY, mock.ANY
+        )
+
+    def test_dut_maanger_pre_allocated_switch_dut_eval_with_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_do_evaluate.return_value = core.StepResult('old')
+        self.mock_dut_manager.dut = 'pre_allocated_dut'
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITH_DUT,
+            EvalAction.WITH_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'eval')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_with_dut_time',
+                    'eval_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_called_once_with(
+            ['switch_cmd', '--dut', 'pre_allocated_dut'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+        )
+        self.mock_do_evaluate.assert_called_once_with(
+            ['eval_cmd', 'pre_allocated_dut'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+            mock.ANY,
+        )
+
+    def test_dut_manager_pre_allocated_multiple_switch_eval_with_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_without_dut_cmd')
+        bisector.main('config', 'switch', 'switch_build_deploy_cmd')
+        bisector.main('config', 'switch', 'switch_with_dut_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_do_evaluate.return_value = core.StepResult('old')
+        self.mock_dut_manager.dut = 'pre_allocated_dut'
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITHOUT_DUT,
+            SwitchAction.BUILD_AND_DEPLOY,
+            SwitchAction.WITH_DUT,
+            EvalAction.WITH_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'eval')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_without_dut_time',
+                    'switch_build_and_deploy_time',
+                    'switch_with_dut_time',
+                    'eval_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_has_calls(
+            [
+                mock.call(
+                    ['switch_without_dut_cmd'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    ['switch_build_deploy_cmd', '--dut', 'pre_allocated_dut'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    ['switch_with_dut_cmd', '--dut', 'pre_allocated_dut'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+            ]
+        )
+        self.mock_do_evaluate.assert_called_once_with(
+            ['eval_cmd', 'pre_allocated_dut'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+            mock.ANY,
+        )
+
+    def test_dut_manager_pre_allocated_multiple_switch_eval_without_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_without_dut_cmd')
+        bisector.main('config', 'switch', 'switch_build_deploy_cmd')
+        bisector.main('config', 'switch', 'switch_with_dut_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_do_evaluate.return_value = core.StepResult('old')
+        self.mock_dut_manager.dut = 'pre_allocated_dut'
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITHOUT_DUT,
+            SwitchAction.BUILD_AND_DEPLOY,
+            SwitchAction.WITH_DUT,
+            EvalAction.WITHOUT_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'eval')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_without_dut_time',
+                    'switch_build_and_deploy_time',
+                    'switch_with_dut_time',
+                    'eval_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_has_calls(
+            [
+                mock.call(
+                    ['switch_without_dut_cmd'], bisector.domain, '3', mock.ANY
+                ),
+                mock.call(
+                    ['switch_build_deploy_cmd', '--dut', 'pre_allocated_dut'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    ['switch_with_dut_cmd', '--dut', 'pre_allocated_dut'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+            ]
+        )
+        self.mock_do_evaluate.assert_called_once_with(
+            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
+        )
+
+    def test_dut_manager_auto_allocated_multiple_switch_eval_with_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_without_dut_cmd')
+        bisector.main('config', 'switch', 'switch_build_deploy_cmd')
+        bisector.main('config', 'switch', 'switch_with_dut_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_do_evaluate.return_value = core.StepResult('old')
+        self.mock_dut_manager.dut = None
+        self.mock_dut_manager.provision.return_value.__enter__.return_value = (
+            'auto_allocated_dut'
+        )
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITHOUT_DUT,
+            SwitchAction.BUILD_AND_DEPLOY,
+            SwitchAction.WITH_DUT,
+            EvalAction.WITH_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'eval')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_without_dut_time',
+                    'switch_build_time',
+                    'switch_deploy_time',
+                    'switch_with_dut_time',
+                    'eval_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_has_calls(
+            [
+                mock.call(
+                    ['switch_without_dut_cmd'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    ['switch_build_deploy_cmd', '--no_deploy'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    [
+                        'switch_build_deploy_cmd',
+                        '--dut',
+                        'auto_allocated_dut',
+                        '--deploy_only',
+                    ],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    ['switch_with_dut_cmd', '--dut', 'auto_allocated_dut'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+            ]
+        )
+        self.mock_do_evaluate.assert_called_once_with(
+            ['eval_cmd', 'auto_allocated_dut'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+            mock.ANY,
+        )
+
+    def test_dut_manager_auto_allocated_multiple_switch_eval_without_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_without_dut_cmd')
+        bisector.main('config', 'switch', 'switch_build_deploy_cmd')
+        bisector.main('config', 'switch', 'switch_with_dut_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_do_evaluate.return_value = core.StepResult('old')
+        self.mock_dut_manager.dut = None
+        self.mock_dut_manager.provision.return_value.__enter__.return_value = (
+            'auto_allocated_dut'
+        )
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITHOUT_DUT,
+            SwitchAction.BUILD_AND_DEPLOY,
+            SwitchAction.WITH_DUT,
+            EvalAction.WITHOUT_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'eval')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_without_dut_time',
+                    'switch_build_time',
+                    'switch_deploy_time',
+                    'switch_with_dut_time',
+                    'eval_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_has_calls(
+            [
+                mock.call(
+                    ['switch_without_dut_cmd'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    ['switch_build_deploy_cmd', '--no_deploy'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    [
+                        'switch_build_deploy_cmd',
+                        '--dut',
+                        'auto_allocated_dut',
+                        '--deploy_only',
+                    ],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    ['switch_with_dut_cmd', '--dut', 'auto_allocated_dut'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+            ]
+        )
+        self.mock_do_evaluate.assert_called_once_with(
+            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
+        )
+
+    def test_dut_manager_pre_allocated_switch_without_dut_eval_with_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_do_evaluate.return_value = core.StepResult('old')
+        self.mock_dut_manager.dut = 'pre_allocated_dut'
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITHOUT_DUT,
+            EvalAction.WITH_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'eval')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_without_dut_time',
+                    'eval_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_called_once_with(
+            ['switch_cmd'], bisector.domain, '3', mock.ANY
+        )
+        self.mock_do_evaluate.assert_called_once_with(
+            ['eval_cmd', 'pre_allocated_dut'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+            mock.ANY,
+        )
+
+    def test_no_dut_anager_switch_without_dut_eval_with_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=None
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = None
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITHOUT_DUT,
+            EvalAction.WITH_DUT,
+        ]
+
+        # dut_manager == None
+        with self.assertRaises(AssertionError):
+            self.run_test(bisector)
+
+        self.mock_do_switch.assert_called_once_with(
+            ['switch_cmd'], bisector.domain, '3', mock.ANY
+        )
+
+    def test_no_dut_anager_switch_with_dut_eval_without_dut(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=None
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITH_DUT,
+            EvalAction.WITHOUT_DUT,
+        ]
+
+        # dut_manager == None
+        with self.assertRaises(AssertionError):
+            self.run_test(bisector)
+
+    def test_dut_manager_no_eval_script(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+
+        # Success
+        self.mock_switch_eval_script_action.return_value = SwitchAction.WITH_DUT
+
+        with self.assertRaises(AssertionError):
+            self.run_test(bisector)
+
+    def test_no_dut_manager_switch_failed(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=None
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = core.StepResult('fatal')
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITHOUT_DUT,
+            EvalAction.WITHOUT_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'switch')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_without_dut_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_called_once_with(
+            ['switch_cmd'], bisector.domain, '3', mock.ANY
+        )
+
+    def test_dut_manager_pre_allocated_switch_failed(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.return_value = core.StepResult('fatal')
+        self.mock_dut_manager.dut = 'pre_allocated_dut'
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.WITH_DUT,
+            EvalAction.WITHOUT_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'switch')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_with_dut_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_called_once_with(
+            ['switch_cmd', '--dut', 'pre_allocated_dut'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+        )
+
+    def test_dut_manager_auto_allocated_switch_failed_on_deploy(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, dut_manager=self.mock_dut_manager
+        )
+        bisector.main('init', '--num=10', '--old=0', '--new=9')
+        bisector.main('config', 'switch', 'switch_cmd')
+        bisector.main('config', 'eval', 'eval_cmd')
+
+        # Success
+        self.mock_do_switch.side_effect = [
+            None,
+            core.StepResult('fatal'),
+        ]
+        self.mock_dut_manager.dut = None
+        self.mock_dut_manager.provision.return_value.__enter__.return_value = (
+            'auto_allocated_dut'
+        )
+        self.mock_switch_eval_script_action.side_effect = [
+            SwitchAction.BUILD_AND_DEPLOY,
+            EvalAction.WITHOUT_DUT,
+        ]
+
+        step, sample = self.run_test(bisector)
+
+        self.assertEqual(step, 'switch')
+        self.assertEqual(
+            sample.keys(),
+            set(
+                [
+                    'rev',
+                    'index',
+                    'status',
+                    'switch_time',
+                    'switch_build_time',
+                    'switch_deploy_time',
+                ]
+            ),
+        )
+        self.mock_do_switch.assert_has_calls(
+            [
+                mock.call(
+                    ['switch_cmd', '--no_deploy'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+                mock.call(
+                    [
+                        'switch_cmd',
+                        '--dut',
+                        'auto_allocated_dut',
+                        '--deploy_only',
+                    ],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                ),
+            ]
+        )
 
 
 if __name__ == '__main__':

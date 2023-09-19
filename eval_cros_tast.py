@@ -369,6 +369,10 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
     return gather_test_result(opts, result_dir)
 
 
+def action() -> bisector_cli.EvalAction:
+    return bisector_cli.EvalAction.WITH_DUT
+
+
 def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.step_main_wrapper(step_main, args)
 

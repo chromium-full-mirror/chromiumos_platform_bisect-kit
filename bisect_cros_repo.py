@@ -8,7 +8,8 @@
 Example:
   $ ./bisect_cros_repo.py init --old rev1 --new rev2 \\
       --chromeos_root ~/chromiumos \\
-      --chromeos_mirror $CHROMEOS_MIRROR
+      --chromeos_mirror $CHROMEOS_MIRROR \\
+      --dut DUT
   $ ./bisect_cros_repo.py config switch ./switch_cros_localbuild.py
   $ ./bisect_cros_repo.py config eval ./eval-manually.sh
   $ ./bisect_cros_repo.py run

@@ -177,6 +177,10 @@ def switch_main(args: tuple[str] | None):
         lacros_util.deploy(opts.chrome_src, opts.dut)
 
 
+def action() -> bisector_cli.SwitchAction:
+    return bisector_cli.SwitchAction.BUILD_AND_DEPLOY
+
+
 def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 

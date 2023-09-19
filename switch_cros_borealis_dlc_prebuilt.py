@@ -105,6 +105,10 @@ def switch_main(args) -> None:
     inner_main(opts.chromeos_root, opts.board, opts.dut, opts.version)
 
 
+def action() -> bisector_cli.SwitchAction:
+    return bisector_cli.SwitchAction.WITH_DUT
+
+
 def main(args: tuple[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 

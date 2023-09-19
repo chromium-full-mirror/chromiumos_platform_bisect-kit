@@ -368,9 +368,11 @@ class CrosDiagnoser:
                 old,
                 new,
                 init_args=init_args,
-                switch_cmd=switch_cmd,
+                switch_cmds=[
+                    switch_cmd,
+                    switch_test_harness_cmd,
+                ],
                 eval_cmd=eval_cmd,
-                switch_test_harness_cmd=switch_test_harness_cmd,
                 old_value=self.config['old_value'],
                 new_value=self.config['new_value'],
                 term_old=self.config['term_old'],
@@ -579,7 +581,12 @@ class CrosDiagnoser:
                         '--flavor',
                         android_flavor,
                     ],
-                    switch_cmd=['./switch_arc_prebuilt.py', '--rich_result'],
+                    switch_cmds=[
+                        [
+                            './switch_arc_prebuilt.py',
+                            '--rich_result',
+                        ],
+                    ],
                     eval_cmd=eval_cmd,
                     old_value=self.config['old_value'],
                     new_value=self.config['new_value'],
@@ -668,7 +675,12 @@ class CrosDiagnoser:
                     '--board',
                     self.config['board'],
                 ],
-                switch_cmd=['./switch_arc_localbuild.py', '--rich_result'],
+                switch_cmds=[
+                    [
+                        './switch_arc_localbuild.py',
+                        '--rich_result',
+                    ],
+                ],
                 eval_cmd=eval_cmd,
                 old_value=self.config['old_value'],
                 new_value=self.config['new_value'],
@@ -776,7 +788,7 @@ class CrosDiagnoser:
                 self.old_info.cr_version,
                 self.new_info.cr_version,
                 init_args=init_args,
-                switch_cmd=switch_cmd,
+                switch_cmds=[switch_cmd],
                 eval_cmd=eval_cmd,
                 old_value=self.config['old_value'],
                 new_value=self.config['new_value'],
@@ -886,7 +898,7 @@ class CrosDiagnoser:
             old,
             new,
             init_args=init_args,
-            switch_cmd=switch_cmd,
+            switch_cmds=[switch_cmd],
             eval_cmd=eval_cmd,
             old_value=self.config['old_value'],
             new_value=self.config['new_value'],
@@ -1010,7 +1022,7 @@ class CrosDiagnoser:
                     '--chrome_mirror',
                     self.config['chrome_mirror'],
                 ],
-                switch_cmd=switch_cmd,
+                switch_cmds=[switch_cmd],
                 eval_cmd=eval_cmd,
                 old_value=self.config['old_value'],
                 new_value=self.config['new_value'],
@@ -1107,6 +1119,10 @@ class CrosDiagnoser:
         if not self.config['disable_rootfs_verification']:
             switch_cmd.append('--no_disable_rootfs_verification')
 
+        switch_cmds = [switch_cmd]
+        if buildbucket_build:
+            switch_cmds.append(switch_test_harness_cmd)
+
         bisector.init_if_necessary(
             self.cros_old,
             self.cros_new,
@@ -1118,14 +1134,11 @@ class CrosDiagnoser:
                 '--chromeos_mirror',
                 self.config['chromeos_mirror'],
             ],
-            switch_cmd=switch_cmd,
+            switch_cmds=switch_cmds,
             eval_cmd=eval_cmd,
             future_build_cmd=future_build_cmd,
             # If using build bucket, we still need to setup test harness on the
             # bisect runner.
-            switch_test_harness_cmd=switch_test_harness_cmd
-            if buildbucket_build
-            else None,
             old_value=self.config['old_value'],
             new_value=self.config['new_value'],
             term_old=self.config['term_old'],

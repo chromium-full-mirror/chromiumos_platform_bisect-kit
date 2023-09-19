@@ -11,7 +11,8 @@ Example:
       --android_mirror ANDROID_MIRROR \\
       --branch BRANCH \\
       --flavor FLAVOR \\
-      --board BOARD
+      --board BOARD \\
+      --dut DUT
 
   $ ./bisect_android_repo.py config switch ./switch_arc_localbuild.py
   $ ./bisect_android_repo.py config eval ./eval-manually.sh

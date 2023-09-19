@@ -11,6 +11,7 @@ import collections
 import copy
 import datetime
 import enum
+import importlib
 import json
 import logging
 import os
@@ -223,18 +224,17 @@ def do_evaluate(
     return result
 
 
-class _SwitchAction(enum.StrEnum):
+class SwitchAction(enum.StrEnum):
     """The action to perform for a "switch" step.
 
-    There are two sets of switch targets.
-    1. The binary under testing. It could be ChromeOS, Chrome, Lacros, and so
-      on. Bisections are performed to identify different behaviors in different
-      binary versions.
-    2. Test harness. It could be Autotest, Tast, and so on. They are frameworks
-      to drive test on the binaries under testing. In general we switch the
-      version of test harness to match the version of binaries under testing.
+    There are three sets of switch targets.
+    1. DUT is needed, but the step can be broken into BUILD phase and DEPLOY phase where BUILD doesn't require DUT and DEPLOY requires.
+    2. DUT is needed, and the step can not be further broken into sub phases.
+    3. DUT is not needed.
     """
 
+    # The following 3 enums are for switches which can be broekn down into
+    # DEPLOY and BUILD phases.
     # Build the binary under testing.
     BUILD = 'build'
 
@@ -244,13 +244,61 @@ class _SwitchAction(enum.StrEnum):
     # Build and Deploy the binary under testing.
     BUILD_AND_DEPLOY = 'build_and_deploy'
 
-    # Switch the test harness only but not the binary under testing.
-    TEST_HARNESS = 'test_harness'
+    # Switch that requires a DUT.
+    WITH_DUT = 'with_dut'
+
+    # Switch that doesn't require a DUT.
+    WITHOUT_DUT = 'without_dut'
 
 
-def do_switch(
-    switch_cmd, domain, rev, log_file, action, dut
-) -> core.StepResult | None:
+class EvalAction(enum.StrEnum):
+    """The action to perform for a "eval" step.
+
+    There are two sets of eval targets.
+    1. DUT is needed.
+    2. DUT is not needed.
+    """
+
+    # Eval that requires a DUT.
+    WITH_DUT = 'with_dut'
+
+    # Eval that doesn't require a DUT.
+    WITHOUT_DUT = 'without_dut'
+
+
+def import_module_from_path(full_path: str):
+    file_name = os.path.basename(full_path)
+    module_name, _ = os.path.splitext(file_name)
+
+    spec = importlib.util.spec_from_file_location(module_name, full_path)
+    if not spec:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+
+    return module
+
+
+def switch_eval_script_action(
+    cmd: list[str], default_action: SwitchAction | EvalAction
+) -> SwitchAction | EvalAction:
+    """Resolves the action by inspecting the script module."""
+
+    exec_opts = step_command_parser.parse_args(cmd)
+    executable = exec_opts.command[0]
+    module = import_module_from_path(executable)
+    if module:
+        return module.action()
+
+    logging.warning(
+        'Failed to import %s, use default action %s', executable, default_action
+    )
+
+    return default_action
+
+
+def do_switch(switch_cmd, domain, rev, log_file) -> core.StepResult | None:
     """Invokes switcher command.
 
     The `switch_cmd` can get the target revision from the environment variable
@@ -269,23 +317,12 @@ def do_switch(
       domain: a bisect_kit.core.Domain instance.
       rev: version to switch.
       log_file: hint sub-process where to output detail log
-      action: a _SwitchAction object.
-      dut: the DUT. Can not be None unless action == _SwitchAction.BUILD.
 
     Returns:
       None if switch successfully, otherwise core.StepResult with 'skip' or
       'fatal'.
     """
     env = os.environ.copy()
-    if action != _SwitchAction.BUILD:
-        assert dut, 'dut must not be None'
-        env['DUT'] = dut
-
-    if action == _SwitchAction.BUILD:
-        env['NO_DEPLOY'] = 'true'
-    elif action == _SwitchAction.DEPLOY:
-        env['DEPLOY_ONLY'] = 'true'
-
     env['BISECT_REV'] = rev
     domain.setenv(env, rev)
 
@@ -419,11 +456,92 @@ class BisectorCommandLine:
 
     If you need to control the bisector using python code, the easier way is
     passing command line arguments to main() function. For example,
-      bisector = Bisector(CustomDomain)
-      bisector.main('init', '--old', '123', '--new', '456')
-      bisector.main('config', 'switch', 'true')
-      bisector.main('config', 'eval', 'true')
+      bisector = Bisector(ChromeOSVersionDomain)
+      bisector.main(
+          'init', '--old', 'R118-15604.0.0', '--new', 'R119-15609.0.0',
+          '--term_old', 'PASS', '--term_new', 'FAIL', '--board', 'nissa',
+          '--dut', <DUT>
+      )
+      bisector.main('config', 'clear', 'switch')
+      bisector.main(
+          'config', 'switch', '--mode=bisectkit',
+          './switch_cros_prebuilt.py', '--rich_result'
+      )
+      bisector.main(
+          'config', 'switch', '--mode=bisectkit',
+          './switch_tast_prebuilt.py', '--rich_result',
+          '--chromeos_root', <chromeos_root>, '--board', 'nissa'
+      )
+      bisector.main(
+          'config', 'eval', '--mode=bisectkit', './eval_cros_tast.py',
+          '--rich_result', '--with_private_bundles',
+          '--chromeos_root', <chromeos_root>,
+          '--test_name', 'tast.audio.CyclicBench.rr10_4thread_10ms',
+          '--reboot_before_test', '--prebuilt'
+      )
       bisector.main('run')
+
+    Switch and evaluate operations are configured via the 'config' sub command.
+    There can be multiple switch command but only one eval command registered.
+    If running 'config switch <switch_cmd>' multiple times, all switch command
+    would be recorded. As a result, be sure to run 'config clear switch' once to
+    clean up existing entry in the session file.
+
+    Some bisections requires a DUT (device under test). This class support DUT
+    management in two ways:
+    1. By the '--dut' flag in 'init' sub command. The domain script needs to
+       define the flag first.
+    2. Auto allocate DUT when necessary. Only the python interface supports this
+       option by passing in a DutManager to the class initializer:
+           dut_manager = DutManager(...)
+           bisector = Bisector(CustomDomain, dut_manager)
+       When executing the domain script from the command line. The only way
+       is to pass in a pre-allocated DUT via the '--dut' flag.
+
+    The DUT is passed to the switch script via the '--dut' flag, and to the eval
+    script as the first positional argument. As the above example shows, DUT
+    information is missing when configuring the switch and eval script because
+    it is handled by the class automatically.
+
+    The class support different types of switch and eval scripts.
+
+    Switch scripts:
+    1. The script requires a DUT.
+       In the case, the script should define a method called "action"
+       which returns SwitchAction.WITH_DUT.
+       This class would pass in --dut <DUT> when calling the script.
+
+    2. The script has a build phase and a deploy phase. A DUT is only needed
+       in the deploy phase.
+       In this case, the script should define a method called "action"
+       which returns SwitchAction.BUILD_AND_DEPLOY.
+       The class would run the script twice. The first time with an additional
+       flag "--no_deploy". The second time with additional flags
+       "--dut <DUT> --deploy_only".
+
+    3. The script doesn't need a DUT.
+       In this case, the script should define a method called "action"
+       which returns SwitchAction.WITHOUT_DUT.
+       No additional flag would be passed to the script when executing.
+    If the switch script is not a python script, it defaults to the
+    "WITHOUT_DUT" case.
+
+    Eval scripts:
+    1. The script requires a DUT.
+       In the case, the script should define a method called "action"
+       which returns EvalAction.WITH_DUT.
+       This class would pass in <DUT> as the first positional argument when
+       calling the eval script.
+    2. The script doesn't need a DUT.
+       In this case, the eval script should define a method called "action"
+       which returns EvalAction.WITHOUT_DUT.
+       No additional flag would be passed to the script when executing.
+    Similarly, if the eval script is not a python script, it defaults to the
+    "WITHOUT_DUT" case.
+
+    All combinations of switch and eval scripts are supported.
+    For example, it's fine to set up switch scripts with or without DUT, and
+    so to the eval script.
     """
 
     def __init__(self, domain_cls, dut_manager=None):
@@ -613,21 +731,34 @@ class BisectorCommandLine:
         )
         return log_path
 
-    def _evaluate(self, rev: str, sample: dict, dut: str) -> bool:
+    def _evaluate(
+        self,
+        eval_cmd: list[str],
+        rev: str,
+        sample: dict,
+        action: EvalAction,
+        dut: str | None = None,
+    ) -> bool:
         """Evaluate at the rev.
 
         Args:
+          eval_cmd: the eval command.
           rev: the revision.
           sample: the dict to append result to. See _switch_and_eval() for details.
+          action: the action to perform.
           dut: the DUT.
 
         Returns:
-          Success or not.
+          Whether the eval is successful.
         """
-        eval_cmd = self.config['eval'] + [dut]
+        if action == EvalAction.WITH_DUT:
+            assert dut, 'dut must be present with action %s' % action
+            eval_cmd = eval_cmd + [dut]
+
+        logger.debug('eval (%s) at rev=%s', action, rev)
+
         eval_log = self._step_log_path(rev, 'eval')
         eval_log_fullpath = os.path.join(self.session_dir, eval_log)
-        logger.debug('eval rev=%s', rev)
 
         t0 = time.time()
         result = do_evaluate(
@@ -671,38 +802,47 @@ class BisectorCommandLine:
 
     def _switch(
         self,
+        switch_cmd: list[str],
         rev: str,
         sample: dict,
-        action: _SwitchAction,
+        action: SwitchAction,
         log_file: str,
         dut: str | None = None,
     ) -> bool:
         """Switch to a specific rev.
 
         Args:
+          switch_cmd: the switch command.
           rev: the revision.
           sample: the dict to append result to. See _switch_and_eval() for details.
-          action: see _SwitchAction for details.
+          action: see SwitchAction for details.
           log_file: the path to switch log.
           dut: the DUT.
+
         Returns
-          Successful or not.
+          Whether the switch is successful.
         """
         logger.debug('switch (%s) to rev=%s', action, rev)
 
-        script = self.config['switch']
-        if action == _SwitchAction.TEST_HARNESS:
-            script = self.config.get('switch_test_harness')
-            if not script:
-                logger.debug(
-                    'nothing to do for setting up test harness to rev %s', rev
-                )
-                return True
-
         log_full_path = os.path.join(self.session_dir, log_file)
 
+        extra_args = []
+        if action in [
+            SwitchAction.DEPLOY,
+            SwitchAction.BUILD_AND_DEPLOY,
+            SwitchAction.WITH_DUT,
+        ]:
+            assert dut, 'dut must be present with action %s' % action
+            extra_args += ['--dut', dut]
+        if action == SwitchAction.BUILD:
+            extra_args += ['--no_deploy']
+        elif action == SwitchAction.DEPLOY:
+            extra_args += ['--deploy_only']
+
         t0 = time.time()
-        result = do_switch(script, self.domain, rev, log_full_path, action, dut)
+        result = do_switch(
+            switch_cmd + extra_args, self.domain, rev, log_full_path
+        )
         t1 = time.time()
 
         duration = t1 - t0
@@ -731,6 +871,9 @@ class BisectorCommandLine:
           rev: Target version.
           prev_rev: Previous version.
 
+        Raises:
+          errors.InternalError if the control flow reaches unreachable.
+
         Returns:
           (step, sample):
             step: Last step executed ('switch' or 'eval').
@@ -758,8 +901,49 @@ class BisectorCommandLine:
         # informative.
         sample = {'rev': rev, 'index': self.states.rev2idx(rev)}
 
+        switch_build_deploy_cmds = []
+        switch_with_dut_cmds = []
+        switch_without_dut_cmds = []
+        for cmd in self.config.get('switch'):
+            action = switch_eval_script_action(cmd, SwitchAction.WITHOUT_DUT)
+            if action == SwitchAction.BUILD_AND_DEPLOY:
+                switch_build_deploy_cmds.append(cmd)
+            elif action == SwitchAction.WITH_DUT:
+                switch_with_dut_cmds.append(cmd)
+            elif action == SwitchAction.WITHOUT_DUT:
+                switch_without_dut_cmds.append(cmd)
+        logger.debug('switch_build_deploy_cmds: %s', switch_build_deploy_cmds)
+        logger.debug('switch_with_dut_cmds: %s', switch_with_dut_cmds)
+        logger.debug('switch_without_dut_cmds: %s', switch_without_dut_cmds)
+
+        eval_with_dut_cmd = None
+        eval_without_dut_cmd = None
+        cmd = self.config.get('eval')
+        assert cmd, 'no eval script set'
+        action = switch_eval_script_action(cmd, EvalAction.WITHOUT_DUT)
+        if action == EvalAction.WITH_DUT:
+            eval_with_dut_cmd = cmd
+        elif action == EvalAction.WITHOUT_DUT:
+            eval_without_dut_cmd = cmd
+        logger.debug('eval_with_dut_cmd: %s', eval_with_dut_cmd)
+        logger.debug('eval_without_dut_cmd: %s', eval_without_dut_cmd)
+
         # if _switch() is called multiple times, the same log file is appended.
         switch_log = self._step_log_path(rev, 'switch')
+
+        for cmd in switch_without_dut_cmds:
+            if not self._switch(
+                cmd, rev, sample, SwitchAction.WITHOUT_DUT, switch_log
+            ):
+                return 'switch', sample
+
+        # Shortcut if no DUT is needed for both switch and eval.
+        if not switch_build_deploy_cmds and not switch_with_dut_cmds:
+            if eval_without_dut_cmd:
+                self._evaluate(
+                    eval_without_dut_cmd, rev, sample, EvalAction.WITHOUT_DUT
+                )
+                return 'eval', sample
 
         # A DUT can be specified via "--dut" flag when running domain_cls
         # scripts with "init" sub command, either via command line execution or
@@ -775,27 +959,49 @@ class BisectorCommandLine:
         # once if needed.
         if dut:
             if prev_rev != rev:
-                if not self._switch(
-                    rev,
-                    sample,
-                    _SwitchAction.BUILD_AND_DEPLOY,
-                    switch_log,
-                    dut,
-                ):
-                    return 'switch', sample
-                if not self._switch(
-                    rev,
-                    sample,
-                    _SwitchAction.TEST_HARNESS,
-                    switch_log,
-                    dut,
-                ):
-                    return 'switch', sample
-            self._evaluate(rev, sample, dut)
-            return 'eval', sample
+                for cmd in switch_build_deploy_cmds:
+                    if not (
+                        self._switch(
+                            cmd,
+                            rev,
+                            sample,
+                            SwitchAction.BUILD_AND_DEPLOY,
+                            switch_log,
+                            dut,
+                        )
+                    ):
+                        return 'switch', sample
+                for cmd in switch_with_dut_cmds:
+                    if not (
+                        self._switch(
+                            cmd,
+                            rev,
+                            sample,
+                            SwitchAction.WITH_DUT,
+                            switch_log,
+                            dut,
+                        )
+                    ):
+                        return 'switch', sample
+
+            # Even switch requires a DUT, eval might not (e.g., eval manually).
+            # So try both cases.
+            if eval_with_dut_cmd:
+                self._evaluate(
+                    eval_with_dut_cmd, rev, sample, EvalAction.WITH_DUT, dut
+                )
+                return 'eval', sample
+            if eval_without_dut_cmd:
+                self._evaluate(
+                    eval_without_dut_cmd, rev, sample, EvalAction.WITHOUT_DUT
+                )
+                return 'eval', sample
+
+            # One of 'eval_with_dut_cmd' or 'eval_without_dut_cmd' should exist.
+            raise errors.InternalError('Control flow should not reach here.')
 
         logger.debug(
-            'DUT has not been allocated yet, defer allocation to dut_manager'
+            'DUT has not been allocated yet, delegate allocation to dut_manager'
         )
         # If dut has not been allocated, dut_manager must exist.
         assert (
@@ -805,30 +1011,57 @@ class BisectorCommandLine:
         # A DUT has not been allocated yet. Do switch in two steps (build then
         # deploy). Auto allocate a DUT at the deploy step.
         if prev_rev != rev:
-            if not self._switch(rev, sample, _SwitchAction.BUILD, switch_log):
-                return 'switch', sample
+            for cmd in switch_build_deploy_cmds:
+                if not (
+                    self._switch(
+                        cmd, rev, sample, SwitchAction.BUILD, switch_log
+                    )
+                ):
+                    return 'switch', sample
         with self.dut_manager.provision() as dut:
             # Deploy is needed if a new version is to be deployed, or a new DUT
             # has been allocated. If it's the same version and the same DUT,
             # we don't need to deploy again.
             if prev_rev != rev or not self.dut_manager.is_restored_dut():
-                if not self._switch(
-                    rev, sample, _SwitchAction.DEPLOY, switch_log, dut
-                ):
-                    return 'switch', sample
-                # Though test harness is setup on the test server (i.e., the
-                # bisector runner) instead of on the DUT, the scripts queries
-                # some config from DUT for now. So DUT is required.
-                if not self._switch(
-                    rev,
-                    sample,
-                    _SwitchAction.TEST_HARNESS,
-                    switch_log,
-                    dut,
-                ):
-                    return 'switch', sample
-            self._evaluate(rev, sample, dut)
-            return 'eval', sample
+                for cmd in switch_build_deploy_cmds:
+                    if not (
+                        self._switch(
+                            cmd,
+                            rev,
+                            sample,
+                            SwitchAction.DEPLOY,
+                            switch_log,
+                            dut,
+                        )
+                    ):
+                        return 'switch', sample
+                for cmd in switch_with_dut_cmds:
+                    if not (
+                        self._switch(
+                            cmd,
+                            rev,
+                            sample,
+                            SwitchAction.WITH_DUT,
+                            switch_log,
+                            dut,
+                        )
+                    ):
+                        return 'switch', sample
+            # Even switch requires a DUT, eval might not (e.g., eval manually).
+            # However, eval manully might still depend on the auto allocated
+            # DUT, so run it inside the dut manager context.
+            if eval_with_dut_cmd:
+                self._evaluate(
+                    eval_with_dut_cmd, rev, sample, EvalAction.WITH_DUT, dut
+                )
+                return 'eval', sample
+            if eval_without_dut_cmd:
+                self._evaluate(
+                    eval_without_dut_cmd, rev, sample, EvalAction.WITHOUT_DUT
+                )
+                return 'eval', sample
+
+        raise errors.InternalError('Control flow should not reach here.')
 
     def estimate_cost(self, prev_rev):
         avg_switch_time = math_util.Averager()
@@ -1300,7 +1533,7 @@ class BisectorCommandLine:
         if not self.states.inited and not self.states.load_states():
             raise errors.Uninitialized
         self.domain = self.domain_cls(self.states.config)
-        if not opts.value:
+        if opts.key != 'clear' and not opts.value:
             print(self.states.config[opts.key])
             return
 
@@ -1308,14 +1541,22 @@ class BisectorCommandLine:
             'switch',
             'eval',
             'future_build',
-            'switch_test_harness',
         ]:
             exec_opts = step_command_parser.parse_args(opts.value)
             result = cli.check_executable(exec_opts.command[0])
             if result:
                 raise errors.ArgumentError('%s command' % opts.key, result)
 
-            self.states.config[opts.key] = opts.value
+            if opts.key == 'switch':
+                self.states.config.setdefault(opts.key, [])
+                self.states.config[opts.key].append(opts.value)
+            else:
+                self.states.config[opts.key] = opts.value
+
+        elif opts.key == 'clear':
+            for value in opts.value:
+                if value in self.states.config:
+                    del self.states.config[value]
 
         elif opts.key == 'confidence':
             if len(opts.value) != 1:
@@ -1389,8 +1630,8 @@ class BisectorCommandLine:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             description=textwrap.dedent(
                 """
-          Besides arguments for 'init' command, you also need to set 'switch'
-          and 'eval' command line via 'config' command.
+          Besides arguments for 'init' command, you also need to set at least one
+          'switch' command and exactly one 'eval' command line via 'config' command.
             $ bisector config switch <switch command and arguments>
             $ bisector config eval <eval command and arguments>
 
@@ -1463,6 +1704,7 @@ class BisectorCommandLine:
         parser_config.add_argument(
             'key',
             choices=[
+                'clear',
                 'switch',
                 'eval',
                 'confidence',
@@ -1470,7 +1712,6 @@ class BisectorCommandLine:
                 'term_old',
                 'term_new',
                 'future_build',
-                'switch_test_harness',
             ],
             metavar='key',
             help='What config to change. choices=[%(choices)s]',

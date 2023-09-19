@@ -50,10 +50,9 @@ class BisectorWrapper:
         old: str,
         new: str,
         init_args: list[str],
-        switch_cmd: list[str],
-        eval_cmd: list[str],
+        switch_cmds: list[list[str]] | None = None,
+        eval_cmd: list[str] | None = None,
         future_build_cmd: list[str] | None = None,
-        switch_test_harness_cmd: list[str] | None = None,
         old_value: float | None = None,
         new_value: float | None = None,
         term_old: str | None = None,
@@ -84,18 +83,30 @@ class BisectorWrapper:
             # diagnoser's log.
             self.call('init', *(common_init_args + init_args))
 
-        self.call('config', 'switch', '--mode=bisectkit', *switch_cmd)
-        self.call('config', 'eval', '--mode=bisectkit', *eval_cmd)
+        if switch_cmds:
+            # config 'switch' is accumulative. So we need to clear existing
+            # values first.
+            self.call(
+                'config',
+                'clear',
+                'switch',
+            )
+            for cmd in switch_cmds:
+                self.call(
+                    'config',
+                    'switch',
+                    '--mode=bisectkit',
+                    *cmd,
+                )
+        self.call(
+            'config',
+            'eval',
+            '--mode=bisectkit',
+            *eval_cmd,
+        )
         if future_build_cmd:
             self.call(
                 'config', 'future_build', '--mode=bisectkit', *future_build_cmd
-            )
-        if switch_test_harness_cmd:
-            self.call(
-                'config',
-                'switch_test_harness',
-                '--mode=bisectkit',
-                *switch_test_harness_cmd,
             )
 
     def narrow_down(self) -> tuple[str, str, str | None]:

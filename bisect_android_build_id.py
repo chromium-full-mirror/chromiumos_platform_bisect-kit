@@ -7,7 +7,7 @@
 
 Example:
   $ ./bisect_android_build_id.py init --old rev1 --new rev2 --branch BRANCH \\
-      --flavor FLAVOR
+      --flavor FLAVOR --dut DUT
   $ ./bisect_android_build_id.py config switch ./switch_arc_prebuilt.py
   $ ./bisect_android_build_id.py config eval ./eval-manually.sh
   $ ./bisect_android_build_id.py run

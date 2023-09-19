@@ -18,6 +18,7 @@ import argparse
 import logging
 import os
 
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import git_util
@@ -47,6 +48,10 @@ def create_argument_parser():
     )
 
     return parser
+
+
+def action() -> bisector_cli.SwitchAction:
+    return bisector_cli.SwitchAction.WITHOUT_DUT
 
 
 @cli.fatal_error_handler
