@@ -28,6 +28,8 @@ class TestDepsParser(unittest.TestCase):
           'buildtools_revision': 'refs/heads/main',
           'checkout_foo': False,
           'checkout_bar': True,
+          'speedometer_3.0_revision':
+              '5107c739c1b2a008e7293e3b489c4f80a8fb2e01',
         }
 
         deps = {
@@ -44,6 +46,10 @@ class TestDepsParser(unittest.TestCase):
                 'refs/heads/main',
             'condition': 'checkout_bar',
           },
+          'src/third_party/speedometer/v3.0':
+              Var('chromium_git') +
+              '/external/github.com/WebKit/Speedometer.git' + '@' +
+              Var('speedometer_3.0_revision'),
         }
 
         recursedeps = [
@@ -178,7 +184,7 @@ class TestDep(unittest.TestCase):
         self.assertTrue(dep.eval_condition())
 
     def test_variable(self):
-        url = 'http://example.com@{var1}'
+        url = 'http://example.com@{vars[var1]}'
         dep = gclient_util.Dep('src', {'var1': 'foobar'}, url)
         self.assertEqual(dep.url, 'http://example.com@foobar')
 

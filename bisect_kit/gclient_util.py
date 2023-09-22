@@ -431,7 +431,11 @@ class Dep:
                 self.packages = entry['packages']
 
         if self.dep_type == 'git':
-            self.url = self.url.format(**self.variables)
+            # TODO(b/301570818): It should be just
+            # self.url.format(vars.variables).
+            # Pass unpacked self.variables temporarily due to a bad entry in
+            # DEPS.
+            self.url = self.url.format(vars=self.variables, **self.variables)
 
     def __eq__(self, rhs):
         return vars(self) == vars(rhs)
@@ -932,8 +936,10 @@ class DepsParser:
         self.code_storage = code_storage
 
     def load_single_deps(self, content):
+        # var names may not be valid python identifiers, so wrap them in a
+        # dictionary (b/301370477).
         def var_function(name):
-            return '{%s}' % name
+            return '{vars[%s]}' % name
 
         def str_function(name):
             return str(name)
@@ -997,7 +1003,7 @@ class DepsParser:
 
         for path, dep_entry in local_scope.get('deps', {}).items():
             # recalculate path
-            path = path.format(**deps.variables)
+            path = path.format(vars=deps.variables)
             if local_scope.get('use_relative_paths', False):
                 path = os.path.join(parent_path, path)
             path = os.path.normpath(path)
@@ -1043,7 +1049,7 @@ class DepsParser:
 
             if local_scope.get('use_relative_paths', False):
                 path = os.path.join(parent_path, path)
-            path = path.format(**deps.variables)
+            path = path.format(vars=deps.variables)
             if path in deps.entries:
                 recursedeps.append((path, deps_file))
         deps.recursedeps = recursedeps
