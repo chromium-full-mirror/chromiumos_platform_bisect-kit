@@ -20,7 +20,14 @@ def is_installable(dlc_name: str, dut: str) -> bool:
     """Check if the DLC package is installable supported on the DUT."""
     try:
         ls_output = util.ssh_cmd(
-            dut, 'ls', str(DLC_OPT_PATH / dlc_name), max_attempts=5
+            dut,
+            'dlc_metadata_util',
+            '--get',
+            f'--id={dlc_name}',
+            '||',
+            'ls',
+            str(DLC_OPT_PATH / dlc_name),
+            max_attempts=5,
         )
         return ls_output.strip() != ''
     except subprocess.CalledProcessError:
