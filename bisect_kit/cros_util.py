@@ -2340,8 +2340,8 @@ def build_packages(
             env['FEATURES'] += ' -separatedebug splitdebug'
             cros_sdk(
                 chromeos_root,
-                './update_chroot',
-                '--toolchain_boards',
+                'update_chroot',
+                '--toolchain-boards',
                 board,
                 env=env,
                 stderr_callback=stderr_callback,
