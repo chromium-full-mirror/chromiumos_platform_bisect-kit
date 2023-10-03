@@ -37,19 +37,24 @@ logger = logging.getLogger(__name__)
 class CrosDiagnoser:
     """Integrated bisectors API for ChromeOS regression analysis."""
 
-    def __init__(self, states, path_factory, config, dut):
+    def __init__(
+        self, states: core.DiagnoseStates, config: dict, dut: str | None
+    ):
         """Initializer.
 
         Args:
           states: a core.DiagnoseStates objejct.
-          path_factory: a DefaultProjectPathFactory object.
           config: a config from a core.DiagnoseStates object.
           dut: a pre-allocated DUT address, or the string ":lab:" to indicate
               a DUT is to be auto-allocated.
         """
         self.states = states
-        self.path_factory = path_factory
         self.config = config
+        self.path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+            self.config['mirror_base'],
+            self.config['work_base'],
+            self.config['session'],
+        )
         # self.noisy will be updated after we gather more information from each
         # bisect session.
         self.noisy = config['noisy']
@@ -1301,7 +1306,10 @@ class DiagnoseCommandLineBase:
                 % (argument_key, android_version)
             )
 
-    def check_options(self, opts, path_factory):
+    def check_options(self, opts):
+        path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+            opts.mirror_base, opts.work_base, opts.session
+        )
         if not opts.chromeos_mirror:
             opts.chromeos_mirror = path_factory.get_chromeos_mirror()
             logger.info('chromeos_mirror = %s', opts.chromeos_mirror)
@@ -1472,10 +1480,7 @@ class DiagnoseCommandLineBase:
         self.states.save()
 
     def cmd_init(self, opts):
-        path_factory = setup_cros_bisect.DefaultProjectPathFactory(
-            opts.mirror_base, opts.work_base, opts.session
-        )
-        self.check_options(opts, path_factory)
+        self.check_options(opts)
 
         if opts.dut != cros_lab_util.LAB_DUT and not cros_util.is_good_dut(
             opts.dut
@@ -1557,23 +1562,12 @@ class DiagnoseCommandLineBase:
 
     def cmd_log(self, opts):
         self.states.load_states()
-        path_factory = setup_cros_bisect.DefaultProjectPathFactory(
-            self.config['mirror_base'],
-            self.config['work_base'],
-            self.config['session'],
-        )
-        diagnoser = CrosDiagnoser(self.states, path_factory, self.config, None)
-
+        diagnoser = CrosDiagnoser(self.states, self.config, None)
         diagnoser.cmd_log(opts.json)
 
     def cmd_view(self, opts):
         self.states.load_states()
-        path_factory = setup_cros_bisect.DefaultProjectPathFactory(
-            self.config['mirror_base'],
-            self.config['work_base'],
-            self.config['session'],
-        )
-        diagnoser = CrosDiagnoser(self.states, path_factory, self.config, None)
+        diagnoser = CrosDiagnoser(self.states, self.config, None)
         diagnoser.cmd_view(opts.json, opts.verbose)
 
     def create_argument_parser_hook(self, parser_init):

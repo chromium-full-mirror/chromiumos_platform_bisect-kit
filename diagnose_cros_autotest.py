@@ -21,7 +21,6 @@ from bisect_kit import diagnoser_cros
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import util
 import experiment
-import setup_cros_bisect
 
 
 logger = logging.getLogger(__name__)
@@ -51,8 +50,8 @@ def get_test_dependency_labels(config):
 class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     """Diagnose command line interface."""
 
-    def check_options(self, opts, path_factory):
-        super().check_options(opts, path_factory)
+    def check_options(self, opts):
+        super().check_options(opts)
 
         is_cts = (
             opts.cts_revision
@@ -147,14 +146,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         return switch_test_harness_cmd, common_eval_cmd
 
     def do_run(self, dut):
-        path_factory = setup_cros_bisect.DefaultProjectPathFactory(
-            self.config['mirror_base'],
-            self.config['work_base'],
-            self.config['session'],
-        )
-        diagnoser = diagnoser_cros.CrosDiagnoser(
-            self.states, path_factory, self.config, dut
-        )
+        diagnoser = diagnoser_cros.CrosDiagnoser(self.states, self.config, dut)
 
         switch_test_harness_cmd, common_eval_cmd = self._build_cmds()
 
