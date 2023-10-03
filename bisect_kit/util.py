@@ -28,6 +28,8 @@ import psutil
 
 logger = logging.getLogger(__name__)
 
+PathLike = os.PathLike | str
+
 
 class TimeoutExpired(Exception):
     """Timeout expired.
@@ -50,7 +52,8 @@ class Popen:
 
     def __init__(
         self,
-        args: str | list[str],
+        args: PathLike | list[PathLike],
+        cwd: PathLike | None = None,
         stdout_callback: typing.Callable | None = None,
         stderr_callback: typing.Callable | None = None,
         log_stdout: bool = True,
@@ -61,10 +64,11 @@ class Popen:
 
         Args:
           args: Command line arguments.
+          cwd: The working directory to execute the command line.
           stdout_callback: Callback function for stdout. Called once per line.
           stderr_callback: Callback function for stderr. Called once per line.
-          binary: binary mode; default is False
           log_stdout: Whether write the stdout output of the child process to log.
+          binary: binary mode; default is False
           **kwargs: Additional arguments passing to subprocess.Popen.
         """
         if 'stdout' in kwargs:
@@ -91,45 +95,51 @@ class Popen:
         self.duration = -1.0
         self.start = time.time()
         self.queue: queue.Queue = queue.Queue(65536)
-        if isinstance(args, str):
-            logger.debug('cwd=%s, run %r', kwargs.get('cwd'), args)
-        else:
-            logger.debug(
-                'cwd=%s, run %r',
-                kwargs.get('cwd'),
-                subprocess.list2cmdline(map(str, args)),
-            )
+
+        if cwd is not None:
+            cwd = str(cwd)
+
+        if isinstance(args, PathLike):
+            args = [args]
+        args = [str(arg) for arg in args]
+
+        logger.debug('cwd=%s, run %r', cwd, subprocess.list2cmdline(args))
+
         self.p = subprocess.Popen(
-            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=cwd,
+            **kwargs,
         )
 
-        self.stdout_thread = threading.Thread(
-            target=self._reader_thread, args=('stdout', self.p.stdout)
-        )
-        self.stdout_thread.daemon = True
-        self.stdout_thread.start()
-
-        self.stderr_thread = threading.Thread(
-            target=self._reader_thread, args=('stderr', self.p.stderr)
-        )
-        self.stderr_thread.daemon = True
-        self.stderr_thread.start()
+        self.stdout_thread = self._start_reader_thread('stdout', self.p.stdout)
+        self.stderr_thread = self._start_reader_thread('stderr', self.p.stderr)
 
     @property
     def returncode(self) -> int:
         return self.p.returncode
 
-    def _reader_thread(self, fd_name: str, fd: typing.IO) -> None:
-        """Reader thread to help reading stdout and stderr.
+    def _start_reader_thread(
+        self, fd_name: str, fd: typing.IO
+    ) -> threading.Thread:
+        """Creates and starts a reader thread to help reading stdout and stderr.
 
         Args:
           fd_name: 'stdout' or 'stderr'.
           fd: file object which producing output.
         """
-        for line in fd:
-            self.queue.put((fd_name, line))
-        self.queue.put((fd_name, ''))
-        fd.close()
+
+        def _reader_thread(fd_name: str, fd: typing.IO) -> None:
+            for line in fd:
+                self.queue.put((fd_name, line))
+            self.queue.put((fd_name, ''))
+            fd.close()
+
+        thread = threading.Thread(target=_reader_thread, args=(fd_name, fd))
+        thread.daemon = True
+        thread.start()
+        return thread
 
     def wait(self, timeout: float | None = None) -> int:
         """Waits child process.
