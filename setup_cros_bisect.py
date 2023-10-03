@@ -33,6 +33,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree
 
+from bisect_kit import btrfs_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import gclient_util
@@ -73,49 +74,6 @@ class DefaultProjectPathFactory:
 
     def get_chrome_tree(self):
         return os.path.join(self.work_base, self.session, 'chrome')
-
-
-def make_subvolume(path):
-    if os.path.exists(path):
-        return
-    dirname, basename = os.path.split(path)
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
-    util.check_call('btrfs', 'subvolume', 'create', basename, cwd=dirname)
-
-
-def subvolume_or_makedirs(use_btrfs: bool, path: str):
-    if os.path.exists(path):
-        return
-
-    path = os.path.abspath(path)
-    if use_btrfs:
-        make_subvolume(path)
-    else:
-        os.makedirs(path)
-
-
-def is_btrfs_subvolume(path):
-    if os.path.islink(path):
-        return False
-    if util.check_output('stat', '-f', '--format=%T', path).strip() != 'btrfs':
-        return False
-    return util.check_output('stat', '--format=%i', path).strip() == '256'
-
-
-def snapshot_or_copytree(src, dst):
-    assert os.path.isdir(src), '%s does not exist' % src
-    assert os.path.isdir(os.path.dirname(dst))
-
-    # Make sure dst do not exist, otherwise it becomes "dst/name" (one extra
-    # depth) instead of "dst".
-    assert not os.path.exists(dst)
-
-    if is_btrfs_subvolume(src):
-        util.check_call('btrfs', 'subvolume', 'snapshot', src, dst)
-    else:
-        # -a for recursion and preserve all attributes.
-        util.check_call('cp', '-a', src, dst)
 
 
 def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
@@ -196,8 +154,8 @@ def add_local_mount(chromeos_tree: str):
 def setup_chromeos_repos(path_factory, use_btrfs: bool):
     chromeos_mirror = path_factory.get_chromeos_mirror()
     chromeos_tree = path_factory.get_chromeos_tree()
-    subvolume_or_makedirs(use_btrfs, chromeos_mirror)
-    subvolume_or_makedirs(use_btrfs, chromeos_tree)
+    btrfs_util.makedirs(chromeos_mirror, use_btrfs)
+    btrfs_util.makedirs(chromeos_tree, use_btrfs)
 
     manifest_url = (
         'https://chrome-internal.googlesource.com/chromeos/manifest-internal'
@@ -399,9 +357,9 @@ def sync_chromeos_code(opts, path_factory):
 
 def setup_chrome_repos(path_factory, use_btrfs: bool):
     chrome_cache = path_factory.get_chrome_cache()
-    subvolume_or_makedirs(use_btrfs, chrome_cache)
     chrome_tree = path_factory.get_chrome_tree()
-    subvolume_or_makedirs(use_btrfs, chrome_tree)
+    btrfs_util.makedirs(chrome_cache, use_btrfs)
+    btrfs_util.makedirs(chrome_tree, use_btrfs)
 
     spec = """
 solutions = [
@@ -448,8 +406,8 @@ def sync_chrome_code(path_factory, use_btrfs: bool):
 def setup_android_repos(path_factory, branch, use_btrfs: bool):
     android_mirror = path_factory.get_android_mirror(branch)
     android_tree = path_factory.get_android_tree(branch)
-    subvolume_or_makedirs(use_btrfs, android_mirror)
-    subvolume_or_makedirs(use_btrfs, android_tree)
+    btrfs_util.makedirs(android_mirror, use_btrfs)
+    btrfs_util.makedirs(android_tree, use_btrfs)
 
     manifest_url = (
         'persistent-https://googleplex-android.git.corp.google.com'
@@ -560,11 +518,13 @@ def do_sync(opts):
                 '(this takes hours; be patient)'
             )
             chromeos_tree = path_factory.get_chromeos_tree()
-            use_btrfs = is_btrfs_subvolume(chromeos_tree)
-            delete_tree(chromeos_tree)
+            use_btrfs = btrfs_util.is_btrfs_subvolume(chromeos_tree)
+            btrfs_util.delete_tree(chromeos_tree)
             setup_chromeos_repos(path_factory, use_btrfs)
     if sync_all or opts.chrome:
-        use_btrfs = is_btrfs_subvolume(path_factory.get_chrome_tree())
+        use_btrfs = btrfs_util.is_btrfs_subvolume(
+            path_factory.get_chrome_tree()
+        )
         sync_chrome_code(path_factory, use_btrfs)
 
     if sync_all:
@@ -611,7 +571,7 @@ def cmd_new(opts):
         logger.info(
             'prepare tree for chromeos, %s', path_factory.get_chromeos_tree()
         )
-        snapshot_or_copytree(
+        btrfs_util.copy_tree(
             chromeos_template, path_factory.get_chromeos_tree()
         )
 
@@ -620,7 +580,7 @@ def cmd_new(opts):
         logger.info(
             'prepare tree for chrome, %s', path_factory.get_chrome_tree()
         )
-        snapshot_or_copytree(chrome_template, path_factory.get_chrome_tree())
+        btrfs_util.copy_tree(chrome_template, path_factory.get_chrome_tree())
 
     if prepare_all:
         android_branches = enumerate_android_branches_available(
@@ -634,19 +594,10 @@ def cmd_new(opts):
             branch,
             path_factory.get_android_tree(branch),
         )
-        snapshot_or_copytree(
+        btrfs_util.copy_tree(
             template_factory.get_android_tree(branch),
             path_factory.get_android_tree(branch),
         )
-
-
-def delete_tree(path):
-    if is_btrfs_subvolume(path):
-        # btrfs should be mounted with 'user_subvol_rm_allowed' option and thus
-        # normal user permission is enough.
-        util.check_call('btrfs', 'subvolume', 'delete', path)
-    else:
-        util.check_call('sudo', 'rm', '-rf', path)
 
 
 def cmd_list(opts):
@@ -669,17 +620,15 @@ def cmd_delete(opts):
         if os.path.exists(os.path.join(chromeos_tree, 'chromite')):
             # ignore error
             util.call('cros_sdk', '--unmount', cwd=chromeos_tree)
-        delete_tree(chromeos_tree)
+        btrfs_util.delete_tree(chromeos_tree, missing_ok=True)
 
     chrome_tree = path_factory.get_chrome_tree()
-    if os.path.exists(chrome_tree):
-        delete_tree(chrome_tree)
+    btrfs_util.delete_tree(chrome_tree, missing_ok=True)
 
     android_branches = enumerate_android_branches_available(opts.mirror_base)
     for branch in android_branches:
         android_tree = path_factory.get_android_tree(branch)
-        if os.path.exists(android_tree):
-            delete_tree(android_tree)
+        btrfs_util.delete_tree(android_tree, missing_ok=True)
 
     os.rmdir(os.path.join(opts.work_base, opts.session))
 
@@ -695,17 +644,17 @@ def cmd_delete(opts):
 
         for path in glob.glob(os.path.join(chromeos_root, 'chroot/tmp/*')):
             logger.debug('remove cache (chroot/tmp): %s', path)
-            delete_tree(path)
+            btrfs_util.delete_tree(path)
 
         for path in glob.glob(os.path.join(chromeos_root, 'tmp/*')):
             logger.debug('remove cache (chromeos root tmp): %s', path)
-            delete_tree(path)
+            btrfs_util.delete_tree(path)
 
     for path in glob.glob(
         os.path.join(path_factory.get_chrome_cache(), '_cache_*')
     ):
         logger.debug('remove cache (chrome gclient cache): %s', path)
-        delete_tree(path)
+        btrfs_util.delete_tree(path)
 
 
 def create_parser():
