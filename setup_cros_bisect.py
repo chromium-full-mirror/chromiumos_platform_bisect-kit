@@ -76,7 +76,7 @@ class DefaultProjectPathFactory:
         return os.path.join(self.work_base, self.session, 'chrome')
 
 
-def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
+def _collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
     manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
     manifest_path = 'default.xml'
     manifest_full_path = os.path.join(manifest_dir, manifest_path)
@@ -129,7 +129,7 @@ def collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
     return removed
 
 
-def add_local_mount(chromeos_tree: str):
+def _add_local_mount(chromeos_tree: str):
     """Add gsutil cred in ~/.config folder in chromeos local mount setting.
 
     This is necessary to run gsutil commands under chroot.
@@ -151,7 +151,7 @@ def add_local_mount(chromeos_tree: str):
             print('\n'.join(mount_config), file=f)
 
 
-def setup_chromeos_repos(path_factory, use_btrfs: bool):
+def _setup_chromeos_repos(path_factory, use_btrfs: bool):
     chromeos_mirror = path_factory.get_chromeos_mirror()
     chromeos_tree = path_factory.get_chromeos_tree()
     btrfs_util.makedirs(chromeos_mirror, use_btrfs)
@@ -209,10 +209,10 @@ def setup_chromeos_repos(path_factory, use_btrfs: bool):
 
     logger.info('repo sync for chromeos tree')
     repo_util.sync(chromeos_tree)
-    add_local_mount(chromeos_tree)
+    _add_local_mount(chromeos_tree)
 
 
-def read_last_sync_time(repo_dir):
+def _read_last_sync_time(repo_dir):
     timestamp_path = os.path.join(repo_dir, 'last_sync_time')
     if os.path.exists(timestamp_path):
         with open(timestamp_path) as f:
@@ -222,13 +222,13 @@ def read_last_sync_time(repo_dir):
         return int(time.time()) - 86400 * 120
 
 
-def write_sync_time(repo_dir, sync_time):
+def _write_sync_time(repo_dir, sync_time):
     timestamp_path = os.path.join(repo_dir, 'last_sync_time')
     with open(timestamp_path, 'w') as f:
         f.write('%d\n' % sync_time)
 
 
-def write_extra_manifest_to_mirror(repo_dir, removed):
+def _write_extra_manifest_to_mirror(repo_dir, removed):
     # project names that should be excluded in deleted-repos
     exclude_repositories = [
         'chromeos/overlays/overlay-goroh-private',  # removed in b/218319750
@@ -270,7 +270,7 @@ def write_extra_manifest_to_mirror(repo_dir, removed):
         f.write("""</manifest>\n""")
 
 
-def delete_extra_manifest(repo_dir):
+def _delete_extra_manifest(repo_dir):
     path = os.path.join(
         repo_dir, repo_util.LOCAL_MANIFESTS_DIR, MANIFEST_FOR_DELETED
     )
@@ -278,17 +278,17 @@ def delete_extra_manifest(repo_dir):
         os.unlink(path)
 
 
-def generate_extra_manifest_for_deleted_repo(repo_dir, only_branch=None):
-    last_sync_time = read_last_sync_time(repo_dir)
-    removed = collect_removed_manifest_repos(
+def _generate_extra_manifest_for_deleted_repo(repo_dir, only_branch=None):
+    last_sync_time = _read_last_sync_time(repo_dir)
+    removed = _collect_removed_manifest_repos(
         repo_dir, last_sync_time, only_branch=only_branch
     )
-    write_extra_manifest_to_mirror(repo_dir, removed)
+    _write_extra_manifest_to_mirror(repo_dir, removed)
     logger.info('since last sync, %d repo got removed', len(removed))
     return len(removed)
 
 
-def additional_chrome_mirror_sync(chrome_cache):
+def _additional_chrome_mirror_sync(chrome_cache):
     # Why additional sync is necessary:
     #   1. `gclient sync` take cares only for the state of the DEPS files on the
     #      current working directory (main branch). If a repo has been removed
@@ -332,30 +332,28 @@ def additional_chrome_mirror_sync(chrome_cache):
             r.get()
 
 
-def sync_chromeos_code(opts, path_factory):
-    del opts  # unused
-
+def _sync_chromeos_code(path_factory):
     start_sync_time = int(time.time())
     chromeos_mirror = path_factory.get_chromeos_mirror()
 
     logger.info('repo sync for chromeos mirror')
-    delete_extra_manifest(chromeos_mirror)
+    _delete_extra_manifest(chromeos_mirror)
     # current_branch=False to ignore "sync-c=true" in the manifest file.
     repo_util.sync(chromeos_mirror, current_branch=False)
     # If there are repos deleted after last sync, generate custom manifest and
     # sync again for those repos. So we can mirror commits just before the repo
     # deletion.
-    if generate_extra_manifest_for_deleted_repo(chromeos_mirror) != 0:
+    if _generate_extra_manifest_for_deleted_repo(chromeos_mirror) != 0:
         logger.info('repo sync again')
         repo_util.sync(chromeos_mirror, current_branch=False)
-    write_sync_time(chromeos_mirror, start_sync_time)
+    _write_sync_time(chromeos_mirror, start_sync_time)
 
     logger.info('repo sync for chromeos tree')
     chromeos_tree = path_factory.get_chromeos_tree()
     repo_util.sync(chromeos_tree)
 
 
-def setup_chrome_repos(path_factory, use_btrfs: bool):
+def _setup_chrome_repos(path_factory, use_btrfs: bool):
     chrome_cache = path_factory.get_chrome_cache()
     chrome_tree = path_factory.get_chrome_tree()
     btrfs_util.makedirs(chrome_cache, use_btrfs)
@@ -395,15 +393,15 @@ cache_dir = %r
         else:
             logger.info('gclient sync for chrome')
         gclient_util.sync(chrome_tree, with_branch_heads=True, with_tags=True)
-        additional_chrome_mirror_sync(chrome_cache)
+        _additional_chrome_mirror_sync(chrome_cache)
 
 
-def sync_chrome_code(path_factory, use_btrfs: bool):
+def _sync_chrome_code(path_factory, use_btrfs: bool):
     # The sync step is identical to the initial gclient config step.
-    setup_chrome_repos(path_factory, use_btrfs)
+    _setup_chrome_repos(path_factory, use_btrfs)
 
 
-def setup_android_repos(path_factory, branch, use_btrfs: bool):
+def _setup_android_repos(path_factory, branch, use_btrfs: bool):
     android_mirror = path_factory.get_android_mirror(branch)
     android_tree = path_factory.get_android_tree(branch)
     btrfs_util.makedirs(android_mirror, use_btrfs)
@@ -446,8 +444,7 @@ def setup_android_repos(path_factory, branch, use_btrfs: bool):
     repo_util.sync(android_tree, current_branch=True)
 
 
-def sync_android_code(opts, path_factory, branch):
-    del opts  # unused
+def _sync_android_code(path_factory, branch):
     start_sync_time = int(time.time())
     android_mirror = path_factory.get_android_mirror(branch)
     android_tree = path_factory.get_android_tree(branch)
@@ -456,21 +453,21 @@ def sync_android_code(opts, path_factory, branch):
         os.path.join(android_mirror, locking.LOCK_FILE_FOR_MIRROR_SYNC)
     ):
         logger.info('repo sync for android mirror branch=%s', branch)
-        delete_extra_manifest(android_mirror)
+        _delete_extra_manifest(android_mirror)
         repo_util.sync(android_mirror, current_branch=True)
         # Android usually big jump between milestone releases and add/delete lots of
         # repos when switch releases. Because it's infeasible to bisect between such
         # big jump, the deleted repo is useless. In order to save disk, do not sync
         # repos deleted in other branches.
         if (
-            generate_extra_manifest_for_deleted_repo(
+            _generate_extra_manifest_for_deleted_repo(
                 android_mirror, only_branch=branch
             )
             != 0
         ):
             logger.info('repo sync again')
             repo_util.sync(android_mirror, current_branch=True)
-        write_sync_time(android_mirror, start_sync_time)
+        _write_sync_time(android_mirror, start_sync_time)
 
     logger.info('repo sync for android tree branch=%s', branch)
     repo_util.sync(android_tree, current_branch=True)
@@ -482,14 +479,14 @@ def cmd_init(opts):
     )
 
     if opts.chromeos:
-        setup_chromeos_repos(path_factory, opts.btrfs)
+        _setup_chromeos_repos(path_factory, opts.btrfs)
     if opts.chrome:
-        setup_chrome_repos(path_factory, opts.btrfs)
+        _setup_chrome_repos(path_factory, opts.btrfs)
     for branch in opts.android:
-        setup_android_repos(path_factory, branch, opts.btrfs)
+        _setup_android_repos(path_factory, branch, opts.btrfs)
 
 
-def enumerate_android_branches_available(base):
+def _enumerate_android_branches_available(base):
     branches = []
     for name in os.listdir(base):
         if name.startswith('android.'):
@@ -509,7 +506,7 @@ def do_sync(opts):
 
     if sync_all or opts.chromeos:
         try:
-            sync_chromeos_code(opts, path_factory)
+            _sync_chromeos_code(path_factory)
         except Exception:
             # b/222638221: repo may be broken due to infra issues
             # re-create the whole repo and sync again
@@ -520,21 +517,21 @@ def do_sync(opts):
             chromeos_tree = path_factory.get_chromeos_tree()
             use_btrfs = btrfs_util.is_btrfs_subvolume(chromeos_tree)
             btrfs_util.delete_tree(chromeos_tree)
-            setup_chromeos_repos(path_factory, use_btrfs)
+            _setup_chromeos_repos(path_factory, use_btrfs)
     if sync_all or opts.chrome:
         use_btrfs = btrfs_util.is_btrfs_subvolume(
             path_factory.get_chrome_tree()
         )
-        sync_chrome_code(path_factory, use_btrfs)
+        _sync_chrome_code(path_factory, use_btrfs)
 
     if sync_all:
-        android_branches = enumerate_android_branches_available(
+        android_branches = _enumerate_android_branches_available(
             opts.mirror_base
         )
     else:
         android_branches = opts.android
     for branch in android_branches:
-        sync_android_code(opts, path_factory, branch)
+        _sync_android_code(path_factory, branch)
 
 
 def cmd_sync(opts):
@@ -567,7 +564,7 @@ def cmd_new(opts):
     chromeos_template = template_factory.get_chromeos_tree()
     if (prepare_all and os.path.exists(chromeos_template)) or opts.chromeos:
         # Add mount config again if it's missing.
-        add_local_mount(chromeos_template)
+        _add_local_mount(chromeos_template)
         logger.info(
             'prepare tree for chromeos, %s', path_factory.get_chromeos_tree()
         )
@@ -583,7 +580,7 @@ def cmd_new(opts):
         btrfs_util.copy_tree(chrome_template, path_factory.get_chrome_tree())
 
     if prepare_all:
-        android_branches = enumerate_android_branches_available(
+        android_branches = _enumerate_android_branches_available(
             opts.mirror_base
         )
     else:
@@ -625,7 +622,7 @@ def cmd_delete(opts):
     chrome_tree = path_factory.get_chrome_tree()
     btrfs_util.delete_tree(chrome_tree, missing_ok=True)
 
-    android_branches = enumerate_android_branches_available(opts.mirror_base)
+    android_branches = _enumerate_android_branches_available(opts.mirror_base)
     for branch in android_branches:
         android_tree = path_factory.get_android_tree(branch)
         btrfs_util.delete_tree(android_tree, missing_ok=True)
