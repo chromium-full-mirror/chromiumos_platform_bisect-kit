@@ -302,14 +302,16 @@ def ssh_cmd(
     *args,
     connect_timeout: int | None = None,
     max_attempts: int = 1,
+    retry_interval: int = 60,
 ) -> str:
     """Runs remote command using ssh.
 
     Args:
       host: remote host address
       *args: command and args running on the remote host
-      connect_timeout: connection timeout in seconds (int)
+      connect_timeout: connection timeout in seconds
       max_attempts: maximum number of attempts to connect to the remote host
+      retry_interval: retry interval in seconds
 
     Raises:
       subprocess.CalledProcessError if the exit code is non-zero.
@@ -340,11 +342,10 @@ def ssh_cmd(
                 )
         # ssh's ConnectionAttempts is not enough because we want to deal with
         # situations needing several seconds to recover.
-        delay = 60
         logger.warning(
-            'ssh connection failed, will retry %d seconds later', delay
+            'ssh connection failed, will retry %d seconds later', retry_interval
         )
-        time.sleep(delay)
+        time.sleep(retry_interval)
 
 
 def scp_cmd(
@@ -352,14 +353,16 @@ def scp_cmd(
     to_file: str,
     connect_timeout: int | None = None,
     max_attempts: int = 1,
+    retry_interval: int = 60,
 ) -> str:
     """Copies a file through scp.
 
     Args:
       from_file: from file name
       to_file: target file name
-      connect_timeout: connection timeout in seconds (int)
+      connect_timeout: connection timeout in seconds
       max_attempts: maximum number of attempts to connect to the remote host
+      retry_interval: retry interval in seconds
 
     Raises:
       subprocess.CalledProcessError if the exit code is non-zero.
@@ -391,11 +394,10 @@ def scp_cmd(
                 )
         # ssh's ConnectionAttempts is not enough because we want to deal with
         # situations needing several seconds to recover.
-        delay = 60
         logger.warning(
-            'ssh connection failed, will retry %d seconds later', delay
+            'ssh connection failed, will retry %d seconds later', retry_interval
         )
-        time.sleep(delay)
+        time.sleep(retry_interval)
 
 
 def escape_rev(rev: str) -> str:

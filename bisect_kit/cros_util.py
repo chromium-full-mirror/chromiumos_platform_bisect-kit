@@ -809,13 +809,15 @@ def query_dut_boot_id(
     host: str,
     connect_timeout: int | None = None,
     max_attempts: int = DEFAULT_QUERY_BOOT_ID_ATTEMPTS,
+    retry_interval: int = 60,
 ) -> str:
     """Query boot id.
 
     Args:
       host: DUT address
-      connect_timeout: connection timeout
+      connect_timeout: connection timeout in seconds
       max_attempts: the number of attempts to query the DUT
+      retry_interval: retry interval in seconds
 
     Returns:
       boot uuid
@@ -826,6 +828,7 @@ def query_dut_boot_id(
         '/proc/sys/kernel/random/boot_id',
         connect_timeout=connect_timeout,
         max_attempts=max_attempts,
+        retry_interval=retry_interval,
     ).strip()
 
 
@@ -861,20 +864,19 @@ def wait_reboot_done(host, boot_id):
     # For dev-mode test image, the reboot time is roughly at least 16 seconds
     # (dev screen short delay) or more (long delay).
     time.sleep(15)
-    for _ in range(100):
-        try:
-            # During boot, DUT does not response and thus ssh may hang a while. So
-            # set a connect timeout. 3 seconds are enough and 2 are not. It's okay to
-            # set tight limit because it's inside retry loop.
-            assert boot_id != query_dut_boot_id(
-                host, connect_timeout=5
-            ), 'rebooted but boot id intact?'
-            return
-        except errors.SshConnectionError:
-            logger.debug('reboot not ready? sleep wait 1 sec')
-            time.sleep(1)
-
-    raise errors.ExternalError('reboot failed?')
+    try:
+        # During boot, DUT does not response and thus ssh may hang a while. So
+        # set a connect timeout. 3 seconds are enough and 2 are not. It's okay to
+        # set tight limit because it's inside retry loop.
+        assert boot_id != query_dut_boot_id(
+            host,
+            connect_timeout=5,
+            max_attempts=60,
+            retry_interval=1,
+        ), 'rebooted but boot id intact?'
+        return
+    except errors.SshConnectionError as e:
+        raise errors.ExternalError('reboot failed?') from e
 
 
 def should_fetch_release_manifest_from_gs(version: str) -> bool:
