@@ -14,12 +14,63 @@ import typing
 
 logger = logging.getLogger(__name__)
 
+PathLike = os.PathLike | str
+
 DEFAULT_SESSION_BASE = 'bisect.sessions'
 DEFAULT_SESSION_NAME = 'default'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors').expanduser())
 DEFAULT_WORK_BASE = str(pathlib.Path('~/bisect-workdir').expanduser())
 DEFAULT_CHROMEOS_ROOT = str(pathlib.Path('~/chromiumos').expanduser())
+
+
+class ProjectPathFactory:
+    """Factory for chromeos/chrome/android source tree paths."""
+
+    def __init__(
+        self,
+        mirror_base: PathLike = DEFAULT_MIRROR_BASE,
+        work_base: PathLike = DEFAULT_WORK_BASE,
+        session: str = DEFAULT_SESSION_NAME,
+    ):
+        self._mirror_base = pathlib.Path(mirror_base)
+        self._work_base = pathlib.Path(work_base)
+        self._session_name = session
+        self._session_workdir = self._work_base / self._session_name
+
+    @property
+    def session_name(self) -> str:
+        return self._session_name
+
+    @property
+    def session_workdir(self) -> str:
+        return str(self._session_workdir)
+
+    @property
+    def mirror_base(self) -> str:
+        return str(self._mirror_base)
+
+    @property
+    def work_base(self) -> str:
+        return str(self._work_base)
+
+    def get_chromeos_mirror(self) -> str:
+        return str(self._mirror_base / 'chromeos')
+
+    def get_chromeos_tree(self) -> str:
+        return str(self._session_workdir / 'chromeos')
+
+    def get_android_mirror(self, branch: str) -> str:
+        return str(self._mirror_base / f'android.{branch}')
+
+    def get_android_tree(self, branch: str) -> str:
+        return str(self._session_workdir / f'android.{branch}')
+
+    def get_chrome_cache(self) -> str:
+        return str(self._mirror_base / 'chrome')
+
+    def get_chrome_tree(self) -> str:
+        return str(self._session_workdir / 'chrome')
 
 
 def determine_session_dir(

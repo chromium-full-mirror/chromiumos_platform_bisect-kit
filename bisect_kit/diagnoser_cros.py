@@ -28,7 +28,6 @@ from bisect_kit import wrapper
 from bisect_kit.dlc import borealis_util
 import cros_helper
 import experiment
-import setup_cros_bisect
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,7 @@ class CrosDiagnoser:
         """
         self.states = states
         self.config = config
-        self.path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+        self.path_factory = common.ProjectPathFactory(
             self.config['mirror_base'],
             self.config['work_base'],
             self.config['session'],
@@ -1307,7 +1306,7 @@ class DiagnoseCommandLineBase:
             )
 
     def check_options(self, opts):
-        path_factory = setup_cros_bisect.DefaultProjectPathFactory(
+        path_factory = common.ProjectPathFactory(
             opts.mirror_base, opts.work_base, opts.session
         )
         if not opts.chromeos_mirror:

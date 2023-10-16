@@ -49,33 +49,6 @@ MANIFEST_FOR_DELETED = 'deleted-repos.xml'
 logger = logging.getLogger(__name__)
 
 
-class DefaultProjectPathFactory:
-    """Factory for chromeos/chrome/android source tree paths."""
-
-    def __init__(self, mirror_base, work_base, session):
-        self.mirror_base = mirror_base
-        self.work_base = work_base
-        self.session = session
-
-    def get_chromeos_mirror(self):
-        return os.path.join(self.mirror_base, 'chromeos')
-
-    def get_chromeos_tree(self):
-        return os.path.join(self.work_base, self.session, 'chromeos')
-
-    def get_android_mirror(self, branch):
-        return os.path.join(self.mirror_base, 'android.%s' % branch)
-
-    def get_android_tree(self, branch):
-        return os.path.join(self.work_base, self.session, 'android.%s' % branch)
-
-    def get_chrome_cache(self):
-        return os.path.join(self.mirror_base, 'chrome')
-
-    def get_chrome_tree(self):
-        return os.path.join(self.work_base, self.session, 'chrome')
-
-
 def _collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
     manifest_dir = os.path.join(repo_dir, '.repo', 'manifests')
     manifest_path = 'default.xml'
@@ -474,7 +447,7 @@ def _sync_android_code(path_factory, branch):
 
 
 def cmd_init(opts):
-    path_factory = DefaultProjectPathFactory(
+    path_factory = common.ProjectPathFactory(
         opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
     )
 
@@ -495,7 +468,7 @@ def _enumerate_android_branches_available(base):
 
 
 def do_sync(opts):
-    path_factory = DefaultProjectPathFactory(
+    path_factory = common.ProjectPathFactory(
         opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
     )
 
@@ -549,10 +522,10 @@ def cmd_new(opts):
     if not os.path.exists(work_dir):
         os.makedirs(work_dir)
 
-    template_factory = DefaultProjectPathFactory(
+    template_factory = common.ProjectPathFactory(
         opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
     )
-    path_factory = DefaultProjectPathFactory(
+    path_factory = common.ProjectPathFactory(
         opts.mirror_base, opts.work_base, opts.session
     )
 
@@ -608,7 +581,7 @@ def cmd_list(opts):
 
 def cmd_delete(opts):
     assert opts.session
-    path_factory = DefaultProjectPathFactory(
+    path_factory = common.ProjectPathFactory(
         opts.mirror_base, opts.work_base, opts.session
     )
 
