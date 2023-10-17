@@ -549,7 +549,7 @@ class BisectorCommandLine:
         self.dut_manager = dut_manager
 
         self.domain = None
-        self.session_dir = None
+        self.session = None
         self.states = None
         self.strategy = None
         self.future_build_depth = 1
@@ -758,7 +758,7 @@ class BisectorCommandLine:
         logger.debug('eval (%s) at rev=%s', action, rev)
 
         eval_log = self._step_log_path(rev, 'eval')
-        eval_log_fullpath = os.path.join(self.session_dir, eval_log)
+        eval_log_fullpath = common.get_session_log_file(self.session, eval_log)
 
         t0 = time.time()
         result = do_evaluate(
@@ -824,7 +824,7 @@ class BisectorCommandLine:
         """
         logger.debug('switch (%s) to rev=%s', action, rev)
 
-        log_full_path = os.path.join(self.session_dir, log_file)
+        log_full_path = common.get_session_log_file(self.session, log_file)
 
         extra_args = []
         if action in [
@@ -1517,8 +1517,10 @@ class BisectorCommandLine:
         self._add_revs_status_helper(opts.revs, 'skip')
 
     def _create_states(self, session=None):
-        self.session_dir = common.determine_session_dir(session)
-        session_file = os.path.join(self.session_dir, self.domain_cls.__name__)
+        self.session = session
+        session_file = common.get_session_log_file(
+            session, self.domain_cls.__name__
+        )
 
         if self.states:
             assert self.states.session_file == session_file

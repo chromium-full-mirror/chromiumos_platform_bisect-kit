@@ -479,11 +479,12 @@ class DutManager:
         if statistics.dut_leases_log_path:
             return statistics.dut_leases_log_path
 
-        session_dir = common.determine_session_dir(self.config['session'])
         log_file = 'dut_leases.{timestamp}.json'.format(
             timestamp=time.strftime('%Y%m%d-%H%M%S'),
         )
-        log_path = os.path.join(session_dir, 'log', log_file)
+        log_path = common.get_session_log_file(
+            self.config['session'], f'log/{log_file}'
+        )
 
         statistics.dut_leases_log_path = log_path
         self._states.save()

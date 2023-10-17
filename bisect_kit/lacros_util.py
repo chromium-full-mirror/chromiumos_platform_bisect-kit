@@ -314,7 +314,7 @@ def _get_deploy_chrome_path(
         )
 
     return os.path.join(
-        common.DEFAULT_CHROMEOS_ROOT, 'chromite/bin/deploy_chrome'
+        common.get_default_chromeos_root(), 'chromite/bin/deploy_chrome'
     )
 
 

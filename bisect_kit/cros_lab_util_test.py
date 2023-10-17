@@ -111,7 +111,7 @@ class TestCrosLab(unittest.TestCase):
         ):
             self.assertTrue(
                 cros_lab_util.enable_rootfs_verification(
-                    'dummy_DUT', common.DEFAULT_CHROMEOS_ROOT
+                    'dummy_DUT', common.get_default_chromeos_root()
                 )
             )
 
@@ -120,7 +120,7 @@ class TestCrosLab(unittest.TestCase):
         ):
             self.assertFalse(
                 cros_lab_util.enable_rootfs_verification(
-                    'dummy_DUT', common.DEFAULT_CHROMEOS_ROOT
+                    'dummy_DUT', common.get_default_chromeos_root()
                 )
             )
 
@@ -139,7 +139,7 @@ class TestCrosLab(unittest.TestCase):
         ):
             self.assertTrue(
                 cros_lab_util.enable_rootfs_verification(
-                    'dummy_DUT', common.DEFAULT_CHROMEOS_ROOT
+                    'dummy_DUT', common.get_default_chromeos_root()
                 )
             )
 

@@ -11,7 +11,6 @@ import argparse
 import dataclasses
 import json
 import logging
-import os
 
 from bisect_kit import cli
 from bisect_kit import common
@@ -310,9 +309,7 @@ def main():
     parser_release_dut.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
-        default=os.environ.get(
-            'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
-        ),
+        default=common.get_default_chromeos_root(),
         help='ChromeOS source tree, for overlay data (default: %(default)s)',
     )
     parser_release_dut.add_argument(
@@ -341,9 +338,7 @@ def main():
     parser_allocate_dut.add_argument(
         '--chromeos_root',
         type=cli.argtype_dir_path,
-        default=os.environ.get(
-            'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
-        ),
+        default=common.get_default_chromeos_root(),
         help='ChromeOS source tree, for overlay data (default: %(default)s)',
     )
     parser_allocate_dut.set_defaults(func=cmd_allocate_dut)

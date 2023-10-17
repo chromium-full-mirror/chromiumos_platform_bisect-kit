@@ -52,17 +52,17 @@ class SessionBasePatcher:
     """Helper class to patch session base and clean up."""
 
     def __init__(self):
-        self.session_base_bak = common.DEFAULT_SESSION_BASE
+        self.session_base_bak = common.DEFAULT_LOG_BASE
         self.session_base = None
 
     def patch(self):
         if not self.session_base:
             self.session_base = tempfile.mkdtemp()
-            common.DEFAULT_SESSION_BASE = self.session_base
+            common.DEFAULT_LOG_BASE = self.session_base
 
     def reset(self):
         if self.session_base:
-            common.DEFAULT_SESSION_BASE = self.session_base_bak
+            common.DEFAULT_LOG_BASE = self.session_base_bak
             shutil.rmtree(self.session_base)
             self.session_base = None
 

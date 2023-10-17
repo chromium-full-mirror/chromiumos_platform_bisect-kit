@@ -50,9 +50,9 @@ class CrosDiagnoser:
         self.states = states
         self.config = config
         self.path_factory = common.ProjectPathFactory(
-            self.config['mirror_base'],
-            self.config['work_base'],
             self.config['session'],
+            self.config['work_base'],
+            self.config['mirror_base'],
         )
         # self.noisy will be updated after we gather more information from each
         # bisect session.
@@ -1307,7 +1307,7 @@ class DiagnoseCommandLineBase:
 
     def check_options(self, opts):
         path_factory = common.ProjectPathFactory(
-            opts.mirror_base, opts.work_base, opts.session
+            opts.session, opts.work_base, opts.mirror_base
         )
         if not opts.chromeos_mirror:
             opts.chromeos_mirror = path_factory.get_chromeos_mirror()
@@ -1861,7 +1861,8 @@ class DiagnoseCommandLineBase:
         opts = self.argument_parser.parse_args(args)
         common.config_logging(opts)
 
-        session_dir = common.determine_session_dir(opts.session)
-        session_file = os.path.join(session_dir, self.__class__.__name__)
+        session_file = common.get_session_log_file(
+            opts.session, self.__class__.__name__
+        )
         self.states = core.DiagnoseStates(session_file)
         opts.func(opts)

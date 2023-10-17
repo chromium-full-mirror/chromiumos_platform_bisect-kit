@@ -409,8 +409,7 @@ class BisectStates(States):
         cls, bisector_cls: str, session: str
     ) -> BisectStates:
         """Initializes BisectStates from a bisector class name."""
-        session_dir = common.determine_session_dir(session)
-        session_file = os.path.join(session_dir, bisector_cls)
+        session_file = common.get_session_log_file(session, bisector_cls)
         return cls(session_file)
 
     @property

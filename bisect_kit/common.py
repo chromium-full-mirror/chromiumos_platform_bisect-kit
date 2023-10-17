@@ -16,12 +16,14 @@ logger = logging.getLogger(__name__)
 
 PathLike = os.PathLike | str
 
-DEFAULT_SESSION_BASE = 'bisect.sessions'
 DEFAULT_SESSION_NAME = 'default'
-DEFAULT_LOG_FILENAME = 'bisect-kit.log'
-DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors').expanduser())
 DEFAULT_WORK_BASE = str(pathlib.Path('~/bisect-workdir').expanduser())
-DEFAULT_CHROMEOS_ROOT = str(pathlib.Path('~/chromiumos').expanduser())
+DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors').expanduser())
+
+DEFAULT_LOG_BASE = 'bisect.sessions'
+DEFAULT_LOG_FILENAME = 'bisect-kit.log'
+
+_DEFAULT_CHROMEOS_ROOT = str(pathlib.Path('~/chromiumos').expanduser())
 
 
 class ProjectPathFactory:
@@ -29,14 +31,22 @@ class ProjectPathFactory:
 
     def __init__(
         self,
-        mirror_base: PathLike = DEFAULT_MIRROR_BASE,
-        work_base: PathLike = DEFAULT_WORK_BASE,
-        session: str = DEFAULT_SESSION_NAME,
+        session_name: str | None = None,
+        work_base: PathLike | None = None,
+        mirror_base: PathLike | None = None,
     ):
-        self._mirror_base = pathlib.Path(mirror_base)
+        if not session_name:
+            session_name = DEFAULT_SESSION_NAME
+        self._session_name = session_name
+
+        if not work_base:
+            work_base = DEFAULT_WORK_BASE
         self._work_base = pathlib.Path(work_base)
-        self._session_name = session
         self._session_workdir = self._work_base / self._session_name
+
+        if not mirror_base:
+            mirror_base = DEFAULT_MIRROR_BASE
+        self._mirror_base = pathlib.Path(mirror_base)
 
     @property
     def session_name(self) -> str:
@@ -53,6 +63,9 @@ class ProjectPathFactory:
     @property
     def work_base(self) -> str:
         return str(self._work_base)
+
+    def get_session_file(self, file_path: PathLike) -> str:
+        return str(self._session_workdir / file_path)
 
     def get_chromeos_mirror(self) -> str:
         return str(self._mirror_base / 'chromeos')
@@ -73,15 +86,18 @@ class ProjectPathFactory:
         return str(self._session_workdir / 'chrome')
 
 
-def determine_session_dir(
+def get_default_chromeos_root() -> str:
+    return os.environ.get('DEFAULT_CHROMEOS_ROOT', _DEFAULT_CHROMEOS_ROOT)
+
+
+def get_session_log_file(
     session_name: str | None = None,
-    session_base: str | None = None,
-) -> pathlib.Path:
-    if not session_name:
-        session_name = DEFAULT_SESSION_NAME
-    if not session_base:
-        session_base = DEFAULT_SESSION_BASE
-    return pathlib.Path(session_base) / session_name
+    file_path: PathLike | None = None,
+) -> str:
+    path_factory = ProjectPathFactory(session_name, work_base=DEFAULT_LOG_BASE)
+    if not file_path:
+        return path_factory.session_workdir
+    return path_factory.get_session_file(file_path)
 
 
 def config_logging(opts):
@@ -100,18 +116,19 @@ def config_logging(opts):
         return
     config_logging.configured = True
 
-    log_file: pathlib.Path
+    log_file: str
     if opts.log_file is not None:
-        log_file = pathlib.Path(opts.log_file)
+        log_file = opts.log_file
     elif getattr(opts, 'session', None):
-        log_file = determine_session_dir(opts.session) / DEFAULT_LOG_FILENAME
+        log_file = get_session_log_file(opts.session, DEFAULT_LOG_FILENAME)
     else:
-        log_file = pathlib.Path(DEFAULT_LOG_FILENAME)
-    log_file.parent.mkdir(parents=True, exist_ok=True)
+        log_file = DEFAULT_LOG_FILENAME
+
+    pathlib.Path(log_file).parent.mkdir(parents=True, exist_ok=True)
 
     print(f'log file = {log_file}', file=sys.stderr)
-    os.environ['LOG_FILE'] = str(log_file)
-    opts.log_file = str(log_file)
+    os.environ['LOG_FILE'] = log_file
+    opts.log_file = log_file
 
     if getattr(opts, 'debug'):
         os.environ['BISECT_KIT_CONSOLE_LOG_LEVEL'] = 'DEBUG'

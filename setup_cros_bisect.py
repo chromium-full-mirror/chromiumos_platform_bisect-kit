@@ -448,7 +448,7 @@ def _sync_android_code(path_factory, branch):
 
 def cmd_init(opts):
     path_factory = common.ProjectPathFactory(
-        opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
+        CHECKOUT_TEMPLATE_NAME, opts.work_base, opts.mirror_base
     )
 
     if opts.chromeos:
@@ -469,7 +469,7 @@ def _enumerate_android_branches_available(base):
 
 def do_sync(opts):
     path_factory = common.ProjectPathFactory(
-        opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
+        CHECKOUT_TEMPLATE_NAME, opts.work_base, opts.mirror_base
     )
 
     sync_all = False
@@ -523,10 +523,10 @@ def cmd_new(opts):
         os.makedirs(work_dir)
 
     template_factory = common.ProjectPathFactory(
-        opts.mirror_base, opts.work_base, CHECKOUT_TEMPLATE_NAME
+        CHECKOUT_TEMPLATE_NAME, opts.work_base, opts.mirror_base
     )
     path_factory = common.ProjectPathFactory(
-        opts.mirror_base, opts.work_base, opts.session
+        opts.session, opts.work_base, opts.mirror_base
     )
 
     prepare_all = False
@@ -582,7 +582,7 @@ def cmd_list(opts):
 def cmd_delete(opts):
     assert opts.session
     path_factory = common.ProjectPathFactory(
-        opts.mirror_base, opts.work_base, opts.session
+        opts.session, opts.work_base, opts.mirror_base
     )
 
     chromeos_tree = path_factory.get_chromeos_tree()
@@ -603,9 +603,7 @@ def cmd_delete(opts):
     os.rmdir(os.path.join(opts.work_base, opts.session))
 
     # remove caches
-    chromeos_root = os.getenv(
-        'DEFAULT_CHROMEOS_ROOT', common.DEFAULT_CHROMEOS_ROOT
-    )
+    chromeos_root = common.get_default_chromeos_root()
     if chromeos_root:
         path = os.path.join(chromeos_root, 'devserver/static')
         if os.path.exists(path):
