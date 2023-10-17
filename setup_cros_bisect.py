@@ -27,6 +27,7 @@ import glob
 import logging
 import multiprocessing
 import os
+import pathlib
 import subprocess
 import time
 import urllib.parse
@@ -43,7 +44,8 @@ from bisect_kit import repo_util
 from bisect_kit import util
 
 
-CHECKOUT_TEMPLATE_NAME = 'template'
+PathLike = os.PathLike | str
+
 MANIFEST_FOR_DELETED = 'deleted-repos.xml'
 
 logger = logging.getLogger(__name__)
@@ -447,9 +449,7 @@ def _sync_android_code(path_factory, branch):
 
 
 def cmd_init(opts):
-    path_factory = common.ProjectPathFactory(
-        CHECKOUT_TEMPLATE_NAME, opts.work_base, opts.mirror_base
-    )
+    path_factory = common.TemplatePathFactory(opts.work_base, opts.mirror_base)
 
     if opts.chromeos:
         _setup_chromeos_repos(path_factory, opts.btrfs)
@@ -459,18 +459,8 @@ def cmd_init(opts):
         _setup_android_repos(path_factory, branch, opts.btrfs)
 
 
-def _enumerate_android_branches_available(base):
-    branches = []
-    for name in os.listdir(base):
-        if name.startswith('android.'):
-            branches.append(name.partition('.')[2])
-    return branches
-
-
 def do_sync(opts):
-    path_factory = common.ProjectPathFactory(
-        CHECKOUT_TEMPLATE_NAME, opts.work_base, opts.mirror_base
-    )
+    path_factory = common.TemplatePathFactory(opts.work_base, opts.mirror_base)
 
     sync_all = False
     if not opts.chromeos and not opts.chrome and not opts.android:
@@ -498,9 +488,7 @@ def do_sync(opts):
         _sync_chrome_code(path_factory, use_btrfs)
 
     if sync_all:
-        android_branches = _enumerate_android_branches_available(
-            opts.mirror_base
-        )
+        android_branches = path_factory.iter_android_branches()
     else:
         android_branches = opts.android
     for branch in android_branches:
@@ -518,15 +506,14 @@ def cmd_sync(opts):
 
 
 def cmd_new(opts):
-    work_dir = os.path.join(opts.work_base, opts.session)
-    if not os.path.exists(work_dir):
-        os.makedirs(work_dir)
-
-    template_factory = common.ProjectPathFactory(
-        CHECKOUT_TEMPLATE_NAME, opts.work_base, opts.mirror_base
+    template_factory = common.TemplatePathFactory(
+        opts.work_base, opts.mirror_base
     )
     path_factory = common.ProjectPathFactory(
         opts.session, opts.work_base, opts.mirror_base
+    )
+    pathlib.Path(path_factory.session_workdir).mkdir(
+        parents=True, exist_ok=True
     )
 
     prepare_all = False
@@ -553,9 +540,7 @@ def cmd_new(opts):
         btrfs_util.copy_tree(chrome_template, path_factory.get_chrome_tree())
 
     if prepare_all:
-        android_branches = _enumerate_android_branches_available(
-            opts.mirror_base
-        )
+        android_branches = path_factory.iter_android_branches()
     else:
         android_branches = opts.android
     for branch in android_branches:
@@ -571,19 +556,33 @@ def cmd_new(opts):
 
 
 def cmd_list(opts):
-    print('%-20s  %s' % ('Session', 'Path'))
-    for name in os.listdir(opts.work_base):
-        if name == CHECKOUT_TEMPLATE_NAME:
-            continue
-        path = os.path.join(opts.work_base, name)
-        print('%-20s  %s' % (name, path))
+    def _iter_rows():
+        yield 'Session', 'Path'
+        path_factory = common.WorkBasePathFactory(work_base=opts.work_base)
+        for session_name in path_factory.iter_session_names(
+            exclude_non_uuid=False
+        ):
+            yield session_name, path_factory.get_session_workdir(session_name)
+
+    for session_name, session_path in _iter_rows():
+        print(f'{session_name:<20}  {session_path}')
 
 
 def cmd_delete(opts):
-    assert opts.session
-    path_factory = common.ProjectPathFactory(
-        opts.session, opts.work_base, opts.mirror_base
-    )
+    if opts.all_uuid_sessions:
+        # If this function is called manually, the user should stop the bkr
+        # process first to avoid deleting the running session accidentally.
+        path_factory = common.WorkBasePathFactory(work_base=opts.work_base)
+        for session_name in path_factory.iter_session_names():
+            _delete_session(session_name, opts.mirror_base, opts.work_base)
+    elif opts.session:
+        _delete_session(opts.session, opts.mirror_base, opts.work_base)
+
+    _clear_global_caches()
+
+
+def _delete_session(session: str, mirror_base: PathLike, work_base: PathLike):
+    path_factory = common.ProjectPathFactory(session, work_base, mirror_base)
 
     chromeos_tree = path_factory.get_chromeos_tree()
     if os.path.exists(chromeos_tree):
@@ -595,14 +594,21 @@ def cmd_delete(opts):
     chrome_tree = path_factory.get_chrome_tree()
     btrfs_util.delete_tree(chrome_tree, missing_ok=True)
 
-    android_branches = _enumerate_android_branches_available(opts.mirror_base)
+    android_branches = path_factory.iter_android_branches()
     for branch in android_branches:
         android_tree = path_factory.get_android_tree(branch)
         btrfs_util.delete_tree(android_tree, missing_ok=True)
 
-    os.rmdir(os.path.join(opts.work_base, opts.session))
+    btrfs_util.delete_tree(path_factory.session_workdir, missing_ok=True)
 
-    # remove caches
+    for path in glob.glob(
+        os.path.join(path_factory.get_chrome_cache(), '_cache_*')
+    ):
+        logger.debug('remove cache (chrome gclient cache): %s', path)
+        btrfs_util.delete_tree(path)
+
+
+def _clear_global_caches():
     chromeos_root = common.get_default_chromeos_root()
     if chromeos_root:
         path = os.path.join(chromeos_root, 'devserver/static')
@@ -617,12 +623,6 @@ def cmd_delete(opts):
         for path in glob.glob(os.path.join(chromeos_root, 'tmp/*')):
             logger.debug('remove cache (chromeos root tmp): %s', path)
             btrfs_util.delete_tree(path)
-
-    for path in glob.glob(
-        os.path.join(path_factory.get_chrome_cache(), '_cache_*')
-    ):
-        logger.debug('remove cache (chrome gclient cache): %s', path)
-        btrfs_util.delete_tree(path)
 
 
 def create_parser():
@@ -736,7 +736,12 @@ def create_parser():
     parser_delete = subparsers.add_parser(
         'delete',
         help='Delete source checkout',
-        parents=parents_session_required,
+        parents=parents_session_optional,
+    )
+    parser_delete.add_argument(
+        '--all-uuid-sessions',
+        action='store_true',
+        help='Delete all sessions with names in UUID format',
     )
     parser_delete.set_defaults(func=cmd_delete)
 

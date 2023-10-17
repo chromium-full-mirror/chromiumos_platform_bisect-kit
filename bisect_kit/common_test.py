@@ -40,6 +40,20 @@ class TestCommon(unittest.TestCase):
         with open(self.log_file) as f:
             self.assertIn('test', f.read())
 
+    def test_is_valid_uuid(self):
+        self.assertTrue(
+            common.is_valid_uuid('683b2c93-7c88-4ac5-b4ed-206137ac859b')
+        )
+
+        # not uuid version 4
+        self.assertFalse(
+            common.is_valid_uuid('683b2c93-7c88-3ac5-b4ed-206137ac859b')
+        )
+        # malformed
+        self.assertFalse(
+            common.is_valid_uuid('0683b2c93-7c88-4ac5-b4ed-206137ac859b')
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

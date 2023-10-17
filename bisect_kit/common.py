@@ -4,12 +4,14 @@
 
 """Common functions used by almost of all bisect kit scripts."""
 
+import collections.abc
 import logging
 import logging.config
 import os
 import pathlib
 import sys
 import typing
+import uuid
 
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,7 @@ logger = logging.getLogger(__name__)
 PathLike = os.PathLike | str
 
 DEFAULT_SESSION_NAME = 'default'
+DEFAULT_TEMPLATE_NAME = 'template'
 DEFAULT_WORK_BASE = str(pathlib.Path('~/bisect-workdir').expanduser())
 DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors').expanduser())
 
@@ -26,8 +29,47 @@ DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 _DEFAULT_CHROMEOS_ROOT = str(pathlib.Path('~/chromiumos').expanduser())
 
 
-class ProjectPathFactory:
-    """Factory for chromeos/chrome/android source tree paths."""
+class WorkBasePathFactory:
+    """Factory for generating session paths."""
+
+    def __init__(self, work_base: str | None = None):
+        if not work_base:
+            work_base = DEFAULT_WORK_BASE
+        self._work_base = pathlib.Path(work_base).absolute()
+
+    @property
+    def work_base(self) -> str:
+        return str(self._work_base)
+
+    def iter_session_names(
+        self,
+        exclude_non_uuid: bool = True,
+        exclude_template: bool = True,
+    ) -> collections.abc.Iterator[str]:
+        for path in self._work_base.iterdir():
+            if not path.is_dir():
+                continue
+            if is_valid_uuid(str(path.name)):
+                yield path.name
+                continue
+            if exclude_non_uuid:
+                continue
+            if exclude_template and path.name == DEFAULT_TEMPLATE_NAME:
+                continue
+            yield path.name
+
+    def get_session_workdir(self, session_name: str | None) -> str:
+        if not session_name:
+            session_name = DEFAULT_SESSION_NAME
+        return str(self._work_base / session_name)
+
+
+class ProjectPathFactory(WorkBasePathFactory):
+    """Factory for generating chromeos/chrome/android source tree paths."""
+
+    CHROME_SRC = 'chromeos'
+    CHROMEOS_SRC = 'chrome'
+    ANDROID_SRC_PREFIX = 'android.'
 
     def __init__(
         self,
@@ -35,18 +77,16 @@ class ProjectPathFactory:
         work_base: PathLike | None = None,
         mirror_base: PathLike | None = None,
     ):
+        super().__init__(work_base=work_base)
+
         if not session_name:
             session_name = DEFAULT_SESSION_NAME
         self._session_name = session_name
-
-        if not work_base:
-            work_base = DEFAULT_WORK_BASE
-        self._work_base = pathlib.Path(work_base)
         self._session_workdir = self._work_base / self._session_name
 
         if not mirror_base:
             mirror_base = DEFAULT_MIRROR_BASE
-        self._mirror_base = pathlib.Path(mirror_base)
+        self._mirror_base = pathlib.Path(mirror_base).absolute()
 
     @property
     def session_name(self) -> str:
@@ -60,30 +100,42 @@ class ProjectPathFactory:
     def mirror_base(self) -> str:
         return str(self._mirror_base)
 
-    @property
-    def work_base(self) -> str:
-        return str(self._work_base)
-
     def get_session_file(self, file_path: PathLike) -> str:
         return str(self._session_workdir / file_path)
 
     def get_chromeos_mirror(self) -> str:
-        return str(self._mirror_base / 'chromeos')
+        return str(self._mirror_base / self.CHROMEOS_SRC)
 
     def get_chromeos_tree(self) -> str:
-        return str(self._session_workdir / 'chromeos')
+        return str(self._session_workdir / self.CHROMEOS_SRC)
 
     def get_android_mirror(self, branch: str) -> str:
-        return str(self._mirror_base / f'android.{branch}')
+        return str(self._mirror_base / f'{self.ANDROID_SRC_PREFIX}{branch}')
 
     def get_android_tree(self, branch: str) -> str:
-        return str(self._session_workdir / f'android.{branch}')
+        return str(self._session_workdir / f'{self.ANDROID_SRC_PREFIX}{branch}')
+
+    def iter_android_branches(self) -> collections.abc.Iterator[str]:
+        for path in self._mirror_base.iterdir():
+            if path.name.startswith(self.ANDROID_SRC_PREFIX):
+                yield path.name.removeprefix(self.ANDROID_SRC_PREFIX)
 
     def get_chrome_cache(self) -> str:
-        return str(self._mirror_base / 'chrome')
+        return str(self._mirror_base / self.CHROME_SRC)
 
     def get_chrome_tree(self) -> str:
-        return str(self._session_workdir / 'chrome')
+        return str(self._session_workdir / self.CHROME_SRC)
+
+
+class TemplatePathFactory(ProjectPathFactory):
+    """Factory for generating template paths."""
+
+    def __init__(
+        self,
+        work_base: PathLike | None = None,
+        mirror_base: PathLike | None = None,
+    ):
+        super().__init__(DEFAULT_TEMPLATE_NAME, work_base, mirror_base)
 
 
 def get_default_chromeos_root() -> str:
@@ -92,12 +144,18 @@ def get_default_chromeos_root() -> str:
 
 def get_session_log_file(
     session_name: str | None = None,
-    file_path: PathLike | None = None,
+    file_path: PathLike = '',
 ) -> str:
-    path_factory = ProjectPathFactory(session_name, work_base=DEFAULT_LOG_BASE)
-    if not file_path:
-        return path_factory.session_workdir
+    path_factory = ProjectPathFactory(session_name, DEFAULT_LOG_BASE)
     return path_factory.get_session_file(file_path)
+
+
+def is_valid_uuid(uuid_str: str) -> bool:
+    try:
+        uuid_obj = uuid.UUID(uuid_str, version=4)
+        return str(uuid_obj) == uuid_str
+    except ValueError:
+        return False
 
 
 def config_logging(opts):
