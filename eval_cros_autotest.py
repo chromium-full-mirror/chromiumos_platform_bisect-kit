@@ -359,7 +359,9 @@ def parse_cts_results(result_dir, test_name) -> tuple[bool, str | None]:
 
     # Returns the reason of the first failure.
     for test in root.iter('Test'):
-        if test.get('result') == 'pass':
+        test_result = test.get('result')
+        # See https://source.android.com/docs/compatibility/cts/interpret#test_summary
+        if test_result in ('pass', 'ASSUMPTION_FAILURE', 'IGNORED'):
             continue
         reason = None
         failure = test.find('Failure')

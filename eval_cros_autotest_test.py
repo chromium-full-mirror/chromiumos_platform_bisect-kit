@@ -48,6 +48,24 @@ class TestEvalCrosAutotest(unittest.TestCase):
             (True, None),
         )
 
+        self.assertEqual(
+            eval_cros_autotest.parse_cts_results(
+                testing.get_testdata_path(
+                    'cts_test_result/cts.assumption-failure'
+                ),
+                'cheets_CTS_P.tradefed-run-test',
+            ),
+            (True, None),
+        )
+
+        self.assertEqual(
+            eval_cros_autotest.parse_cts_results(
+                testing.get_testdata_path('cts_test_result/cts.ignored'),
+                'cheets_CTS_P.tradefed-run-test',
+            ),
+            (True, None),
+        )
+
         passed, reason = eval_cros_autotest.parse_cts_results(
             testing.get_testdata_path('cts_test_result/gts.fail'),
             'cheets_GTS.tradefed-run-test',
