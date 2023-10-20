@@ -2094,7 +2094,12 @@ def prepare_chroot(chromeos_root, replace=False):
     # The creds file is copied into the chroot since 12866.0.0.
     # But earlier versions need this file as well because of cipd ACL change.
     creds_path = '~/.config/chrome_infra/auth/creds.json'
-    if os.path.exists(os.path.expanduser(creds_path)):
+    chromeos_build = int(
+        query_repo_chromeos_version(chromeos_root)['CHROMEOS_BUILD']
+    )
+    if chromeos_build < 12866 and os.path.exists(
+        os.path.expanduser(creds_path)
+    ):
         copy_into_chroot(chromeos_root, creds_path, creds_path, overwrite=False)
 
     # quick-provision requires special config for autotest.
@@ -3287,3 +3292,25 @@ def normalize_test_name(test_name: str) -> str:
       The normalized test name
     """
     return test_name.removeprefix('tauto.')
+
+
+def query_repo_chromeos_version(chromeos_root: str) -> dict[str, str]:
+    """Queries the version file inside chromeos_root.
+
+    Args:
+      chromeos_root: the chromeos tree
+
+    Returns:
+      A dict indicates the version info inside the repo.
+      The version keys are defined in:
+      https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/0357a0ff14d1de4fb99976a3edf453063cde8130/chromeos/config/chromeos_version.sh
+    """
+    sh_path = os.path.join(
+        chromeos_root,
+        'src/third_party/chromiumos-overlay/chromeos/config/chromeos_version.sh',
+    )
+    if not os.path.exists(sh_path):
+        raise errors.InternalError('Unable to find chromeos_version.sh')
+
+    output = util.check_output(sh_path)
+    return dict(re.findall(r'(\w+)=(.*)$', output, re.M))

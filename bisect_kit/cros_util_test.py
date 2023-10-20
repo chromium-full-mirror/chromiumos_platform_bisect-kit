@@ -1036,6 +1036,32 @@ class TestCrosUtil(unittest.TestCase):
         mock_ssh_cmd.side_effect = ['/dev/mmcblk0', '/dev/mmcblk0p5', '0']
         self.assertEqual(cros_util.is_dut_kernel_ready('bar'), False)
 
+    @mock.patch('os.path.exists')
+    @mock.patch('bisect_kit.util.check_output')
+    def test_query_repo_chromeos_version(
+        self, mock_check_output, mock_path_exists
+    ):
+        mock_path_exists.return_value = True
+        mock_check_output.return_value = '''ChromiumOS version information:
+    CHROME_BRANCH=120
+    CHROME_VERSION=
+    CHROMEOS_BUILD=15651
+    CHROMEOS_BRANCH=0
+    CHROMEOS_PATCH=0
+    CHROMEOS_VERSION_STRING=15651.0.0'''
+
+        self.assertDictEqual(
+            cros_util.query_repo_chromeos_version('foo'),
+            {
+                'CHROME_BRANCH': '120',
+                'CHROME_VERSION': '',
+                'CHROMEOS_BUILD': '15651',
+                'CHROMEOS_BRANCH': '0',
+                'CHROMEOS_PATCH': '0',
+                'CHROMEOS_VERSION_STRING': '15651.0.0',
+            },
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
