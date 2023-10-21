@@ -54,6 +54,46 @@ class TestCommon(unittest.TestCase):
             common.is_valid_uuid('0683b2c93-7c88-4ac5-b4ed-206137ac859b')
         )
 
+    def test_path_factory(self):
+        path_facory = common.ProjectPathFactory(
+            'dummy_session', '/dummy_work_base', '/dummy_mirror_base'
+        )
+        self.assertEqual(path_facory.work_base, '/dummy_work_base')
+        self.assertEqual(path_facory.session_name, 'dummy_session')
+        self.assertEqual(path_facory.mirror_base, '/dummy_mirror_base')
+        self.assertEqual(
+            path_facory.get_session_workdir('dummy_session'),
+            '/dummy_work_base/dummy_session',
+        )
+        self.assertEqual(
+            path_facory.get_session_file('dummy_file'),
+            '/dummy_work_base/dummy_session/dummy_file',
+        )
+        self.assertEqual(
+            path_facory.get_chromeos_mirror(),
+            '/dummy_mirror_base/chromeos',
+        )
+        self.assertEqual(
+            path_facory.get_chromeos_tree(),
+            '/dummy_work_base/dummy_session/chromeos',
+        )
+        self.assertEqual(
+            path_facory.get_android_mirror('dummy_branch'),
+            '/dummy_mirror_base/android.dummy_branch',
+        )
+        self.assertEqual(
+            path_facory.get_android_tree('dummy_branch'),
+            '/dummy_work_base/dummy_session/android.dummy_branch',
+        )
+        self.assertEqual(
+            path_facory.get_chrome_cache(),
+            '/dummy_mirror_base/chrome',
+        )
+        self.assertEqual(
+            path_facory.get_chrome_tree(),
+            '/dummy_work_base/dummy_session/chrome',
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

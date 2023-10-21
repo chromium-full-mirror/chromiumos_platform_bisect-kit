@@ -67,8 +67,8 @@ class WorkBasePathFactory:
 class ProjectPathFactory(WorkBasePathFactory):
     """Factory for generating chromeos/chrome/android source tree paths."""
 
-    CHROME_SRC = 'chromeos'
-    CHROMEOS_SRC = 'chrome'
+    CHROMEOS_SRC = 'chromeos'
+    CHROME_SRC = 'chrome'
     ANDROID_SRC_PREFIX = 'android.'
 
     def __init__(
