@@ -459,8 +459,10 @@ def cmd_init(opts):
         _setup_android_repos(path_factory, branch, opts.btrfs)
 
 
-def do_sync(opts):
-    path_factory = common.TemplatePathFactory(opts.work_base, opts.mirror_base)
+def do_sync_template(opts):
+    template_factory = common.TemplatePathFactory(
+        opts.work_base, opts.mirror_base
+    )
 
     sync_all = False
     if not opts.chromeos and not opts.chrome and not opts.android:
@@ -469,7 +471,7 @@ def do_sync(opts):
 
     if sync_all or opts.chromeos:
         try:
-            _sync_chromeos_code(path_factory)
+            _sync_chromeos_code(template_factory)
         except Exception:
             # b/222638221: repo may be broken due to infra issues
             # re-create the whole repo and sync again
@@ -477,32 +479,32 @@ def do_sync(opts):
                 'chromeos sync failed, re-init chromeos repo '
                 '(this takes hours; be patient)'
             )
-            chromeos_tree = path_factory.get_chromeos_tree()
+            chromeos_tree = template_factory.get_chromeos_tree()
             use_btrfs = btrfs_util.is_btrfs_subvolume(chromeos_tree)
             btrfs_util.delete_tree(chromeos_tree)
-            _setup_chromeos_repos(path_factory, use_btrfs)
+            _setup_chromeos_repos(template_factory, use_btrfs)
     if sync_all or opts.chrome:
         use_btrfs = btrfs_util.is_btrfs_subvolume(
-            path_factory.get_chrome_tree()
+            template_factory.get_chrome_tree()
         )
-        _sync_chrome_code(path_factory, use_btrfs)
+        _sync_chrome_code(template_factory, use_btrfs)
 
     if sync_all:
-        android_branches = path_factory.iter_android_branches()
+        android_branches = template_factory.iter_android_branches()
     else:
         android_branches = opts.android
     for branch in android_branches:
-        _sync_android_code(path_factory, branch)
+        _sync_android_code(template_factory, branch)
 
 
 def cmd_sync(opts):
     try:
-        do_sync(opts)
+        do_sync_template(opts)
     except subprocess.CalledProcessError:
         # Sync may fail due to network or server issues.
-        logger.exception('do_sync failed, will retry one minute later')
+        logger.exception('do_sync_template failed, will retry one minute later')
         time.sleep(60)
-        do_sync(opts)
+        do_sync_template(opts)
 
 
 def cmd_new(opts):
@@ -684,7 +686,7 @@ def create_parser():
 
     parser_sync = subparsers.add_parser(
         'sync',
-        help='Sync source trees',
+        help='Sync template source trees',
         description='Sync all if no projects are specified '
         '(--chrome, --chromeos, or --android)',
         parents=parents_session_optional,
