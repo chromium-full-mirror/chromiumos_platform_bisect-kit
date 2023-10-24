@@ -18,6 +18,7 @@ import dataclasses
 import json
 import logging
 import os
+import pathlib
 import re
 import shutil
 import typing
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 _re_intra_rev = r'^([^,]+)~([^,]+)/(\d+)$'
 
-_DIFF_CACHE_DIR = 'bisectkit-cache'
+_DIFF_CACHE_DIR = 'codemanager-diff'
 
 
 def make_intra_rev(a, b, index):
@@ -720,12 +721,16 @@ class CodeManager:
       root_dir: root path of project source tree
       spec_manager: SpecManager object
       code_storage: CodeStorage object
+      session_cache_dir: the root session cache dir.
+        Put diff cache files under the log dir so the bisection internal state is kept.
     """
 
-    def __init__(self, root_dir, spec_manager, code_storage):
+    def __init__(self, root_dir, spec_manager, code_storage, session_cache_dir):
         self.root_dir = root_dir
         self.spec_manager = spec_manager
         self.code_storage = code_storage
+        self.diff_cache_dir = pathlib.Path(session_cache_dir) / _DIFF_CACHE_DIR
+        logger.debug('CodeManager: diff_cache_dir: %s', self.diff_cache_dir)
 
     def generate_action_groups_between_specs(self, prev_float, next_float):
         """Generates actions between two float specs.
@@ -1206,23 +1211,21 @@ class CodeManager:
     def save_action_groups_between_releases(self, old, new, action_groups):
         data = [ag.serialize() for ag in action_groups]
 
-        cache_dir = os.path.join(self.root_dir, _DIFF_CACHE_DIR)
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
-        cache_filename = os.path.join(cache_dir, '%s,%s.json' % (old, new))
-        with open(cache_filename, 'w') as fp:
+        if not self.diff_cache_dir.exists():
+            self.diff_cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_filename = self.diff_cache_dir / ('%s,%s.json' % (old, new))
+        with cache_filename.open('w') as fp:
             json.dump(data, fp, indent=4, sort_keys=True)
 
     def load_action_groups_between_releases(self, old, new):
-        cache_dir = os.path.join(self.root_dir, _DIFF_CACHE_DIR)
-        cache_filename = os.path.join(cache_dir, '%s,%s.json' % (old, new))
-        if not os.path.exists(cache_filename):
+        cache_filename = self.diff_cache_dir / ('%s,%s.json' % (old, new))
+        if not cache_filename.exists():
             raise errors.InternalError(
                 'cached revlist not found: %s' % cache_filename
             )
 
         result = []
-        with open(cache_filename) as f:
+        with cache_filename.open() as f:
             for data in json.load(f):
                 result.append(ActionGroup.deserialize(data))
 

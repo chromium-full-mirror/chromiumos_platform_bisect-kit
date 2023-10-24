@@ -96,7 +96,7 @@ class BisectorWrapper:
                     'config',
                     'switch',
                     '--mode=bisectkit',
-                    *cmd,
+                    *(cmd + ['--session', self.session]),
                 )
         self.call(
             'config',

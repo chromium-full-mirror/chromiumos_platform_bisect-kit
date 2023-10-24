@@ -178,6 +178,8 @@ class CrosDiagnoser:
                 self.config['board'],
                 '--sync_code_only',
                 self.cros_old,
+                '--session',
+                self.config['session'],
             )
             if switch_test_harness_cmd:
                 util.check_call(
@@ -355,8 +357,6 @@ class CrosDiagnoser:
             switch_cmd = [
                 './switch_cros_prebuilt.py',
                 '--rich_result',
-                '--session',
-                self.config['session'],
             ]
             if not self.config['disable_rootfs_verification']:
                 switch_cmd.append('--no_disable_rootfs_verification')
@@ -881,8 +881,6 @@ class CrosDiagnoser:
         switch_cmd = [
             './switch_cros_borealis_dlc_prebuilt.py',
             '--rich_result',
-            '--session',
-            self.config['session'],
             '--chromeos_root',
             self.config['chromeos_root'],
         ]
@@ -1861,7 +1859,7 @@ class DiagnoseCommandLineBase:
         opts = self.argument_parser.parse_args(args)
         common.config_logging(opts)
 
-        session_file = common.get_session_log_file(
+        session_file = common.get_session_log_path(
             opts.session, self.__class__.__name__
         )
         self.states = core.DiagnoseStates(session_file)

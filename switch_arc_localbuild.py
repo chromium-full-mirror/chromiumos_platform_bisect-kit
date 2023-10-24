@@ -83,7 +83,10 @@ def switch(opts):
         spec_manager = android_util.AndroidSpecManager(config)
         cache = repo_util.RepoMirror(opts.android_mirror)
         code_manager = codechange.CodeManager(
-            opts.android_root, spec_manager, cache
+            opts.android_root,
+            spec_manager,
+            cache,
+            common.get_session_cache_dir(opts.session),
         )
         code_manager.switch(opts.rev)
 

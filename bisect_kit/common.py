@@ -26,6 +26,8 @@ DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors').expanduser())
 DEFAULT_LOG_BASE = 'bisect.sessions'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
+DEFAULT_CACHE_DIR = 'cache'
+
 _DEFAULT_CHROMEOS_ROOT = str(pathlib.Path('~/chromiumos').expanduser())
 
 
@@ -142,12 +144,18 @@ def get_default_chromeos_root() -> str:
     return os.environ.get('DEFAULT_CHROMEOS_ROOT', _DEFAULT_CHROMEOS_ROOT)
 
 
-def get_session_log_file(
+def get_session_log_path(
     session_name: str | None = None,
     file_path: PathLike = '',
 ) -> str:
     path_factory = ProjectPathFactory(session_name, DEFAULT_LOG_BASE)
     return path_factory.get_session_file(file_path)
+
+
+def get_session_cache_dir(
+    session_name: str | None = None,
+) -> str:
+    return get_session_log_path(session_name, DEFAULT_CACHE_DIR)
 
 
 def is_valid_uuid(uuid_str: str) -> bool:
@@ -178,7 +186,7 @@ def config_logging(opts):
     if opts.log_file is not None:
         log_file = opts.log_file
     elif getattr(opts, 'session', None):
-        log_file = get_session_log_file(opts.session, DEFAULT_LOG_FILENAME)
+        log_file = get_session_log_path(opts.session, DEFAULT_LOG_FILENAME)
     else:
         log_file = DEFAULT_LOG_FILENAME
 

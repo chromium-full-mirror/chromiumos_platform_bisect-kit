@@ -28,6 +28,7 @@ import os
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
@@ -121,7 +122,10 @@ class ChromeOSRepoDomain(core.BisectDomain):
         spec_manager = cros_util.ChromeOSSpecManager(config)
         cache = repo_util.RepoMirror(opts.chromeos_mirror)
         code_manager = codechange.CodeManager(
-            opts.chromeos_root, spec_manager, cache
+            opts.chromeos_root,
+            spec_manager,
+            cache,
+            common.get_session_cache_dir(opts.session),
         )
         states = core.BisectStates.from_bisector_class(
             'ChromeOSVersionDomain', opts.session

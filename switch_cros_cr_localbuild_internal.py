@@ -188,7 +188,10 @@ def switch_main(args: tuple[str] | None):
         cache = gclient_util.GclientCache(opts.chrome_mirror)
         spec_manager = cr_util.ChromeSpecManager(config)
         code_manager = codechange.CodeManager(
-            opts.chrome_root, spec_manager, cache
+            opts.chrome_root,
+            spec_manager,
+            cache,
+            common.get_session_cache_dir(opts.session),
         )
         code_manager.switch(opts.rev)
         _apply_additional_patch(opts.chrome_root, opts.rev)

@@ -482,7 +482,7 @@ class DutManager:
         log_file = 'dut_leases.{timestamp}.json'.format(
             timestamp=time.strftime('%Y%m%d-%H%M%S'),
         )
-        log_path = common.get_session_log_file(
+        log_path = common.get_session_log_path(
             self.config['session'], f'log/{log_file}'
         )
 

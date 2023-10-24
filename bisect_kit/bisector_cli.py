@@ -758,7 +758,7 @@ class BisectorCommandLine:
         logger.debug('eval (%s) at rev=%s', action, rev)
 
         eval_log = self._step_log_path(rev, 'eval')
-        eval_log_fullpath = common.get_session_log_file(self.session, eval_log)
+        eval_log_fullpath = common.get_session_log_path(self.session, eval_log)
 
         t0 = time.time()
         result = do_evaluate(
@@ -824,7 +824,7 @@ class BisectorCommandLine:
         """
         logger.debug('switch (%s) to rev=%s', action, rev)
 
-        log_full_path = common.get_session_log_file(self.session, log_file)
+        log_full_path = common.get_session_log_path(self.session, log_file)
 
         extra_args = []
         if action in [
@@ -1518,7 +1518,7 @@ class BisectorCommandLine:
 
     def _create_states(self, session=None):
         self.session = session
-        session_file = common.get_session_log_file(
+        session_file = common.get_session_log_path(
             session, self.domain_cls.__name__
         )
 

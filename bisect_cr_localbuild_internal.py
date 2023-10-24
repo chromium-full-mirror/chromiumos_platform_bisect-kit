@@ -14,6 +14,7 @@ import os
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
@@ -161,7 +162,10 @@ class ChromeSrcDomain(core.BisectDomain):
             config['old'] = old = lowest_common_ancestor
 
         code_manager = codechange.CodeManager(
-            opts.chrome_root, spec_manager, cache
+            opts.chrome_root,
+            spec_manager,
+            cache,
+            common.get_session_cache_dir(opts.session),
         )
         revlist, details = code_manager.build_revlist(old, new)
         for detail in details.values():

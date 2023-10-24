@@ -94,6 +94,39 @@ class TestCommon(unittest.TestCase):
             '/dummy_work_base/dummy_session/chrome',
         )
 
+    def test_get_session_file(self):
+        cwd = pathlib.Path.cwd()
+        self.assertEqual(
+            common.get_session_log_path('session_name', 'file'),
+            str(cwd / common.DEFAULT_LOG_BASE / 'session_name' / 'file'),
+        )
+        self.assertEqual(
+            common.get_session_log_path('session_name', 'subdir/file'),
+            str(
+                cwd
+                / common.DEFAULT_LOG_BASE
+                / 'session_name'
+                / 'subdir'
+                / 'file'
+            ),
+        )
+        self.assertEqual(
+            common.get_session_log_path('session_name'),
+            str(cwd / common.DEFAULT_LOG_BASE / 'session_name'),
+        )
+
+    def test_get_session_cache_dir(self):
+        cwd = pathlib.Path.cwd()
+        self.assertEqual(
+            common.get_session_cache_dir('session_name'),
+            str(
+                cwd
+                / common.DEFAULT_LOG_BASE
+                / 'session_name'
+                / common.DEFAULT_CACHE_DIR
+            ),
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

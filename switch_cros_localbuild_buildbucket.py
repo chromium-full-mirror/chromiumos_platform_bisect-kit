@@ -205,7 +205,10 @@ def get_chrome_managers(opts):
     )
     spec_manager = cr_util.ChromeSpecManager(config)
     code_manager = codechange.CodeManager(
-        opts.chrome_root, spec_manager, cache_manager
+        opts.chrome_root,
+        spec_manager,
+        cache_manager,
+        common.get_session_cache_dir(opts.session),
     )
     return spec_manager, code_manager, cache_manager
 
@@ -290,7 +293,10 @@ def get_manifest(opts):
     spec_manager = get_chromeos_spec_manager(opts)
     cache = repo_util.RepoMirror(opts.chromeos_mirror)
     code_manager = codechange.CodeManager(
-        opts.chromeos_root, spec_manager, cache
+        opts.chromeos_root,
+        spec_manager,
+        cache,
+        common.get_session_cache_dir(opts.session),
     )
 
     old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
@@ -445,7 +451,10 @@ def build_revlist(opts):
     spec_manager = cros_util.ChromeOSSpecManager(config)
     cache = repo_util.RepoMirror(opts.chromeos_mirror)
     code_manager = codechange.CodeManager(
-        config['chromeos_root'], spec_manager, cache
+        config['chromeos_root'],
+        spec_manager,
+        cache,
+        common.get_session_cache_dir(opts.session),
     )
     code_manager.build_revlist(old_rev, new_rev)
 

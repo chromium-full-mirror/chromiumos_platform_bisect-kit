@@ -33,6 +33,7 @@ from bisect_kit import android_util
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
+from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -155,7 +156,10 @@ class AndroidRepoDomain(core.BisectDomain):
         spec_manager = android_util.AndroidSpecManager(config)
         cache = repo_util.RepoMirror(opts.android_mirror)
         code_manager = codechange.CodeManager(
-            opts.android_root, spec_manager, cache
+            opts.android_root,
+            spec_manager,
+            cache,
+            common.get_session_cache_dir(opts.session),
         )
         revlist, details = code_manager.build_revlist(old, new)
         for detail in details.values():
