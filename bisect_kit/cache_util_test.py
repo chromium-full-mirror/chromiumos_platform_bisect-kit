@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 """Test cache_util module."""
+
 import unittest
 
 from bisect_kit import cache_util

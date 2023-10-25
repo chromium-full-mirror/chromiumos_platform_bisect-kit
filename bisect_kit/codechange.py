@@ -9,6 +9,7 @@ and their version relationship, i.e. pinned or floating git repo. In other
 words, it's abstraction of chrome's gclient DEPS, and chromeos and Android's
 repo manifest.
 """
+
 from __future__ import annotations
 
 import abc

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 """Cache mechanism to speed up heavy operations."""
+
 import functools
 
 

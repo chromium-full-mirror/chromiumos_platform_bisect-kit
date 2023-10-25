@@ -27,6 +27,7 @@ will be set:
   BOARD (e.g. samus, if available), and
   DUT (e.g. samus-dut, if available).
 """
+
 # Note, this script only works for the main branch of chrome.
 
 import logging
