@@ -11,6 +11,7 @@ import sys
 
 from bisect_kit import errors
 from bisect_kit import math_util
+from bisect_kit import strategy_states
 from scipy.stats import boschloo_exact
 
 
@@ -169,7 +170,7 @@ class NoisyBinarySearch:
         confidence=0.999,
         verify_confidence=0.999,
         endpoint_verification=None,
-        init_range_verified=False,
+        saved_states=None,
     ):
         """Initializes NoisyBinarySearch.
 
@@ -219,11 +220,11 @@ class NoisyBinarySearch:
           verify_confidence: Bisect range verification confidence.
           endpoint_verification: Flag indicating whether the statistical
             verification method is enabled.
-          init_range_verified: Record of whether the initial range has been
-            verified.
+          saved_states: internal states from previous execution, if any.
         """
         assert oracle is None or observation is None
         self._state = self.INITED
+        # guards self._state. See self.state()
         self.dirty = True
         if new_idx is None:
             new_idx = len(rev_info) - 1
@@ -290,8 +291,7 @@ class NoisyBinarySearch:
         # count records the results in both ends.
         self.init_rounds = 0
         self._init_verify_state = self.INIT_DO_ONE
-        assert init_range_verified is not None
-        self.init_range_verified = init_range_verified
+        self.init_range_verified = False
         self.count_revold_old = 0
         self.count_revold_new = 0
         self.count_revnew_old = 0
@@ -300,6 +300,47 @@ class NoisyBinarySearch:
         # passed_noise_rate denotes whether the noise rate calculated during the
         # initial range verification stage has been passed to noisy binary search.
         self.passed_noise_rate = False
+
+        # Reads in saved states from previuos execution, if any.
+        self._import_states(saved_states)
+
+    def export_states(self) -> strategy_states.States:
+        return strategy_states.States(
+            state=self.state,
+            init_verify_state=self.init_verify_state,
+            init_range_verified=self.init_range_verified,
+            init_rounds=self.init_rounds,
+            count_revold_old=self.count_revold_old,
+            count_revold_new=self.count_revold_new,
+            count_revnew_old=self.count_revnew_old,
+            count_revnew_new=self.count_revnew_new,
+            passed_noise_rate=self.passed_noise_rate,
+        )
+
+    def _import_states(self, states: strategy_states.States):
+        logger.debug('_import_states: %s', states)
+        if not states:
+            return
+
+        if states.state is not None:
+            self._state = states.state
+            self.dirty = False
+        if states.init_verify_state is not None:
+            self._init_verify_state = states.init_verify_state
+        if states.init_range_verified is not None:
+            self.init_range_verified = states.init_range_verified
+        if states.init_rounds is not None:
+            self.init_rounds = states.init_rounds
+        if states.count_revold_old is not None:
+            self.count_revold_old = states.count_revold_old
+        if states.count_revold_new is not None:
+            self.count_revold_new = states.count_revold_new
+        if states.count_revnew_old is not None:
+            self.count_revnew_old = states.count_revnew_old
+        if states.count_revnew_new is not None:
+            self.count_revnew_new = states.count_revnew_new
+        if states.passed_noise_rate is not None:
+            self.passed_noise_rate = states.passed_noise_rate
 
     def is_noisy(self):
         """Is noisy case?"""
@@ -328,8 +369,13 @@ class NoisyBinarySearch:
         if self._state == self.INITED:
             if not self.dirty:
                 return self._state
-            idx = self._next_idx_for_initial()
-            self.dirty = False
+            # It may raise exception. So if we don't want to get exception in
+            # read-only operations like get_range() across execution, save
+            # internal states to make self.dirty False after initialization.
+            try:
+                idx = self._next_idx_for_initial()
+            finally:
+                self.dirty = False
             if idx is not None:
                 return self._state
             self._state = self.STARTED
@@ -399,6 +445,10 @@ class NoisyBinarySearch:
         self.dirty = True
 
         status = sample['status']
+
+        if self.endpoint_verification and not self.is_value_bisection():
+            self.renew_initial_count(status, idx)
+
         self.check_verification_range()
         if status == 'skip':
             self.check_proceed_with_skip(

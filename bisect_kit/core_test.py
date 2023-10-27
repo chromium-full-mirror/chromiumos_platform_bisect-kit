@@ -10,6 +10,7 @@ import tempfile
 import unittest
 
 from bisect_kit import core
+from bisect_kit import strategy_states
 
 
 class TestRevInfo(unittest.TestCase):
@@ -191,11 +192,38 @@ class TestBisectStates(unittest.TestCase):
         self.assertEqual(states.idx2rev(1), 'b')
         self.assertEqual(states.rev2idx('b'), 1)
 
+    def test_strategy_states(self):
+        states = core.BisectStates(self.session_file)
+        states.init_states(self.fake_config, ['a', 'b', 'c'], self.fake_details)
+
+        # Before setting.
+        self.assertEqual(states.strategy_states, None)
+
+        s = strategy_states.States(state='blah')
+        states.strategy_states = s
+        # modification after strategy_states() is not propagated.
+        s.state = 'bar'
+        # After setting.
+        self.assertEqual(
+            states.strategy_states, strategy_states.States(state='blah')
+        )
+
+        # Modification on the returned value doesn't affect the internal
+        # value.
+        states.strategy_states.state = 'foo'
+        self.assertEqual(
+            states.strategy_states, strategy_states.States(state='blah')
+        )
+
     def test_save_and_load(self):
         states = core.BisectStates(self.session_file)
         revlist = [str(i) for i in range(10)]
         states.init_states({}, revlist, self.fake_details)
         states.config['foo'] = 'bar'
+        strategy_states_to_save = strategy_states.States(
+            state='blah',
+        )
+        states.strategy_states = strategy_states_to_save
         states.save()
 
         loaded_states = core.BisectStates(self.session_file)
@@ -205,6 +233,7 @@ class TestBisectStates(unittest.TestCase):
         self.assertEqual(loaded_states.config, {'foo': 'bar'})
         self.assertEqual(loaded_states.details, self.fake_details)
         self.assertEqual(loaded_states.rev2idx('5'), 5)
+        self.assertEqual(loaded_states.strategy_states, strategy_states_to_save)
 
     def test_load_failed(self):
         with open(self.session_file, 'w') as f:

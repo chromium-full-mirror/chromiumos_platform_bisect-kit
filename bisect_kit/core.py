@@ -18,6 +18,7 @@ import typing
 
 from bisect_kit import common
 from bisect_kit import math_util
+from bisect_kit import strategy_states
 
 
 logger = logging.getLogger(__name__)
@@ -422,6 +423,23 @@ class BisectStates(States):
         assert self.inited
         return self.data.get('details', {})
 
+    @property
+    def strategy_states(self) -> strategy_states.States | None:
+        assert self.inited
+        states = self.data.get('strategy_states')
+        if states:
+            # Returns a copy so the internal states is not modified
+            # accidentally.
+            # Call setter strategy_states() to set it explicitly.
+            return dataclasses.replace(states)
+        return None
+
+    @strategy_states.setter
+    def strategy_states(self, states: strategy_states.States):
+        # Make a copy so the modification of the argument at the caller site
+        # doesn't propogate.
+        self.data['strategy_states'] = dataclasses.replace(states)
+
     def init_states(self, config, revlist, details=None):
         """Initializes attributes data, rev_info and rev_index.
 
@@ -443,7 +461,7 @@ class BisectStates(States):
 
     def _init_from_dict(self, data: dict) -> bool:
         """Inherit from States."""
-        self.data = data
+        self.data = rebuild_from_json(data)
 
         # reset variables
         self.rev_index = {}
@@ -454,6 +472,7 @@ class BisectStates(States):
 
         for i, rev in enumerate(self.data['revlist']):
             self.rev_index[rev] = i
+
         self._init_done()
         return True
 

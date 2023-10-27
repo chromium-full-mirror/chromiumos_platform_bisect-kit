@@ -773,12 +773,6 @@ class BisectorCommandLine:
 
         status = result.data['status']
         sample['status'] = status
-        if (
-            self.strategy.endpoint_verification
-            and not self.strategy.is_value_bisection()
-        ):
-            self.strategy.renew_initial_count(status, self.states.rev2idx(rev))
-
         if os.path.exists(eval_log_fullpath):
             sample['eval_log'] = eval_log
         if result and 'reason' in result.data:
@@ -1149,6 +1143,35 @@ class BisectorCommandLine:
 
         self.strategy.show_summary()
 
+    def save_progress_with_sample(self, sample: dict):
+        """Add sample to history and save internal states.
+
+        Args:
+            sample: A sample from _switch_and_eval().
+
+        Raises:
+            errors.VerificationFailed
+            errors.UnableToProceed
+        """
+        self.states.add_history('sample', **sample)
+        try:
+            # Call add_sample() to update strategy internal states
+            # before saving it to the session file.
+            # add_sample() calls self.strategy.check_verification_range()
+            # internally, so it bails out if bisection range is unlikely
+            # true.
+            self.strategy.add_sample(sample['index'], **sample)
+        finally:
+            # add_sample() may throw exception, but we want to save
+            # strategy internal states nevertheless. For example when
+            # VerificationFailed is thrown, we want to keep the state so
+            # an re-execution throw VerifyNewBehaviorFailed immediately.
+            # Also the states are saved after the observation is
+            # recorded (e.g., add_history() is called), so we don't loss
+            # observations unexpectedly across executions.
+            self.states.strategy_states = self.strategy.export_states()
+            self.states.save()
+
     def cmd_run(self, opts):
         """Performs bisection.
 
@@ -1188,8 +1211,16 @@ class BisectorCommandLine:
                     self.strategy.check_verification_range()
 
                 step, sample = self._switch_and_eval(rev, prev_rev=prev_rev)
-                self.states.add_history('sample', **sample)
-                self.states.save()
+                status = term_map.get(sample['status'], sample['status'])
+                if 'values' in sample:
+                    logger.info(
+                        'rev=%s status => %s: %s', rev, status, sample['values']
+                    )
+                else:
+                    logger.info('rev=%s status => %s', rev, status)
+
+                self.save_progress_with_sample(sample)
+
                 if sample['status'] == 'fatal':
                     if 'reason' in sample:
                         reason_text = ': %s' % sample['reason']
@@ -1198,19 +1229,8 @@ class BisectorCommandLine:
                     raise errors.ExecutionFatalError(
                         '%s failed' % step + reason_text
                     )
-                status = term_map.get(sample['status'], sample['status'])
-                if 'values' in sample:
-                    logger.info(
-                        'rev=%s status => %s: %s', rev, status, sample['values']
-                    )
-                else:
-                    logger.info('rev=%s status => %s', rev, status)
                 force = False
 
-                # Bail out if bisection range is unlikely true.
-                self.strategy.check_verification_range()
-
-                self.strategy.add_sample(idx, **sample)
                 self._show_step_summary()
 
                 if step == 'switch' and sample['status'] == 'skip':
@@ -1393,7 +1413,6 @@ class BisectorCommandLine:
             'new': self.config['term_new'],
         }
         rev_info = self.states.get_rev_info(term_map)
-        init_range_verified = self.states.get_init_range_verified()
         assert rev_info
         return strategy.NoisyBinarySearch(
             rev_info,
@@ -1406,7 +1425,7 @@ class BisectorCommandLine:
             confidence=self.config['confidence'],
             observation=self.config['noisy'],
             endpoint_verification=self.config['endpoint_verification'],
-            init_range_verified=init_range_verified,
+            saved_states=self.states.strategy_states,
         )
 
     def current_status(self, session=None):
@@ -1492,14 +1511,12 @@ class BisectorCommandLine:
             assert status not in ('old', 'new')
         for rev, times in revs:
             idx = self.states.rev2idx(rev)
-            sample = {'rev': rev, 'status': status}
+            sample = {'rev': rev, 'index': idx, 'status': status}
             # times=1 is default in the loader. Add 'times' entry only if necessary
             # in order to simplify the dict.
             if times > 1:
                 sample['times'] = times
-            self.states.add_history('sample', **sample)
-            self.states.save()
-            self.strategy.add_sample(idx, **sample)
+            self.save_progress_with_sample(sample)
 
     def cmd_new(self, opts):
         """Tells bisect engine the said revs have "new" behavior."""

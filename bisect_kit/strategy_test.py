@@ -111,7 +111,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             self.rev_info,
             confidence=0.99,
             oracle=(0, 0.9),
-            init_range_verified=False,
         )
         for i in [0, 10, 20, 30, 40, 50]:
             bsearch.add_sample(i, 'old')
@@ -138,7 +137,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
         bsearch = strategy.NoisyBinarySearch(
             self.rev_info,
             observation='old=1/10,new=9/10',
-            init_range_verified=False,
         )
         self.assertEqual(bsearch.get_noise_observation(), 'old=1/10,new=9/10')
 
@@ -167,7 +165,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
             rev_info.append(core.RevInfo(str(i)))
 
         bsearch = strategy.NoisyBinarySearch(
-            rev_info, oracle=(0.01, 1), init_range_verified=False
+            rev_info,
+            oracle=(0.01, 1),
         )
         bsearch.add_sample(n - 1, 'new')
         bsearch.add_sample(0, 'old')
@@ -182,7 +181,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
 
     def test_many_skip(self):
         bsearch = strategy.NoisyBinarySearch(
-            self.rev_info, oracle=(0.1, 0.9), init_range_verified=False
+            self.rev_info,
+            oracle=(0.1, 0.9),
         )
         for _ in range(strategy.SKIP_FOREVER - 1):
             bsearch.add_sample(99, 'skip')
@@ -192,7 +192,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
 
     def test_skip(self):
         bsearch = strategy.NoisyBinarySearch(
-            self.rev_info, oracle=(0, 0.9), init_range_verified=False
+            self.rev_info,
+            oracle=(0, 0.9),
         )
         bsearch.add_sample(0, 'old')
         bsearch.add_sample(99, 'new')
@@ -205,7 +206,7 @@ class TestNoisyBinarySearch(unittest.TestCase):
 
     def test_skip_then_success(self):
         bsearch = strategy.NoisyBinarySearch(
-            self.rev_info, init_range_verified=False
+            self.rev_info,
         )
         bsearch.add_sample(0, 'old')
         bsearch.add_sample(99, 'new')
@@ -220,7 +221,8 @@ class TestNoisyBinarySearch(unittest.TestCase):
 
     def test_get_range_with_skip(self):
         bsearch = strategy.NoisyBinarySearch(
-            self.rev_info, oracle=(0, 0.9), init_range_verified=False
+            self.rev_info,
+            oracle=(0, 0.9),
         )
         bsearch.add_sample(0, 'old')
         bsearch.add_sample(33, 'old', times=10)
@@ -235,7 +237,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             self.rev_info,
             confidence=0.99,
             oracle=(0, 0.9),
-            init_range_verified=False,
         )
         self.assertTrue(bsearch.is_noisy())
         for i in [0, 10, 20, 30, 40, 50]:
@@ -266,7 +267,9 @@ class TestNoisyBinarySearch(unittest.TestCase):
         for i in range(465):
             self.rev_info.append(core.RevInfo(str(i)))
         bsearch = strategy.NoisyBinarySearch(
-            self.rev_info, 462, 463, init_range_verified=False
+            self.rev_info,
+            462,
+            463,
         )
         assert not bsearch.is_done()
 
@@ -321,7 +324,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             # Verify range until success.
             verify_confidence=1.0,
             endpoint_verification=endpoint_verification,
-            init_range_verified=False,
         )
 
         rng = random.Random(random_seed)
@@ -335,7 +337,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
                 result = 'new'
             else:
                 result = 'old'
-            bsearch.renew_initial_count(result, idx)
 
             if idx != prev_idx:
                 switch_count += 1
@@ -419,7 +420,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             observation=observation,
             verify_confidence=1.0,
             endpoint_verification=endpoint_verification,
-            init_range_verified=False,
         )
         prev_idx = None
         while bsearch.state == bsearch.INITED:
@@ -431,7 +431,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
                 result = 'new'
             else:
                 result = 'old'
-            bsearch.renew_initial_count(result, idx)
 
             bsearch.add_sample(idx, result)
             prev_idx = idx
@@ -599,7 +598,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             old_value=10.0,
             new_value=20.0,
             endpoint_verification=False,
-            init_range_verified=False,
         )
         self.assertTrue(bsearch.is_value_bisection())
         self.assertEqual(bsearch.classify_result_from_values([100]), 'new')
@@ -622,7 +620,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             old_value=10.0,
             new_value=20.0,
             endpoint_verification=False,
-            init_range_verified=False,
         )
         self.assertEqual(bsearch.next_idx(), 99)
 
@@ -638,7 +635,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             new_value=20.0,
             observation='old=1/100,new=99/100',
             endpoint_verification=False,
-            init_range_verified=False,
         )
         self.assertEqual(bsearch.next_idx(), 99)
 
@@ -659,7 +655,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             new_value=20.0,
             recompute_init_values=True,
             endpoint_verification=False,
-            init_range_verified=False,
         )
         self.assertTrue(bsearch.is_value_bisection())
         self.assertEqual(bsearch.classify_result_from_values([100]), 'value')
@@ -690,7 +685,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             new_value=20.0,
             recompute_init_values=True,
             endpoint_verification=False,
-            init_range_verified=False,
         )
 
         # same value, twice is enough
@@ -716,7 +710,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             new_value=20.0,
             recompute_init_values=True,
             endpoint_verification=False,
-            init_range_verified=False,
         )
 
         # same value, twice is enough
