@@ -71,6 +71,15 @@ def _get_repo_sync_env():
     return env
 
 
+def _repo_cmd(*cmd, repo_dir):
+    env = _get_repo_sync_env()
+    try:
+        util.check_call('update_depot_tools', cwd=repo_dir, env=env)
+    except subprocess.CalledProcessError:
+        logger.warning('update_depot_tools failed')
+    util.check_call(*cmd, cwd=repo_dir, env=env)
+
+
 def init(
     repo_dir,
     manifest_url,
@@ -113,7 +122,7 @@ def init(
         cmd += ['--groups', groups]
     if mirror:
         cmd.append('--mirror')
-    util.check_call(*cmd, cwd=repo_dir, env=_get_repo_sync_env())
+    _repo_cmd(*cmd, repo_dir=repo_dir)
 
 
 def cleanup_repo_generated_files(repo_dir, manifest_name='default.xml'):
@@ -174,7 +183,7 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
         cmd += ['--manifest-name', manifest_name]
     if current_branch is not None:
         cmd += ['--current-branch' if current_branch else '--no-current-branch']
-    util.check_call(*cmd, cwd=repo_dir, env=_get_repo_sync_env())
+    _repo_cmd(*cmd, repo_dir=repo_dir)
 
 
 def abandon(repo_dir, branch_name):
