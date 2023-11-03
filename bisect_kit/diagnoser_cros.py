@@ -1099,7 +1099,12 @@ class CrosDiagnoser:
         )
         future_build_cmd = None
         if not buildbucket_build:
-            switch_cmd = ['./switch_cros_localbuild.py', '--rich_result']
+            switch_cmd = [
+                './switch_cros_localbuild.py',
+                '--rich_result',
+                '--session',
+                self.config['session'],
+            ]
         else:
             switch_cmd = [
                 './switch_cros_localbuild_buildbucket.py',
@@ -1116,6 +1121,8 @@ class CrosDiagnoser:
                 '--no_wait_for_build_completion',
                 '--board',
                 self.config['board'],
+                '--session',
+                self.config['session'],
             ]
 
         if not self.config['disable_rootfs_verification']:
