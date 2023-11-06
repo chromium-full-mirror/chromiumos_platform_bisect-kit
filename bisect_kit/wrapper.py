@@ -11,6 +11,7 @@ import sys
 
 from bisect_kit import bisector_cli
 from bisect_kit import core
+from bisect_kit import errors
 
 
 logger = logging.getLogger(__name__)
@@ -19,11 +20,12 @@ logger = logging.getLogger(__name__)
 class BisectorWrapper:
     """Wrapper of bisector scripts as python module."""
 
-    def __init__(self, name, session, dut_manager=None):
+    def __init__(self, name, session, dut_manager=None, is_stateless=False):
         self.name = name
         self.module = importlib.import_module(name)
         self.session = session
         self.dut_manager = dut_manager
+        self.is_stateless = is_stateless
 
         self.domain_cls = None
         for x in vars(self.module).values():
@@ -120,7 +122,12 @@ class BisectorWrapper:
         )
         try:
             self.call('run')
-        except Exception:
+        except Exception as e:
+            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
+                logger.debug('Retriable error %s, abort immeidately', e)
+                # If the error is retriable, raise immediately and a schedule a
+                # retry soon.
+                raise
             # If bisector failed after bisect range verified, we can continue with
             # knowledge of the partial results. For example,
             #  - ChromeOS prebuilt bisector may cut down half the bisect range and

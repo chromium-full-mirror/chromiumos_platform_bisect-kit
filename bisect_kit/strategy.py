@@ -1100,7 +1100,7 @@ class NoisyBinarySearch:
           reason: the reason why a candidate reported 'skip' status
 
         Raises:
-          errors.UnableToProceed: skip too many times, probably serious issue and
+          errors.TooManyTemporaryErrors: skip too many times, probably serious issue and
               unable to proceed
         """
         # we just got skip
@@ -1115,7 +1115,7 @@ class NoisyBinarySearch:
             self.rev_info[idx]['skip']
             >= (non_skip_count + 1) * (SKIP_FOREVER + 2)
         ):
-            raise errors.UnableToProceed(
+            raise errors.TooManyTemporaryErrors(
                 'unable to evaluate rev=%r (skip) %d times: %s'
                 % (self.rev_info[idx].rev, self.rev_info[idx]['skip'], reason)
             )

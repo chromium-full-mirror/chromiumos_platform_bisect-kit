@@ -5,6 +5,11 @@
 """Exception classes."""
 
 import argparse
+import logging
+import sys
+
+
+logger = logging.getLogger(__name__)
 
 
 class ArgumentError(Exception):
@@ -53,23 +58,42 @@ class ExecutionFatalError(Exception):
     """
 
 
-class NoDutAvailable(Exception):
+class BisectRetriableError(Exception):
+    """The top level class of exceptions which may be transient.
+
+    An automatically retry is worthwhile.
+    Note that here "retry" means a re-execution of the whole bisection process,
+    the current bisection would be halted. It is different from
+    BisectionTemporaryError where it doesn't halt the bisection unless retry
+    limit is reached.
+    """
+
+
+class DutException(BisectRetriableError):
+    """Top level class for DUT related exceptions."""
+
+
+class NoDutAvailable(DutException):
     """There is no DUT which satisfy the DutAllocateSpec in lab."""
 
 
-class DutLeaseTimeout(Exception):
+class DutLeaseTimeout(DutException):
     """Unable to allocate DUT in a predefined time period.
 
     The DutAllocateSpec is valid, but the lease takes too much time.
     """
 
 
-class DutLeaseException(Exception):
+class DutLeaseException(DutException):
     """Issues of skylab DUT lease."""
 
 
-class BrokenDutException(Exception):
+class BrokenDutException(DutException):
     """The DUT is broken."""
+
+
+class TooManyTemporaryErrors(BisectRetriableError):
+    """Unable to narrow bisect range further due to too many temporary errors."""
 
 
 class WrongAssumption(Exception):
@@ -148,10 +172,6 @@ class TooFewRevisionsError(VerificationFailed):
     """Too few revisions to search."""
 
 
-class UnableToProceed(Exception):
-    """Unable to narrow bisect range further due to too many errors."""
-
-
 class InternalError(Exception):
     """bisect-kit internal error.
 
@@ -167,6 +187,10 @@ class BisectionTemporaryError(Exception):
     bisection decision, this is "skip", which means "the current candidate is
     undecidable to have old or new behavior, should skip the result of this
     run, retry may help".
+
+    It differs from BisectRetriableError in that the bisection would not be halted
+    when it happens. Instead it retries internally until some retry limit is
+    reached.
     """
 
 
@@ -179,3 +203,26 @@ class ExternalError(BisectionTemporaryError):
 
 class SshConnectionError(BisectionTemporaryError):
     """SSH connection error."""
+
+
+def reconstruct_from_string(cls_name: str, error_msg: str) -> Exception | None:
+    """Reconstruct an exception from its class name and error message.
+
+    It can be useful when an exception is derived from a subprocess call where
+    the exception information is available in the subprocess output.
+
+    Args:
+      cls_name: the name of the class. It must be one of the
+        exceptions in this module.
+      err_msg: the error message of the exception.
+
+    Returns:
+      The reconstructed exception or None if unable to reconstruct it.
+    """
+    try:
+        cls = getattr(sys.modules[__name__], cls_name)
+    except Exception:
+        logger.error('Failed to find class by name %r', cls_name)
+    else:
+        return cls(error_msg)
+    return None

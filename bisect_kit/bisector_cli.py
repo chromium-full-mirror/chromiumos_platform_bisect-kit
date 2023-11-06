@@ -408,12 +408,17 @@ def step_main_wrapper(
         # These exceptions are kind of external dependencies. So we classify them
         # as 'skip' (undecidable now) and let bisection algorithm retry this
         # candidate later.
+        exception_name = e.__class__.__name__
         logging.exception(str(e))
-        result = core.StepResult('skip', str(e))
+        result = core.StepResult(
+            'skip', reason=str(e), exception=exception_name
+        )
     except Exception as e:
         exception_name = e.__class__.__name__
         logging.exception('unhandled exception')
-        result = core.StepResult('fatal', '%s: %s' % (exception_name, str(e)))
+        result = core.StepResult(
+            'fatal', reason=str(e), exception=exception_name
+        )
 
     # Because it may fail during argument parsing in the main function, we parse
     # sole '--rich_result' here by ourself.
@@ -775,8 +780,11 @@ class BisectorCommandLine:
         sample['status'] = status
         if os.path.exists(eval_log_fullpath):
             sample['eval_log'] = eval_log
-        if result and 'reason' in result.data:
-            sample['reason'] = result.data['reason']
+        if result:
+            if 'reason' in result.data:
+                sample['reason'] = result.data['reason']
+            if 'exception' in result.data:
+                sample['exception'] = result.data['exception']
         if status in ('skip', 'fatal'):
             logger.debug('eval failed => %s', status)
             return False
@@ -849,8 +857,11 @@ class BisectorCommandLine:
         sample['status'] = status
         if os.path.exists(log_full_path):
             sample['switch_log'] = log_file
-        if result and 'reason' in result.data:
-            sample['reason'] = result.data['reason']
+        if result:
+            if 'reason' in result.data:
+                sample['reason'] = result.data['reason']
+            if 'exception' in result.data:
+                sample['exception'] = result.data['exception']
         if status in ('skip', 'fatal'):
             logger.debug('switch (%s) failed => %s', action, status)
             return False
@@ -874,8 +885,11 @@ class BisectorCommandLine:
             sample (dict): sampling result of `rev`. The dict contains:
               status: Execution result ('old', 'new', 'fatal', or 'skip').
               values: For eval bisection, collected values from eval step.
-              switch_time: how much time in switch step
-              eval_time: how much time in eval step
+              reason: Failure reason, if any.
+              exception: The exception class which causes the error, if any.
+              switch_time: Total time in switch step
+              switch_<type>_time: Time spent in sub step(s) of switch.
+              eval_time: How much time in eval step
         """
         # pre-build future revisions.
         if self.config.get('future_build'):
@@ -1151,7 +1165,7 @@ class BisectorCommandLine:
 
         Raises:
             errors.VerificationFailed
-            errors.UnableToProceed
+            errors.TooManyTemporaryErrors
         """
         self.states.add_history('sample', **sample)
         try:
@@ -1182,7 +1196,7 @@ class BisectorCommandLine:
               pass the statistical test.
           errors.VerificationFailed: The bisection range is verified false. We
               expect 'old' at the first rev and 'new' at last rev.
-          errors.UnableToProceed: Too many errors to narrow down further the
+          errors.TooManyTemporaryErrors: Too many errors to narrow down further the
               bisection range.
         """
         # Set dummy values in case exception raised before loop.
@@ -1226,6 +1240,11 @@ class BisectorCommandLine:
                         reason_text = ': %s' % sample['reason']
                     else:
                         reason_text = ''
+                    e = errors.reconstruct_from_string(
+                        sample.get('exception'), sample.get('reason')
+                    )
+                    if e:
+                        raise e
                     raise errors.ExecutionFatalError(
                         '%s failed' % step + reason_text
                     )

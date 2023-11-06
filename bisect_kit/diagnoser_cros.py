@@ -64,6 +64,10 @@ class CrosDiagnoser:
         self.old_info: cros_util.VersionInfo = cros_util.VersionInfo()
         self.new_info: cros_util.VersionInfo = cros_util.VersionInfo()
 
+        self.is_stateless = experiment.is_in_experiment(
+            self.config.get('experiments'), experiment.ID.STATELESS
+        )
+
     def _verified_chromeos_prebuilt(self):
         if self.config['bypass_chromeos_prebuilt']:
             return 'assume'
@@ -116,16 +120,13 @@ class CrosDiagnoser:
             else:
                 logger.info('no need to init autotest deps')
 
-        should_auto_allocate_dut = experiment.is_in_experiment(
-            self.config.get('experiments'), experiment.ID.STATELESS
-        )
         # Steps 1 to 4 are prebuilt stages. So we can just use the same DUT in
         # stateless bisection.
         dut_manager = dut_manager_module.DutManager(
             'Prebuilt',
             self.states,
             self.pre_allocated_dut,
-            should_auto_allocate_dut,
+            self.is_stateless,
         )
         with dut_manager.provision() as dut:
             # Query DUT dependent properties.
@@ -197,7 +198,11 @@ class CrosDiagnoser:
                     return
             except errors.DiagnoseContradiction:
                 raise
-            except Exception:
+            except Exception as e:
+                if self.is_stateless and isinstance(
+                    e, errors.BisectRetriableError
+                ):
+                    raise
                 self.make_decision(
                     'Exception in Android bisector before verification; '
                     'assume the culprit is not inside Android and continue'
@@ -217,7 +222,11 @@ class CrosDiagnoser:
                 )
             except errors.DiagnoseContradiction:
                 raise
-            except Exception:
+            except Exception as e:
+                if self.is_stateless and isinstance(
+                    e, errors.BisectRetriableError
+                ):
+                    raise
                 self.make_decision(
                     'Exception in Lacros bisector before verification; '
                     'assume the culprit is not inside Lacros and continue'
@@ -239,7 +248,11 @@ class CrosDiagnoser:
                     return
             except errors.DiagnoseContradiction:
                 raise
-            except Exception:
+            except Exception as e:
+                if self.is_stateless and isinstance(
+                    e, errors.BisectRetriableError
+                ):
+                    raise
                 self.make_decision(
                     'Exception in DLC bisector before verification; '
                     'assume the culprit is not inside DLC and continue'
@@ -273,7 +286,7 @@ class CrosDiagnoser:
             'LocalChrome',
             self.states,
             self.pre_allocated_dut,
-            should_auto_allocate_dut,
+            self.is_stateless,
             bisect_local_chrome_dut_init_func,
             bisect_local_chrome_dut_leave_context_check_func,
         )
@@ -291,7 +304,9 @@ class CrosDiagnoser:
                 return
         except errors.DiagnoseContradiction:
             raise
-        except Exception:
+        except Exception as e:
+            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
+                raise
             self.make_decision(
                 'Exception in Chrome bisector before verification; '
                 'assume the culprit is not inside Chrome and continue'
@@ -302,7 +317,7 @@ class CrosDiagnoser:
             'LocalChromeOS',
             self.states,
             self.pre_allocated_dut,
-            should_auto_allocate_dut,
+            self.is_stateless,
         )
         self.narrow_down_chromeos_localbuild(
             dut_manager,
@@ -366,7 +381,10 @@ class CrosDiagnoser:
                 init_args.append('--disable_snapshot')
 
             bisector = wrapper.BisectorWrapper(
-                'bisect_cros_version', self.config['session'], dut_manager
+                'bisect_cros_version',
+                self.config['session'],
+                dut_manager,
+                self.is_stateless,
             )
             bisector.init_if_necessary(
                 old,
@@ -573,7 +591,10 @@ class CrosDiagnoser:
                 session=self.config['session'],
             )
             bisector = wrapper.BisectorWrapper(
-                'bisect_android_build_id', self.config['session'], dut_manager
+                'bisect_android_build_id',
+                self.config['session'],
+                dut_manager,
+                self.is_stateless,
             )
             try:
                 bisector.init_if_necessary(
@@ -661,7 +682,10 @@ class CrosDiagnoser:
             session=self.config['session'],
         )
         bisector = wrapper.BisectorWrapper(
-            'bisect_android_repo', self.config['session'], dut_manager
+            'bisect_android_repo',
+            self.config['session'],
+            dut_manager,
+            self.is_stateless,
         )
         try:
             bisector.init_if_necessary(
@@ -775,7 +799,10 @@ class CrosDiagnoser:
         ]
 
         bisector = wrapper.BisectorWrapper(
-            'bisect_lacros_prebuilt', self.config['session'], dut_manager
+            'bisect_lacros_prebuilt',
+            self.config['session'],
+            dut_manager,
+            self.is_stateless,
         )
 
         init_args = [
@@ -894,7 +921,10 @@ class CrosDiagnoser:
         ]
 
         bisector = wrapper.BisectorWrapper(
-            'bisect_borealis_dlc_version', self.config['session'], dut_manager
+            'bisect_borealis_dlc_version',
+            self.config['session'],
+            dut_manager,
+            self.is_stateless,
         )
         bisector.init_if_necessary(
             old,
@@ -1012,7 +1042,10 @@ class CrosDiagnoser:
                     switch_cmd.append('--no_disable_rootfs_verification')
 
         bisector = wrapper.BisectorWrapper(
-            'bisect_cr_localbuild_internal', self.config['session'], dut_manager
+            'bisect_cr_localbuild_internal',
+            self.config['session'],
+            dut_manager,
+            self.is_stateless,
         )
         try:
             bisector.init_if_necessary(
@@ -1095,7 +1128,10 @@ class CrosDiagnoser:
             session=self.config['session'],
         )
         bisector = wrapper.BisectorWrapper(
-            'bisect_cros_repo', self.config['session'], dut_manager
+            'bisect_cros_repo',
+            self.config['session'],
+            dut_manager,
+            self.is_stateless,
         )
         future_build_cmd = None
         if not buildbucket_build:
@@ -1490,7 +1526,9 @@ class DiagnoseCommandLineBase:
             opts.dut
         ):
             if not cros_lab_util.repair(opts.dut):
-                raise ValueError('DUT is in bad state')
+                raise errors.BrokenDutException(
+                    '%r is not a good DUT' % opts.dut
+                )
 
         cros_prebuilt_old = opts.base_cros_version
         cros_prebuilt_new = opts.base_cros_version

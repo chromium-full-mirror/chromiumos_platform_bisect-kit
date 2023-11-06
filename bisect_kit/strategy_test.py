@@ -187,7 +187,7 @@ class TestNoisyBinarySearch(unittest.TestCase):
         for _ in range(strategy.SKIP_FOREVER - 1):
             bsearch.add_sample(99, 'skip')
 
-        with self.assertRaises(errors.UnableToProceed):
+        with self.assertRaises(errors.TooManyTemporaryErrors):
             bsearch.add_sample(99, 'skip')
 
     def test_skip(self):

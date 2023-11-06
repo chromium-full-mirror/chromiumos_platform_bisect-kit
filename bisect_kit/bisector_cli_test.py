@@ -185,7 +185,7 @@ class TestBisectorCommandLine(unittest.TestCase):
         bisector.main('init', '--num=20', '--old=3', '--new=15')
         bisector.main('config', 'switch', 'false')
         bisector.main('config', 'eval', 'sh', '-c', '[ "$BISECT_REV" -lt 7 ]')
-        with self.assertRaises(errors.UnableToProceed):
+        with self.assertRaises(errors.TooManyTemporaryErrors):
             bisector.main('run')
 
         result = bisector.current_status()
@@ -352,9 +352,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         bisector.main('run', '-1')
         self.assertEqual(bisector.strategy.get_range(), (20, 30))
 
-        with self.assertRaises(errors.UnableToProceed):
+        with self.assertRaises(errors.TooManyTemporaryErrors):
             bisector.main('skip', '20*10')
-        with self.assertRaises(errors.UnableToProceed):
+        with self.assertRaises(errors.TooManyTemporaryErrors):
             bisector.main('skip', '30*10')
         self.assertEqual(bisector.strategy.get_range(), (20, 30))
 

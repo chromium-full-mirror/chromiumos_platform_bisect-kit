@@ -32,12 +32,15 @@ class StepResult:
         status: typing.Literal['old', 'new', 'skip', 'fatal', 'value'],
         reason: str | None = None,
         values: list[float] | None = None,
+        exception: str | None = None,
     ):
         self.data: dict[str, typing.Any] = {'status': status}
         if values:
             self.data['values'] = values
         if reason:
             self.data['reason'] = reason
+        if exception:
+            self.data['exception'] = exception
 
 
 class RevInfo:
