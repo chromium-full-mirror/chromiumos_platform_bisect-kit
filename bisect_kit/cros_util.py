@@ -1919,6 +1919,8 @@ def convert_path_outside_chroot(chromeos_root, path):
         # http://crrev/c/4522314
         # e.g. /home/user1/bisect-workdir/template/chromeos/out/home/user1
         return os.path.join(chromeos_root, 'out', path[1:])
+    if path.startswith(('/build', '/tmp')):
+        return os.path.join(chromeos_root, 'out', path[1:])
     assert '~' not in path, 'tilde (~) character is not fully supported'
 
     assert os.path.isabs(path)
