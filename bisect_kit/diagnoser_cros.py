@@ -120,6 +120,10 @@ class CrosDiagnoser:
             else:
                 logger.info('no need to init autotest deps')
 
+        # Indicate that a new round of bisection starts, possibly a retry.
+        self.states.add_history('start')
+        self.states.save()
+
         # Steps 1 to 4 are prebuilt stages. So we can just use the same DUT in
         # stateless bisection.
         dut_manager = dut_manager_module.DutManager(
