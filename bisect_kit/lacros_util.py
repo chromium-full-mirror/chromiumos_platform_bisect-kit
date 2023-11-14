@@ -487,16 +487,18 @@ def build(chrome_src: str, board_cpu_arch: str):
             pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
             _generate_gn_arguments(chrome_src, board_cpu_arch, output_directory)
             util.check_output(*lacros_build_cmd, cwd=chrome_src, env=env)
-        return
+        return output_directory
 
 
-def deploy(chrome_src: str, dut_ip: str):
+def deploy(chrome_src: str, dut_ip: str, output_directory: str | None = None):
     """Deploy lacros
 
     Args:
       chrome_src: Chrome source root directory
       dut_ip: IP of the DUT
+      output_directory: optional output directory from which to deploy binaries.
     """
-    output_directory = _get_output_directory(chrome_src)
+    if not output_directory:
+        output_directory = _get_output_directory(chrome_src)
     deploy_chrome_script_path = _get_deploy_chrome_path(chrome_src=chrome_src)
     deploy_lacros_to_dut(output_directory, dut_ip, deploy_chrome_script_path)

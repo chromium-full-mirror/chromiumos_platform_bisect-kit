@@ -11,7 +11,11 @@ else
     TARGETS="chrome nacl_helper"
 fi
 
-out_dir=out_${SDK_BOARD}/Release
+if [ -n "${OUT_DIR}" ]; then
+    out_dir=${OUT_DIR}
+else
+    out_dir=out_${SDK_BOARD}/Release
+fi
 
 AUTOTEST_TEST_BINARY_PATH=\
 /usr/local/autotest/deps/chrome_test/test_src/out/Release/

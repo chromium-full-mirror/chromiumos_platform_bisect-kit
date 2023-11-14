@@ -26,6 +26,7 @@ import sys
 import bisect_cr_localbuild_internal
 import bisect_kit
 from bisect_kit import bisector_cli
+from bisect_kit import cache_util
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
@@ -183,6 +184,30 @@ def switch_main(args: tuple[str] | None):
         chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror
     )
 
+    chrome_cache = None
+    lacros_cache = None
+    # If build exists in cache, shortcut it.
+    if opts.deploy_method == 'chrome_deploy':
+        chrome_cache = cache_util.BuildArtifactsCache(
+            cache_util.BuildArtifactsCache.BuildType.CHROME,
+            opts.board,
+            opts.rev,
+            opts.target,
+        )
+        lacros_cache = cache_util.BuildArtifactsCache(
+            cache_util.BuildArtifactsCache.BuildType.LACROS,
+            opts.board_cpu_arch,
+            opts.rev,
+        )
+        chrome_cache_hit = chrome_cache.cache_hit()
+        lacros_cache_hit = lacros_cache.cache_hit()
+        if chrome_cache_hit and lacros_cache_hit:
+            logger.info(
+                'Both chrome and lacros are in cache, no need to sync and build.'
+            )
+            opts.no_sync_code = True
+            opts.no_build = True
+
     if not opts.no_sync_code:
         logger.info('switch source code')
         cache = gclient_util.GclientCache(opts.chrome_mirror)
@@ -225,30 +250,66 @@ def switch_main(args: tuple[str] | None):
 
         # TODO(kcwu): support local patch.
         if opts.deploy_method == 'chrome_deploy':
-            cr_util.build(
-                opts.chrome_src,
-                opts.board,
-                opts.target,
-                opts.with_tests,
-            )
+            if chrome_cache.cache_hit():
+                logger.info('No need to build chrome. Found %s', chrome_cache)
+            else:
+                out_dir = cr_util.build(
+                    opts.chrome_src,
+                    opts.board,
+                    opts.target,
+                    opts.with_tests,
+                )
+                if out_dir:
+                    exclude_patterns = [
+                        'obj',
+                        'gen',
+                        'android_clang*',
+                    ]
+                    chrome_cache.put(out_dir, exclude_patterns)
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.build(opts)
 
-        lacros_util.build(opts.chrome_src, opts.board_cpu_arch)
+        if lacros_cache.cache_hit():
+            logger.info('No need to build lacros. Found %s', lacros_cache)
+        else:
+            out_dir = lacros_util.build(opts.chrome_src, opts.board_cpu_arch)
+            if out_dir:
+                exclude_patterns = [
+                    'obj',
+                    'gen',
+                ]
+                lacros_cache.put(out_dir, exclude_patterns)
 
     if not opts.no_deploy:
         if opts.deploy_method == 'chrome_deploy':
-            cr_util.deploy(
-                opts.chrome_src,
-                opts.board,
-                opts.dut,
-                opts.target,
-                opts.with_tests,
-            )
+            if chrome_cache.cache_hit():
+                with chrome_cache.get() as out_dir:
+                    cr_util.deploy(
+                        opts.chrome_src,
+                        opts.board,
+                        opts.dut,
+                        opts.target,
+                        opts.with_tests,
+                        out_dir=out_dir,
+                    )
+            else:
+                cr_util.deploy(
+                    opts.chrome_src,
+                    opts.board,
+                    opts.dut,
+                    opts.target,
+                    opts.with_tests,
+                )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.deploy(opts)
 
-        lacros_util.deploy(opts.chrome_src, opts.dut)
+        if lacros_cache.cache_hit():
+            with lacros_cache.get() as out_dir:
+                lacros_util.deploy(
+                    opts.chrome_src, opts.dut, output_directory=out_dir
+                )
+        else:
+            lacros_util.deploy(opts.chrome_src, opts.dut)
 
     # Sanity check. The OS version should not change.
     if opts.dut:

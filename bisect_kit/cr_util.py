@@ -308,11 +308,15 @@ def build(chrome_src, board, targets, with_tests=True):
       board: ChromeOS board name
       targets: ninja targets. Default to build chrome.
       with_tests: build test binaries as well if targets is not specified
+
+    Returns:
+      The output directory of the build.
     """
     if not targets:
         targets = determine_targets_to_build(
             chrome_src, board, with_tests=with_tests, force_nacl=True
         )
+
     logger.info('build %s', targets)
     out_dir = os.path.join('out_%s' % board, 'Release')
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
@@ -327,8 +331,10 @@ def build(chrome_src, board, targets, with_tests=True):
             shutil.rmtree(os.path.join(chrome_src, out_dir))
             simple_chrome_shell(chrome_src, board, *cmd, internal=True)
 
+    return os.path.join(chrome_src, out_dir)
 
-def deploy(chrome_src, board, dut, targets, with_tests=True):
+
+def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
     """Deploy Chrome binaries.
 
     Args:
@@ -337,6 +343,7 @@ def deploy(chrome_src, board, dut, targets, with_tests=True):
       dut: DUT address
       targets: ninja targets. Default to build chrome.
       with_tests: build test binaries as well if targets is not specified
+      out_dir: optional output dir from which to deploy binaries.
     """
     if not targets:
         targets = determine_targets_to_build(
@@ -348,11 +355,14 @@ def deploy(chrome_src, board, dut, targets, with_tests=True):
     logger.info('deploy %s', targets)
     env = os.environ.copy()
     env['DUT'] = dut
+    if out_dir:
+        env['OUT_DIR'] = out_dir
 
     deploy_script = os.path.join(
         bisect_kit.BISECT_KIT_ROOT, 'deploy_chrome_helper.sh'
     )
     cmd = ['sh', '-ex', deploy_script] + targets
+
     simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
 
 
