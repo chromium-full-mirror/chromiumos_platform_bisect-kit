@@ -78,6 +78,20 @@ class BuildArtifactsCache:
 
     _GAC_JSON = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
 
+    _EXCLUDES_PATTERNS_MAP = {
+        BuildType.CHROME: [
+            'obj',
+            'gen',
+            'android_clang*',
+            '.reproxy_tmp',
+        ],
+        BuildType.LACROS: [
+            'obj',
+            'gen',
+            '.reproxy_tmp',
+        ],
+    }
+
     def _get_bucket_name(self):
         with open(self._GAC_JSON) as f:
             data = json.load(f)
@@ -152,16 +166,18 @@ class BuildArtifactsCache:
             self._bucket, self._variant, self._tar_file_name
         )
 
-    def put(self, src_dir: str, exclude_patterns: list[str] | None = None):
-        if exclude_patterns is None:
-            exclude_patterns = []
-
+    def put(self, src_dir: str):
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
                 tar_file_path = os.path.join(tmpdir, self._tar_file_name)
                 util.check_call(
                     'tar',
-                    *["--exclude=%s" % p for p in exclude_patterns],
+                    *[
+                        "--exclude=%s" % p
+                        for p in self._EXCLUDES_PATTERNS_MAP.get(
+                            self._build_type, []
+                        )
+                    ],
                     '-czf',
                     tar_file_path,
                     '.',

@@ -260,12 +260,7 @@ def switch_main(args: tuple[str] | None):
                     opts.with_tests,
                 )
                 if out_dir:
-                    exclude_patterns = [
-                        'obj',
-                        'gen',
-                        'android_clang*',
-                    ]
-                    chrome_cache.put(out_dir, exclude_patterns)
+                    chrome_cache.put(out_dir)
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.build(opts)
 
@@ -274,11 +269,7 @@ def switch_main(args: tuple[str] | None):
         else:
             out_dir = lacros_util.build(opts.chrome_src, opts.board_cpu_arch)
             if out_dir:
-                exclude_patterns = [
-                    'obj',
-                    'gen',
-                ]
-                lacros_cache.put(out_dir, exclude_patterns)
+                lacros_cache.put(out_dir)
 
     if not opts.no_deploy:
         if opts.deploy_method == 'chrome_deploy':
