@@ -53,6 +53,7 @@ dmypy.json
 
 # Bisector
 *.log
+log/
 bisect.sessions/
 bisect_kit.json
 internal/
