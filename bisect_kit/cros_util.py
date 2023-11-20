@@ -1613,32 +1613,19 @@ def cros_flash(
     args = ['--debug', '--no-reboot', '--no-ping', host, image_path]
     if clobber_stateful:
         args.append('--clobber-stateful')
+    if disable_rootfs_verification:
+        args.append('--disable-rootfs-verification')
 
     try:
         cros_sdk(chromeos_root, 'cros', 'flash', *args)
         wait_kernel_ready(host)
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError('cros flash failed') from e
-
     try:
         util.ssh_cmd(host, 'chromeos-firmwareupdate', '--mode=recovery')
     except subprocess.CalledProcessError as e:
         logger.warning('chromeos-firmwareupdate failed: %s', e)
-
-    if disable_rootfs_verification:
-        args.append('--no-stateful-update')
-        args.append('--no-rootfs-update')
-        args.append('--disable-rootfs-verification')
-        try:
-            cros_sdk(chromeos_root, 'cros', 'flash', *args)
-            wait_kernel_ready(host)
-        except subprocess.CalledProcessError as e:
-            raise errors.ExternalError(
-                'disable rootfs verification failed'
-            ) from e
-    else:
-        reboot(host, force_reboot_callback=force_reboot_callback)
-
+    reboot(host, force_reboot_callback=force_reboot_callback)
     return True
 
 
