@@ -1610,7 +1610,7 @@ def cros_flash(
     # have been deprecated. Please see
     # https://chromium.googlesource.com/chromiumos/chromite/+/9a0199fd48fb9466153d8598dc8602b26c9d21ba
     # https://chromium.googlesource.com/chromiumos/chromite/+/9ed30bc3ed292b02d85fde89c64207484b7a3aa4
-    args = ['--debug', '--no-reboot', '--no-ping', host, image_path]
+    args = ['--debug', '--no-ping', host, image_path]
     if clobber_stateful:
         args.append('--clobber-stateful')
     if disable_rootfs_verification:
@@ -1621,11 +1621,6 @@ def cros_flash(
         wait_kernel_ready(host)
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError('cros flash failed') from e
-    try:
-        util.ssh_cmd(host, 'chromeos-firmwareupdate', '--mode=recovery')
-    except subprocess.CalledProcessError as e:
-        logger.warning('chromeos-firmwareupdate failed: %s', e)
-    reboot(host, force_reboot_callback=force_reboot_callback)
     return True
 
 
