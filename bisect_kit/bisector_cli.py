@@ -763,14 +763,14 @@ class BisectorCommandLine:
         logger.debug('eval (%s) at rev=%s', action, rev)
 
         eval_log = self._step_log_path(rev, 'eval')
-        eval_log_fullpath = common.get_session_log_path(self.session, eval_log)
+        eval_log_full_path = common.get_session_log_path(self.session, eval_log)
 
         t0 = time.time()
         result = do_evaluate(
             eval_cmd,
             self.domain,
             rev,
-            eval_log_fullpath,
+            eval_log_full_path,
             capture_values=self.strategy.is_value_bisection(),
         )
         t1 = time.time()
@@ -778,7 +778,7 @@ class BisectorCommandLine:
 
         status = result.data['status']
         sample['status'] = status
-        if os.path.exists(eval_log_fullpath):
+        if os.path.exists(eval_log_full_path):
             sample['eval_log'] = eval_log
         if result:
             if 'reason' in result.data:
@@ -898,11 +898,14 @@ class BisectorCommandLine:
             )
             for r in revisions:
                 future_build_log = self._step_log_path(r, 'future_build')
+                future_build_log_full_path = common.get_session_log_path(
+                    self.session, future_build_log
+                )
                 do_future_build(
                     self.config['future_build'],
                     self.domain,
                     r,
-                    future_build_log,
+                    future_build_log_full_path,
                 )
 
         # We treat 'rev' as source of truth. 'index' is redundant and just
