@@ -155,7 +155,7 @@ def add_allocate_dut_arguments(
         # TODO(cylee): for possible backward compatibility, remove it after
         # ensuring no caller is using it.
         '--pool',
-        help='Pool to search DUT (default: %(default)s)',
+        help='Pools to search DUT (default: %(default)s); comma separated',
         default=DEFAULT_DUT_POOL,
     )
     parser.add_argument(

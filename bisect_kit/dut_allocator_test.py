@@ -25,7 +25,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         sample_num = len(available_bots)
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots(
-            dimensions, variants, sample_num
+            dimensions, variants, None, sample_num
         )
 
         self.assertEqual(len(acquired_bots), sample_num)
@@ -44,7 +44,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         sample_num = len(available_bots) // 2
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots(
-            dimensions, variants, sample_num
+            dimensions, variants, None, sample_num
         )
 
         self.assertEqual(len(acquired_bots), sample_num)
@@ -63,7 +63,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         sample_num = 10
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots(
-            dimensions, variants, sample_num
+            dimensions, variants, None, sample_num
         )
 
         self.assertEqual(len(acquired_bots), len(available_bots))
@@ -78,7 +78,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         sample_num = 10
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots(
-            dimensions, variants, sample_num
+            dimensions, variants, None, sample_num
         )
 
         self.assertEqual(len(acquired_bots), 0)
@@ -101,12 +101,38 @@ class TestSampleAvailableBots(unittest.TestCase):
 
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots(
-            dimensions, variants, sample_num, filter_func
+            dimensions, variants, None, sample_num, filter_func
         )
 
         filtered_bots = list(filter(filter_func, available_bots))
         self.assertEqual(len(acquired_bots), len(filtered_bots))
         self.assertCountEqual(acquired_bots, filtered_bots)
+
+    @mock.patch('bisect_kit.cros_lab_util.swarming_bots_list')
+    def test_sample_multiple_pools(self, mock_swarming_bots_list):
+        available_bots = [f'bot{k}' for k in range(20)]
+        mock_swarming_bots_list.side_effect = (
+            available_bots[:5],
+            available_bots[5:10],
+            available_bots[10:15],
+            available_bots[15:20],
+        )
+
+        dimensions = ['d1', 'd2']
+        variants = ['v1', 'v2']
+        pools = ['p1', 'p2']
+        sample_num = len(available_bots)
+
+        # pylint: disable=protected-access
+        acquired_bots = dut_allocator._sample_available_bots(
+            dimensions,
+            variants,
+            pools,
+            sample_num,
+        )
+
+        self.assertEqual(len(acquired_bots), len(available_bots))
+        self.assertCountEqual(acquired_bots, available_bots)
 
     def test_sample_available_bots_with_retry_value_error(self):
         available_bots = [f'bot{k}' for k in range(10)]
@@ -119,7 +145,11 @@ class TestSampleAvailableBots(unittest.TestCase):
         with self.assertRaises(ValueError):
             # pylint: disable=protected-access
             dut_allocator._sample_available_bots_with_retry(
-                dimensions, variants, sample_num, max_attempts=max_attempts
+                dimensions,
+                variants,
+                None,
+                sample_num,
+                max_attempts=max_attempts,
             )
 
     @mock.patch('time.sleep')
@@ -139,12 +169,12 @@ class TestSampleAvailableBots(unittest.TestCase):
 
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots_with_retry(
-            dimensions, variants, sample_num, max_attempts=max_attempts
+            dimensions, variants, None, sample_num, max_attempts=max_attempts
         )
         self.assertCountEqual(acquired_bots, available_bots)
         mock_sleep.assert_not_called()
         mock_sample_available_bots.assert_called_once_with(
-            dimensions, variants, mock.ANY, None, is_busy=False
+            dimensions, variants, None, mock.ANY, None, is_busy=False
         )
 
     @mock.patch('time.sleep')
@@ -165,14 +195,18 @@ class TestSampleAvailableBots(unittest.TestCase):
 
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots_with_retry(
-            dimensions, variants, sample_num, max_attempts=max_attempts
+            dimensions, variants, None, sample_num, max_attempts=max_attempts
         )
         self.assertCountEqual(acquired_bots, available_bots)
         mock_sleep.assert_not_called()
         mock_sample_available_bots.assert_has_calls(
             [
-                mock.call(dimensions, variants, mock.ANY, None, is_busy=False),
-                mock.call(dimensions, variants, mock.ANY, None, is_busy=None),
+                mock.call(
+                    dimensions, variants, None, mock.ANY, None, is_busy=False
+                ),
+                mock.call(
+                    dimensions, variants, None, mock.ANY, None, is_busy=None
+                ),
             ]
         )
 
@@ -196,24 +230,31 @@ class TestSampleAvailableBots(unittest.TestCase):
 
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots_with_retry(
-            dimensions, variants, sample_num, max_attempts=max_attempts
+            dimensions, variants, None, sample_num, max_attempts=max_attempts
         )
         self.assertCountEqual(acquired_bots, available_bots)
         mock_sleep.assert_called_once()
         mock_sample_available_bots.assert_has_calls(
             [
-                mock.call(dimensions, variants, mock.ANY, None, is_busy=False),
-                mock.call(dimensions, variants, mock.ANY, None, is_busy=None),
+                mock.call(
+                    dimensions, variants, None, mock.ANY, None, is_busy=False
+                ),
+                mock.call(
+                    dimensions, variants, None, mock.ANY, None, is_busy=None
+                ),
                 mock.call(
                     dimensions,
                     variants,
+                    None,
                     mock.ANY,
                     None,
                     is_dead=None,
                     quarantined=None,
                     is_busy=None,
                 ),
-                mock.call(dimensions, variants, mock.ANY, None, is_busy=False),
+                mock.call(
+                    dimensions, variants, None, mock.ANY, None, is_busy=False
+                ),
             ]
         )
 
@@ -233,7 +274,11 @@ class TestSampleAvailableBots(unittest.TestCase):
         with self.assertRaises(errors.NoDutAvailable):
             # pylint: disable=protected-access
             dut_allocator._sample_available_bots_with_retry(
-                dimensions, variants, sample_num, max_attempts=max_attempts
+                dimensions,
+                variants,
+                None,
+                sample_num,
+                max_attempts=max_attempts,
             )
 
         mock_sleep.assert_called()

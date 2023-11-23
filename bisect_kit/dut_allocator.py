@@ -51,6 +51,7 @@ def _filter_dimensions_by_lab(
 def _sample_available_bots(
     dimensions: list[str],
     variants: list[str],
+    pools: list[str] | None,
     num: int = 1,
     filter_func: collections.abc.Callable | None = None,
     *,
@@ -69,6 +70,7 @@ def _sample_available_bots(
     Args:
         dimensions: a list of dimension constraints
         variants: a list of variant constraints
+        pools: a list of pools. None means not to consider pools.
         num: sample (at most) `num` available bots
         filter_func: a boolean filter function will be applied before
             the sampling. Passing `None` means no filtering.
@@ -79,17 +81,27 @@ def _sample_available_bots(
         limit: see `cros_lab_util.swarming_bots_list()`
     Returns: a list of available bots
     """
-    bots = []
-    for variant in variants:
+
+    def fetch_bots(dimensions):
+        logger.debug('fetch_bots: %s', dimensions)
         # There might be thousand bots available, set 'limit' to reduce swarming
         # API cost. This is not uniform random, but should be good enough.
-        bots += cros_lab_util.swarming_bots_list(
-            dimensions + [variant],
+        return cros_lab_util.swarming_bots_list(
+            dimensions,
             is_dead=is_dead,
             quarantined=quarantined,
             is_busy=is_busy,
             limit=limit,
         )
+
+    bots = []
+    if not pools:
+        for variant in variants:
+            bots += fetch_bots(dimensions + [variant])
+    else:
+        for pool in pools:
+            for variant in variants:
+                bots += fetch_bots(dimensions + [variant, pool])
 
     if filter_func:
         bots = list(filter(filter_func, bots))
@@ -99,6 +111,7 @@ def _sample_available_bots(
 def _sample_available_bots_with_retry(
     dimensions: list[str],
     variants: list[str],
+    pools: list[str] | None,
     num: int,
     filter_func: collections.abc.Callable | None = None,
     max_attempts: int = 5,
@@ -112,6 +125,7 @@ def _sample_available_bots_with_retry(
     Args:
         dimensions: a list of dimension constraints
         variants: a list of variant constraints
+        pools: a list of pools. None means not to consider pools.
         num: sample (at most) `num` available bots
         filter_func: a boolean filter function will be applied before
             the sampling. Passing `None` means no filtering.
@@ -123,6 +137,7 @@ def _sample_available_bots_with_retry(
         _sample_available_bots,
         dimensions,
         variants,
+        pools,
         num,
         filter_func,
     )
@@ -154,15 +169,14 @@ def _sample_available_bots_with_retry(
 def _filter_dimensions_by_board(
     boards_with_prebuilt: list[str] | None,
     dimensions: list[str],
-    pool: str | None,
+    pools: list[str] | None,
 ) -> list[str]:
     result = set()
-    for dimension in dimensions:
-        constraints = [dimension]
-        if pool:
-            constraints.append('label-pool:' + pool)
+
+    def sample_bots(constraints, result):
         # Ideally, we need only one result. Here we get more (limit=10) in order to
         # cope with incorrect metadata in swarming database (b/196499726).
+        logger.debug('sample_bots: %s', constraints)
         bots = cros_lab_util.swarming_bots_list(
             constraints, is_busy=None, limit=10
         )
@@ -177,6 +191,14 @@ def _filter_dimensions_by_board(
                 )
                 continue
             result.add(dimension)
+
+    for dimension in dimensions:
+        constraints = [dimension]
+        if pools:
+            for pool in pools:
+                sample_bots(constraints + [pool], result)
+        else:
+            sample_bots(constraints, result)
     return list(result)
 
 
@@ -278,9 +300,12 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
     t0 = time.time()
     dimensions = [f'{key}:{value}' for key, value in spec.dimensions]
     dimensions.append('dut_state:ready')
-    if spec.pool:
-        dimensions.append('label-pool:' + spec.pool)
     dimensions = _filter_dimensions_by_lab(dimensions, raise_unknown=True)
+
+    pools = None
+    if spec.pool:
+        pools = ['label-pool:%s' % p for p in spec.pool.split(',')]
+        pools = _filter_dimensions_by_lab(pools, raise_unknown=True)
 
     # Note: board, model, sku, and dut_name are mutual exclusive so at most one
     # of them is present.
@@ -375,7 +400,7 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
             )
         variants = filtered
         filtered = _filter_dimensions_by_board(
-            boards_with_prebuilt, variants, spec.pool
+            boards_with_prebuilt, variants, pools
         )
         if not filtered:
             raise errors.NoDutAvailable(
@@ -388,7 +413,7 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
     while True:
         # Query every time because each iteration takes a few minutes
         bots = _sample_available_bots_with_retry(
-            dimensions, variants, spec.parallel, filter_func
+            dimensions, variants, pools, spec.parallel, filter_func
         )
 
         remaining_time = spec.time_limit - (time.time() - t0)
