@@ -158,6 +158,19 @@ def get_session_cache_dir(
     return get_session_log_path(session_name, DEFAULT_CACHE_DIR)
 
 
+def check_dir_existence(path: PathLike, raise_error=True) -> bool:
+    path = pathlib.Path(path).expanduser().absolute()
+    if not path.exists():
+        if raise_error:
+            raise FileNotFoundError(path)
+        return False
+    if not path.is_dir():
+        if raise_error:
+            raise NotADirectoryError(path)
+        return False
+    return True
+
+
 def is_valid_uuid(uuid_str: str) -> bool:
     try:
         uuid_obj = uuid.UUID(uuid_str, version=4)

@@ -7,14 +7,17 @@
 import os
 import pathlib
 
+from bisect_kit import common
 from bisect_kit import util
 
 
 PathLike = os.PathLike | str
 
 
-def is_btrfs_subvolume(path: PathLike) -> bool:
-    path = pathlib.Path(path)
+def is_btrfs_subvolume(path: PathLike, raise_error=True) -> bool:
+    path = pathlib.Path(path).expanduser().absolute()
+    if not common.check_dir_existence(path, raise_error=raise_error):
+        return False
     if path.is_symlink():
         return False
     if util.check_output('stat', '-f', '--format=%T', path).strip() != 'btrfs':
@@ -23,7 +26,7 @@ def is_btrfs_subvolume(path: PathLike) -> bool:
 
 
 def _make_subvolume(path: PathLike) -> None:
-    path = pathlib.Path(path)
+    path = pathlib.Path(path).expanduser().absolute()
     if path.exists():
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -31,7 +34,7 @@ def _make_subvolume(path: PathLike) -> None:
 
 
 def makedirs(path: PathLike, use_btrfs: bool) -> None:
-    path = pathlib.Path(path).absolute()
+    path = pathlib.Path(path).expanduser().absolute()
     if path.exists():
         return
 
@@ -44,10 +47,8 @@ def makedirs(path: PathLike, use_btrfs: bool) -> None:
 def copy_tree(src: PathLike, dst: PathLike) -> None:
     src = pathlib.Path(src)
     dst = pathlib.Path(dst)
-    if not src.is_dir():
-        raise FileNotFoundError(src)
-    if not dst.parent.is_dir():
-        raise FileNotFoundError(dst.parent)
+    common.check_dir_existence(src)
+    common.check_dir_existence(dst.parent)
     # Make sure dst do not exist, otherwise it becomes "dst/name" (one extra
     # depth) instead of "dst".
     if not dst.exists():
@@ -61,7 +62,7 @@ def copy_tree(src: PathLike, dst: PathLike) -> None:
 
 
 def delete_tree(path: PathLike, missing_ok=False) -> None:
-    path = pathlib.Path(path)
+    path = pathlib.Path(path).expanduser().absolute()
     if not path.exists():
         if missing_ok:
             return
