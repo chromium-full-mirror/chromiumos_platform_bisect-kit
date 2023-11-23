@@ -29,6 +29,7 @@ import multiprocessing
 import os
 import pathlib
 import subprocess
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -576,14 +577,14 @@ def cmd_delete(opts):
         # process first to avoid deleting the running session accidentally.
         path_factory = common.WorkBasePathFactory(work_base=opts.work_base)
         for session_name in path_factory.iter_session_names():
-            _delete_session(session_name, opts.mirror_base, opts.work_base)
+            _delete_session(session_name, opts.work_base, opts.mirror_base)
     elif opts.session:
-        _delete_session(opts.session, opts.mirror_base, opts.work_base)
+        _delete_session(opts.session, opts.work_base, opts.mirror_base)
 
     _clear_global_caches()
 
 
-def _delete_session(session: str, mirror_base: PathLike, work_base: PathLike):
+def _delete_session(session: str, work_base: PathLike, mirror_base: PathLike):
     path_factory = common.ProjectPathFactory(session, work_base, mirror_base)
 
     chromeos_tree = path_factory.get_chromeos_tree()
@@ -625,6 +626,78 @@ def _clear_global_caches():
         for path in glob.glob(os.path.join(chromeos_root, 'tmp/*')):
             logger.debug('remove cache (chromeos root tmp): %s', path)
             btrfs_util.delete_tree(path)
+
+
+def cmd_check(opts):
+    if _check_environments(opts.work_base, opts.mirror_base, opts.fixme):
+        return 0
+    return -1
+
+
+def _check_environments(
+    work_base: PathLike, mirror_base: PathLike, should_fix: bool
+) -> bool:
+    template_factory = common.TemplatePathFactory(work_base, mirror_base)
+    is_chromeos_tree_ok = _check_chromeos_tree(template_factory, should_fix)
+    is_chomre_tree_ok = _check_chrome_tree(template_factory, should_fix)
+    is_chrome_deps_ok = _check_chrome_build_deps(template_factory, should_fix)
+
+    return is_chromeos_tree_ok and is_chomre_tree_ok and is_chrome_deps_ok
+
+
+def _check_chromeos_tree(
+    path_factory: common.ProjectPathFactory, should_fix: bool
+) -> bool:
+    chromeos_tree = pathlib.Path(path_factory.get_chromeos_tree())
+    if btrfs_util.is_btrfs_subvolume(chromeos_tree, raise_error=False):
+        return True
+    logger.warning(
+        'chromeos_tree not exists or is not a valid btrfs subvolume: %s',
+        chromeos_tree,
+    )
+    if not should_fix:
+        return False
+    btrfs_util.delete_tree(chromeos_tree, missing_ok=True)
+    _setup_chromeos_repos(path_factory, use_btrfs=True)
+    return True
+
+
+def _check_chrome_tree(
+    path_factory: common.ProjectPathFactory, should_fix: bool
+) -> bool:
+    chrome_tree = pathlib.Path(path_factory.get_chrome_tree())
+    if btrfs_util.is_btrfs_subvolume(chrome_tree, raise_error=False):
+        return True
+    logger.warning(
+        'chrome_tree not exists or is not a valid btrfs subvolume: %s',
+        chrome_tree,
+    )
+    if not should_fix:
+        return False
+    btrfs_util.delete_tree(chrome_tree, missing_ok=True)
+    _setup_chrome_repos(path_factory, use_btrfs=True)
+    return True
+
+
+def _check_chrome_build_deps(
+    path_factoroy: common.ProjectPathFactory, should_fix: bool
+):
+    chrome_tree = pathlib.Path(path_factoroy.get_chrome_tree())
+    cmds = ['src/build/install-build-deps.sh', '--no-prompt', '--android']
+    if should_fix:
+        util.check_output(*cmds, cwd=chrome_tree)
+        return True
+
+    try:
+        cmds.append('--quick-check')
+        util.check_output(*cmds, cwd=chrome_tree)
+        return True
+    except FileNotFoundError as e:
+        logger.warning('deps ckecking script not found: %s', e)
+        return False
+    except subprocess.CalledProcessError:
+        logger.warning('missing dependencies for chrome build: %s', chrome_tree)
+        return False
 
 
 def create_parser():
@@ -747,6 +820,18 @@ def create_parser():
     )
     parser_delete.set_defaults(func=cmd_delete)
 
+    parser_check = subparsers.add_parser(
+        'check',
+        help='Check if the environments is sufficient to run a full bisection run',
+        parents=parents_session_optional,
+    )
+    parser_check.add_argument(
+        '--fixme',
+        action='store_true',
+        help='Attempt to fix the environments if it is in an unhealthy state',
+    )
+    parser_check.set_defaults(func=cmd_check)
+
     return parser
 
 
@@ -754,8 +839,8 @@ def main():
     parser = create_parser()
     opts = parser.parse_args()
     common.config_logging(opts)
-    opts.func(opts)
+    return opts.func(opts)
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
