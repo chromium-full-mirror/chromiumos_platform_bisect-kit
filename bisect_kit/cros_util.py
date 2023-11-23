@@ -1613,6 +1613,7 @@ def cros_flash(
     args = ['--debug', '--no-ping', host, image_path]
     if clobber_stateful:
         args.append('--clobber-stateful')
+        args.append('--clear-tpm-owner')
     if disable_rootfs_verification:
         args.append('--disable-rootfs-verification')
 
