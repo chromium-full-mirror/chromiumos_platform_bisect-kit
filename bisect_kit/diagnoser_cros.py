@@ -1906,6 +1906,8 @@ class DiagnoseCommandLineBase:
 
     def main(self, args=None):
         opts = self.argument_parser.parse_args(args)
+        # TODO(b/313563185): Always enable rootfs verification for now, this will be removed later.
+        opts.disable_rootfs_verification = False
         common.config_logging(opts)
 
         session_file = common.get_session_log_path(
