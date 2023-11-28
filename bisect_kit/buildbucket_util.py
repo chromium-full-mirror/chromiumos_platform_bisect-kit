@@ -14,7 +14,6 @@ import socket
 import ssl
 import tempfile
 
-from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import util
@@ -262,14 +261,13 @@ class BuildbucketApi:
         self,
         board: str,
         manifest_xml: str,
-        recipe: str = 'build_bisector',
+        recipe: str = 'build_postsubmit',
         deps: str | None = None,
         git_auth: bool = True,
         bucket: str = 'bisector',
         force_rebuild: bool = False,
         search_only: bool = False,
         build_tags: dict[str, str] | None = None,
-        chromeos_version='',
     ):
         """Schedule a build job in buildbucket.
 
@@ -297,24 +295,11 @@ class BuildbucketApi:
         for key, value in build_tags.items():
             tags.append(StringPair(key=key, value=value))
 
-        old_rev, new_rev, cl_count = codechange.parse_intra_rev(
-            chromeos_version
-        )
         chromeos_digest = self._cas_upload('snapshot.xml', manifest_xml)
         # TODO(zjchang): remove git_auth after crbug.com/1068743 fixed.
         properties = {
             '$recipe_engine/cas': {
                 'instance': self.cas_instance,
-            },
-            '$chromeos/sysroot_archive': {
-                'sysroot_enabled': {
-                    'save_sysroot_archive': True,
-                    'use_sysroot_archive': True,
-                    'gs_bucket': 'bisector-builds',
-                    'chromeos_start_version': old_rev,
-                    'chromeos_end_version': new_rev,
-                    'chromeos_cl_diff_counts': cl_count,
-                },
             },
             '$chromeos/failures': {
                 'disable_silences': True,

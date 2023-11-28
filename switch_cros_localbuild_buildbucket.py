@@ -393,7 +393,6 @@ def search_and_schedule_build(opts) -> int | None:
         deps=deps,
         git_auth=git_auth,
         search_only=opts.no_build,
-        chromeos_version=opts.chromeos_rev,
     )
 
     if build_info is None:
