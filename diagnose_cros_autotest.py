@@ -107,14 +107,14 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             '--rich_result',
             '--chromeos_root',
             self.config['chromeos_root'],
-        ]  # yapf: disable
+        ]
         if self.config['test_name'] and not self.config['cts_test']:
             common_eval_cmd += ['--test_name', self.config['test_name']]
         if self.config['metric']:
             common_eval_cmd += [
                 '--metric',
                 self.config['metric'],
-            ]  # yapf: disable
+            ]
         if self.config['fail_to_pass']:
             common_eval_cmd.append('--fail_to_pass')
         if self.config['reboot_before_test']:

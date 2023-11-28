@@ -137,7 +137,7 @@ def mark_as_stable(opts):
         '--debug',
         '--all',
         'commit',
-    ]  # yapf: disable
+    ]
     util.check_call(*cmd, cwd=opts.chromeos_root)
 
 

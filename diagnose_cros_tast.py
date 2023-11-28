@@ -52,12 +52,12 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             self.config['chromeos_root'],
             '--test_name',
             self.config['test_name'],
-        ]  # yapf: disable
+        ]
         if self.config['metric']:
             common_eval_cmd += [
                 '--metric',
                 self.config['metric'],
-            ]  # yapf: disable
+            ]
         if self.config['fail_to_pass']:
             common_eval_cmd.append('--fail_to_pass')
         if self.config['reboot_before_test']:
