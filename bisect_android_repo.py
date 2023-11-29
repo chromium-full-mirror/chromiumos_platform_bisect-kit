@@ -7,8 +7,8 @@
 
 Example:
   $ ./bisect_android_repo.py init --old rev1 --new rev2 \\
-      --android_root ~/android \\
-      --android_mirror ANDROID_MIRROR \\
+      --android-root ~/android \\
+      --android-mirror ANDROID_MIRROR \\
       --branch BRANCH \\
       --flavor FLAVOR \\
       --board BOARD \\
@@ -98,14 +98,14 @@ class AndroidRepoDomain(core.BisectDomain):
             help='DUT address',
         )
         parser.add_argument(
-            '--android_root',
+            '--android-root',
             metavar='ANDROID_ROOT',
             type=cli.argtype_dir_path,
             default=os.environ.get('ANDROID_ROOT', ''),
             help='Android tree root',
         )
         parser.add_argument(
-            '--android_mirror',
+            '--android-mirror',
             type=cli.argtype_dir_path,
             default=os.environ.get('ANDROID_MIRROR', ''),
             help='Android repo mirror path',

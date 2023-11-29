@@ -13,7 +13,6 @@ It is implemented by calling Android's push_to_device.py.
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
@@ -33,10 +32,9 @@ logger = logging.getLogger(__name__)
 
 def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(description=__doc__, parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(description=__doc__, parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )

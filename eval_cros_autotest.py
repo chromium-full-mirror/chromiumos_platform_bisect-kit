@@ -13,7 +13,6 @@ matches. Otherwise your test binary will be overwritten.
 
 from __future__ import annotations
 
-import argparse
 import glob
 import logging
 import os
@@ -51,12 +50,11 @@ EXIT_CODE_MAP = {
 def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
     # exit_on_error=False: to capture invalid argument values
-    parser = argparse.ArgumentParser(
+    parser = cli.ArgumentParser(
         description=__doc__, parents=parents, exit_on_error=False
     )
-    cli.patching_argparser_exit(parser)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
@@ -68,14 +66,14 @@ def create_argument_parser():
         default=os.environ.get('DUT', ''),
     )
     parser.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
         default=os.environ.get('CHROMEOS_ROOT', ''),
         help='ChromeOS tree root',
     )
     parser.add_argument(
-        '--chrome_root',
+        '--chrome-root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROME_ROOT'),
@@ -93,25 +91,25 @@ def create_argument_parser():
         help='Remove existing autotest folder on the DUT first',
     )
     parser.add_argument(
-        '--reboot_before_test',
+        '--reboot-before-test',
         action='store_true',
         help='Reboot before test run',
     )
 
     group = parser.add_argument_group(title='Options for normal autotest tests')
     group.add_argument(
-        '--test_name',
+        '--test-name',
         help='Test name, like "video_VideoDecodeAccelerator.h264"',
     )
     group.add_argument(
-        '--fail_to_pass',
+        '--fail-to-pass',
         action='store_true',
         help='For functional tests: old behavior is FAIL and new behavior is '
         'PASS; If not specified, default = old behavior is PASS and new '
         'behavior is FAIL',
     )
     group.add_argument(
-        '--consider_test_crash_as_failure',
+        '--consider-test-crash-as-failure',
         action='store_true',
         help='Consider test crashes as failure instead of skip',
     )
@@ -128,22 +126,22 @@ def create_argument_parser():
     )
 
     group = parser.add_argument_group(title='Options for CTS/GTS tests')
-    group.add_argument('--cts_revision', help='CTS revision, like "9.0_r3"')
-    group.add_argument('--cts_abi', choices=['arm', 'x86'])
+    group.add_argument('--cts-revision', help='CTS revision, like "9.0_r3"')
+    group.add_argument('--cts-abi', choices=['arm', 'x86'])
     group.add_argument(
-        '--cts_prefix',
+        '--cts-prefix',
         help='Prefix of autotest test name, '
         'like cheets_CTS_N, cheets_CTS_P, cheets_GTS',
     )
     group.add_argument(
-        '--cts_module', help='CTS/GTS module name, like "CtsCameraTestCases"'
+        '--cts-module', help='CTS/GTS module name, like "CtsCameraTestCases"'
     )
     group.add_argument(
-        '--cts_test',
+        '--cts-test',
         help='CTS/GTS test name, like '
         '"android.hardware.cts.CameraTest#testDisplayOrientation"',
     )
-    group.add_argument('--cts_timeout', type=float, help='timeout, in seconds')
+    group.add_argument('--cts-timeout', type=float, help='timeout, in seconds')
 
     return parser
 
@@ -450,15 +448,15 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
         if opts.test_name or opts.metric or opts.args:
             raise errors.ArgumentError(
                 None,
-                'do not specify --test_name, --metric, --args for CTS/GTS tests',
+                'do not specify --test-name, --metric, --args for CTS/GTS tests',
             )
         if not opts.cts_prefix:
             raise errors.ArgumentError(
-                None, '--cts_prefix should be specified for CTS/GTS tests'
+                None, '--cts-prefix should be specified for CTS/GTS tests'
             )
         if not opts.cts_module:
             raise errors.ArgumentError(
-                None, '--cts_module should be specified for CTS/GTS tests'
+                None, '--cts-module should be specified for CTS/GTS tests'
             )
         opts.test_name = '%s.tradefed-run-test' % opts.cts_prefix
         opts.args = [
@@ -474,20 +472,20 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
             opts.args.append('timeout=%s' % opts.cts_timeout)
     else:
         if not opts.test_name:
-            raise errors.ArgumentError(None, 'argument --test_name is required')
+            raise errors.ArgumentError(None, 'argument --test-name is required')
 
     # Verify command line options.
     if opts.metric:
         if opts.fail_to_pass:
             raise errors.ArgumentError(
-                '--fail_to_pass',
-                '--fail_to_pass is not for benchmark test (--metric)',
+                '--fail-to-pass',
+                '--fail-to-pass is not for benchmark test (--metric)',
             )
     if opts.test_name.startswith('telemetry_'):
         if not opts.chrome_root:
             raise errors.ArgumentError(
-                '--chrome_root',
-                '--chrome_root is mandatory for telemetry tests',
+                '--chrome-root',
+                '--chrome-root is mandatory for telemetry tests',
             )
     if opts.prebuilt:
         autotest_dir = os.path.join(

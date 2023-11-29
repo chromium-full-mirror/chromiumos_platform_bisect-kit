@@ -4,7 +4,6 @@
 
 """Test common module."""
 
-import argparse
 import logging
 import pathlib
 import tempfile
@@ -32,8 +31,8 @@ class TestCommon(unittest.TestCase):
     )
     def test_logging(self):
         parents = [cli.create_common_argument_parser()]
-        parser = argparse.ArgumentParser(parents=parents)
-        opts = parser.parse_args(['--log_file', self.log_file])
+        parser = cli.ArgumentParser(parents=parents)
+        opts = parser.parse_args(['--log-file', self.log_file])
         common.config_logging(opts)
 
         logger.debug('test')

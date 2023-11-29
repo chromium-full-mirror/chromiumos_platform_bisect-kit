@@ -4,7 +4,6 @@
 
 """Test cli module."""
 
-import argparse
 import unittest
 
 from bisect_kit import cli
@@ -77,21 +76,6 @@ class TestCli(unittest.TestCase):
         self.assertEqual(cli.lookup_signal_name(15), 'SIGTERM')
         self.assertEqual(cli.lookup_signal_name(99), 'Unknown')
 
-    def test_patching_argparser_exit(self):
-        parser = argparse.ArgumentParser()
-        cli.patching_argparser_exit(parser)
-        parser.add_argument('--value', type=int)
-        parser.add_argument('--necessary', required=True)
-
-        # Nothing happened.
-        parser.parse_args(['--necessary', 'foo'])
-
-        with self.assertRaises(errors.ArgumentError):
-            parser.parse_args(['foo'])
-
-        with self.assertRaises(errors.ArgumentError):
-            parser.parse_args(['--necessary', 'foo', '--value', 'bar'])
-
     def test_argtype_key_value(self):
         self.assertEqual(cli.argtype_key_value('key=value'), ('key', 'value'))
         self.assertEqual(cli.argtype_key_value('key='), ('key', ''))
@@ -116,6 +100,46 @@ class TestCli(unittest.TestCase):
         with self.assertRaises(SystemExit) as e:
             test_func()
         self.assertEqual(e.exception.code, cli.EXIT_CODE_FATAL)
+
+
+class TestArgumentParser(unittest.TestCase):
+    """Test ArgumentParser class in cli module"""
+
+    def test_add_argument(self):
+        parser = cli.ArgumentParser()
+        with self.assertRaises(ValueError):
+            parser.add_argument('--optional_underscore')
+        parser.add_argument('--optional-hyphen')
+        parser.add_argument('positional_underscore')
+
+    def test_parse_args(self):
+        parser = cli.ArgumentParser()
+        parser.add_argument('--foo-bar')
+        args = parser.parse_args(['--foo-bar', 'dummy_value'])
+        self.assertEqual(args.foo_bar, 'dummy_value')
+        args = parser.parse_args(['--foo_bar', 'dummy_value'])
+        self.assertEqual(args.foo_bar, 'dummy_value')
+
+    def test_exit(self):
+        parser = cli.ArgumentParser()
+        parser.add_argument('--value', type=int)
+        parser.add_argument('--necessary', required=True)
+
+        # Nothing happened.
+        parser.parse_args(['--necessary', 'foo'])
+
+        with self.assertRaises(errors.ArgumentError):
+            parser.parse_args(['foo'])
+
+        with self.assertRaises(errors.ArgumentError):
+            parser.parse_args(['--necessary', 'foo', '--value', 'bar'])
+
+    def test_normalize_args(self):
+        args = './cmd sub_cmd -a --arg_1 value1 --arg-2 value2 --arg_3=value_3 -- --arg_4 --arg-5'.split()
+        expected = './cmd sub_cmd -a --arg-1 value1 --arg-2 value2 --arg-3=value_3 -- --arg_4 --arg-5'.split()
+        self.assertSequenceEqual(
+            cli.ArgumentParser.normalize_args(args), expected
+        )
 
 
 if __name__ == '__main__':

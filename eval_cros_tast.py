@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import logging
 import os
@@ -44,10 +43,9 @@ EXIT_CODE_MAP = {
 
 def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(description=__doc__, parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(description=__doc__, parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
@@ -59,7 +57,7 @@ def create_argument_parser():
         default=os.environ.get('DUT', ''),
     )
     parser.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
         default=os.environ.get('CHROMEOS_ROOT', ''),
@@ -72,18 +70,18 @@ def create_argument_parser():
         'otherwise use the default one',
     )
     parser.add_argument(
-        '--tast_build',
+        '--tast-build',
         action='store_true',
         help='Build tast test bundle (-build=true) if specified; '
         'default is using prebuilt bundle on the DUT',
     )
     parser.add_argument(
-        '--with_private_bundles',
+        '--with-private-bundles',
         action='store_true',
         help='Whether search tests in private bundles or not',
     )
     parser.add_argument(
-        '--reboot_before_test',
+        '--reboot-before-test',
         action='store_true',
         help='Reboot before test run',
     )
@@ -97,19 +95,19 @@ def create_argument_parser():
 
     group = parser.add_argument_group(title='Options for normal autotest tests')
     group.add_argument(
-        '--test_name',
+        '--test-name',
         required=True,
         help='Test name, like "video_VideoDecodeAccelerator.h264"',
     )
     group.add_argument(
-        '--fail_to_pass',
+        '--fail-to-pass',
         action='store_true',
         help='For functional tests: old behavior is FAIL and new behavior is '
         'PASS; If not specified, default = old behavior is PASS and new '
         'behavior is FAIL',
     )
     group.add_argument(
-        '--consider_test_crash_as_failure',
+        '--consider-test-crash-as-failure',
         action='store_true',
         help='Consider test crashes as failure instead of skip',
     )
@@ -315,19 +313,19 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
     if opts.with_private_bundles and not opts.tast_build:
         if not cros_util.query_dut_is_by_official_builder(opts.dut):
             # Official builders uploaded private tast bundles and tast can download
-            # them with -downloadprivatebundles=true, so --tast_build is not
+            # them with -downloadprivatebundles=true, so --tast-build is not
             # required. Otherwise, we must build the bundles by ourselves.
             raise errors.ArgumentError(
-                '--tast_build',
-                'for non-official chromeos image, --tast_build must be specified',
+                '--tast-build',
+                'for non-official chromeos image, --tast-build must be specified',
             )
 
     # Verify command line options.
     if opts.metric:
         if opts.fail_to_pass:
             raise errors.ArgumentError(
-                '--fail_to_pass',
-                '--fail_to_pass is not for benchmark test (--metric)',
+                '--fail-to-pass',
+                '--fail-to-pass is not for benchmark test (--metric)',
             )
     # Remove the "tast." prefix prepended by autotest.
     opts.test_name = re.sub(r'^tast\.', '', opts.test_name)

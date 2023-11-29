@@ -14,7 +14,7 @@ from bisect_kit import errors
 logger = logging.getLogger(__name__)
 
 
-def common_local_build_flags() -> argparse.ArgumentParser:
+def common_local_build_flags() -> cli.ArgumentParser:
     """Add common flags for local build switch scripts.
 
     There are commonly three stages:
@@ -25,14 +25,14 @@ def common_local_build_flags() -> argparse.ArgumentParser:
     There are 2^3 = 8 possibilities, though some of them are meaningless.
 
     Another set of mutual exclusive flags are provided for ease of use:
-        1. --sync_code_only: shorthand for --no_build --no_deploy.
-        2. --build_only: shorthand for --no_sync_code --no_deploy.
-        3. --deploy_only: shorthand for --no_sync_codeand --no_build.
+        1. --sync-code-only: shorthand for --no-build --no-deploy.
+        2. --build-only: shorthand for --no-sync-code --no-deploy.
+        3. --deploy-only: shorthand for --no-sync-codeand --no-build.
 
     Returns:
-        An argparse.ArgumentParser object.
+        An cli.ArgumentParser object.
     """
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = cli.ArgumentParser(add_help=False)
     parser.add_argument(
         '--dut',
         type=cli.argtype_notempty,
@@ -41,41 +41,41 @@ def common_local_build_flags() -> argparse.ArgumentParser:
         help='DUT address',
     )
     parser.add_argument(
-        '--no_sync_code',
+        '--no-sync-code',
         action='store_true',
         default=os.environ.get('NO_SYNC_CODE') == 'true',
         help='Do no sync source code',
     )
     parser.add_argument(
-        '--no_build',
+        '--no-build',
         action='store_true',
         default=os.environ.get('NO_BUILD') == 'true',
         help='Do no build',
     )
     parser.add_argument(
-        '--no_deploy',
+        '--no-deploy',
         action='store_true',
         default=os.environ.get('NO_DEPLOY') == 'true',
         help='Do no deploy to DUT',
     )
     shortcut_group = parser.add_mutually_exclusive_group()
     shortcut_group.add_argument(
-        '--sync_code_only',
+        '--sync-code-only',
         action='store_true',
         default=os.environ.get('SYNC_CODE_ONLY') == 'true',
-        help='sync code only. Shorthand for --no_build and --no_deploy',
+        help='sync code only. Shorthand for --no-build and --no-deploy',
     )
     shortcut_group.add_argument(
-        '--build_only',
+        '--build-only',
         action='store_true',
         default=os.environ.get('BUILD_ONLY') == 'true',
-        help='build only. Shorthand for --no_sync_code and --no_deploy',
+        help='build only. Shorthand for --no-sync-code and --no-deploy',
     )
     shortcut_group.add_argument(
-        '--deploy_only',
+        '--deploy-only',
         action='store_true',
         default=os.environ.get('DEPLOY_ONLY') == 'true',
-        help='deploy only. Shorthand for --no_sync_code and --no_build',
+        help='deploy only. Shorthand for --no-sync-code and --no-build',
     )
     return parser
 
@@ -97,8 +97,8 @@ def post_init_local_build_flags(opts: argparse.Namespace):
     if opts.sync_code_only:
         if opts.no_sync_code:
             raise errors.ArgumentError(
-                '--sync_code_only and --no_sync_code',
-                '--sync_code_only implies --no_sync_code = False',
+                '--sync-code-only and --no-sync-code',
+                '--sync-code-only implies --no-sync-code = False',
             )
         opts.no_build = True
         opts.no_deploy = True
@@ -108,8 +108,8 @@ def post_init_local_build_flags(opts: argparse.Namespace):
     if opts.build_only:
         if opts.no_build:
             raise errors.ArgumentError(
-                '--build_only and --no_build',
-                '--build_only implies --no_build = False',
+                '--build-only and --no-build',
+                '--build-only implies --no-build = False',
             )
         opts.no_sync_code = True
         opts.no_deploy = True
@@ -119,8 +119,8 @@ def post_init_local_build_flags(opts: argparse.Namespace):
     if opts.deploy_only:
         if opts.no_deploy:
             raise errors.ArgumentError(
-                '--deploy_only and --no_deploy',
-                '--deploy_only implies --no_deploy = False',
+                '--deploy-only and --no-deploy',
+                '--deploy-only implies --no-deploy = False',
             )
         opts.no_sync_code = True
         opts.no_build = True
@@ -129,12 +129,12 @@ def post_init_local_build_flags(opts: argparse.Namespace):
 
     if opts.no_sync_code and opts.no_build and opts.no_deploy:
         raise errors.ArgumentError(
-            '--no_sync_code, --no_build, --no_deploy',
+            '--no-sync-code, --no-build, --no-deploy',
             'All three of them are True, nothing to do?',
         )
 
     if not opts.dut:
         if not opts.no_deploy:
             raise errors.ArgumentError(
-                '--dut', 'DUT can be omitted only if --no_deploy'
+                '--dut', 'DUT can be omitted only if --no-deploy'
             )

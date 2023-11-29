@@ -32,7 +32,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         super().check_options(opts)
 
         if not opts.eval_script:
-            self.argument_parser.error('argument --eval_script is required')
+            self.argument_parser.error('argument --eval-script is required')
 
     def init_hook(self, opts):
         self.states.config.update(
@@ -42,7 +42,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     def create_argument_parser_hook(self, parser_init: ArgumentParser):
         group = parser_init.add_argument_group(title='Options for Custom eval')
         group.add_argument(
-            '--eval_script',
+            '--eval-script',
             help='Predefined eval script to execute',
             choices=['eval_custom_dut_bootable'],
         )
@@ -51,7 +51,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         if eval_script == 'eval_custom_dut_bootable':
             return 'eval_custom_dut_bootable.py'
 
-        return self.argument_parser.error('argument --eval_script is not valid')
+        return self.argument_parser.error('argument --eval-script is not valid')
 
     def _build_cmds(self):
         switch_test_harness_cmd = None
@@ -59,7 +59,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         eval_script_filename = self._get_eval_script_file_name(eval_script)
         common_eval_cmd = [
             f'./{eval_script_filename}',
-            '--rich_result',
+            '--rich-result',
         ]
 
         return switch_test_harness_cmd, common_eval_cmd

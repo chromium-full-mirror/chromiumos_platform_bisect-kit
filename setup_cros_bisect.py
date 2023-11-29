@@ -701,15 +701,15 @@ def _check_chrome_build_deps(
 
 
 def create_parser():
-    base_parser = argparse.ArgumentParser(add_help=False)
+    base_parser = cli.ArgumentParser(add_help=False)
     base_parser.add_argument(
-        '--mirror_base',
+        '--mirror-base',
         metavar='MIRROR_BASE',
         default=os.environ.get('MIRROR_BASE', common.DEFAULT_MIRROR_BASE),
         help='Directory for mirrors (default: %(default)s)',
     )
     base_parser.add_argument(
-        '--work_base',
+        '--work-base',
         metavar='WORK_BASE',
         default=os.environ.get('WORK_BASE', common.DEFAULT_WORK_BASE),
         help='Directory for bisection working directories'
@@ -724,9 +724,10 @@ def create_parser():
         base_parser,
     ]
 
-    parser = argparse.ArgumentParser(
+    parser = cli.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=__doc__,
+        raise_bad_status=False,
     )
     subparsers = parser.add_subparsers(
         dest='command', title='commands', metavar='<command>', required=True

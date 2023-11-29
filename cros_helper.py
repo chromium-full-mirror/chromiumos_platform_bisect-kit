@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import argparse
 import dataclasses
 import json
 import logging
@@ -137,7 +136,7 @@ def add_allocate_dut_arguments(
     """Add DUT allocate related argument to |parser|.
 
     Args:
-      parser: an argparse object which supports add_argument(), etc.
+      parser: an ArgumentParser object which supports add_argument(), etc.
         It can be an argument parser, an argument group, or others alike.
       allow_required: whether any of the argument are allowed to be set as required.
         When it's False, all arguments should be optional.
@@ -148,7 +147,7 @@ def add_allocate_dut_arguments(
     # All flags below are prepended with a prefix to avoid name collision
     # with other flags. Defaults to prepend an empty string.
     def flag_name(name):
-        return '--%s%s' % (flags_prefix + '_' if flags_prefix else '', name)
+        return '--%s%s' % (flags_prefix + '-' if flags_prefix else '', name)
 
     parser.add_argument(
         flag_name('pool'),
@@ -187,30 +186,30 @@ def add_allocate_dut_arguments(
         help='allocation criteria; comma separated',
     )
     group.add_argument(
-        flag_name('dut_name'),
+        flag_name('dut-name'),
         help='allocation criteria; comma separated',
     )
 
     parser.add_argument(
-        flag_name('satlab_ip'),
+        flag_name('satlab-ip'),
         # TODO(cylee): for possible backward compatibility, remove it after
         # ensuring no caller is using it.
-        '--satlab_ip',
+        '--satlab-ip',
         help='Optional, required only if the dut is a satlab dut',
         type=cli.argtype_re(r'\d+\.\d+\.\d+\.\d+', '172.30.251.188'),
     )
     parser.add_argument(
-        flag_name('version_hint'),
+        flag_name('version-hint'),
         help='chromeos version; comma separated',
     )
     parser.add_argument(
-        flag_name('builder_hint'),
+        flag_name('builder-hint'),
         help='chromeos builder; comma separated',
     )
     # Pubsub ack deadline is 10 minutes (b/143663659). Default 9 minutes with 1
     # minute buffer.
     parser.add_argument(
-        flag_name('time_limit'),
+        flag_name('time-limit'),
         type=int,
         default=9 * 60,
         help='Time limit to attempt lease in seconds (default: %(default)s)',
@@ -234,8 +233,7 @@ def add_allocate_dut_arguments(
 @cli.fatal_error_handler
 def main():
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser()
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser()
     subparsers = parser.add_subparsers(
         dest='command', title='commands', metavar='<command>', required=True
     )
@@ -307,16 +305,16 @@ def main():
     parser_release_dut.add_argument('dut')
     parser_release_dut.set_defaults(func=cmd_release_dut)
     parser_release_dut.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         default=common.get_default_chromeos_root(),
         help='ChromeOS source tree, for overlay data (default: %(default)s)',
     )
     parser_release_dut.add_argument(
-        '--enable_rootfs_verification',
+        '--enable-rootfs-verification',
         dest='enable_rootfs_verification',
         action='store_true',
-        help="Enable rootfs verification when releasing the DUT",
+        help='Enable rootfs verification when releasing the DUT',
     )
 
     parser_allocate_dut = subparsers.add_parser(
@@ -333,10 +331,10 @@ def main():
     )
     # add_allocate_dut_arguments() is shared by both
     # "cros_helper.py allocate_dut" and "diagnose_cros_*.py init".
-    # --chromeos_root is already an argument of the latter in another
+    # --chromeos-root is already an argument of the latter in another
     # argument group, so it is left out here.
     parser_allocate_dut.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         default=common.get_default_chromeos_root(),
         help='ChromeOS source tree, for overlay data (default: %(default)s)',

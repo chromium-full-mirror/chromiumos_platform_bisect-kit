@@ -5,7 +5,6 @@
 
 """Evaluate if a DUT is bootable"""
 
-import argparse
 import os
 import sys
 
@@ -20,10 +19,9 @@ from bisect_kit import errors
 
 def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(description=__doc__, parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(description=__doc__, parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )

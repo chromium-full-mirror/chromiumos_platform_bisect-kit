@@ -1967,9 +1967,9 @@ def cros_sdk(
     prefix = ['chromite/bin/cros_sdk', '--no-ns-pid']
 
     if chrome_root:
-        prefix += ['--chrome_root', chrome_root]
+        prefix += ['--chrome-root', chrome_root]
     if goma_dir:
-        prefix += ['--goma_dir', goma_dir]
+        prefix += ['--goma-dir', goma_dir]
     if replace:
         prefix += ['--replace']
 

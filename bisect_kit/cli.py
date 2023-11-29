@@ -28,6 +28,75 @@ EXIT_CODE_FATAL = 128
 EXIT_CODE_VALUE = 0
 
 
+class ArgumentParser(argparse.ArgumentParser):
+    """A subclass of `argparse.ArgumentParser` that recommends using optional
+    arguments with hyphens instead of underscores."""
+
+    def __init__(self, *args, raise_bad_status=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._raise_bad_status = raise_bad_status
+
+    def parse_args(self, args=None, namespace=None):
+        """Parses arguments and accepts both underscore-separated and
+        hyphen-separated optional arguments."""
+        if args is None:
+            args = sys.argv[1:]
+        return super().parse_args(self.normalize_args(args), namespace=None)
+
+    def add_argument(self, *names: str, **kwargs):
+        """Adds optional arguments with hyphens instead of underscores.
+
+        Please not that any internal `-` characters will be converted to `_`
+        characters to make sure the string is a valid attribute name.
+        For example:
+
+        >>> parser.add_argument('--foo-bar')
+        >>> parser.parse_args('--foo-bar baz'.split())
+        Namespace(foo_bar='baz')
+        """
+        names_with_underscore = [
+            name for name in names if name.startswith('--') and '_' in name
+        ]
+        if names_with_underscore:
+            raise ValueError(
+                'Please add optional arguments with names with hyphens '
+                f'instead of underscores: {", ".join(names_with_underscore)}'
+            )
+        return super().add_argument(*names, **kwargs)
+
+    def exit(self, status=0, message=None):
+        if self._raise_bad_status and status != 0:
+            if message:
+                message = message.strip()
+            raise errors.ArgumentError(None, message)
+        return super().exit(status, message)
+
+    @staticmethod
+    def normalize_args(args: list[str]) -> list[str]:
+        """Normalizes underscore-separated optional arguments to
+        hyphen-separated for backward compatibility."""
+        normalized = []
+        preserved = False
+        for arg in args:
+            if arg == '--':
+                preserved = True
+                normalized.append(arg)
+            elif not preserved and arg.startswith('--'):
+                key, op, value = arg.partition('=')
+                norm_arg = ''.join([key.replace('_', '-'), op, value])
+                if norm_arg != arg:
+                    logger.warning(
+                        'Underscores in arguments will be deprecated. '
+                        'Please use hyphens instead. (%s -> %s)',
+                        arg,
+                        norm_arg,
+                    )
+                normalized.append(norm_arg)
+            else:  # preserved or not a key
+                normalized.append(arg)
+        return normalized
+
+
 def argtype_notempty(s):
     """Validates argument is not an empty string.
 
@@ -252,24 +321,6 @@ def format_returncode(returncode):
     return 'exited with code %d' % returncode
 
 
-def patching_argparser_exit(parser):
-    """Patching argparse.ArgumentParser.exit to raise exception for failures.
-
-    Args:
-      parser: argparse.ArgumentParser object
-    """
-    orig_exit = parser.exit
-
-    def exit_hack(status=0, message=None):
-        if status != 0:
-            if message:
-                message = message.strip()
-            raise errors.ArgumentError(None, message)
-        orig_exit(status, message)
-
-    parser.exit = exit_hack
-
-
 def fatal_error_handler(func):
     """Function decorator which exits with fatal code for fatal exceptions.
 
@@ -297,10 +348,10 @@ def fatal_error_handler(func):
     return wrapper
 
 
-def create_common_argument_parser() -> argparse.ArgumentParser:
-    common_argument_parser = argparse.ArgumentParser(add_help=False)
+def create_common_argument_parser() -> ArgumentParser:
+    common_argument_parser = ArgumentParser(add_help=False)
     common_argument_parser.add_argument(
-        '--log_file',
+        '--log-file',
         metavar='LOG_FILE',
         default=os.environ.get('LOG_FILE'),
         help='Override log filename',
@@ -311,8 +362,8 @@ def create_common_argument_parser() -> argparse.ArgumentParser:
     return common_argument_parser
 
 
-def create_session_optional_parser() -> argparse.ArgumentParser:
-    session_optional_parser = argparse.ArgumentParser(
+def create_session_optional_parser() -> ArgumentParser:
+    session_optional_parser = ArgumentParser(
         add_help=False, parents=[create_common_argument_parser()]
     )
     session_optional_parser.add_argument(
@@ -323,8 +374,8 @@ def create_session_optional_parser() -> argparse.ArgumentParser:
     return session_optional_parser
 
 
-def create_session_required_parser() -> argparse.ArgumentParser:
-    session_required_parser = argparse.ArgumentParser(
+def create_session_required_parser() -> ArgumentParser:
+    session_required_parser = ArgumentParser(
         add_help=False, parents=[create_common_argument_parser()]
     )
     session_required_parser.add_argument(

@@ -6,7 +6,7 @@
 """Git bisector to bisect a range of git commits.
 
 Example:
-  $ ./bisect_git.py init --old rev1 --new rev2 --git_repo /path/to/git/repo
+  $ ./bisect_git.py init --old rev1 --new rev2 --git-repo /path/to/git/repo
   $ ./bisect_git.py config switch ./switch_git.py
   $ ./bisect_git.py config eval ./eval-manually.sh
   $ ./bisect_git.py run
@@ -33,7 +33,7 @@ class GitDomain(core.BisectDomain):
     @staticmethod
     def add_init_arguments(parser):
         parser.add_argument(
-            '--git_repo',
+            '--git-repo',
             required=True,
             type=cli.argtype_dir_path,
             help='Git repository path',

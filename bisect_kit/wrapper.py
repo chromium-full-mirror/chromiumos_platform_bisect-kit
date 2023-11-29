@@ -67,19 +67,19 @@ class BisectorWrapper:
         if not status['inited']:
             common_init_args: list[str] = ['--old', old, '--new', new]
             if term_old:
-                common_init_args += ['--term_old', term_old]
+                common_init_args += ['--term-old', term_old]
             if term_new:
-                common_init_args += ['--term_new', term_new]
+                common_init_args += ['--term-new', term_new]
             if noisy:
                 common_init_args += ['--noisy', noisy]
             if old_value is not None:
-                common_init_args += ['--old_value', str(old_value)]
+                common_init_args += ['--old-value', str(old_value)]
             if new_value is not None:
-                common_init_args += ['--new_value', str(new_value)]
+                common_init_args += ['--new-value', str(new_value)]
             if recompute_init_values:
-                common_init_args.append('--recompute_init_values')
+                common_init_args.append('--recompute-init-values')
             if endpoint_verification:
-                common_init_args.append('--endpoint_verification')
+                common_init_args.append('--endpoint-verification')
             # Note that, if 'init' failed, no session file for this bisector is
             # created. In other words, the error event is only recorded in
             # diagnoser's log.

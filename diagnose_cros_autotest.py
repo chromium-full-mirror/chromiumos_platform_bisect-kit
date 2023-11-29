@@ -64,21 +64,21 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         if is_cts:
             if opts.test_name or opts.metric or opts.extra_test_variables:
                 self.argument_parser.error(
-                    'do not specify --test_name, --metric, '
-                    + '--extra_test_variables for CTS/GTS tests'
+                    'do not specify --test-name, --metric, '
+                    + '--extra-test-variables for CTS/GTS tests'
                 )
             if not opts.cts_prefix:
                 self.argument_parser.error(
-                    '--cts_prefix should be specified for CTS/GTS tests'
+                    '--cts-prefix should be specified for CTS/GTS tests'
                 )
             if not opts.cts_module:
                 self.argument_parser.error(
-                    '--cts_module should be specified for CTS/GTS tests'
+                    '--cts-module should be specified for CTS/GTS tests'
                 )
             opts.test_name = '%s.tradefed-run-test' % opts.cts_prefix
         elif not opts.test_name:
             self.argument_parser.error(
-                '--test_name should be specified if not CTS/GTS tests'
+                '--test-name should be specified if not CTS/GTS tests'
             )
 
     def init_hook(self, opts):
@@ -95,36 +95,36 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         # prebuilt version will be specified later.
         switch_test_harness_cmd = [
             './switch_autotest_prebuilt.py',
-            '--rich_result',
-            '--chromeos_root',
+            '--rich-result',
+            '--chromeos-root',
             self.config['chromeos_root'],
         ]
         if self.config['test_name'] and not self.config['cts_test']:
-            switch_test_harness_cmd += ['--test_name', self.config['test_name']]
+            switch_test_harness_cmd += ['--test-name', self.config['test_name']]
 
         common_eval_cmd = [
             './eval_cros_autotest.py',
-            '--rich_result',
-            '--chromeos_root',
+            '--rich-result',
+            '--chromeos-root',
             self.config['chromeos_root'],
         ]
         if self.config['test_name'] and not self.config['cts_test']:
-            common_eval_cmd += ['--test_name', self.config['test_name']]
+            common_eval_cmd += ['--test-name', self.config['test_name']]
         if self.config['metric']:
             common_eval_cmd += [
                 '--metric',
                 self.config['metric'],
             ]
         if self.config['fail_to_pass']:
-            common_eval_cmd.append('--fail_to_pass')
+            common_eval_cmd.append('--fail-to-pass')
         if self.config['reboot_before_test']:
-            common_eval_cmd.append('--reboot_before_test')
+            common_eval_cmd.append('--reboot-before-test')
         for var in self.config['extra_test_variables']:
             common_eval_cmd.append('--args')
             common_eval_cmd.append(var)
 
         if self.config['test_name'].startswith('telemetry_'):
-            common_eval_cmd += ['--chrome_root', self.config['chrome_root']]
+            common_eval_cmd += ['--chrome-root', self.config['chrome_root']]
 
         for arg_name in [
             'cts_revision',
@@ -141,7 +141,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                 ]
 
         if self.config['consider_test_crash_as_failure']:
-            common_eval_cmd.append('--consider_test_crash_as_failure')
+            common_eval_cmd.append('--consider-test-crash-as-failure')
 
         return switch_test_harness_cmd, common_eval_cmd
 
@@ -217,24 +217,24 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         group = parser_init.add_argument_group(
             title='Options for CTS/GTS tests'
         )
-        group.add_argument('--cts_revision', help='CTS revision, like "9.0_r3"')
-        group.add_argument('--cts_abi', choices=['arm', 'x86'])
+        group.add_argument('--cts-revision', help='CTS revision, like "9.0_r3"')
+        group.add_argument('--cts-abi', choices=['arm', 'x86'])
         group.add_argument(
-            '--cts_prefix',
+            '--cts-prefix',
             help='Prefix of autotest test name, '
             'like cheets_CTS_N, cheets_CTS_P, cheets_GTS',
         )
         group.add_argument(
-            '--cts_module',
+            '--cts-module',
             help='CTS/GTS module name, like "CtsCameraTestCases"',
         )
         group.add_argument(
-            '--cts_test',
+            '--cts-test',
             help='CTS/GTS test name, like '
             '"android.hardware.cts.CameraTest#testDisplayOrientation"',
         )
         group.add_argument(
-            '--cts_timeout', type=float, help='timeout, in seconds'
+            '--cts-timeout', type=float, help='timeout, in seconds'
         )
 
 

@@ -14,7 +14,6 @@ It fetches specified lacros version and deploy to a DUT using deploy_chrome
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
@@ -34,10 +33,9 @@ logger = logging.getLogger(__name__)
 
 def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(description=__doc__, parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(description=__doc__, parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
@@ -48,13 +46,13 @@ def create_argument_parser():
         default=os.environ.get('DUT', ''),
     )
     parser.add_argument(
-        '--board_cpu_arch',
+        '--board-cpu-arch',
         type=cli.argtype_notempty,
         metavar='BOARD_CPU_ARCH',
         default=os.environ.get('BOARD_CPU_ARCH', ''),
     )
     parser.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         metavar='CHROMEOS_ROOT',
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROMEOS_ROOT', ''),

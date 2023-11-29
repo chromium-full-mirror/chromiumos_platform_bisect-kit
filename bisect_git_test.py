@@ -48,7 +48,7 @@ class TestGitDomain(unittest.TestCase):
         old, new = revs[1], revs[-1]
 
         bisector.main(
-            'init', '--old', old, '--new', new, '--git_repo', self.git_repo
+            'init', '--old', old, '--new', new, '--git-repo', self.git_repo
         )
 
         bisector.main('config', 'switch', 'true')

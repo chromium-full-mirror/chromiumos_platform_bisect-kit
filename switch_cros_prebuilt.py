@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
@@ -26,10 +25,9 @@ logger = logging.getLogger(__name__)
 
 def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(description=__doc__, parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(description=__doc__, parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
@@ -54,18 +52,18 @@ def create_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
-        '--clobber_stateful',
+        '--clobber-stateful',
         action='store_true',
         help='Clobber stateful partition when performing update',
     )
     parser.add_argument(
-        '--no_disable_rootfs_verification',
+        '--no-disable-rootfs-verification',
         dest='disable_rootfs_verification',
         action='store_false',
         help="Don't disable rootfs verification after update is completed",
     )
     parser.add_argument(
-        '--default_chromeos_root',
+        '--default-chromeos-root',
         type=cli.argtype_dir_path,
         default=common.get_default_chromeos_root(),
         help='Default chromeos tree to run "cros flash" (default: %(default)s)',

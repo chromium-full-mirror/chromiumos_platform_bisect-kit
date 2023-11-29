@@ -88,7 +88,7 @@ class ChromeOSVersionDomain(core.BisectDomain):
             'to be specified',
         )
         parser.add_argument(
-            '--disable_snapshot',
+            '--disable-snapshot',
             action='store_true',
             help='Disable snapshot for bisect chromeos prebuilt',
         )

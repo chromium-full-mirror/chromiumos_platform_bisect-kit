@@ -60,7 +60,7 @@ class AndroidBuildIDDomain(core.BisectDomain):
             help='example: cheets_x86-user',
         )
         parser.add_argument(
-            '--only_good_build',
+            '--only-good-build',
             action='store_true',
             help='Bisect only good builds. '
             'This flag is only needed if weird builds blocked bisection',

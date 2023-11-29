@@ -18,7 +18,6 @@ alternative binaries.
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
@@ -46,15 +45,14 @@ def create_argument_parser():
         cli.create_session_optional_parser(),
         switch_helper.common_local_build_flags(),
     ]
-    parser = argparse.ArgumentParser(parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
     parser.add_argument(
-        '--board_cpu_arch',
+        '--board-cpu-arch',
         type=cli.argtype_notempty,
         metavar='BOARD_CPU_ARCH',
         default=os.environ.get('BOARD_CPU_ARCH', ''),
@@ -74,7 +72,7 @@ def create_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
-        '--chrome_root',
+        '--chrome-root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROME_ROOT', ''),
@@ -90,7 +88,7 @@ def create_argument_parser():
         'This option could be specified multiple times.',
     )
     group.add_argument(
-        '--without_tests',
+        '--without-tests',
         action='store_false',
         dest='with_tests',
         help='(if --target is not specified) '
@@ -98,7 +96,7 @@ def create_argument_parser():
     )
 
     parser.add_argument(
-        '--deploy_method',
+        '--deploy-method',
         choices=['chrome_deploy', 'image'],
         default='chrome_deploy',
         help='Deploy method (default: %(default)s)',
@@ -108,7 +106,7 @@ def create_argument_parser():
         title='Options for building chrome in chromeos sdk chroot'
     )
     group.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
         default=os.environ.get('CHROMEOS_ROOT'),
@@ -135,8 +133,8 @@ def switch_main(args: tuple[str] | None):
     if opts.deploy_method != 'chrome_deploy':
         if not opts.chromeos_root:
             raise errors.ArgumentError(
-                '--chromeos_root',
-                'should be specified for --deploy_method=' + opts.deploy_method,
+                '--chromeos-root',
+                'should be specified for --deploy-method=' + opts.deploy_method,
             )
 
     opts.chrome_src = os.path.join(opts.chrome_root, 'src')

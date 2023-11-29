@@ -14,7 +14,6 @@ This is actually equivalent to
 be expanded at switch time, not now.)
 """
 
-import argparse
 import logging
 import os
 
@@ -29,8 +28,7 @@ logger = logging.getLogger(__name__)
 
 def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(parents=parents)
     parser.add_argument(
         'git_rev',
         nargs='?',
@@ -40,7 +38,7 @@ def create_argument_parser():
         help='Git revision id',
     )
     parser.add_argument(
-        '--git_repo',
+        '--git-repo',
         type=cli.argtype_dir_path,
         metavar='GIT_REPO',
         default=os.environ.get('GIT_REPO'),

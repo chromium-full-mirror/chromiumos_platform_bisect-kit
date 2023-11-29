@@ -26,8 +26,8 @@ class DummyDomain(core.BisectDomain):
     def add_init_arguments(parser):
         parser.add_argument('--num', required=True, type=int)
         parser.add_argument('--ans', type=int)
-        parser.add_argument('--old_p', type=float, default=0.0)
-        parser.add_argument('--new_p', type=float, default=1.0)
+        parser.add_argument('--old-p', type=float, default=0.0)
+        parser.add_argument('--new-p', type=float, default=1.0)
         parser.add_argument('--dut', type=str)
 
     @staticmethod
@@ -139,7 +139,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             DummyDomain, self.dut_manager
         )
         bisector.main(
-            'init', '--num=10', '--old=0', '--new=9', '--endpoint_verification'
+            'init', '--num=10', '--old=0', '--new=9', '--endpoint-verification'
         )
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'true')
@@ -154,7 +154,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             DummyDomain, self.dut_manager
         )
         bisector.main(
-            'init', '--num=10', '--old=0', '--new=9', '--endpoint_verification'
+            'init', '--num=10', '--old=0', '--new=9', '--endpoint-verification'
         )
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
@@ -254,7 +254,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             '--num=200',
             '--old=0',
             '--new=99',
-            '--endpoint_verification',
+            '--endpoint-verification',
         )
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
@@ -316,7 +316,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             '--old=0',
             '--new=99',
             '--noisy=old=1/10,new=9/10',
-            '--endpoint_verification',
+            '--endpoint-verification',
         )
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
@@ -368,7 +368,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             '--old=0',
             '--new=99',
             '--noisy=old=3/10,new=7/10',
-            '--endpoint_verification',
+            '--endpoint-verification',
         )
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
@@ -417,7 +417,7 @@ class TestBisectorCommandLine(unittest.TestCase):
                             '--old=0',
                             '--new=99',
                             noisy_flag,
-                            '--endpoint_verification',
+                            '--endpoint-verification',
                         )
                         bisector.main('config', 'switch', 'true')
                         bisector.main('config', 'eval', 'false')
@@ -931,7 +931,7 @@ class TestSwitchAndEval(unittest.TestCase):
                     mock.ANY,
                 ),
                 mock.call(
-                    ['switch_build_deploy_cmd', '--no_deploy'],
+                    ['switch_build_deploy_cmd', '--no-deploy'],
                     bisector.domain,
                     '3',
                     mock.ANY,
@@ -941,7 +941,7 @@ class TestSwitchAndEval(unittest.TestCase):
                         'switch_build_deploy_cmd',
                         '--dut',
                         'auto_allocated_dut',
-                        '--deploy_only',
+                        '--deploy-only',
                     ],
                     bisector.domain,
                     '3',
@@ -1015,7 +1015,7 @@ class TestSwitchAndEval(unittest.TestCase):
                     mock.ANY,
                 ),
                 mock.call(
-                    ['switch_build_deploy_cmd', '--no_deploy'],
+                    ['switch_build_deploy_cmd', '--no-deploy'],
                     bisector.domain,
                     '3',
                     mock.ANY,
@@ -1025,7 +1025,7 @@ class TestSwitchAndEval(unittest.TestCase):
                         'switch_build_deploy_cmd',
                         '--dut',
                         'auto_allocated_dut',
-                        '--deploy_only',
+                        '--deploy-only',
                     ],
                     bisector.domain,
                     '3',
@@ -1253,7 +1253,7 @@ class TestSwitchAndEval(unittest.TestCase):
         self.mock_do_switch.assert_has_calls(
             [
                 mock.call(
-                    ['switch_cmd', '--no_deploy'],
+                    ['switch_cmd', '--no-deploy'],
                     bisector.domain,
                     '3',
                     mock.ANY,
@@ -1263,7 +1263,7 @@ class TestSwitchAndEval(unittest.TestCase):
                         'switch_cmd',
                         '--dut',
                         'auto_allocated_dut',
-                        '--deploy_only',
+                        '--deploy-only',
                     ],
                     bisector.domain,
                     '3',

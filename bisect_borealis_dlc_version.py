@@ -7,8 +7,8 @@
 
 Example:
   $ ./bisect_borealis_dlc_version.py init --old rev1 --new rev2 --dut DUT \\
-    --chromeos_root ~/chromiumos \\
-    --chromeos_mirror $CHROMEOS_MIRROR
+    --chromeos-root ~/chromiumos \\
+    --chromeos-mirror $CHROMEOS_MIRROR
   $ ./bisect_borealis_dlc_version.py config switch ./switch_cros_borealis_dlc_prebuilt.py
   $ ./bisect_borealis_dlc_version.py config eval ./eval-manually.sh
   $ ./bisect_borealis_dlc_version.py run
@@ -69,7 +69,7 @@ class BorealisVersionDomain(core.BisectDomain):
             help='ChromeOS board name',
         )
         parser.add_argument(
-            '--chromeos_root',
+            '--chromeos-root',
             metavar='CHROMEOS_ROOT',
             type=cli.argtype_dir_path,
             required=True,
@@ -77,7 +77,7 @@ class BorealisVersionDomain(core.BisectDomain):
             help='ChromeOS tree root',
         )
         parser.add_argument(
-            '--chromeos_mirror',
+            '--chromeos-mirror',
             type=cli.argtype_dir_path,
             default=os.environ.get('CHROMEOS_MIRROR', ''),
             help='ChromeOS repo mirror path',

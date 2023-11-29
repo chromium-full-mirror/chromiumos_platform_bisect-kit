@@ -7,7 +7,7 @@
 
 Example:
   $ ./bisect_lacros_prebuilt.py init --old rev1 --new rev2 --dut DUT \\
-        --chromeos_root ~/chromiumos
+        --chromeos-root ~/chromiumos
   $ ./bisect_lacros_prebuilt.py config switch ./switch_lacros_prebuilt.py
   $ ./bisect_lacros_prebuilt.py config eval ./eval-manually.sh
   $ ./bisect_lacros_prebuilt.py run
@@ -55,7 +55,7 @@ class LacrosVersionDomain(core.BisectDomain):
             help='Address of DUT (Device Under Test)',
         )
         parser.add_argument(
-            '--chromeos_root',
+            '--chromeos-root',
             metavar='CHROMEOS_ROOT',
             type=cli.argtype_dir_path,
             default=os.environ.get('CHROMEOS_ROOT', ''),
@@ -69,7 +69,7 @@ class LacrosVersionDomain(core.BisectDomain):
             help='ChromeOS board name',
         )
         parser.add_argument(
-            '--board_cpu_arch',
+            '--board-cpu-arch',
             type=cli.argtype_notempty,
             metavar='BOARD_CPU_ARCH',
             default=os.environ.get('BOARD_CPU_ARCH', ''),

@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
@@ -29,25 +28,25 @@ logger = logging.getLogger(__name__)
 
 def add_build_and_deploy_arguments(parser_group):
     parser_group.add_argument(
-        '--goma_chromeos_dir',
+        '--goma-chromeos-dir',
         type=cli.argtype_dir_path,
         default=os.environ.get('GOMA_CHROMEOS_DIR'),
         help='Goma-chromeos installed directory to mount into the ChromeOS '
         'chroot',
     )
     parser_group.add_argument(
-        '--clobber_stateful',
+        '--clobber-stateful',
         action='store_true',
         help='Clobber stateful partition when performing update',
     )
     parser_group.add_argument(
-        '--no_disable_rootfs_verification',
+        '--no-disable-rootfs-verification',
         dest='disable_rootfs_verification',
         action='store_false',
         help="Don't disable rootfs verification after update is completed",
     )
     parser_group.add_argument(
-        '--no_mark_as_stable',
+        '--no-mark-as-stable',
         dest='mark_as_stable',
         action='store_false',
         help="Don't mark repo stable",
@@ -59,10 +58,9 @@ def create_argument_parser():
         cli.create_session_optional_parser(),
         switch_helper.common_local_build_flags(),
     ]
-    parser = argparse.ArgumentParser(parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
@@ -82,14 +80,14 @@ def create_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
         default=os.environ.get('CHROMEOS_ROOT', ''),
         help='ChromeOS tree root (default: %(default)s)',
     )
     parser.add_argument(
-        '--chromeos_mirror',
+        '--chromeos-mirror',
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROMEOS_MIRROR', ''),
         help='ChromeOS repo mirror path',

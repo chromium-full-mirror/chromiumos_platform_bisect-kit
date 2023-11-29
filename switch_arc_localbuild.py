@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
@@ -34,10 +33,9 @@ def create_argument_parser():
         cli.create_session_optional_parser(),
         switch_helper.common_local_build_flags(),
     ]
-    parser = argparse.ArgumentParser(parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
@@ -50,14 +48,14 @@ def create_argument_parser():
         help='Android build id, or bisecting intra version number',
     )
     parser.add_argument(
-        '--android_root',
+        '--android-root',
         type=cli.argtype_dir_path,
         metavar='ANDROID_ROOT',
         default=os.environ.get('ANDROID_ROOT', ''),
         help='Android tree root',
     )
     parser.add_argument(
-        '--android_mirror',
+        '--android-mirror',
         type=cli.argtype_dir_path,
         default=os.environ.get('ANDROID_MIRROR', ''),
         help='Android repo mirror path',

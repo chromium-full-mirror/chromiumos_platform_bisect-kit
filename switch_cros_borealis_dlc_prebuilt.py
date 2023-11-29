@@ -5,7 +5,6 @@
 
 """Switcher for ChromeOS Borealis DLC bisecting."""
 
-import argparse
 import logging
 import os
 import sys
@@ -24,13 +23,12 @@ from bisect_kit.dlc import dlc_util
 logger = logging.getLogger(__name__)
 
 
-def create_argument_parser() -> argparse.ArgumentParser:
+def create_argument_parser() -> cli.ArgumentParser:
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(parents=parents)
 
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
@@ -47,7 +45,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help='ChromeOS board name',
     )
     parser.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
         default=os.environ.get('CHROMEOS_ROOT', ''),

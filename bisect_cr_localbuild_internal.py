@@ -66,7 +66,7 @@ class ChromeSrcDomain(core.BisectDomain):
     @staticmethod
     def add_init_arguments(parser):
         parser.add_argument(
-            '--chrome_root',
+            '--chrome-root',
             required=True,
             metavar='CHROME_ROOT',
             type=cli.argtype_dir_path,
@@ -74,7 +74,7 @@ class ChromeSrcDomain(core.BisectDomain):
             help='Root of chrome source tree, like ~/chromium',
         )
         parser.add_argument(
-            '--chrome_mirror',
+            '--chrome-mirror',
             required=True,
             metavar='CHROME_MIRROR',
             type=cli.argtype_dir_path,
@@ -102,7 +102,7 @@ class ChromeSrcDomain(core.BisectDomain):
         chrome_src = os.path.join(opts.chrome_root, 'src')
         if not os.path.exists(chrome_src):
             raise errors.ArgumentError(
-                '--chrome_root', "chrome src directory doesn't exist"
+                '--chrome-root', "chrome src directory doesn't exist"
             )
 
         if opts.dut:

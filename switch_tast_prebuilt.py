@@ -12,7 +12,6 @@ Later, you can run tests using "eval_cros_tast.py --prebuilt" or
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import shutil
@@ -36,15 +35,14 @@ GS_BUILDBUCKET_BUILD_PATH = 'gs://chromeos-image-archive/{path}'
 
 def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(description=__doc__, parents=parents)
-    cli.patching_argparser_exit(parser)
+    parser = cli.ArgumentParser(description=__doc__, parents=parents)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
     parser.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROMEOS_ROOT', ''),
         help='ChromeOS tree root',

@@ -156,10 +156,10 @@ class CrosDiagnoser:
                     ]
                 else:
                     cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + [
-                        '--tast_build'
+                        '--tast-build'
                     ]
                     lacros_prebuilt_eval_cmd = lacros_prebuilt_eval_cmd + [
-                        '--tast_build'
+                        '--tast-build'
                     ]
 
             # Step 1: Narrows down ChromeOS prebuilt.
@@ -174,14 +174,14 @@ class CrosDiagnoser:
             # Switches CrOS repository and DUT to narrowed down old version.
             util.check_call(
                 './switch_cros_localbuild.py',
-                '--rich_result',
-                '--chromeos_root',
+                '--rich-result',
+                '--chromeos-root',
                 self.config['chromeos_root'],
-                '--chromeos_mirror',
+                '--chromeos-mirror',
                 self.config['chromeos_mirror'],
                 '--board',
                 self.config['board'],
-                '--sync_code_only',
+                '--sync-code-only',
                 self.cros_old,
                 '--session',
                 self.config['session'],
@@ -350,12 +350,12 @@ class CrosDiagnoser:
         """
         if self.config['bisect_chrome']:
             self.make_decision(
-                'The ChromeOS prebuilt bisection is bypassed since --bisect_chrome is on'
+                'The ChromeOS prebuilt bisection is bypassed since --bisect-chrome is on'
             )
             self.cros_old = self.cros_new = self.config['base_cros_version']
         elif self.config['bisect_android']:
             self.make_decision(
-                'The ChromeOS prebuilt bisection is bypassed since --bisect_android is on'
+                'The ChromeOS prebuilt bisection is bypassed since --bisect-android is on'
             )
             self.cros_old = self.cros_new = self.config['base_cros_version']
         elif self.config['bypass_chromeos_prebuilt']:
@@ -375,14 +375,14 @@ class CrosDiagnoser:
             )
             switch_cmd = [
                 './switch_cros_prebuilt.py',
-                '--rich_result',
+                '--rich-result',
             ]
             if not self.config['disable_rootfs_verification']:
-                switch_cmd.append('--no_disable_rootfs_verification')
+                switch_cmd.append('--no-disable-rootfs-verification')
 
             init_args = ['--board', self.config['board']]
             if self.config['disable_snapshot']:
-                init_args.append('--disable_snapshot')
+                init_args.append('--disable-snapshot')
 
             bisector = wrapper.BisectorWrapper(
                 'bisect_cros_version',
@@ -477,7 +477,7 @@ class CrosDiagnoser:
                 return
         cmd = [
             './switch_cros_prebuilt.py',
-            '--rich_result',
+            '--rich-result',
             '--session',
             self.config['session'],
             '--board',
@@ -487,7 +487,7 @@ class CrosDiagnoser:
             self.cros_old,
         ]
         if not self.config['disable_rootfs_verification']:
-            cmd.append('--no_disable_rootfs_verification')
+            cmd.append('--no-disable-rootfs-verification')
         util.check_call(*cmd)
 
     def _need_android_bisect(
@@ -505,7 +505,7 @@ class CrosDiagnoser:
         """
         if self.config['bisect_chrome']:
             self.make_decision(
-                'The Android prebuilt bisection is bypassed since --bisect_chrome is on'
+                'The Android prebuilt bisection is bypassed since --bisect-chrome is on'
             )
             return False
 
@@ -613,7 +613,7 @@ class CrosDiagnoser:
                     switch_cmds=[
                         [
                             './switch_arc_prebuilt.py',
-                            '--rich_result',
+                            '--rich-result',
                         ],
                     ],
                     eval_cmd=eval_cmd,
@@ -696,9 +696,9 @@ class CrosDiagnoser:
                 android_old,
                 android_new,
                 init_args=[
-                    '--android_root',
+                    '--android-root',
                     android_root,
-                    '--android_mirror',
+                    '--android-mirror',
                     android_mirror,
                     '--branch',
                     self.old_info['android_branch'],
@@ -710,7 +710,7 @@ class CrosDiagnoser:
                 switch_cmds=[
                     [
                         './switch_arc_localbuild.py',
-                        '--rich_result',
+                        '--rich-result',
                     ],
                 ],
                 eval_cmd=eval_cmd,
@@ -770,10 +770,8 @@ class CrosDiagnoser:
         """
         if self.config['bisect_android']:
             self.make_decision(
-                (
-                    'The bisection with Lacros prebuilt is bypassed since '
-                    '--bisect_android is on'
-                )
+                'The bisection with Lacros prebuilt is bypassed since '
+                '--bisect-android is on'
             )
             return False
 
@@ -797,8 +795,8 @@ class CrosDiagnoser:
 
         switch_cmd = [
             './switch_lacros_prebuilt.py',
-            '--rich_result',
-            '--chromeos_root',
+            '--rich-result',
+            '--chromeos-root',
             self.config['chromeos_root'],
         ]
 
@@ -810,11 +808,11 @@ class CrosDiagnoser:
         )
 
         init_args = [
-            '--chromeos_root',
+            '--chromeos-root',
             self.config['chromeos_root'],
             '--board',
             self.config['board'],
-            '--board_cpu_arch',
+            '--board-cpu-arch',
             self.config['board_cpu_arch'],
         ]
 
@@ -879,19 +877,19 @@ class CrosDiagnoser:
 
         if self.config['bisect_android']:
             self.make_decision(
-                'The bisection with DLC is bypassed since --bisect_android is on'
+                'The bisection with DLC is bypassed since --bisect-android is on'
             )
             return False
 
         if self.config['bisect_chrome']:
             self.make_decision(
-                'The bisection with DLC is bypassed since --bisect_chrome is on'
+                'The bisection with DLC is bypassed since --bisect-chrome is on'
             )
             return False
 
         if self.config['bypass_dlc_prebuilt']:
             self.make_decision(
-                'The bisection with DLC is bypassed since --bypass_dlc_prebuilt is on'
+                'The bisection with DLC is bypassed since --bypass-dlc-prebuilt is on'
             )
             return False
 
@@ -911,16 +909,16 @@ class CrosDiagnoser:
         )
         switch_cmd = [
             './switch_cros_borealis_dlc_prebuilt.py',
-            '--rich_result',
-            '--chromeos_root',
+            '--rich-result',
+            '--chromeos-root',
             self.config['chromeos_root'],
         ]
         init_args = [
             '--board',
             self.config['board'],
-            '--chromeos_root',
+            '--chromeos-root',
             self.config['chromeos_root'],
-            '--chromeos_mirror',
+            '--chromeos-mirror',
             self.config['chromeos_mirror'],
         ]
 
@@ -985,7 +983,7 @@ class CrosDiagnoser:
 
         if self.config['bisect_android']:
             self.make_decision(
-                'The bisection with Chrome local build is bypassed since --bisect_android is on'
+                'The bisection with Chrome local build is bypassed since --bisect-android is on'
             )
             return False
 
@@ -1013,37 +1011,37 @@ class CrosDiagnoser:
             switch_cmd = [
                 './switch_cros_localbuild_buildbucket.py',
                 'bisect_chrome',
-                '--rich_result',
-                '--chromeos_root',
+                '--rich-result',
+                '--chromeos-root',
                 self.config['chromeos_root'],
-                '--chromeos_mirror',
+                '--chromeos-mirror',
                 self.config['chromeos_mirror'],
-                '--chromeos_rev',
+                '--chromeos-rev',
                 self.cros_old,
                 '--board',
                 self.config['board'],
             ]
             if not self.config['disable_rootfs_verification']:
-                switch_cmd.append('--no_disable_rootfs_verification')
+                switch_cmd.append('--no-disable-rootfs-verification')
         else:
             switch_cmd = [
                 './switch_cros_cr_localbuild_internal.py',
-                '--rich_result',
+                '--rich-result',
                 '--board',
                 self.config['board'],
-                '--board_cpu_arch',
+                '--board-cpu-arch',
                 self.config['board_cpu_arch'],
             ]
             if not should_build_with_tests:
-                switch_cmd.append('--without_tests')
+                switch_cmd.append('--without-tests')
             if self.config['chrome_deploy_image']:
                 switch_cmd += [
-                    '--deploy_method=image',
-                    '--chromeos_root',
+                    '--deploy-method=image',
+                    '--chromeos-root',
                     self.config['chromeos_root'],
                 ]
                 if not self.config['disable_rootfs_verification']:
-                    switch_cmd.append('--no_disable_rootfs_verification')
+                    switch_cmd.append('--no-disable-rootfs-verification')
 
         bisector = wrapper.BisectorWrapper(
             'bisect_cr_localbuild_internal',
@@ -1056,9 +1054,9 @@ class CrosDiagnoser:
                 self.old_info.cr_version,
                 self.new_info.cr_version,
                 init_args=[
-                    '--chrome_root',
+                    '--chrome-root',
                     self.config['chrome_root'],
-                    '--chrome_mirror',
+                    '--chrome-mirror',
                     self.config['chrome_mirror'],
                 ],
                 switch_cmds=[switch_cmd],
@@ -1111,12 +1109,12 @@ class CrosDiagnoser:
         """
         if self.config['bisect_chrome']:
             self.make_decision(
-                'Bypass ChromeOS local build since --bisect_chrome is on'
+                'Bypass ChromeOS local build since --bisect-chrome is on'
             )
             return
         if self.config['bisect_android']:
             self.make_decision(
-                'Bypass ChromeOS local build since --bisect_android is on'
+                'Bypass ChromeOS local build since --bisect-android is on'
             )
             return
         if self.config['bypass_chromeos_build']:
@@ -1141,7 +1139,7 @@ class CrosDiagnoser:
         if not buildbucket_build:
             switch_cmd = [
                 './switch_cros_localbuild.py',
-                '--rich_result',
+                '--rich-result',
                 '--session',
                 self.config['session'],
             ]
@@ -1149,16 +1147,16 @@ class CrosDiagnoser:
             switch_cmd = [
                 './switch_cros_localbuild_buildbucket.py',
                 'bisect_chromeos',
-                '--rich_result',
+                '--rich-result',
                 '--board',
                 self.config['board'],
             ]
             future_build_cmd = [
                 './switch_cros_localbuild_buildbucket.py',
                 'bisect_chromeos',
-                '--rich_result',
-                '--no_deploy',
-                '--no_wait_for_build_completion',
+                '--rich-result',
+                '--no-deploy',
+                '--no-wait-for-build-completion',
                 '--board',
                 self.config['board'],
                 '--session',
@@ -1166,7 +1164,7 @@ class CrosDiagnoser:
             ]
 
         if not self.config['disable_rootfs_verification']:
-            switch_cmd.append('--no_disable_rootfs_verification')
+            switch_cmd.append('--no-disable-rootfs-verification')
 
         switch_cmds = [switch_cmd]
         if buildbucket_build:
@@ -1178,9 +1176,9 @@ class CrosDiagnoser:
             init_args=[
                 '--board',
                 self.config['board'],
-                '--chromeos_root',
+                '--chromeos-root',
                 self.config['chromeos_root'],
-                '--chromeos_mirror',
+                '--chromeos-mirror',
                 self.config['chromeos_mirror'],
             ],
             switch_cmds=switch_cmds,
@@ -1387,7 +1385,7 @@ class DiagnoseCommandLineBase:
         if opts.allocate_dut_satlab_ip:
             if not cros_lab_util.is_satlab_dut(opts.dut):
                 raise errors.ArgumentError(
-                    '--allocate_dut_satlab_ip',
+                    '--allocate-dut-satlab-ip',
                     'Should be only provided with a satlab dut',
                 )
             cros_lab_util.write_satlab_ssh_config(
@@ -1404,8 +1402,8 @@ class DiagnoseCommandLineBase:
                 and not opts.allocate_dut_dut_name
             ):
                 self.argument_parser.error(
-                    'either --allocate_dut_board, --allocate_dut_model, '
-                    '--allocate_dut_sku, or --allocate_dut_dut_name '
+                    'either --allocate-dut-board, --allocate-dut-model, '
+                    '--allocate-dut-sku, or --allocate-dut-dut-name '
                     'need to be specified if DUT is missing or "%s"'
                     % cros_lab_util.LAB_DUT
                 )
@@ -1420,17 +1418,17 @@ class DiagnoseCommandLineBase:
 
         if opts.bisect_chrome and opts.bisect_android:
             self.argument_parser.error(
-                '--bisect_chrome and --bisect_android are not allowed together'
+                '--bisect-chrome and --bisect-android are not allowed together'
             )
         elif opts.bisect_chrome:
             opts.base_cros_version = self.check_cros_image_exists(
-                '--base_cros_version', opts.board, opts.base_cros_version
+                '--base-cros-version', opts.board, opts.base_cros_version
             )
             self.check_chrome_version('--old', opts.old)
             self.check_chrome_version('--new', opts.new)
         elif opts.bisect_android:
             opts.base_cros_version = self.check_cros_image_exists(
-                '--base_cros_version', opts.board, opts.base_cros_version
+                '--base-cros-version', opts.board, opts.base_cros_version
             )
             self.check_android_version('--old', opts.old)
             self.check_android_version('--new', opts.new)
@@ -1444,25 +1442,25 @@ class DiagnoseCommandLineBase:
 
         if opts.metric:
             if opts.old_value is None:
-                self.argument_parser.error('--old_value is not provided')
+                self.argument_parser.error('--old-value is not provided')
             if opts.new_value is None:
-                self.argument_parser.error('--new_value is not provided')
+                self.argument_parser.error('--new-value is not provided')
             if opts.fail_to_pass:
                 self.argument_parser.error(
-                    '--fail_to_pass is not for benchmark test (--metric)'
+                    '--fail-to-pass is not for benchmark test (--metric)'
                 )
         else:
             if opts.old_value is not None:
                 self.argument_parser.error(
-                    '--old_value is provided but --metric is not'
+                    '--old-value is provided but --metric is not'
                 )
             if opts.new_value is not None:
                 self.argument_parser.error(
-                    '--new_value is provided but --metric is not'
+                    '--new-value is provided but --metric is not'
                 )
             if opts.recompute_init_values:
                 self.argument_parser.error(
-                    '--recompute_init_values is provided but --metric is not'
+                    '--recompute-init-values is provided but --metric is not'
                 )
 
         if (
@@ -1472,7 +1470,7 @@ class DiagnoseCommandLineBase:
             and opts.term_new is None
         ):
             self.argument_parser.error(
-                '--term_old and --term_new must be both specified or both blank'
+                '--term-old and --term-new must be both specified or both blank'
             )
         if not opts.term_old:
             if opts.metric:
@@ -1621,7 +1619,7 @@ class DiagnoseCommandLineBase:
 
     def create_argument_parser(self):
         parents = [cli.create_session_optional_parser()]
-        parser = argparse.ArgumentParser()
+        parser = cli.ArgumentParser(raise_bad_status=False)
         subparsers = parser.add_subparsers(
             dest='command', title='commands', metavar='<command>', required=True
         )
@@ -1640,53 +1638,53 @@ class DiagnoseCommandLineBase:
         """,
         )
         group.add_argument(
-            '--mirror_base',
+            '--mirror-base',
             metavar='MIRROR_BASE',
             default=os.environ.get('MIRROR_BASE', common.DEFAULT_MIRROR_BASE),
             help='Directory for mirrors (default: %(default)s)',
         )
         group.add_argument(
-            '--work_base',
+            '--work-base',
             metavar='WORK_BASE',
             default=os.environ.get('WORK_BASE', common.DEFAULT_WORK_BASE),
             help='Directory for bisection working directories '
             '(default: %(default)s)',
         )
         group.add_argument(
-            '--chromeos_root',
+            '--chromeos-root',
             metavar='CHROMEOS_ROOT',
             type=cli.argtype_dir_path,
             default=os.environ.get('CHROMEOS_ROOT'),
             help='ChromeOS tree root',
         )
         group.add_argument(
-            '--chromeos_mirror',
+            '--chromeos-mirror',
             type=cli.argtype_dir_path,
             default=os.environ.get('CHROMEOS_MIRROR'),
             help='ChromeOS repo mirror path',
         )
         group.add_argument(
-            '--android_root',
+            '--android-root',
             metavar='ANDROID_ROOT',
             type=cli.argtype_dir_path,
             default=os.environ.get('ANDROID_ROOT'),
             help='Android tree root',
         )
         group.add_argument(
-            '--android_mirror',
+            '--android-mirror',
             type=cli.argtype_dir_path,
             default=os.environ.get('ANDROID_MIRROR'),
             help='Android repo mirror path',
         )
         group.add_argument(
-            '--chrome_root',
+            '--chrome-root',
             metavar='CHROME_ROOT',
             type=cli.argtype_dir_path,
             default=os.environ.get('CHROME_ROOT'),
             help='Chrome tree root',
         )
         group.add_argument(
-            '--chrome_mirror',
+            '--chrome-mirror',
             metavar='CHROME_MIRROR',
             type=cli.argtype_dir_path,
             default=os.environ.get('CHROME_MIRROR'),
@@ -1709,7 +1707,7 @@ class DiagnoseCommandLineBase:
         cros_helper.add_allocate_dut_arguments(
             group,
             allow_required=False,
-            flags_prefix='allocate_dut',
+            flags_prefix='allocate-dut',
         )
 
         group = parser_init.add_argument_group(title='Essential options')
@@ -1732,18 +1730,18 @@ class DiagnoseCommandLineBase:
             help='ChromeOS, Chrome or Android version with new behavior',
         )
         group.add_argument(
-            '--term_old', help='Alternative term for "old" state'
+            '--term-old', help='Alternative term for "old" state'
         )
         group.add_argument(
-            '--term_new', help='Alternative term for "new" state'
+            '--term-new', help='Alternative term for "new" state'
         )
 
         group = parser_init.add_argument_group(
             title='Options for normal autotest tests'
         )
-        group.add_argument('--test_name', help='Test name')
+        group.add_argument('--test-name', help='Test name')
         group.add_argument(
-            '--fail_to_pass',
+            '--fail-to-pass',
             action='store_true',
             help='For functional tests: bisect the CL fixed the regression (when '
             'test became PASS). If not specified, the default is to bisect the CL '
@@ -1751,17 +1749,17 @@ class DiagnoseCommandLineBase:
         )
         group.add_argument('--metric', help='Metric name of benchmark test')
         group.add_argument(
-            '--old_value',
+            '--old-value',
             type=float,
             help='For benchmark test, old value of metric',
         )
         group.add_argument(
-            '--new_value',
+            '--new-value',
             type=float,
             help='For benchmark test, new value of metric',
         )
         group.add_argument(
-            '--recompute_init_values',
+            '--recompute-init-values',
             action='store_true',
             help='For performance test, recompute initial values',
         )
@@ -1774,107 +1772,106 @@ class DiagnoseCommandLineBase:
             help='Enable noisy binary search. Example value: "old=1/10,new=2/3"',
         )
         group.add_argument(
-            '--always_reflash',
+            '--always-reflash',
             action='store_true',
             help='Do not trust ChromeOS version number of DUT and always reflash. '
             'This is usually only needed when resume because previous bisect was '
             'interrupted and the DUT may be in an unexpected state',
         )
         group.add_argument(
-            '--reboot_before_test',
+            '--reboot-before-test',
             action='store_true',
             help='Reboot before test run',
         )
         group.add_argument(
-            '--bypass_chromeos_prebuilt',
+            '--bypass-chromeos-prebuilt',
             action='store_true',
             help='Bypass chromeos prebuilt image bisect',
         )
         group.add_argument(
-            '--bypass_chromeos_build',
+            '--bypass-chromeos-build',
             action='store_true',
             help='Bypass chromeos local build bisect',
         )
         group.add_argument(
-            '--bypass_lacros_prebuilt',
+            '--bypass-lacros-prebuilt',
             action='store_true',
             help='Bypass lacros prebuilt image bisect',
         )
         group.add_argument(
-            '--bypass_chrome_build',
+            '--bypass-chrome-build',
             action='store_true',
             help='Bypass chrome local build bisect',
         )
         group.add_argument(
-            '--bypass_android_prebuilt',
+            '--bypass-android-prebuilt',
             action='store_true',
             help='Bypass android prebuilt image bisect',
         )
         group.add_argument(
-            '--bypass_android_build',
+            '--bypass-android-build',
             action='store_true',
             help='Bypass chromeos local build bisect',
         )
         group.add_argument(
-            '--bypass_dlc_prebuilt',
+            '--bypass-dlc-prebuilt',
             action='store_true',
             help='Bypass DLC prebuilt',
         )
         group.add_argument(
             '--no-disable-rootfs-verification',
-            '--no_disable_rootfs_verification',
             dest='disable_rootfs_verification',
             action='store_false',
             help="Don't disable rootfs verification after update is completed",
         )
         group.add_argument(
-            '--bisect_chrome',
+            '--bisect-chrome',
             action='store_true',
             help='Bisect a chrome version',
         )
         group.add_argument(
-            '--bisect_android',
+            '--bisect-android',
             action='store_true',
             help='Bisect an android version',
         )
         group.add_argument(
-            '--base_cros_version',
+            '--base-cros-version',
             type=cros_util.argtype_cros_version,
             help='ChromeOS base version for running chrome bisection',
         )
         group.add_argument(
-            '--chrome_deploy_image',
+            '--chrome-deploy-image',
             action='store_true',
             help='Build and deploy ChromeOS image when bisect Chrome',
         )
         group.add_argument(
-            '--disable_snapshot',
+            '--disable-snapshot',
             action='store_true',
             help='Disable snapshot for bisect chromeos prebuilt',
         )
         group.add_argument(
-            '--disable_buildbucket_chromeos',
+            '--disable-buildbucket-chromeos',
             action='store_true',
             help='Build ChromeOS on local instead of buildbucket',
         )
         group.add_argument(
-            '--enable_buildbucket_chrome',
+            '--enable-buildbucket-chrome',
             action='store_true',
             help='Build Chrome on buildbucket',
         )
         group.add_argument(
-            '--extra_test_variables',
+            '--extra-test-variables',
             help='Extra variables passed to `test_that --args` or `tast -var`',
             action='append',
             default=[],
         )
         group.add_argument(
-            '--endpoint_verification',
+            '--endpoint-verification',
             action='store_true',
             help='Enable statistical method to verify endpoints',
         )
         group.add_argument(
-            '--consider_test_crash_as_failure',
+            '--consider-test-crash-as-failure',
             action='store_true',
             help='Consider test crashes as failure instead of skip',
         )

@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import argparse
 import copy
 import logging
 import os
@@ -35,12 +34,12 @@ logger = logging.getLogger(__name__)
 
 def add_build_and_deploy_arguments(parser_group):
     parser_group.add_argument(
-        '--clobber_stateful',
+        '--clobber-stateful',
         action='store_true',
         help='Clobber stateful partition when performing update',
     )
     parser_group.add_argument(
-        '--no_disable_rootfs_verification',
+        '--no-disable-rootfs-verification',
         dest='disable_rootfs_verification',
         action='store_false',
         help="Don't disable rootfs verification after update is completed",
@@ -49,9 +48,9 @@ def add_build_and_deploy_arguments(parser_group):
 
 def create_common_argument_parser():
     """Common arguments parser for both Chrome and ChromeOS builds"""
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = cli.ArgumentParser(add_help=False)
     parser.add_argument(
-        '--rich_result',
+        '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
     )
@@ -63,26 +62,26 @@ def create_common_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
-        '--chromeos_root',
+        '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
         default=os.environ.get('CHROMEOS_ROOT', ''),
         help='ChromeOS tree root (default: %(default)s)',
     )
     parser.add_argument(
-        '--chromeos_mirror',
+        '--chromeos-mirror',
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROMEOS_MIRROR', ''),
         help='ChromeOS repo mirror path',
     )
     parser.add_argument(
-        '--no_wait_for_build_completion',
+        '--no-wait-for-build-completion',
         action='store_true',
-        help='When used with --no_deploy, the script exits '
+        help='When used with --no-deploy, the script exits '
         'immediately after the job is scheduled.',
     )
     parser.add_argument(
-        '--buildbucket_id',
+        '--buildbucket-id',
         type=int,
         help='Assign a buildbucket id instead of sending a build request',
     )
@@ -97,7 +96,7 @@ def create_common_argument_parser():
         help='Assign a buildbucket bucket to build it (default: %(default)s)',
     )
     parser.add_argument(
-        '--build_revlist',
+        '--build-revlist',
         action='store_true',
         help='Force to build revlist cache again. '
         'This flag is recommended if you need to run this script independently.',
@@ -109,9 +108,8 @@ def create_common_argument_parser():
 
 
 def create_argument_parser():
-    parser = argparse.ArgumentParser()
+    parser = cli.ArgumentParser()
     subparsers = parser.add_subparsers(dest='subcommand', required=True)
-    cli.patching_argparser_exit(parser)
 
     parents = [
         cli.create_session_optional_parser(),
@@ -137,21 +135,21 @@ def create_argument_parser():
         'bisect_chrome', help='Bisect on Chrome versions', parents=parents
     )
     parser_chrome.add_argument(
-        '--chrome_root',
+        '--chrome-root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROME_ROOT', ''),
         help='Root of Chrome source tree, like ~/chromium',
     )
     parser_chrome.add_argument(
-        '--chrome_mirror',
+        '--chrome-mirror',
         metavar='CHROME_MIRROR',
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROME_MIRROR', ''),
         help='gclient cache dir',
     )
     parser_chrome.add_argument(
-        '--chromeos_rev',
+        '--chromeos-rev',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
         default=os.environ.get('CROS_VERSION', ''),
@@ -473,11 +471,11 @@ def switch(opts) -> core.StepResult:
         logger.info(msg)
         return core.StepResult('fatal', reason=msg)
 
-    # If --no_deploy is False, always wait for build completion because the
+    # If --no-deploy is False, always wait for build completion because the
     # binary is needed for deploy.  Otherwise,
-    # 1. If --no_wait_for_build_completion is True, exit as soon as job
+    # 1. If --no-wait-for-build-completion is True, exit as soon as job
     #   scheduled and ignore potential errors.
-    # 2. If --no_wait_for_build_completion is False, exit after the build
+    # 2. If --no-wait-for-build-completion is False, exit after the build
     #   completes.
     if not opts.no_deploy or not opts.no_wait_for_build_completion:
         wait_for_build_completion(opts, buildbucket_id)

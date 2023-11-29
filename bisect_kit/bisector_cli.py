@@ -50,7 +50,7 @@ EXIT_CODE_MAP = {
     VALUE: cli.EXIT_CODE_VALUE,
 }
 
-step_command_parser = argparse.ArgumentParser(prog='config')
+step_command_parser = cli.ArgumentParser(prog='config', raise_bad_status=False)
 step_command_parser.add_argument(
     '--mode', choices=['git', 'bisectkit'], default='git'
 )
@@ -361,7 +361,7 @@ def do_future_build(
             and fetch the result of previous jobs.
 
     For example, switch_cros_localbuild_buildbucket.py can do:
-        1. Use --no_deploy to start a build job, the script exits immediately
+        1. Use --no-deploy to start a build job, the script exits immediately
             after job starts.
         2. When switch a version, the script will check if there's any existing
             job and resue the artifacts.
@@ -421,9 +421,9 @@ def step_main_wrapper(
         )
 
     # Because it may fail during argument parsing in the main function, we parse
-    # sole '--rich_result' here by ourself.
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('--rich_result', action='store_true')
+    # sole '--rich-result' here by ourself.
+    parser = cli.ArgumentParser(add_help=False, raise_bad_status=False)
+    parser.add_argument('--rich-result', action='store_true')
     opts, _ = parser.parse_known_args(args)
 
     if opts.rich_result:
@@ -464,25 +464,25 @@ class BisectorCommandLine:
       bisector = Bisector(ChromeOSVersionDomain)
       bisector.main(
           'init', '--old', 'R118-15604.0.0', '--new', 'R119-15609.0.0',
-          '--term_old', 'PASS', '--term_new', 'FAIL', '--board', 'nissa',
+          '--term-old', 'PASS', '--term-new', 'FAIL', '--board', 'nissa',
           '--dut', <DUT>
       )
       bisector.main('config', 'clear', 'switch')
       bisector.main(
           'config', 'switch', '--mode=bisectkit',
-          './switch_cros_prebuilt.py', '--rich_result'
+          './switch_cros_prebuilt.py', '--rich-result'
       )
       bisector.main(
           'config', 'switch', '--mode=bisectkit',
-          './switch_tast_prebuilt.py', '--rich_result',
-          '--chromeos_root', <chromeos_root>, '--board', 'nissa'
+          './switch_tast_prebuilt.py', '--rich-result',
+          '--chromeos-root', <chromeos_root>, '--board', 'nissa'
       )
       bisector.main(
           'config', 'eval', '--mode=bisectkit', './eval_cros_tast.py',
-          '--rich_result', '--with_private_bundles',
-          '--chromeos_root', <chromeos_root>,
-          '--test_name', 'tast.audio.CyclicBench.rr10_4thread_10ms',
-          '--reboot_before_test', '--prebuilt'
+          '--rich-result', '--with-private-bundles',
+          '--chromeos-root', <chromeos_root>,
+          '--test-name', 'tast.audio.CyclicBench.rr10_4thread_10ms',
+          '--reboot-before-test', '--prebuilt'
       )
       bisector.main('run')
 
@@ -521,8 +521,8 @@ class BisectorCommandLine:
        In this case, the script should define a method called "action"
        which returns SwitchAction.BUILD_AND_DEPLOY.
        The class would run the script twice. The first time with an additional
-       flag "--no_deploy". The second time with additional flags
-       "--dut <DUT> --deploy_only".
+       flag "--no-deploy". The second time with additional flags
+       "--dut <DUT> --deploy-only".
 
     3. The script doesn't need a DUT.
        In this case, the script should define a method called "action"
@@ -670,18 +670,18 @@ class BisectorCommandLine:
         try:
             if (opts.old_value is None) != (opts.new_value is None):
                 raise errors.ArgumentError(
-                    '--old_value and --new_value', 'both should be specified'
+                    '--old-value and --new-value', 'both should be specified'
                 )
             if opts.old_value is not None and opts.old_value == opts.new_value:
                 raise errors.ArgumentError(
-                    '--old_value and --new_value',
+                    '--old-value and --new-value',
                     'their values should be different',
                 )
             if opts.recompute_init_values and opts.old_value is None:
                 raise errors.ArgumentError(
-                    '--recompute_init_values',
-                    '--old_value and --new_value must be specified '
-                    'when --recompute_init_values is present',
+                    '--recompute-init-values',
+                    '--old-value and --new-value must be specified '
+                    'when --recompute-init-values is present',
                 )
 
             config, candidates = self.domain_cls.init(opts)
@@ -837,9 +837,9 @@ class BisectorCommandLine:
             assert dut, 'dut must be present with action %s' % action
             extra_args += ['--dut', dut]
         if action == SwitchAction.BUILD:
-            extra_args += ['--no_deploy']
+            extra_args += ['--no-deploy']
         elif action == SwitchAction.DEPLOY:
-            extra_args += ['--deploy_only']
+            extra_args += ['--deploy-only']
 
         t0 = time.time()
         result = do_switch(
@@ -1648,10 +1648,11 @@ class BisectorCommandLine:
         )
 
         parents = [cli.create_session_optional_parser()]
-        parser = argparse.ArgumentParser(
+        parser = cli.ArgumentParser(
             prog=prog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             description=description,
+            raise_bad_status=False,
         )
         subparsers = parser.add_subparsers(
             dest='command', title='commands', metavar='<command>', required=True
@@ -1694,12 +1695,12 @@ class BisectorCommandLine:
             help='End of bisect range, which has new behavior',
         )
         parser_init.add_argument(
-            '--term_old',
+            '--term-old',
             default='OLD',
             help='Alternative term for "old" state (default: %(default)r)',
         )
         parser_init.add_argument(
-            '--term_new',
+            '--term-new',
             default='NEW',
             help='Alternative term for "new" state (default: %(default)r)',
         )
@@ -1711,17 +1712,17 @@ class BisectorCommandLine:
             'Skip if not flaky, say, "new=2/3" means old is always good.',
         )
         parser_init.add_argument(
-            '--old_value',
+            '--old-value',
             type=float,
             help='For performance test, value of old behavior',
         )
         parser_init.add_argument(
-            '--new_value',
+            '--new-value',
             type=float,
             help='For performance test, value of new behavior',
         )
         parser_init.add_argument(
-            '--recompute_init_values',
+            '--recompute-init-values',
             action='store_true',
             help='For performance test, recompute initial values',
         )
@@ -1732,7 +1733,7 @@ class BisectorCommandLine:
             help='Confidence level (default: %(default)r)',
         )
         parser_init.add_argument(
-            '--endpoint_verification',
+            '--endpoint-verification',
             action='store_true',
             help='Enable statistical method to verify endpoints',
         )
@@ -1796,7 +1797,7 @@ class BisectorCommandLine:
             help="Run at least once even it's already done",
         )
         parser_run.add_argument(
-            '--current_rev',
+            '--current-rev',
             type=self.domain_cls.intra_revtype,
             help='give hint the current rev',
         )
@@ -1868,7 +1869,7 @@ class BisectorCommandLine:
             'next', help='Prints next suggested rev to bisect', parents=parents
         )
         parser_next.add_argument(
-            '--current_rev',
+            '--current-rev',
             type=self.domain_cls.intra_revtype,
             help='give hint the current rev',
         )

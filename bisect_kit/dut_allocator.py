@@ -274,7 +274,7 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
             spec.builder_hint = cros_util.query_dut_board(spec.dut_name)
     elif not spec.pool:
         raise errors.ArgumentError(
-            '--pool', 'need to be specified if not --dut_name'
+            '--pool', 'need to be specified if not --dut-name'
         )
     if spec.version_hint:
         for v in spec.version_hint.split(','):
@@ -283,7 +283,7 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
             ) or cros_util.is_cros_snapshot_version(v):
                 continue
             raise errors.ArgumentError(
-                '--version_hint',
+                '--version-hint',
                 'should be ChromeOS version numbers, separated by comma',
             )
     if spec.duration is not None and spec.duration < 60:
@@ -292,7 +292,7 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
     if spec.satlab_ip:
         if not cros_lab_util.is_satlab_dut(spec.dut_name):
             raise errors.ArgumentError(
-                '--satlab_ip', 'Should be only provided with a satlab dut'
+                '--satlab-ip', 'Should be only provided with a satlab dut'
             )
 
         cros_lab_util.write_satlab_ssh_config(spec.dut_name, spec.satlab_ip)
@@ -369,7 +369,7 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
             spec.builder_hint = spec.board
         if not spec.builder_hint:
             raise errors.ArgumentError(
-                '--builder_hint', 'must be specified along with --version_hint'
+                '--builder-hint', 'must be specified along with --version-hint'
             )
         boards_with_prebuilt = []
         versions = spec.version_hint.split(',')
@@ -387,7 +387,7 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
         logger.info('boards with prebuilt: %s', boards_with_prebuilt)
         if not boards_with_prebuilt:
             raise errors.ArgumentError(
-                '--version_hint',
+                '--version-hint',
                 'given builders have no prebuilt for %s' % spec.version_hint,
             )
         filtered = _filter_dimensions_by_board(

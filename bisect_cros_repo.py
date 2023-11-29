@@ -7,8 +7,8 @@
 
 Example:
   $ ./bisect_cros_repo.py init --old rev1 --new rev2 \\
-      --chromeos_root ~/chromiumos \\
-      --chromeos_mirror $CHROMEOS_MIRROR \\
+      --chromeos-root ~/chromiumos \\
+      --chromeos-mirror $CHROMEOS_MIRROR \\
       --dut DUT
   $ ./bisect_cros_repo.py config switch ./switch_cros_localbuild.py
   $ ./bisect_cros_repo.py config eval ./eval-manually.sh
@@ -70,7 +70,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
             help='ChromeOS board name',
         )
         parser.add_argument(
-            '--chromeos_root',
+            '--chromeos-root',
             metavar='CHROMEOS_ROOT',
             type=cli.argtype_dir_path,
             required=True,
@@ -78,7 +78,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
             help='ChromeOS tree root',
         )
         parser.add_argument(
-            '--chromeos_mirror',
+            '--chromeos-mirror',
             type=cli.argtype_dir_path,
             default=os.environ.get('CHROMEOS_MIRROR', ''),
             help='ChromeOS repo mirror path',

@@ -58,10 +58,10 @@ def create_argument_parser():
     """Creates command line argument parser.
 
     Returns:
-      An argparse.ArgumentParser instance.
+      An cli.ArgumentParser instance.
     """
     parents = [cli.create_session_optional_parser()]
-    parser = argparse.ArgumentParser(
+    parser = cli.ArgumentParser(
         description=textwrap.dedent(
             """
           Helper script to report exit code according to execution result.
@@ -73,7 +73,6 @@ def create_argument_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=parents,
     )
-    cli.patching_argparser_exit(parser)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         '--new',
@@ -98,7 +97,7 @@ def create_argument_parser():
         'otherwise return SKIP.',
     )
     group.add_argument(
-        '--precondition_output',
+        '--precondition-output',
         metavar='REGEX',
         type=re.compile,
         help='Precondition to match %(metavar)s',
@@ -151,7 +150,7 @@ def create_argument_parser():
         help="Don't stop earlier if we know ratio will meet or not by calculation",
     )
     group.add_argument(
-        '--terminate_output',
+        '--terminate-output',
         metavar='REGEX',
         type=re.compile,
         help='Once there is one line matching %(metavar)s, '
