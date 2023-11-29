@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import sys
@@ -57,10 +58,10 @@ def create_argument_parser():
         help='Clobber stateful partition when performing update',
     )
     parser.add_argument(
-        '--no-disable-rootfs-verification',
-        dest='disable_rootfs_verification',
-        action='store_false',
-        help="Don't disable rootfs verification after update is completed",
+        '--disable-rootfs-verification',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='Whether to disable rootfs verification after update is complete, default is %(default)s',
     )
     parser.add_argument(
         '--default-chromeos-root',

@@ -18,6 +18,7 @@ alternative binaries.
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import sys
@@ -102,11 +103,11 @@ def create_argument_parser():
         'This option could be specified multiple times.',
     )
     group.add_argument(
-        '--without-tests',
-        action='store_false',
-        dest='with_tests',
+        '--with-tests',
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help='(if --target is not specified) '
-        'Besides chrome, build test binaries as well.',
+        'Whether to build test binaries besides chrome as well, default is %(default)s',
     )
 
     parser.add_argument(

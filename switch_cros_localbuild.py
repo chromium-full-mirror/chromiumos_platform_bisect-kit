@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import sys
@@ -40,16 +41,16 @@ def add_build_and_deploy_arguments(parser_group):
         help='Clobber stateful partition when performing update',
     )
     parser_group.add_argument(
-        '--no-disable-rootfs-verification',
-        dest='disable_rootfs_verification',
-        action='store_false',
-        help="Don't disable rootfs verification after update is completed",
+        '--disable-rootfs-verification',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='Whether to disable rootfs verification after update is complete, default is %(default)s',
     )
     parser_group.add_argument(
-        '--no-mark-as-stable',
-        dest='mark_as_stable',
-        action='store_false',
-        help="Don't mark repo stable",
+        '--mark-as-stable',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='Whether to mark repo as stable, default is %(default)s',
     )
 
 

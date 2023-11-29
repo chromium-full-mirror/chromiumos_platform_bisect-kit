@@ -1033,7 +1033,7 @@ class CrosDiagnoser:
                 self.config['board_cpu_arch'],
             ]
             if not should_build_with_tests:
-                switch_cmd.append('--without-tests')
+                switch_cmd.append('--no-with-tests')
             if self.config['chrome_deploy_image']:
                 switch_cmd += [
                     '--deploy-method=image',
@@ -1819,10 +1819,10 @@ class DiagnoseCommandLineBase:
             help='Bypass DLC prebuilt',
         )
         group.add_argument(
-            '--no-disable-rootfs-verification',
-            dest='disable_rootfs_verification',
-            action='store_false',
-            help="Don't disable rootfs verification after update is completed",
+            '--disable-rootfs-verification',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Whether to disable rootfs verification after update is complete, default is %(default)s',
         )
         group.add_argument(
             '--bisect-chrome',
