@@ -60,7 +60,7 @@ def create_argument_parser():
     parser.add_argument(
         '--disable-rootfs-verification',
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help='Whether to disable rootfs verification after update is complete, default is %(default)s',
     )
     parser.add_argument(

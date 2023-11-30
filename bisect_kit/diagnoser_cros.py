@@ -377,7 +377,9 @@ class CrosDiagnoser:
                 './switch_cros_prebuilt.py',
                 '--rich-result',
             ]
-            if not self.config['disable_rootfs_verification']:
+            if self.config['disable_rootfs_verification']:
+                switch_cmd.append('--disable-rootfs-verification')
+            else:
                 switch_cmd.append('--no-disable-rootfs-verification')
 
             init_args = ['--board', self.config['board']]
@@ -486,7 +488,9 @@ class CrosDiagnoser:
             dut,
             self.cros_old,
         ]
-        if not self.config['disable_rootfs_verification']:
+        if self.config['disable_rootfs_verification']:
+            cmd.append('--disable-rootfs-verification')
+        else:
             cmd.append('--no-disable-rootfs-verification')
         util.check_call(*cmd)
 
@@ -1021,7 +1025,9 @@ class CrosDiagnoser:
                 '--board',
                 self.config['board'],
             ]
-            if not self.config['disable_rootfs_verification']:
+            if self.config['disable_rootfs_verification']:
+                switch_cmd.append('--disable-rootfs-verification')
+            else:
                 switch_cmd.append('--no-disable-rootfs-verification')
         else:
             switch_cmd = [
@@ -1040,7 +1046,9 @@ class CrosDiagnoser:
                     '--chromeos-root',
                     self.config['chromeos_root'],
                 ]
-                if not self.config['disable_rootfs_verification']:
+                if self.config['disable_rootfs_verification']:
+                    switch_cmd.append('--disable-rootfs-verification')
+                else:
                     switch_cmd.append('--no-disable-rootfs-verification')
 
         bisector = wrapper.BisectorWrapper(
@@ -1163,7 +1171,9 @@ class CrosDiagnoser:
                 self.config['session'],
             ]
 
-        if not self.config['disable_rootfs_verification']:
+        if self.config['disable_rootfs_verification']:
+            switch_cmd.append('--disable-rootfs-verification')
+        else:
             switch_cmd.append('--no-disable-rootfs-verification')
 
         switch_cmds = [switch_cmd]
@@ -1821,7 +1831,7 @@ class DiagnoseCommandLineBase:
         group.add_argument(
             '--disable-rootfs-verification',
             action=argparse.BooleanOptionalAction,
-            default=True,
+            default=False,
             help='Whether to disable rootfs verification after update is complete, default is %(default)s',
         )
         group.add_argument(
@@ -1903,8 +1913,6 @@ class DiagnoseCommandLineBase:
 
     def main(self, args=None):
         opts = self.argument_parser.parse_args(args)
-        # TODO(b/313563185): Always enable rootfs verification for now, this will be removed later.
-        opts.disable_rootfs_verification = False
         common.config_logging(opts)
 
         session_file = common.get_session_log_path(

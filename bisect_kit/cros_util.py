@@ -1481,7 +1481,7 @@ def provision_image(
     image_info,
     version=None,
     clobber_stateful=False,
-    disable_rootfs_verification=True,
+    disable_rootfs_verification=False,
     force_reboot_callback=None,
 ):
     # Try quick_provision first, but fallback to cros flash.
@@ -1632,7 +1632,7 @@ def provision_image_with_retry(
     image_info,
     version=None,
     clobber_stateful=False,
-    disable_rootfs_verification=True,
+    disable_rootfs_verification=False,
     repair_callback=None,
     force_reboot_callback=None,
 ):

@@ -43,7 +43,7 @@ def add_build_and_deploy_arguments(parser_group):
     parser_group.add_argument(
         '--disable-rootfs-verification',
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help='Whether to disable rootfs verification after update is complete, default is %(default)s',
     )
     parser_group.add_argument(
