@@ -27,10 +27,10 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
 import threading
 import time
 import timeit
-import urllib.parse
 
 from bisect_kit import common
 from bisect_kit import cros_util
@@ -52,8 +52,10 @@ LAB_DUT_EXCEPTIONS = [
     r'cre.+',
 ]
 
-SWARMING_CLIENT = os.path.expanduser('~/luci-py/client/swarming.py')
-SWARMING_SERVER = 'https://chromeos-swarming.appspot.com'
+SWARMING_PRPC_SERVER = 'chromeos-swarming.appspot.com'
+# https://chromium.googlesource.com/infra/luci/luci-py/+/733d5d3b5299408cbc6a5e5b33b1a461ea9e0acd/appengine/swarming/proto/api_v2/swarming.proto#162
+SWARMING_PRPC_QUERY_ALL = 10
+SWARMING_PRPC_DEFAULT_LIMIT = 1000
 LEASE_DURATION = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
 
@@ -191,28 +193,34 @@ def crosfleet_dut_info(dut_name):
     return None
 
 
-def swarming_query(method, limit=None, verbose_log=True):
-    """Wrapper of 'swarming.py query'.
-
-    This is the lower level query interface. You can see available methods by
-    running `swarming.py query-list`.
+def swarming_grpc(method: str, content: dict) -> str:
+    """Call swarming prpc.
 
     Args:
-      method: the API method
-      limit: limit number of result
-      verbose_log: log more if True
+      method (str): grpc method name.
+      content (dict): content send to grpc method.
 
     Returns:
-      result dict; the content is defined by each method call.
+      A string, the result of grpc call.
     """
     service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
-    cmd = [SWARMING_CLIENT, 'query', '--swarming', SWARMING_SERVER, method]
+    cmd = [
+        'prpc',
+        'call',
+        SWARMING_PRPC_SERVER,
+        method,
+    ]
     if not common.under_luci_context() and service_account_json:
-        cmd += ['--auth-service-account-json', service_account_json]
-    if limit:
-        cmd += ['--limit', str(limit)]
-    data = util.check_output(*cmd, retry=5, log_stdout=verbose_log)
-    return json.loads(data)
+        cmd += ['-service-account-json', service_account_json]
+
+    with tempfile.TemporaryFile(mode='w', suffix='.json') as temp:
+        json.dump(content, temp)
+        temp.flush()
+        temp.seek(0)
+        return util.check_output(
+            *cmd,
+            stdin=temp,
+        )
 
 
 def swarming_cancel(task_id):
@@ -221,18 +229,9 @@ def swarming_cancel(task_id):
     Args:
       task_id: task id
     """
-    service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
-    cmd = [
-        SWARMING_CLIENT,
-        'cancel',
-        '--swarming',
-        SWARMING_SERVER,
-        '--kill-running',
-        task_id,
-    ]
-    if not common.under_luci_context() and service_account_json:
-        cmd += ['--auth-service-account-json', service_account_json]
-    util.check_call(*cmd, retry=5)
+    method = 'swarming.v2.Tasks.CancelTask'
+    content = {'task_id': task_id, 'kill_running': True}
+    return json.loads(swarming_grpc(method, content))
 
 
 def bb_cancel(build_id, reason):
@@ -260,16 +259,17 @@ def _simplify_bot_dimensions(dimensions_pairs):
 
 
 def swarming_bots_dimensions():
-    method = 'bots/dimensions'
-    bots_dimensions = swarming_query(method, verbose_log=False).get(
-        'bots_dimensions', []
+    method = 'swarming.v2.Bots.GetBotDimensions'
+    return _simplify_bot_dimensions(
+        json.loads(swarming_grpc(method, {}))['botsDimensions']
     )
-    return _simplify_bot_dimensions(bots_dimensions)
 
 
 def swarming_bot_info(bot_id, verbose_log=True):
-    method = f'bot/{bot_id}/get'
-    bot = swarming_query(method, limit=1, verbose_log=verbose_log)
+    del verbose_log
+    method = 'swarming.v2.Bots.GetBot'
+    content = {'bot_id': bot_id}
+    bot = json.loads(swarming_grpc(method, content))
     bot['dimensions'] = _simplify_bot_dimensions(bot['dimensions'])
     return bot
 
@@ -295,23 +295,24 @@ def swarming_bots_list(
     Returns:
       list of bots dict
     """
-    method = 'bots/list'
-    query = [('dimensions', d) for d in dimensions]
-    if is_dead is not None:
-        query.append(('is_dead', 'TRUE' if is_dead else 'FALSE'))
-    if quarantined is not None:
-        query.append(('quarantined', 'TRUE' if quarantined else 'FALSE'))
-    if is_busy is not None:
-        query.append(('is_busy', 'TRUE' if is_busy else 'FALSE'))
+    del verbose_log
+    dimensions = [
+        {'key': d.split(':')[0], 'value': d.split(':')[1]} for d in dimensions
+    ]
+    if not limit:
+        limit = SWARMING_PRPC_DEFAULT_LIMIT
+    method = 'swarming.v2.Bots.ListBots'
+    content = {'dimensions': dimensions, 'limit': limit}
 
-    if query:
-        # doseq=True because dimensions could be multiple.
-        method += '?' + urllib.parse.urlencode(query, doseq=True)
+    if is_dead is not None:
+        content['is_dead'] = is_dead
+    if quarantined is not None:
+        content['quarantined'] = quarantined
+    if is_busy is not None:
+        content['is_busy'] = is_busy
 
     bots = []
-    for bot in swarming_query(method, limit=limit, verbose_log=verbose_log).get(
-        'items', []
-    ):
+    for bot in json.loads(swarming_grpc(method, content)).get('items', []):
         bot['dimensions'] = _simplify_bot_dimensions(bot['dimensions'])
         bots.append(bot)
     return bots
@@ -399,8 +400,15 @@ def swarming_bot_tasks(bot_id, limit=None):
       list of task dict
     """
     assert bot_id
-    method = 'bot/%s/tasks' % bot_id
-    return swarming_query(method, limit=limit).get('items', [])
+    if not limit:
+        limit = SWARMING_PRPC_DEFAULT_LIMIT
+    method = 'swarming.v2.Bots.ListBotTasks'
+    content = {
+        'bot_id': bot_id,
+        'state': SWARMING_PRPC_QUERY_ALL,
+        'limit': limit,
+    }
+    return json.loads(swarming_grpc(method, content))['items']
 
 
 def swarming_task_request(task_id, verbose_log=True):
@@ -413,9 +421,11 @@ def swarming_task_request(task_id, verbose_log=True):
     Returns:
       task request dict
     """
+    del verbose_log
     assert task_id
-    method = 'task/%s/request' % task_id
-    return swarming_query(method, verbose_log=verbose_log)
+    method = 'swarming.v2.Tasks.GetRequest'
+    content = {'taskId': task_id}
+    return json.loads(swarming_grpc(method, content))
 
 
 def swarming_task_result(task_id, verbose_log=True):
@@ -428,9 +438,11 @@ def swarming_task_result(task_id, verbose_log=True):
     Returns:
       task result dict
     """
+    del verbose_log
     assert task_id
-    method = 'task/%s/result' % task_id
-    return swarming_query(method, verbose_log=verbose_log)
+    method = 'swarming.v2.Tasks.GetResult'
+    content = {'taskId': task_id}
+    return json.loads(swarming_grpc(method, content))
 
 
 def is_skylab_dut(dut_name):
