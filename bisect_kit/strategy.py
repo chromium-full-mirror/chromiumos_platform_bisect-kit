@@ -324,6 +324,8 @@ class NoisyBinarySearch:
 
         if states.state is not None:
             self._state = states.state
+            if self._state == self.STARTED:
+                self._init_for_state_started()
             self.dirty = False
         if states.init_verify_state is not None:
             self._init_verify_state = states.init_verify_state
@@ -379,65 +381,70 @@ class NoisyBinarySearch:
             if idx is not None:
                 return self._state
             self._state = self.STARTED
-
-            if self.is_value_bisection() and self.recompute_init_values:
-                if self.old_avg is None:
-                    self.old_avg = math_util.average(
-                        self.rev_info[self.old_idx].averages()
-                    )
-                if self.new_avg is None:
-                    self.new_avg = math_util.average(
-                        self.rev_info[self.new_idx].averages()
-                    )
-                score = trend_score(
-                    self.old_value, self.new_value, self.old_avg, self.new_avg
-                )
-                if score <= 0:
-                    raise errors.WrongAssumption(
-                        'unable to reproduce the same trend (%f->%f): %f->%f'
-                        % (
-                            self.old_value,
-                            self.new_value,
-                            self.old_avg,
-                            self.new_avg,
-                        )
-                    )
-                # Reject if we cannot reproduce the trend even half way.
-                # TODO(kcwu): make this threshold configurable.
-                if score < 0.5:
-                    expect_delta = abs(self.new_value - self.old_value)
-                    actual_delta = abs(self.new_avg - self.old_avg)
-                    if self.old_value == 0 or self.old_avg == 0:
-                        raise errors.WrongAssumption(
-                            'unable to reproduce the value gap: '
-                            'expect delta=%f; actual delta=%f'
-                            % (expect_delta, actual_delta)
-                        )
-                    raise errors.WrongAssumption(
-                        'unable to reproduce the value gap: '
-                        'expect delta=%f (%f%%); actual delta=%f (%f%%)'
-                        % (
-                            expect_delta,
-                            abs(expect_delta / self.old_value) * 100,
-                            actual_delta,
-                            abs(actual_delta / self.old_avg) * 100,
-                        )
-                    )
-                if self.threshold is None:
-                    self.threshold = (self.old_avg + self.new_avg) / 2
-                self.rev_info[self.old_idx].reclassify(
-                    self.old_avg, self.threshold, self.new_avg
-                )
-                self.rev_info[self.new_idx].reclassify(
-                    self.old_avg, self.threshold, self.new_avg
-                )
+            self._init_for_state_started()
 
         assert self._state == self.STARTED, 'unexpected state: %s' % self._state
+        return self._state
+
+    def _init_for_state_started(self):
+        """build internal states when self._state reached STARTED."""
+        assert self._state == self.STARTED
+        if self.is_value_bisection() and self.recompute_init_values:
+            if self.old_avg is None:
+                self.old_avg = math_util.average(
+                    self.rev_info[self.old_idx].averages()
+                )
+            if self.new_avg is None:
+                self.new_avg = math_util.average(
+                    self.rev_info[self.new_idx].averages()
+                )
+            score = trend_score(
+                self.old_value, self.new_value, self.old_avg, self.new_avg
+            )
+            if score <= 0:
+                raise errors.WrongAssumption(
+                    'unable to reproduce the same trend (%f->%f): %f->%f'
+                    % (
+                        self.old_value,
+                        self.new_value,
+                        self.old_avg,
+                        self.new_avg,
+                    )
+                )
+            # Reject if we cannot reproduce the trend even half way.
+            # TODO(kcwu): make this threshold configurable.
+            if score < 0.5:
+                expect_delta = abs(self.new_value - self.old_value)
+                actual_delta = abs(self.new_avg - self.old_avg)
+                if self.old_value == 0 or self.old_avg == 0:
+                    raise errors.WrongAssumption(
+                        'unable to reproduce the value gap: '
+                        'expect delta=%f; actual delta=%f'
+                        % (expect_delta, actual_delta)
+                    )
+                raise errors.WrongAssumption(
+                    'unable to reproduce the value gap: '
+                    'expect delta=%f (%f%%); actual delta=%f (%f%%)'
+                    % (
+                        expect_delta,
+                        abs(expect_delta / self.old_value) * 100,
+                        actual_delta,
+                        abs(actual_delta / self.old_avg) * 100,
+                    )
+                )
+            if self.threshold is None:
+                self.threshold = (self.old_avg + self.new_avg) / 2
+            self.rev_info[self.old_idx].reclassify(
+                self.old_avg, self.threshold, self.new_avg
+            )
+            self.rev_info[self.new_idx].reclassify(
+                self.old_avg, self.threshold, self.new_avg
+            )
+
         if self.prob is None:
             self._rebuild()
             self._estimate_model()
             assert self.prob
-        return self._state
 
     def add_sample(self, idx, status=None, **kwargs):
         sample = dict(status=status, **kwargs)
