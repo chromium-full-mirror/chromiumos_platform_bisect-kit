@@ -4,6 +4,7 @@
 
 """Test cli module."""
 
+import argparse
 import unittest
 
 from bisect_kit import cli
@@ -115,10 +116,31 @@ class TestArgumentParser(unittest.TestCase):
     def test_parse_args(self):
         parser = cli.ArgumentParser()
         parser.add_argument('--foo-bar')
-        args = parser.parse_args(['--foo-bar', 'dummy_value'])
-        self.assertEqual(args.foo_bar, 'dummy_value')
-        args = parser.parse_args(['--foo_bar', 'dummy_value'])
-        self.assertEqual(args.foo_bar, 'dummy_value')
+        args = parser.parse_args(['--foo-bar', 'dummy1'])
+        self.assertEqual(args.foo_bar, 'dummy1')
+        with self.assertRaises(errors.ArgumentError):
+            args = parser.parse_args(['--foo_bar', 'dummy1', '-baz', 'dummy2'])
+
+        ns = argparse.Namespace()
+        args = parser.parse_args(['--foo_bar', 'dummy1'], ns)
+        self.assertEqual(args, ns)
+
+    def test_parse_known_args(self):
+        parser = cli.ArgumentParser()
+        parser.add_argument('--foo-bar')
+        args, remaining = parser.parse_known_args(['--foo-bar', 'dummy1'])
+        self.assertEqual(args.foo_bar, 'dummy1')
+        self.assertListEqual(remaining, [])
+        args, remaining = parser.parse_known_args(
+            ['--foo_bar', 'dummy1', '--baz', 'dummy2']
+        )
+        self.assertEqual(args.foo_bar, 'dummy1')
+        self.assertListEqual(remaining, ['--baz', 'dummy2'])
+
+        ns = argparse.Namespace()
+        args, remaining = parser.parse_known_args(['--foo_bar', 'dummy1'], ns)
+        self.assertEqual(args, ns)
+        self.assertListEqual(remaining, [])
 
     def test_exit(self):
         parser = cli.ArgumentParser()

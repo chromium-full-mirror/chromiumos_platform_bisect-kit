@@ -41,7 +41,14 @@ class ArgumentParser(argparse.ArgumentParser):
         hyphen-separated optional arguments."""
         if args is None:
             args = sys.argv[1:]
-        return super().parse_args(self.normalize_args(args), namespace=None)
+        return super().parse_args(self.normalize_args(args), namespace)
+
+    def parse_known_args(self, args=None, namespace=None):
+        """Parses arguments and accepts both underscore-separated and
+        hyphen-separated optional arguments."""
+        if args is None:
+            args = sys.argv[1:]
+        return super().parse_known_args(self.normalize_args(args), namespace)
 
     def add_argument(self, *names: str, **kwargs):
         """Adds optional arguments with hyphens instead of underscores.
