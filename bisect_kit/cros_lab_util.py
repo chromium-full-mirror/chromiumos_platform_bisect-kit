@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import calendar
 import contextlib
+import dataclasses
 import errno
 import json
 import logging
@@ -27,10 +28,11 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
 import threading
 import time
 import timeit
-import urllib.parse
+import typing
 
 from bisect_kit import common
 from bisect_kit import cros_util
@@ -52,10 +54,40 @@ LAB_DUT_EXCEPTIONS = [
     r'cre.+',
 ]
 
-SWARMING_CLIENT = os.path.expanduser('~/luci-py/client/swarming.py')
-SWARMING_SERVER = 'https://chromeos-swarming.appspot.com'
+SWARMING_PRPC_SERVER = 'chromeos-swarming.appspot.com'
+# https://chromium.googlesource.com/infra/luci/luci-py/+/733d5d3b5299408cbc6a5e5b33b1a461ea9e0acd/appengine/swarming/proto/api_v2/swarming.proto#162
+SWARMING_PRPC_QUERY_ALL = 10
+SWARMING_PRPC_DEFAULT_LIMIT = 1000
 LEASE_DURATION = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
+
+
+@dataclasses.dataclass(eq=True)
+class LeaseStatus:
+    """A data represents the swarming DUT lease status.
+
+    Attributes:
+        dut_name: The swarming dut name.
+        bot_id: The bot id of given `dut_name`.
+        task_name: Current task name or None.
+        task_id: Current task id or None.
+        is_leased: Whether the DUT is leased now (bool). If false, following
+            fields are not available.
+        leased_by: User id leases the dut.
+        is_leased_by_me: Whether is leased by current account.
+        duration: Lease duration in seconds.
+        start_time: Lease start timestamp. (seconds since unix epoch time)
+    """
+
+    dut_name: str
+    bot_id: typing.Optional[str] = None
+    task_name: typing.Optional[str] = None
+    task_id: typing.Optional[str] = None
+    is_leased: bool = False
+    leased_by: typing.Optional[str] = None
+    is_leased_by_me: typing.Optional[bool] = None
+    duration: typing.Optional[int] = None
+    start_time: typing.Optional[int] = None
 
 
 def normalize_sku_name(sku):
@@ -191,28 +223,34 @@ def crosfleet_dut_info(dut_name):
     return None
 
 
-def swarming_query(method, limit=None, verbose_log=True):
-    """Wrapper of 'swarming.py query'.
-
-    This is the lower level query interface. You can see available methods by
-    running `swarming.py query-list`.
+def swarming_grpc(method: str, content: dict) -> str:
+    """Call swarming prpc.
 
     Args:
-      method: the API method
-      limit: limit number of result
-      verbose_log: log more if True
+      method (str): grpc method name.
+      content (dict): content send to grpc method.
 
     Returns:
-      result dict; the content is defined by each method call.
+      A string, the result of grpc call.
     """
     service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
-    cmd = [SWARMING_CLIENT, 'query', '--swarming', SWARMING_SERVER, method]
+    cmd = [
+        'prpc',
+        'call',
+        SWARMING_PRPC_SERVER,
+        method,
+    ]
     if not common.under_luci_context() and service_account_json:
-        cmd += ['--auth-service-account-json', service_account_json]
-    if limit:
-        cmd += ['--limit', str(limit)]
-    data = util.check_output(*cmd, retry=5, log_stdout=verbose_log)
-    return json.loads(data)
+        cmd += ['-service-account-json', service_account_json]
+    # TODO(zjchang): To communicate with subprocess without opening new file.
+    with tempfile.TemporaryFile(mode='w', suffix='.json') as temp:
+        json.dump(content, temp)
+        temp.flush()
+        temp.seek(0)
+        return util.check_output(
+            *cmd,
+            stdin=temp,
+        )
 
 
 def swarming_cancel(task_id):
@@ -220,19 +258,15 @@ def swarming_cancel(task_id):
 
     Args:
       task_id: task id
+
+    Returns:
+        A dict swarming.v2.CancelResponse, including
+            canceled (bool)
+            is_running (bool)
     """
-    service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
-    cmd = [
-        SWARMING_CLIENT,
-        'cancel',
-        '--swarming',
-        SWARMING_SERVER,
-        '--kill-running',
-        task_id,
-    ]
-    if not common.under_luci_context() and service_account_json:
-        cmd += ['--auth-service-account-json', service_account_json]
-    util.check_call(*cmd, retry=5)
+    method = 'swarming.v2.Tasks.CancelTask'
+    content = {'task_id': task_id, 'kill_running': True}
+    return json.loads(swarming_grpc(method, content))
 
 
 def bb_cancel(build_id, reason):
@@ -260,16 +294,17 @@ def _simplify_bot_dimensions(dimensions_pairs):
 
 
 def swarming_bots_dimensions():
-    method = 'bots/dimensions'
-    bots_dimensions = swarming_query(method, verbose_log=False).get(
-        'bots_dimensions', []
+    method = 'swarming.v2.Bots.GetBotDimensions'
+    return _simplify_bot_dimensions(
+        json.loads(swarming_grpc(method, {}))['botsDimensions']
     )
-    return _simplify_bot_dimensions(bots_dimensions)
 
 
 def swarming_bot_info(bot_id, verbose_log=True):
-    method = f'bot/{bot_id}/get'
-    bot = swarming_query(method, limit=1, verbose_log=verbose_log)
+    del verbose_log
+    method = 'swarming.v2.Bots.GetBot'
+    content = {'bot_id': bot_id}
+    bot = json.loads(swarming_grpc(method, content))
     bot['dimensions'] = _simplify_bot_dimensions(bot['dimensions'])
     return bot
 
@@ -295,23 +330,22 @@ def swarming_bots_list(
     Returns:
       list of bots dict
     """
-    method = 'bots/list'
-    query = [('dimensions', d) for d in dimensions]
-    if is_dead is not None:
-        query.append(('is_dead', 'TRUE' if is_dead else 'FALSE'))
-    if quarantined is not None:
-        query.append(('quarantined', 'TRUE' if quarantined else 'FALSE'))
-    if is_busy is not None:
-        query.append(('is_busy', 'TRUE' if is_busy else 'FALSE'))
+    del verbose_log
+    dimensions = [dict(zip(['key', 'value'], d.split(':'))) for d in dimensions]
+    if not limit:
+        limit = SWARMING_PRPC_DEFAULT_LIMIT
+    method = 'swarming.v2.Bots.ListBots'
+    content = {'dimensions': dimensions, 'limit': limit}
 
-    if query:
-        # doseq=True because dimensions could be multiple.
-        method += '?' + urllib.parse.urlencode(query, doseq=True)
+    if is_dead is not None:
+        content['is_dead'] = is_dead
+    if quarantined is not None:
+        content['quarantined'] = quarantined
+    if is_busy is not None:
+        content['is_busy'] = is_busy
 
     bots = []
-    for bot in swarming_query(method, limit=limit, verbose_log=verbose_log).get(
-        'items', []
-    ):
+    for bot in json.loads(swarming_grpc(method, content)).get('items', []):
         bot['dimensions'] = _simplify_bot_dimensions(bot['dimensions'])
         bots.append(bot)
     return bots
@@ -375,10 +409,10 @@ def swarming_dut_satlab_ip(dut: str) -> str:
         return satlab_ip
 
     logger.debug(
-        'drone_server dimension in swarming is not valid. This satlab does not have latest update. Trying with external_ip dimension.'
+        'drone_server dimension in swarming is not valid. This satlab does not have latest update. Trying with externalIp dimension.'
     )
 
-    satlab_ip = bots[0]['external_ip']
+    satlab_ip = bots[0]['externalIp']
     wrong_satlab_ip_prefix = '104'
     if satlab_ip.startswith(wrong_satlab_ip_prefix):
         raise errors.ExternalError(
@@ -399,8 +433,15 @@ def swarming_bot_tasks(bot_id, limit=None):
       list of task dict
     """
     assert bot_id
-    method = 'bot/%s/tasks' % bot_id
-    return swarming_query(method, limit=limit).get('items', [])
+    if not limit:
+        limit = SWARMING_PRPC_DEFAULT_LIMIT
+    method = 'swarming.v2.Bots.ListBotTasks'
+    content = {
+        'bot_id': bot_id,
+        'state': SWARMING_PRPC_QUERY_ALL,
+        'limit': limit,
+    }
+    return json.loads(swarming_grpc(method, content))['items']
 
 
 def swarming_task_request(task_id, verbose_log=True):
@@ -413,9 +454,11 @@ def swarming_task_request(task_id, verbose_log=True):
     Returns:
       task request dict
     """
+    del verbose_log
     assert task_id
-    method = 'task/%s/request' % task_id
-    return swarming_query(method, verbose_log=verbose_log)
+    method = 'swarming.v2.Tasks.GetRequest'
+    content = {'task_id': task_id}
+    return json.loads(swarming_grpc(method, content))
 
 
 def swarming_task_result(task_id, verbose_log=True):
@@ -428,9 +471,11 @@ def swarming_task_result(task_id, verbose_log=True):
     Returns:
       task result dict
     """
+    del verbose_log
     assert task_id
-    method = 'task/%s/result' % task_id
-    return swarming_query(method, verbose_log=verbose_log)
+    method = 'swarming.v2.Tasks.GetResult'
+    content = {'task_id': task_id}
+    return json.loads(swarming_grpc(method, content))
 
 
 def is_skylab_dut(dut_name):
@@ -445,17 +490,17 @@ def is_skylab_dut(dut_name):
     return bool(bots)
 
 
-def is_dut_leased_by_me(status):
-    if not status['is_leased']:
+def is_dut_leased_by_me(status: LeaseStatus):
+    if not status.is_leased:
         logger.debug(
             '%s current task: %s, is not leased',
-            status['dut_name'],
-            status['task_name'],
+            status.dut_name,
+            status.task_name,
         )
         return False
 
-    if not status['is_leased_by_me']:
-        logger.debug('%s is not leased by me', status['dut_name'])
+    if not status.is_leased_by_me:
+        logger.debug('%s is not leased by me', status.dut_name)
         return False
 
     return True
@@ -615,7 +660,7 @@ class AsyncDutLeaser:
                     break
             else:
                 raise errors.DutLeaseException(
-                    'lease verification failed: %s' % status
+                    'lease verification failed: %s' % dataclasses.asdict(status)
                 )
 
             # (b/290040570)
@@ -736,7 +781,7 @@ def crosfleet_lease_dut(dut_name, reason, duration=None, timeout=None):
                 break
         else:
             raise errors.DutLeaseException(
-                'lease verification failed: %s' % status
+                'lease verification failed: %s' % dataclasses.asdict(status)
             )
 
         orphan_task = False
@@ -794,10 +839,10 @@ def parse_timestamp_from_swarming(timestamp):
     Returns:
       unix timestamp (seconds since unix epoch time)
     """
-    return calendar.timegm(time.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f'))
+    return calendar.timegm(time.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ'))
 
 
-def query_lease_status(dut_name, verbose_log=True):
+def query_lease_status(dut_name, verbose_log=True) -> LeaseStatus:
     """Query DUT lease status.
 
     Args:
@@ -805,35 +850,24 @@ def query_lease_status(dut_name, verbose_log=True):
       verbose_log: log more if True
 
     Returns:
-      a dict indicates the detailed lease status:
-        bot_id: the bot id of given `dut_name`
-        task_name: current task name or None
-        task_id: current task id or None
-        is_leased: whether the DUT is leased now (bool). If false, following
-            fields are not available.
-        leased_by: user id
-        is_leased_by_me: whether is leased by current account
-        duration: lease duration in seconds
-        start_time: lease start timestamp
+      The lease status of DUT.
     """
-    status = {'dut_name': dut_name}
+    status = LeaseStatus(dut_name=dut_name)
 
     bots = swarming_bots_list(['dut_name:' + dut_name], verbose_log=False)
     if not bots:
         raise errors.DutLeaseException('dut_name:%s not found' % dut_name)
     assert len(bots) == 1
     bot = bots[0]
-    status['bot_id'] = bot['bot_id']
-    status['task_name'] = bot.get('task_name')
-    status['task_id'] = (
-        bot.get('task_id') or None
-    )  # convert empty string to None
-    status['is_leased'] = (
-        status['task_name'] == 'lease task'
-        or status['task_name']
-        and 'dut_leaser' in status['task_name']
+    status.bot_id = bot['botId']
+    status.task_name = bot.get('taskName')
+    status.task_id = bot.get('taskId') or None  # convert empty string to None
+    status.is_leased = (
+        status.task_name == 'lease task'
+        or status.task_name
+        and 'dut_leaser' in status.task_name
     )
-    if not status['is_leased']:
+    if not status.is_leased:
         return status
 
     service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
@@ -845,13 +879,14 @@ def query_lease_status(dut_name, verbose_log=True):
         user = os.environ['USER']
     assert user
 
-    request = swarming_task_request(status['task_id'], verbose_log=verbose_log)
-    status['leased_by'] = request['authenticated']
-    status['is_leased_by_me'] = bool(status['leased_by'])
-    status['duration'] = int(request['properties']['execution_timeout_secs'])
+    request = swarming_task_request(status.task_id, verbose_log=verbose_log)
+    status.leased_by = request['authenticated']
+    # format change, ignore the detail information (b/179461101)
+    status.is_leased_by_me = bool(status.leased_by)
+    status.duration = int(request['properties']['executionTimeoutSecs'])
 
-    result = swarming_task_result(status['task_id'], verbose_log=verbose_log)
-    status['start_time'] = parse_timestamp_from_swarming(result['started_ts'])
+    result = swarming_task_result(status.task_id, verbose_log=verbose_log)
+    status.start_time = parse_timestamp_from_swarming(result['startedTs'])
     return status
 
 
@@ -880,13 +915,11 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
         previous_status = {}
         while True:
             lease_status = query_lease_status(dut_name, verbose_log=False)
-            if not (
-                lease_status['is_leased'] and lease_status['is_leased_by_me']
-            ):
-                if previous_status and previous_status.get('task_id'):
+            if not (lease_status.is_leased and lease_status.is_leased_by_me):
+                if previous_status and previous_status.task_id:
                     task_url = (
                         'https://chromeos-swarming.appspot.com/task?id=%s'
-                        % previous_status['task_id']
+                        % previous_status.task_id
                     )
                     raise errors.DutLeaseException(
                         'the DUT was leased by me %s , but now is not unexpectedly: %s'
@@ -898,7 +931,7 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
                 )
             previous_status = lease_status
 
-            expire_time = lease_status['start_time'] + lease_status['duration']
+            expire_time = lease_status.start_time + lease_status.duration
             # We need buffer time (like querying lease status, network latency, etc.)
             # before actual lease request, 100 must be enough.
             to_lease_again = expire_time - 100
@@ -925,11 +958,11 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
                 )
 
             # leased, but need to verify in case of race condition
-            tasks = swarming_bot_tasks(lease_status['bot_id'], limit=5)
+            tasks = swarming_bot_tasks(lease_status.bot_id, limit=5)
             assert len(tasks) >= 2
-            assert tasks[0]['task_id'] == this_lease['task_id']
+            assert tasks[0]['taskId'] == this_lease['taskId']
             for i, task in enumerate(tasks[1:], 1):
-                if task['task_id'] == lease_status['task_id']:
+                if task['taskId'] == lease_status.task_id:
                     if i > 1:
                         logger.error('detected race condition')
                         logger.error('cancel our recent lease task')

@@ -417,7 +417,7 @@ class DutManager:
             raise errors.ExternalError(
                 'Expect 1 DUT with name %s but %s returned' % (host, len(bots))
             )
-        bot_id = bots[0]['bot_id']
+        bot_id = bots[0]['botId']
 
         # Query DUT labels by bot id.
         bot_info = cros_lab_util.swarming_bot_info(bot_id)

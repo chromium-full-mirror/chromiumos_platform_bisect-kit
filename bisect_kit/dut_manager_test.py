@@ -702,7 +702,7 @@ class TestConfigUpdated(unittest.TestCase):
 
     def testFunctionalBisect(self):
         self.mock_swarming_bot_list.return_value = [
-            {'bot_id': 'bot_id_1'},
+            {'botId': 'bot_id_1'},
         ]
         self.mock_swarming_bot_info.return_value = {
             'dimensions': {
@@ -753,7 +753,7 @@ class TestConfigUpdated(unittest.TestCase):
 
     def testPerfBisect(self):
         self.mock_swarming_bot_list.return_value = [
-            {'bot_id': 'bot_id_1'},
+            {'botId': 'bot_id_1'},
         ]
         self.mock_swarming_bot_info.return_value = {
             'dimensions': {
