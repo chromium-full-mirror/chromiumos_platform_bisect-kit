@@ -142,7 +142,7 @@ def _execute_git_step_command(
     return core.StepResult('new')
 
 
-def _execute_bisectkit_step_command(args, env=None) -> core.StepResult:
+def execute_bisectkit_step_command(args, env=None) -> core.StepResult:
     """Helper of do_evaluate() and do_switch().
 
     For commands executed in this mode, the last line of stdout should be dump of
@@ -216,7 +216,7 @@ def do_evaluate(
             exec_opts.command, env=env, capture_values=capture_values
         )
     else:
-        result = _execute_bisectkit_step_command(exec_opts.command, env=env)
+        result = execute_bisectkit_step_command(exec_opts.command, env=env)
     if log_file and os.path.exists(log_file):
         with open(log_file, 'a') as f:
             f.write(END_OF_LOG_FILE_MARKER)
@@ -334,7 +334,7 @@ def do_switch(switch_cmd, domain, rev, log_file) -> core.StepResult | None:
     if exec_opts.mode == 'git':
         result = _execute_git_step_command(exec_opts.command, env=env)
     else:
-        result = _execute_bisectkit_step_command(exec_opts.command, env=env)
+        result = execute_bisectkit_step_command(exec_opts.command, env=env)
 
     if log_file and os.path.exists(log_file):
         with open(log_file, 'a') as f:
@@ -378,7 +378,7 @@ def do_future_build(
     if exec_opts.mode != 'bisectkit':
         raise errors.InternalError('Unsupported mode %s' % exec_opts.mode)
 
-    result = _execute_bisectkit_step_command(exec_opts.command, env=env)
+    result = execute_bisectkit_step_command(exec_opts.command, env=env)
     if log_file and os.path.exists(log_file):
         with open(log_file, 'a') as f:
             f.write(END_OF_LOG_FILE_MARKER)
@@ -1239,15 +1239,15 @@ class BisectorCommandLine:
                 self.save_progress_with_sample(sample)
 
                 if sample['status'] == 'fatal':
-                    if 'reason' in sample:
-                        reason_text = ': %s' % sample['reason']
-                    else:
-                        reason_text = ''
                     e = errors.reconstruct_from_string(
                         sample.get('exception'), sample.get('reason')
                     )
                     if e:
                         raise e
+                    if 'reason' in sample:
+                        reason_text = ': %s' % sample['reason']
+                    else:
+                        reason_text = ''
                     raise errors.ExecutionFatalError(
                         '%s failed' % step + reason_text
                     )

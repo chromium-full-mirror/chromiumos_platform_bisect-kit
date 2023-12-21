@@ -15,6 +15,7 @@ import os
 import sys
 
 from bisect_kit import android_util
+from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import core
@@ -31,6 +32,24 @@ import experiment
 
 
 logger = logging.getLogger(__name__)
+
+
+def run_switch_or_eval_cmd(cmd):
+    """Runs a single switch or eval step and handles exceptions."""
+
+    result = bisector_cli.execute_bisectkit_step_command(cmd).data
+    if result['status'] in ['skip', 'fatal']:
+        # reconstruct_from_string() return None if the exception is not
+        # a custom error defined in our own errors module.
+        e = errors.reconstruct_from_string(
+            result.get('exception'), result.get('reason')
+        )
+        if e:
+            raise e
+        raise errors.ExecutionFatalError(
+            'failed to run %s (%s): %s'
+            % (cmd[0], result.get('exception'), result.get('reason'))
+        )
 
 
 class CrosDiagnoser:
@@ -116,7 +135,7 @@ class CrosDiagnoser:
             """
             if is_autotest and should_build_chrome_localbuild_with_tests:
                 logger.info('init autotest deps for %s', dut)
-                util.call(*chrome_localbuild_eval_cmd, dut)
+                run_switch_or_eval_cmd(chrome_localbuild_eval_cmd + [dut])
             else:
                 logger.info('no need to init autotest deps')
 
@@ -172,23 +191,32 @@ class CrosDiagnoser:
             )
 
             # Switches CrOS repository and DUT to narrowed down old version.
-            util.check_call(
-                './switch_cros_localbuild.py',
-                '--rich-result',
-                '--chromeos-root',
-                self.config['chromeos_root'],
-                '--chromeos-mirror',
-                self.config['chromeos_mirror'],
-                '--board',
-                self.config['board'],
-                '--sync-code-only',
-                self.cros_old,
-                '--session',
-                self.config['session'],
+            run_switch_or_eval_cmd(
+                [
+                    './switch_cros_localbuild.py',
+                    '--rich-result',
+                    '--chromeos-root',
+                    self.config['chromeos_root'],
+                    '--chromeos-mirror',
+                    self.config['chromeos_mirror'],
+                    '--board',
+                    self.config['board'],
+                    '--sync-code-only',
+                    self.cros_old,
+                    '--session',
+                    self.config['session'],
+                ]
             )
             if switch_test_harness_cmd:
-                util.check_call(
-                    *(switch_test_harness_cmd + [self.cros_old, '--dut', dut])
+                run_switch_or_eval_cmd(
+                    switch_test_harness_cmd
+                    + [
+                        self.cros_old,
+                        '--session',
+                        self.config['session'],
+                        '--dut',
+                        dut,
+                    ]
                 )
             init_dut_to_old_cros(dut)
             dut_os_version = cros_util.query_dut_short_version(dut)
@@ -492,7 +520,7 @@ class CrosDiagnoser:
             cmd.append('--disable-rootfs-verification')
         else:
             cmd.append('--no-disable-rootfs-verification')
-        util.check_call(*cmd)
+        run_switch_or_eval_cmd(cmd)
 
     def _need_android_bisect(
         self, old_info: cros_util.VersionInfo, new_info: cros_util.VersionInfo
