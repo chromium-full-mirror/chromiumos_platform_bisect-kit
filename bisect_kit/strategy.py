@@ -387,7 +387,11 @@ class NoisyBinarySearch:
         return self._state
 
     def _init_for_state_started(self):
-        """build internal states when self._state reached STARTED."""
+        """build internal states when self._state reached STARTED.
+
+        Raises:
+          errors.WrongAssumption: failed to calculate self.prob.
+        """
         assert self._state == self.STARTED
         if self.is_value_bisection() and self.recompute_init_values:
             if self.old_avg is None:
@@ -397,40 +401,6 @@ class NoisyBinarySearch:
             if self.new_avg is None:
                 self.new_avg = math_util.average(
                     self.rev_info[self.new_idx].averages()
-                )
-            score = trend_score(
-                self.old_value, self.new_value, self.old_avg, self.new_avg
-            )
-            if score <= 0:
-                raise errors.WrongAssumption(
-                    'unable to reproduce the same trend (%f->%f): %f->%f'
-                    % (
-                        self.old_value,
-                        self.new_value,
-                        self.old_avg,
-                        self.new_avg,
-                    )
-                )
-            # Reject if we cannot reproduce the trend even half way.
-            # TODO(kcwu): make this threshold configurable.
-            if score < 0.5:
-                expect_delta = abs(self.new_value - self.old_value)
-                actual_delta = abs(self.new_avg - self.old_avg)
-                if self.old_value == 0 or self.old_avg == 0:
-                    raise errors.WrongAssumption(
-                        'unable to reproduce the value gap: '
-                        'expect delta=%f; actual delta=%f'
-                        % (expect_delta, actual_delta)
-                    )
-                raise errors.WrongAssumption(
-                    'unable to reproduce the value gap: '
-                    'expect delta=%f (%f%%); actual delta=%f (%f%%)'
-                    % (
-                        expect_delta,
-                        abs(expect_delta / self.old_value) * 100,
-                        actual_delta,
-                        abs(actual_delta / self.old_avg) * 100,
-                    )
                 )
             if self.threshold is None:
                 self.threshold = (self.old_avg + self.new_avg) / 2
@@ -780,6 +750,9 @@ class NoisyBinarySearch:
 
         Returns:
           prob, where prob[i] = P(x_i is first new | results)
+
+        Raises:
+          errors.WrongAssumption if failed to calculate prob.
         """
         assert 0 <= old_p < new_p
 
@@ -852,8 +825,7 @@ class NoisyBinarySearch:
         """Rebuilds probability.
 
         Raises:
-          errors.VerificationFailed: Bisection range is not verified and false
-              events occur too many times.
+          errors.WrongAssumption: failed to calculate self.prob.
         """
         assert 0 <= self.old_idx < self.new_idx < len(self.rev_info)
         # First, P(x_i is first new) = Normalize(init_prob[i])
@@ -906,6 +878,9 @@ class NoisyBinarySearch:
         Args:
           idx: index of the new test.
           result: result of the new test. 'old', 'new', or 'skip'.
+
+        Raises:
+          errors.WrongAssumption: failed to calculate self.prob.
         """
         assert self.prob
         assert self.rev_info
@@ -1017,15 +992,6 @@ class NoisyBinarySearch:
         assert right <= self.new_idx
         return left, right
 
-    def is_range_verified(self):
-        """Is bisection range already been verified?"""
-        if self.endpoint_verification and not self.is_value_bisection():
-            return self.init_range_verified
-        return (
-            self.rev_info[self.old_idx]['old'] > 0
-            and self.rev_info[self.new_idx]['new'] > 0
-        )
-
     def check_verification_range(self):
         """Checks if bisection range is reasonable.
 
@@ -1071,31 +1037,15 @@ class NoisyBinarySearch:
     def check_reproduced(self):
         """Checks if the bisection is reproduced.
 
-        Returns true if:
-          1. Both old and new versions are tested, has 'old' or 'new' results.
-          2. It's not unreproduced, passes check_verification_range().
+        The bsearch contains two phases "INITED" and "STARTED".
+        In "INITED" state, the "old" and "new" revisions are checked to see if
+        the regression is reproducible. After verified, it enters "STARTED"
+        phase.
 
         Returns:
           True if the regression is reproduced.
         """
-        if self.endpoint_verification and not self.is_value_bisection():
-            if not self.init_range_verified:
-                return False
-        else:
-            old_count = self.rev_info[self.old_idx]['old']
-            new_count = self.rev_info[self.new_idx]['new']
-            if old_count == 0 or new_count == 0:
-                return False
-
-        try:
-            self.check_verification_range()
-        except (
-            errors.VerifyOldBehaviorFailed,
-            errors.VerifyNewBehaviorFailed,
-            errors.WrongAssumption,
-        ):
-            return False
-        return True
+        return self.state == self.STARTED
 
     def check_proceed_with_skip(self, idx, reason):
         """Checks if we should proceed after skips.
@@ -1403,6 +1353,52 @@ class NoisyBinarySearch:
             # Spend 5 minutes for one side sounds reasonable.
             return info.eval_time > 300
 
+        def check_trend_score(old_avg, new_avg):
+            """Checks whether the recomputed values exhibit the expected trend.
+
+            Args:
+              old_avg: average of the recomputed values at the "old" revision.
+              new_avg: average of the recomputed values at the "new" revision.
+
+            Raises:
+              errors.WrongAssumption if the recomputed values are unlikely to
+              match the trend given by old_value and new_value.
+            """
+            score = trend_score(
+                self.old_value, self.new_value, old_avg, new_avg
+            )
+            if score <= 0:
+                raise errors.WrongAssumption(
+                    'unable to reproduce the same trend (%f->%f): %f->%f'
+                    % (
+                        self.old_value,
+                        self.new_value,
+                        old_avg,
+                        new_avg,
+                    )
+                )
+            # Reject if we cannot reproduce the trend even half way.
+            # TODO(kcwu): make this threshold configurable.
+            if score < 0.5:
+                expect_delta = abs(self.new_value - self.old_value)
+                actual_delta = abs(new_avg - old_avg)
+                if self.old_value == 0 or old_avg == 0:
+                    raise errors.WrongAssumption(
+                        'unable to reproduce the value gap: '
+                        'expect delta=%f; actual delta=%f'
+                        % (expect_delta, actual_delta)
+                    )
+                raise errors.WrongAssumption(
+                    'unable to reproduce the value gap: '
+                    'expect delta=%f (%f%%); actual delta=%f (%f%%)'
+                    % (
+                        expect_delta,
+                        abs(expect_delta / self.old_value) * 100,
+                        actual_delta,
+                        abs(actual_delta / old_avg) * 100,
+                    )
+                )
+
         if not is_one_side_enough(self.rev_info[self.new_idx]):
             logger.debug('%s not enough', self.rev_info[self.new_idx].rev)
             return self.new_idx
@@ -1430,6 +1426,7 @@ class NoisyBinarySearch:
                 trend_score(self.old_value, self.new_value, old_min, new_max)
                 < 0.5
             ):
+                check_trend_score(old_avg, new_avg)
                 return None
         else:
             new_min = min(self.rev_info[self.new_idx].averages())
@@ -1438,6 +1435,7 @@ class NoisyBinarySearch:
                 trend_score(self.old_value, self.new_value, old_max, new_min)
                 < 0.5
             ):
+                check_trend_score(old_avg, new_avg)
                 return None
 
         # If not obviously distinguishable, spend half hour to collect initial
@@ -1446,6 +1444,7 @@ class NoisyBinarySearch:
             return self.old_idx
         if self.rev_info[self.new_idx].eval_time < 1800:
             return self.new_idx
+        check_trend_score(old_avg, new_avg)
         return None
 
     def get_prob(self):

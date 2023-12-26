@@ -755,5 +755,331 @@ class TestNoisyBinarySearch(unittest.TestCase):
         self.assertEqual(observation[1], (10, 11))
 
 
+class TestStates(unittest.TestCase):
+    """Test internal states are saved and loaded correctly.
+
+    - On sucess
+      - the bsearch runs successfully.
+      - check_reproduced() returns True.
+      - get_range() returns correct result before saved and after loaded.
+
+    - On Failure in initialization phase.
+        - the bsearch raises some exception.
+        - check_reproduced() returns False.
+        - get_range() returns correct resutl before saved and after loaded
+          without raising exceptions.
+    """
+
+    def test_noise_search_done(self):
+        """Tests noisy binary search with flaky on two sides."""
+        rev_info = [core.RevInfo(str(i)) for i in range(1000)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            confidence=0.999,
+            oracle=(0.05, 0.7),
+            verify_confidence=1.0,
+            endpoint_verification=True,
+        )
+        random_seed = 0
+        rng = random.Random(random_seed)
+        while not bsearch.is_done():
+            idx = bsearch.next_idx()
+            if rng.random() < (0.05 if idx < 42 else 0.7):
+                result = 'new'
+            else:
+                result = 'old'
+            bsearch.add_sample(idx, result)
+        self.assertEqual(bsearch.get_range(), (41, 42))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            confidence=0.999,
+            oracle=(0.05, 0.7),
+            verify_confidence=1.0,
+            endpoint_verification=True,
+            saved_states=states,
+        )
+        self.assertEqual(saved_bsearch.get_range(), (41, 42))
+
+    def test_noise_search_always_old_behavior(self):
+        """Tests noisy binary search where the test always returns old behavior."""
+        rev_info = [core.RevInfo(str(i)) for i in range(1000)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            confidence=0.999,
+            oracle=(0.05, 0.7),
+            verify_confidence=1.0,
+            endpoint_verification=True,
+        )
+        with self.assertRaises(errors.VerifyInitialRangeFailed):
+            while not bsearch.is_done():
+                idx = bsearch.next_idx()
+                bsearch.add_sample(idx, 'old')
+        self.assertFalse(bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(bsearch.get_range(), (0, 999))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            confidence=0.999,
+            oracle=(0.05, 0.7),
+            verify_confidence=1.0,
+            endpoint_verification=True,
+            saved_states=states,
+        )
+        self.assertFalse(saved_bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(saved_bsearch.get_range(), (0, 999))
+
+    def test_noise_search_always_new_behavior(self):
+        """Tests noisy binary search where the test always returns new behavior."""
+        rev_info = [core.RevInfo(str(i)) for i in range(1000)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            confidence=0.999,
+            oracle=(0.05, 0.7),
+            verify_confidence=1.0,
+            endpoint_verification=True,
+        )
+        with self.assertRaises(errors.VerifyInitialRangeFailed):
+            while not bsearch.is_done():
+                idx = bsearch.next_idx()
+                bsearch.add_sample(idx, 'new')
+        self.assertFalse(bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(bsearch.get_range(), (0, 999))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            confidence=0.999,
+            oracle=(0.05, 0.7),
+            verify_confidence=1.0,
+            endpoint_verification=True,
+            saved_states=states,
+        )
+        self.assertFalse(saved_bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(saved_bsearch.get_range(), (0, 999))
+
+    def test_value_bisect_done(self):
+        rev_info = [core.RevInfo(str(i)) for i in range(100)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+        )
+        # verify the range
+        bsearch.add_sample(99, 'new', values=[20.0], eval_time=1000)
+        bsearch.add_sample(0, 'old', values=[11.0], eval_time=1000)
+
+        self.assertTrue(bsearch.check_reproduced())
+        self.assertEqual(bsearch.get_range(), (0, 99))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+            saved_states=states,
+        )
+
+        self.assertTrue(saved_bsearch.check_reproduced())
+        self.assertEqual(saved_bsearch.get_range(), (0, 99))
+
+    def test_value_bisect_always_old_behavior(self):
+        rev_info = [core.RevInfo(str(i)) for i in range(100)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+        )
+        with self.assertRaises(errors.VerifyNewBehaviorFailed):
+            while not bsearch.is_done():
+                idx = bsearch.next_idx()
+                bsearch.add_sample(idx, 'old', values=[10.0])
+        self.assertFalse(bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(bsearch.get_range(), (0, 99))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+            saved_states=states,
+        )
+
+        self.assertFalse(saved_bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(saved_bsearch.get_range(), (0, 99))
+
+    def test_value_bisect_always_new_behavior(self):
+        rev_info = [core.RevInfo(str(i)) for i in range(100)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+        )
+        with self.assertRaises(errors.VerifyOldBehaviorFailed):
+            while not bsearch.is_done():
+                idx = bsearch.next_idx()
+                bsearch.add_sample(idx, 'new', values=[20.0])
+        self.assertFalse(bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(bsearch.get_range(), (0, 99))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+            saved_states=states,
+        )
+
+        self.assertFalse(saved_bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(saved_bsearch.get_range(), (0, 99))
+
+    def test_recompute_init_values_done(self):
+        rev_info = [core.RevInfo(str(i)) for i in range(100)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            recompute_init_values=True,
+            endpoint_verification=False,
+        )
+        # same value, twice is enough
+        bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
+        bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
+
+        # different value, at least 3 times
+        bsearch.add_sample(0, 'value', values=[10.0], eval_time=1000)
+        bsearch.add_sample(0, 'value', values=[11.0], eval_time=1000)
+        bsearch.add_sample(0, 'value', values=[12.0], eval_time=1000)
+
+        self.assertTrue(bsearch.check_reproduced())
+        self.assertEqual(bsearch.get_range(), (0, 99))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+            saved_states=states,
+        )
+
+        self.assertTrue(saved_bsearch.check_reproduced())
+        self.assertEqual(saved_bsearch.get_range(), (0, 99))
+
+    def test_recompute_init_values_always_old_behavior(self):
+        rev_info = [core.RevInfo(str(i)) for i in range(100)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            recompute_init_values=True,
+            endpoint_verification=False,
+        )
+
+        # same value, twice is enough
+        bsearch.add_sample(0, 'value', values=[10.0], eval_time=1000)
+        bsearch.add_sample(0, 'value', values=[10.0], eval_time=1000)
+
+        # different value, at least 3 times
+        bsearch.add_sample(99, 'value', values=[11.0], eval_time=1000)
+        bsearch.add_sample(99, 'value', values=[12.0], eval_time=1000)
+        with self.assertRaises(errors.WrongAssumption):
+            bsearch.add_sample(99, 'value', values=[9.0], eval_time=1000)
+
+        self.assertFalse(bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(bsearch.get_range(), (0, 99))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+            saved_states=states,
+        )
+
+        self.assertFalse(saved_bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(saved_bsearch.get_range(), (0, 99))
+
+    def test_recompute_init_values_always_new_behavior(self):
+        rev_info = [core.RevInfo(str(i)) for i in range(100)]
+        bsearch = strategy.NoisyBinarySearch(
+            rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            recompute_init_values=True,
+            endpoint_verification=False,
+        )
+
+        # same value, twice is enough
+        bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
+        bsearch.add_sample(99, 'value', values=[20.0], eval_time=1000)
+
+        # different value, at least 3 times
+        bsearch.add_sample(0, 'value', values=[19.0], eval_time=1000)
+        bsearch.add_sample(0, 'value', values=[18.0], eval_time=1000)
+        with self.assertRaises(errors.WrongAssumption):
+            bsearch.add_sample(0, 'value', values=[21.0], eval_time=1000)
+
+        self.assertFalse(bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(bsearch.get_range(), (0, 99))
+
+        states = bsearch.export_states()
+        saved_bsearch = strategy.NoisyBinarySearch(
+            bsearch.rev_info,
+            0,
+            99,
+            old_value=10.0,
+            new_value=20.0,
+            endpoint_verification=False,
+            saved_states=states,
+        )
+
+        self.assertFalse(saved_bsearch.check_reproduced())
+        # Make sure get_range() doesn't raise.
+        self.assertEqual(saved_bsearch.get_range(), (0, 99))
+
+
 if __name__ == '__main__':
     unittest.main()

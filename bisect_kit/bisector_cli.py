@@ -1477,7 +1477,7 @@ class BisectorCommandLine:
             inited=True,
             old=self.states.idx2rev(left),
             new=self.states.idx2rev(right),
-            verified=self.strategy.is_range_verified(),
+            verified=self.strategy.check_reproduced(),
             estimated_noise=estimated_noise,
             done=self.strategy.is_done(),
         )
