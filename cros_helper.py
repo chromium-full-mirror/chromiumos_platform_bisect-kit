@@ -127,7 +127,7 @@ def cmd_allocate_dut(opts):
 
 
 def cmd_repair_dut(opts):
-    cros_lab_util.repair(opts.dut)
+    cros_lab_util.repair(opts.dut, opts.chromeos_root)
 
 
 def add_allocate_dut_arguments(

@@ -88,7 +88,7 @@ def switch_main(args: tuple[str] | None):
         cros_lab_util.write_satlab_ssh_config(opts.dut)
     if not cros_util.is_good_dut(opts.dut):
         logger.fatal('%r is not a good DUT', opts.dut)
-        if not cros_lab_util.repair(opts.dut):
+        if not cros_lab_util.repair(opts.dut, opts.chromeos_root):
             raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
 
     lacros_util.fetch_and_deploy_lacros_prebuilt_to_dut(

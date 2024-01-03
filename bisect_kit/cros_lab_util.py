@@ -1043,14 +1043,15 @@ def reboot_via_servo(dut):
     return True
 
 
-def repair(dut):
-    """Requests lab automatic DUT repairing.
+def repair(dut: str, chromeos_root: str = ''):
+    """Try to fix a DUT with different repair mechanisms.
 
     Note, repairing is unavailable to some DUTs due to infra or some other
     reasons.
 
     Args:
       dut: dut address
+      chromeos_root: ChromeOS root
 
     Returns:
       True if repaired. False if failed or unable to repair.
@@ -1058,6 +1059,20 @@ def repair(dut):
     if not is_lab_dut(dut):
         logger.warning('%s is not DUT in lab; skip repair', dut)
         return False
+
+    logger.debug('Reset using servo for repair')
+    reboot_via_servo(dut)
+    if cros_util.is_good_dut(dut):
+        return True
+
+    if chromeos_root == '':
+        chromeos_root = common.get_default_chromeos_root()
+
+    logger.debug('Reflashing the DUT with existing ChromeOS image for repair')
+    reflash_dut(dut, chromeos_root)
+    if cros_util.is_good_dut(dut):
+        return True
+
     # TODO(kcwu): support 'skylab repair'
     logger.warning('skylab repair is not implemented yet')
     return False
@@ -1117,6 +1132,47 @@ def is_rootfs_verification_on(dut: str) -> bool:
     return False
 
 
+def reflash_dut(
+    dut: str, chromeos_root: str, disable_rootfs_verification: bool = False
+) -> bool:
+    """Reflashes the DUT with existing chromeos Image
+
+    Args:
+        dut: dut host name
+        chromeos_root: ChromeOS root
+        disable_rootfs_verification: flag to specify if root verfication needs to be disabled
+
+    Retruns:
+        True if the reflash is successful, False otherwise
+    """
+    logger.info('Trying to reflash the DUT with existing image')
+    try:
+        cros_short_version = cros_util.query_dut_short_version(dut)
+        dut_board = cros_util.query_dut_board(dut)
+        cros_full_version = cros_util.version_to_full(
+            dut_board, cros_short_version
+        )
+        image_info = cros_util.search_image(dut_board, cros_short_version)
+    except (subprocess.CalledProcessError, errors.SshConnectionError):
+        logger.exception('Failed to get DUT information')
+        return False
+
+    try:
+        cros_util.provision_image(
+            chromeos_root,
+            dut,
+            dut_board,
+            image_info,
+            cros_full_version,
+            disable_rootfs_verification=disable_rootfs_verification,
+        )
+    except errors.ExternalError:
+        logger.exception('Reflash DUT with existing image failed')
+        return False
+
+    return True
+
+
 def enable_rootfs_verification(dut: str, chromeos_root: str) -> bool:
     """Enable rootfs verification on a DUT
 
@@ -1129,39 +1185,19 @@ def enable_rootfs_verification(dut: str, chromeos_root: str) -> bool:
     """
     try:
         if is_rootfs_verification_on(dut):
-            logger.debug("Rootfs verification is already on")
+            logger.debug('Rootfs verification is already on')
             return True
     except (subprocess.CalledProcessError, errors.SshConnectionError):
-        logger.debug("Failed to get rootfs verification info from DUT")
+        logger.debug('Failed to get rootfs verification info from DUT')
 
     start_time = timeit.default_timer()
-    logger.debug("Trying to enable rootfs verification on the DUT")
-    try:
-        cros_short_version = cros_util.query_dut_short_version(dut)
-        dut_board = cros_util.query_dut_board(dut)
-        cros_full_version = cros_util.version_to_full(
-            dut_board, cros_short_version
-        )
-        image_info = cros_util.search_image(dut_board, cros_short_version)
-    except (subprocess.CalledProcessError, errors.SshConnectionError):
-        logger.exception("Failed to get DUT information")
-        return False
-
-    try:
-        cros_util.provision_image(
-            chromeos_root,
-            dut,
-            dut_board,
-            image_info,
-            cros_full_version,
-            disable_rootfs_verification=False,
-        )
-    except errors.ExternalError:
-        logger.exception("Enable rootfs verification failed")
+    logger.debug('Trying to enable rootfs verification on the DUT')
+    if not reflash_dut(dut, chromeos_root):
+        logger.exception('Enable rootfs verification failed')
         return False
     end_time = timeit.default_timer()
     time_elapsed_in_minutes = (end_time - start_time) / 60
     logger.debug(
-        "Enabled rootfs verifaction on in %.2f minutes", time_elapsed_in_minutes
+        'Enabled rootfs verifaction on in %.2f minutes', time_elapsed_in_minutes
     )
     return True

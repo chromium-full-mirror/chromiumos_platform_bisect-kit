@@ -111,7 +111,7 @@ def inner_main(opts):
 
     if not cros_util.is_good_dut(opts.dut):
         logger.error('%r is not a good DUT', opts.dut)
-        if not cros_lab_util.repair(opts.dut):
+        if not cros_lab_util.repair(opts.dut, opts.default_chromeos_root):
             raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
     if not opts.board:
         opts.board = cros_util.query_dut_board(opts.dut)

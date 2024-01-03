@@ -1565,7 +1565,7 @@ class DiagnoseCommandLineBase:
         if opts.dut != cros_lab_util.LAB_DUT and not cros_util.is_good_dut(
             opts.dut
         ):
-            if not cros_lab_util.repair(opts.dut):
+            if not cros_lab_util.repair(opts.dut, opts.chromeos_root):
                 raise errors.BrokenDutException(
                     '%r is not a good DUT' % opts.dut
                 )
