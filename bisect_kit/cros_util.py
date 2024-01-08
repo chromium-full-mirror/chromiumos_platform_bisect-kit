@@ -46,6 +46,7 @@ from bisect_kit import locking
 from bisect_kit import plugin_util
 from bisect_kit import repo_util
 from bisect_kit import util
+from bisect_kit import vm_leaser
 from google.protobuf import json_format
 
 
@@ -120,6 +121,7 @@ disk_image_bundle_filename = 'chromiumos_test_image.tar.xz'
 test_image_filename = 'chromiumos_test_image.bin'
 test_image_zip_filename = 'image.zip'
 sample_partition_filename = 'full_dev_part_KERN.bin.gz'
+vm_image_filename = 'chromiumos_test_image_gce.tar.gz'
 
 CROSLAND_URL_TEMPLATE = 'https://crosland.corp.google.com/log/%s..%s'
 FORWARDED_DUT_HOST = 'localhost'
@@ -199,6 +201,8 @@ class ImageType(enum.Enum):
     PARTITION_IMAGE = enum.auto()
     # Contains files like image.zip. We need to unzip first.
     ZIP_FILE = enum.auto()
+    # The image file used to bootup gce image.
+    VM_IMAGE = enum.auto()
 
     @classmethod
     def determine(cls, path: str) -> ImageType | None:
@@ -210,6 +214,8 @@ class ImageType(enum.Enum):
             return cls.ZIP_FILE
         if filename in [disk_image_bundle_filename, test_image_filename]:
             return cls.DISK_IMAGE
+        if filename in [vm_image_filename]:
+            return cls.VM_IMAGE
         return None
 
 
@@ -271,6 +277,16 @@ class SnapshotStore:
         Returns:
           A gs path for specific version or None if not exists.
         """
+        is_vm_board = vm_leaser.is_vm_board(board)
+        if is_vm_board:
+            query_files = [
+                vm_image_filename,
+            ]
+        else:
+            query_files = [
+                test_image_zip_filename,
+                sample_partition_filename,
+            ]
         if snapshot_version not in cls.images:
             logger.warning(
                 '%s not found in SnapshotStore, try to fetch from buckets %s',
@@ -279,10 +295,7 @@ class SnapshotStore:
             )
             cls.images[snapshot_version] = ImageInfo()
             for bucket in snapshot_buckets:
-                for filename in [
-                    test_image_zip_filename,
-                    sample_partition_filename,
-                ]:
+                for filename in query_files:
                     path = cls.default_path.format(
                         board=board,
                         bucket=bucket,
@@ -292,7 +305,18 @@ class SnapshotStore:
                     output = gs_util.ls(path, ignore_errors=True)
                     if output:
                         img_type = ImageType.determine(output[0])
-                        cls.images[snapshot_version][img_type] = output[0]
+                        if is_vm_board:
+                            image_path = (
+                                vm_leaser.gs_image_archive_to_gce_image_name(
+                                    output[0]
+                                )
+                            )
+                            if image_path:
+                                cls.images[snapshot_version][
+                                    img_type
+                                ] = image_path
+                        else:
+                            cls.images[snapshot_version][img_type] = output[0]
 
         zip_image = cls.images[snapshot_version].get(ImageType.ZIP_FILE)
         partition_image = cls.images[snapshot_version].get(
@@ -1205,14 +1229,26 @@ def list_prebuilt_from_image_archive(
     """
     assert is_cros_full_version(old) or is_cros_snapshot_version(old)
     assert is_cros_full_version(new) or is_cros_snapshot_version(new)
-    files = _find_files_from_image_archive(
-        board,
-        prebuilt_image_buckets,
-        [
+    if vm_leaser.is_vm_board(board):
+        is_vm = True
+        files_to_find = [vm_image_filename]
+        files_to_find_snapshot = [vm_image_filename]
+    else:
+        is_vm = False
+        files_to_find = [
             disk_image_bundle_filename,
             sample_partition_filename,
             test_image_zip_filename,
-        ],
+        ]
+        files_to_find_snapshot = [
+            test_image_zip_filename,
+            sample_partition_filename,
+        ]
+
+    files = _find_files_from_image_archive(
+        board,
+        prebuilt_image_buckets,
+        files_to_find,
         old,
         new,
     )
@@ -1220,7 +1256,7 @@ def list_prebuilt_from_image_archive(
         files += _find_files_from_image_archive(
             board,
             snapshot_buckets,
-            [test_image_zip_filename, sample_partition_filename],
+            files_to_find_snapshot,
             old,
             new,
         )
@@ -1231,7 +1267,12 @@ def list_prebuilt_from_image_archive(
             result[version] = ImageInfo()
         img_type = ImageType.determine(gs_path)
         assert img_type
-        result[version][img_type] = gs_path
+        if is_vm:
+            image_path = vm_leaser.gs_image_archive_to_gce_image_name(gs_path)
+        else:
+            image_path = gs_path
+        if image_path:
+            result[version][img_type] = image_path
 
     return list(result.items())
 
@@ -1522,18 +1563,28 @@ def search_prebuilt_image(board, version) -> ImageInfo:
     """
     assert is_cros_version(version)
 
+    is_vm_board = vm_leaser.is_vm_board(board)
     image_info = ImageInfo()
     for gs_path in _iter_valid_prebuilt_gs_path(board, version):
-        if gs_util.ls(
-            f'{gs_path}/{disk_image_bundle_filename}', ignore_errors=True
-        ):
-            image_info[
-                ImageType.DISK_IMAGE
-            ] = f'{gs_path}/{disk_image_bundle_filename}'
-        if gs_util.ls(
-            f'{gs_path}/{sample_partition_filename}', ignore_errors=True
-        ):
-            image_info[ImageType.PARTITION_IMAGE] = gs_path
+        if is_vm_board:
+            search_path = f'{gs_path}/{vm_image_filename}'
+            if gs_util.ls(search_path):
+                image_name = vm_leaser.gs_image_archive_to_gce_image_name(
+                    search_path
+                )
+                if image_name:
+                    image_info[ImageType.VM_IMAGE] = image_name
+        else:
+            if gs_util.ls(
+                f'{gs_path}/{disk_image_bundle_filename}', ignore_errors=True
+            ):
+                image_info[
+                    ImageType.DISK_IMAGE
+                ] = f'{gs_path}/{disk_image_bundle_filename}'
+            if gs_util.ls(
+                f'{gs_path}/{sample_partition_filename}', ignore_errors=True
+            ):
+                image_info[ImageType.PARTITION_IMAGE] = gs_path
         if image_info:
             break
     return image_info

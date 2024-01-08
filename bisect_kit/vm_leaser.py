@@ -5,6 +5,7 @@ import dataclasses
 import json
 import os
 import tempfile
+from typing import Optional
 
 from bisect_kit import common
 from bisect_kit import util
@@ -20,6 +21,9 @@ VMLEASER_DEFAULT_DISK_SIZE = 20
 VMLEASER_DEFAULT_REGION = 'us-central1-a'
 VMLEASER_PROD_SERVER = 'vmleaser.api.cr.dev:443'
 
+VM_BOARDS = ['betty-arc-r']
+VM_DEFAULT_IMAGE_CLOUD_PROJECT = 'chromeos-gce-tests'
+
 
 @dataclasses.dataclass
 class VMLeaseResult:
@@ -30,6 +34,48 @@ class VMLeaseResult:
     public_host: str
     gce_project: str
     gce_region: str
+
+
+def is_vm_board(board: str) -> bool:
+    """Returns if the board is a VM board.
+
+    Args:
+      board: The ChromeOS board name.
+
+    Returns:
+      True if the board is a vm board.
+    """
+    return board in VM_BOARDS
+
+
+def gs_image_archive_to_gce_image_name(
+    gs_path: str, gcp_project: str = VM_DEFAULT_IMAGE_CLOUD_PROJECT
+) -> Optional[str]:
+    """Convert gs image path to gce name.
+
+    Args:
+      gs_path: GS path of the GCE image path.
+      gcp_project: GCP project to find GCE image.
+
+    Returns:
+      The gce image name in cloud project, or None if not found.
+    """
+    assert gs_path.startswith('gs://')
+    credentials = service_account.Credentials.from_service_account_file(
+        os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+    )
+    service = discovery.build('compute', 'v1', credentials=credentials)
+    http_gs_path = 'https://storage.googleapis.com/' + gs_path[len('gs://') :]
+    filter_string = f'(description = "{http_gs_path}")'
+    response = (
+        service.images()
+        .list(project=gcp_project, filter=filter_string)
+        .execute()
+    )
+
+    if 'items' not in response or len(response['items']) <= 0:
+        return None
+    return response['items'][0]['name']
 
 
 def grpc(server: str, method: str, content: dict) -> str:
