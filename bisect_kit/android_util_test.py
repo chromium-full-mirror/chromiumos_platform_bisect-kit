@@ -59,6 +59,17 @@ class TestAndroidUtil(unittest.TestCase):
                 )
             )
 
+    def test_get_flavor(self):
+        self.assertEqual(
+            android_util.get_flavor('bertha', 'x86_64'), 'bertha_x86_64-user'
+        )
+        self.assertEqual(
+            android_util.get_flavor('bertha', 'aarch64'), 'bertha_arm64-user'
+        )
+        self.assertEqual(
+            android_util.get_flavor('bertha', 'unknown_arch'), None
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

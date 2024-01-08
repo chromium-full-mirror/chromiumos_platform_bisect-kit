@@ -600,10 +600,14 @@ class CrosDiagnoser:
         if not self._need_android_bisect(self.old_info, self.new_info):
             return verified
 
-        android_flavor = '%s_%s-user' % (
-            self.old_info.android_target,
-            self.config['board_cpu_arch'],
+        android_flavor = android_util.get_flavor(
+            self.old_info.android_target, self.config['board_cpu_arch']
         )
+        if android_flavor is None:
+            self.make_decision(
+                'Android flavor not found for cpu arch (%s). Unable to bisect Android'
+                % self.config['board_cpu_arch'],
+            )
 
         if (
             self.config['bypass_android_prebuilt']

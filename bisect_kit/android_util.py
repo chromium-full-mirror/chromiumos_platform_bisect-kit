@@ -38,6 +38,33 @@ BUILD_IDS_BETWEEN_URL_TEMPLATE = (
 )
 BUILD_INFO_URL_TEMPLATE = ANDROID_URL_BASE + '/builds?id={build_id}'
 
+BOARD_CPU_ARCH_TO_ANDROID_ARCH = {
+    'x86_64': 'x86_64',
+    'aarch64': 'arm64',
+}
+
+
+def get_flavor(android_target: str, board_cpu_arch: str) -> str | None:
+    """Returns the android flavor.
+
+    Args:
+      android_target: The android target fetched from build_report.json
+      dut_cpu_arch: CPU architecture of the board
+
+    Returns:
+      returns the android flavor or None if the cpu arch of the board is unknown.
+    """
+    logger.debug(
+        'android target: %s, board cpu architecture: %s',
+        android_target,
+        board_cpu_arch,
+    )
+    android_arch = BOARD_CPU_ARCH_TO_ANDROID_ARCH.get(board_cpu_arch)
+    if android_arch is None:
+        return None
+    android_flavor = '%s_%s-user' % (android_target, android_arch)
+    return android_flavor
+
 
 def is_android_build_id(s):
     """Is an Android build id."""
