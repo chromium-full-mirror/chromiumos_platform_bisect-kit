@@ -250,6 +250,9 @@ class SwitchAction(enum.StrEnum):
     # Switch that doesn't require a DUT.
     WITHOUT_DUT = 'without_dut'
 
+    # Switch script for VM.
+    SWITCH_VM = 'switch_vm'
+
 
 class EvalAction(enum.StrEnum):
     """The action to perform for a "eval" step.
@@ -530,6 +533,11 @@ class BisectorCommandLine:
        No additional flag would be passed to the script when executing.
     If the switch script is not a python script, it defaults to the
     "WITHOUT_DUT" case.
+
+    4. VM dummy script.
+        In this case, the scripts only passes a SWITCH_VM action,
+        _switch_and_eval will uses this action to determine whether it is
+        necessary to recreate a VM instance when switching CrOS version.
 
     Eval scripts:
     1. The script requires a DUT.
@@ -912,6 +920,9 @@ class BisectorCommandLine:
         # informative.
         sample = {'rev': rev, 'index': self.states.rev2idx(rev)}
 
+        # We use a dummy script to determine if this is a VM bisection.
+        vm_cros_version = None
+        has_switch_vm_cmd = False
         switch_build_deploy_cmds = []
         switch_with_dut_cmds = []
         switch_without_dut_cmds = []
@@ -923,9 +934,17 @@ class BisectorCommandLine:
                 switch_with_dut_cmds.append(cmd)
             elif action == SwitchAction.WITHOUT_DUT:
                 switch_without_dut_cmds.append(cmd)
+            elif action == SwitchAction.SWITCH_VM:
+                has_switch_vm_cmd = True
+        # VM bisection needs to re-create a new instance if version is
+        # different.
+        if has_switch_vm_cmd:
+            vm_cros_version = rev
         logger.debug('switch_build_deploy_cmds: %s', switch_build_deploy_cmds)
         logger.debug('switch_with_dut_cmds: %s', switch_with_dut_cmds)
         logger.debug('switch_without_dut_cmds: %s', switch_without_dut_cmds)
+        logger.debug('has_switch_vm_cmd: %s', has_switch_vm_cmd)
+        logger.debug('vm_cros_version: %s', vm_cros_version)
 
         eval_with_dut_cmd = None
         eval_without_dut_cmd = None
@@ -1029,7 +1048,8 @@ class BisectorCommandLine:
                     )
                 ):
                     return 'switch', sample
-        with self.dut_manager.provision() as dut:
+
+        with self.dut_manager.provision(vm_cros_version=vm_cros_version) as dut:
             # Deploy is needed if a new version is to be deployed, or a new DUT
             # has been allocated. If it's the same version and the same DUT,
             # we don't need to deploy again.

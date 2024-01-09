@@ -4,6 +4,8 @@
 
 """A helper class to encapsulate DUT allocation and monitoring logic."""
 
+from __future__ import annotations
+
 import contextlib
 import dataclasses
 import functools
@@ -16,12 +18,16 @@ import tempfile
 import threading
 import time
 import typing
+from typing import Optional
 
 from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cros_lab_util
+from bisect_kit import cros_util
 from bisect_kit import dut_allocator
 from bisect_kit import errors
+from bisect_kit import util
+from bisect_kit import vm_leaser
 
 
 logger = logging.getLogger(__name__)
@@ -147,10 +153,11 @@ class DutManager:
         states: typing.Type[core.DiagnoseStates] | None,
         pre_allocated_dut: str | None,
         should_auto_allocate: bool,
-        dut_init_func: typing.Callable[[str], None] | None = None,
-        dut_leave_context_check_func: typing.Callable[[str], None]
+        dut_init_func: typing.Callable[[DutManager], None] | None = None,
+        dut_leave_context_check_func: typing.Callable[[DutManager], None]
         | None = None,
         should_force_monitoring: bool = False,
+        vm_cros_version: Optional[str] = None,
     ):
         """initializer.
 
@@ -170,6 +177,7 @@ class DutManager:
                 the exception when leaving the context manager.
             should_force_monitoring: Whether to spawn a thread to monitor DUT lease
                 status.
+            vm_cros_version: ChromeOS version used to boot up a VM machine.
         """
         self._name: str = name
         self._states: typing.Type[core.DiagnoseStates] | None = states
@@ -198,6 +206,21 @@ class DutManager:
         # provision() calls of a DutManager instance.
         self._is_restored_dut: bool = False
 
+        # Arguments for VM bisection.
+        self._vm_cros_version: Optional[str] = vm_cros_version
+        self._allocated_vm: Optional[vm_leaser.VMLeaseResult] = None
+        if self.is_vm:
+            assert not should_force_monitoring
+            # Currently only allow one board input for VM bisection.
+            assert self.dut_allocate_spec.board is not None
+            assert ',' not in self.dut_allocate_spec.board
+            assert (
+                self._vm_cros_version is None
+                or cros_util.is_cros_or_snapshot_version(self._vm_cros_version)
+            )
+        else:
+            assert self._vm_cros_version is None
+
     @property
     def config(self):
         return self._states.config
@@ -205,6 +228,12 @@ class DutManager:
     @property
     def dut_allocate_spec(self):
         return self._states.dut_allocate_spec
+
+    @property
+    def is_vm(self):
+        if not self._states or not self._states.dut_allocate_spec:
+            return False
+        return cros_util.is_vm_board(self._states.dut_allocate_spec.board)
 
     def is_restored_dut(self):
         logger.info('is_restored_dut: %s', self._is_restored_dut)
@@ -235,6 +264,71 @@ class DutManager:
 
         logger.info('%s: no allocated DUT', caller)
         return None
+
+    def _wait_ssh_avaliable(self):
+        """Wait until DUT to be ssh able.
+
+        Raises:
+            errors.SshConnectionError: If unable to ssh after timeout.
+        """
+        util.ssh_cmd(
+            self._auto_allocated_dut,
+            'cat',
+            '/etc/lsb-release',
+            connect_timeout=1,
+            max_attempts=30,
+            retry_interval=3,
+        )
+
+    def _lease_dut(self):
+        """Lease a DUT."""
+        if self.is_vm:
+            if not self._vm_cros_version:
+                logger.error('vm_cros_version not set, ignore allocating VM')
+                return
+            gs_vm_image_path = cros_util.search_image(
+                self.dut_allocate_spec.board, self._vm_cros_version
+            )[cros_util.ImageType.VM_IMAGE]
+            self._allocated_vm = vm_leaser.allocate_dut(
+                self.dut_allocate_spec, gs_vm_image_path, self._vm_cros_version
+            )
+            host = self._allocated_vm.public_host
+            builder = self.dut_allocate_spec.board
+            leased_dut = host
+            logger.debug(
+                'Leased VM cros version: %s, builder: %s, host: %s',
+                self._vm_cros_version,
+                builder,
+                host,
+            )
+        else:
+            host, builder = dut_allocator.allocate_dut(self.dut_allocate_spec)
+            if not host:
+                # This should not happen.
+                raise errors.InternalError('Leased DUT invalid: %s' % host)
+            leased_dut = cros_lab_util.dut_name_to_address(host)
+            logger.debug('Leased DUT %s with builder %s', host, builder)
+        # A DUT is leased at this point successfully.
+        self._auto_allocated_dut = leased_dut
+        self._builder_of_auto_allocated_dut = builder
+        self._auto_allocated_time = time.time()
+        self._is_dut_initialized = False
+        self._is_restored_dut = False
+        self._wait_ssh_avaliable()
+
+    def _release_vm(self):
+        """Release a VM instance, and deletes its image."""
+        assert self.is_vm
+        if not self._auto_allocated_dut:
+            logger.warning('No allocated DUT, skip')
+            return
+        vm_leaser.release_vm(self._allocated_vm)
+        vm_leaser.delete_image(
+            self._allocated_vm.gce_image_name,
+            gcp_project=self._allocated_vm.gce_image_project,
+        )
+        self._allocated_vm = None
+        self._auto_allocated_dut = None
 
     def __enter__(self):
         """Allocates a DUT if necessary.
@@ -277,18 +371,7 @@ class DutManager:
             return self
 
         # Try allocating a DUT now.
-        host, builder = dut_allocator.allocate_dut(self.dut_allocate_spec)
-        logger.debug('Leased DUT %s with builder %s', host, builder)
-        if not host:
-            # This should not happen.
-            raise errors.InternalError('Leased DUT invalid: %s' % host)
-        leased_dut = cros_lab_util.dut_name_to_address(host)
-        # A DUT is leased at this point successfully.
-        self._auto_allocated_dut = leased_dut
-        self._builder_of_auto_allocated_dut = builder
-        self._auto_allocated_time = time.time()
-        self._is_dut_initialized = False
-        self._is_restored_dut = False
+        self._lease_dut()
         return self
 
     def __exit__(self, ex_type, ex_value, ex_traceback):
@@ -306,9 +389,11 @@ class DutManager:
             except Exception as e:
                 error = e
 
-        if self._auto_allocated_dut:
+        if self._auto_allocated_dut and not self.is_vm:
             self._schedule_release_dut()
             self._auto_allocated_dut = None
+        if self.is_vm:
+            self._release_vm()
 
         if error:
             raise error
@@ -330,6 +415,7 @@ class DutManager:
                 )
             )
 
+        assert not self.is_vm
         logger.info('scheduling to release DUT %s', self._auto_allocated_dut)
 
         assert self._auto_allocated_time is not None
@@ -358,7 +444,7 @@ class DutManager:
             self._is_dut_initialized = True
 
     @contextlib.contextmanager
-    def provision(self):
+    def provision(self, vm_cros_version: Optional[str] = None):
         """Main entry point of an instance.
 
         1. Call context manager to allocate a DUT if necessary.
@@ -369,7 +455,23 @@ class DutManager:
           allocated or should_force_monitoring is True.
         5. Return the DUT. Note that None may be returned if allocation
           is deffered.
+
+        Args:
+            vm_cros_version: CrOS version wants to provision. If None, VM
+              bisection uses CrOS version passed in __init__.
         """
+        if self.is_vm:
+            if self._vm_cros_version is None and vm_cros_version is None:
+                yield None
+                return
+            assert (
+                vm_cros_version is None or self._vm_cros_version is None
+            ), 'vm_cros_version is re-defined'
+            if vm_cros_version:
+                assert cros_util.is_cros_or_snapshot_version(vm_cros_version)
+                self._vm_cros_version = vm_cros_version
+        else:
+            assert vm_cros_version is None
         with self:
             dut = self.dut
             if not dut:
@@ -386,23 +488,24 @@ class DutManager:
             # monitored.
             # Use should_force_monitoring = True for cases we want to spwan the monitoring
             # thread anyway.
-            if dut == self._auto_allocated_dut or self._should_force_monitoring:
-                logger.info('monitoring DUT lease status for %s', dut)
-                reason = cros_lab_util.make_lease_reason(self.config['session'])
-                with cros_lab_util.dut_lease_status_monitor(dut, reason):
-                    yield dut
-                    return
+            # Also, currently there is no logic to monitor VM instances.
+            # TODO(zjchang): Implement logic to monitor VM instances.
+            if not self.is_vm:
+                if (
+                    dut == self._auto_allocated_dut
+                    or self._should_force_monitoring
+                ):
+                    logger.info('monitoring DUT lease status for %s', dut)
+                    reason = cros_lab_util.make_lease_reason(
+                        self.config['session']
+                    )
+                    with cros_lab_util.dut_lease_status_monitor(dut, reason):
+                        yield dut
+                        return
             yield dut
 
-    def _update_states(self, dut):
-        """Updates states by the leased dut.
-
-        In stateless bisection, we must guarantee that the DUTs leased in
-        different rounds are compatible.
-        - For functional bisection, we stick to DUTs with the same model in
-          subsequence leases.
-        - For perf bisection, we stick to DUTs with the same sku in
-          subsequence leases.
+    def _update_states_from_swarming(self, dut):
+        """Updates states from swarming by the leased dut.
 
         Args:
           dut: dut address
@@ -464,6 +567,23 @@ class DutManager:
                 'funtional bisection, set dut allocation spec to model: %s',
                 self.dut_allocate_spec.model,
             )
+
+    def _update_states(self, dut):
+        """Updates states by the leased dut.
+
+        In stateless bisection, we must guarantee that the DUTs leased in
+        different rounds are compatible. For non-vm instances:
+
+        - For functional bisection, we stick to DUTs with the same model in
+          subsequence leases.
+        - For perf bisection, we stick to DUTs with the same sku in
+          subsequence leases.
+
+        Args:
+          dut: dut address
+        """
+        if not self.is_vm:
+            self._update_states_from_swarming(dut)
 
         # If DUT is pre-alllocated, config['board'] would have been populated
         # with the corresponding builder and this code path should not be

@@ -16,6 +16,7 @@ will cut down the search range as narrow as it can.
 from argparse import ArgumentParser
 import logging
 
+from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import util
@@ -92,15 +93,19 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         try:
             # Allocate a DUT globally only if not performing a stateless bisect.
             logger.info('experiments: %s', self.config['experiments'])
-            should_auto_allocate = not experiment.is_in_experiment(
-                self.config.get('experiments'), experiment.ID.STATELESS
+            is_vm_board = cros_util.is_vm_board(self.config.get('board'))
+            should_auto_allocate = (
+                not experiment.is_in_experiment(
+                    self.config.get('experiments'), experiment.ID.STATELESS
+                )
+                and not is_vm_board
             )
             dut_manager = dut_manager_module.DutManager(
                 'Global',
                 self.states,
                 self.config['dut'],
                 should_auto_allocate,
-                should_force_monitoring=True,
+                should_force_monitoring=not is_vm_board,
             )
             with dut_manager.provision() as dut:
                 self.do_run(dut)

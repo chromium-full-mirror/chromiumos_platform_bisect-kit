@@ -46,7 +46,6 @@ from bisect_kit import locking
 from bisect_kit import plugin_util
 from bisect_kit import repo_util
 from bisect_kit import util
-from bisect_kit import vm_leaser
 from google.protobuf import json_format
 
 
@@ -136,6 +135,8 @@ DEFAULT_CHECK_KERNEL_READY_ATTPEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_CHECK_GOOD_DUT_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_QUERY_BOOT_ID_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_REPAIR_DUT_ATTEMPTS = 3
+
+VM_BOARDS = ['betty-arc-r']
 
 
 @dataclasses.dataclass
@@ -289,8 +290,7 @@ class SnapshotStore:
           A gs path for specific version or None if not exists.
         """
         if snapshot_version not in cls.images:
-            is_vm_board = vm_leaser.is_vm_board(board)
-            if is_vm_board:
+            if is_vm_board(board):
                 query_files = [vm_image_filename]
             else:
                 query_files = [
@@ -316,13 +316,7 @@ class SnapshotStore:
                         continue
 
                     img_type = ImageType.determine(output[0])
-                    if is_vm_board:
-                        if image_path := vm_leaser.gs_image_archive_to_gce_image_name(
-                            output[0]
-                        ):
-                            image_info[img_type] = image_path
-                    else:
-                        image_info[img_type] = output[0]
+                    image_info[img_type] = output[0]
             cls.images[snapshot_version] = image_info
 
         zip_image = cls.images[snapshot_version].get(ImageType.ZIP_FILE)
@@ -794,6 +788,18 @@ def is_good_dut(
         return False
 
 
+def is_vm_board(board: str) -> bool:
+    """Returns if the board is a VM board.
+
+    Args:
+      board: The ChromeOS board name.
+
+    Returns:
+      True if the board is a vm board.
+    """
+    return board in VM_BOARDS
+
+
 def query_dut_board(host):
     """Query board name of a given DUT"""
     return query_dut_lsb_release(host).get('CHROMEOS_RELEASE_BOARD')
@@ -1250,8 +1256,7 @@ def list_prebuilt_from_image_archive(
     """
     assert is_cros_full_version(old) or is_cros_snapshot_version(old)
     assert is_cros_full_version(new) or is_cros_snapshot_version(new)
-    is_vm_board = vm_leaser.is_vm_board(board)
-    if is_vm_board:
+    if is_vm_board(board):
         files_to_find = [vm_image_filename]
         files_to_find_snapshot = [vm_image_filename]
     else:
@@ -1283,16 +1288,11 @@ def list_prebuilt_from_image_archive(
 
     result = {}
     for version, gs_path in files:
-        if version not in result:
-            result[version] = ImageInfo()
         img_type = ImageType.determine(gs_path)
         assert img_type
-        if is_vm_board:
-            image_path = vm_leaser.gs_image_archive_to_gce_image_name(gs_path)
-        else:
-            image_path = gs_path
-        if image_path:
-            result[version][img_type] = image_path
+        if version not in result:
+            result[version] = ImageInfo()
+        result[version][img_type] = gs_path
 
     return list(result.items())
 
@@ -1588,24 +1588,16 @@ def search_prebuilt_image(board, version) -> ImageInfo:
     """
     assert is_cros_version(version)
 
-    is_vm_board = vm_leaser.is_vm_board(board)
     image_info = ImageInfo()
     for gs_path in _iter_valid_prebuilt_gs_path(board, version):
-        if is_vm_board:
-            search_path = f'{gs_path}/{vm_image_filename}'
-            if gs_util.ls(search_path):
-                image_name = vm_leaser.gs_image_archive_to_gce_image_name(
-                    search_path
-                )
-                if image_name:
-                    image_info[ImageType.VM_IMAGE] = image_name
+        if is_vm_board(board):
+            vm_image_gs_path = f'{gs_path}/{vm_image_filename}'
+            if gs_util.ls(vm_image_gs_path, ignore_errors=True):
+                image_info[ImageType.VM_IMAGE] = vm_image_gs_path
         else:
-            if gs_util.ls(
-                f'{gs_path}/{disk_image_bundle_filename}', ignore_errors=True
-            ):
-                image_info[
-                    ImageType.DISK_IMAGE
-                ] = f'{gs_path}/{disk_image_bundle_filename}'
+            disk_image_gs_path = f'{gs_path}/{disk_image_bundle_filename}'
+            if gs_util.ls(disk_image_gs_path, ignore_errors=True):
+                image_info[ImageType.DISK_IMAGE] = disk_image_gs_path
             if gs_util.ls(
                 f'{gs_path}/{sample_partition_filename}', ignore_errors=True
             ):

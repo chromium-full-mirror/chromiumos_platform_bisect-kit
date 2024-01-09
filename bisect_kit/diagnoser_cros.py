@@ -102,9 +102,14 @@ class CrosDiagnoser:
         self.old_info: cros_util.VersionInfo = cros_util.VersionInfo()
         self.new_info: cros_util.VersionInfo = cros_util.VersionInfo()
 
-        self.is_stateless = experiment.is_in_experiment(
-            self.config.get('experiments'), experiment.ID.STATELESS
+        self.is_vm_board = cros_util.is_vm_board(self.config.get('board'))
+        self.is_stateless = (
+            experiment.is_in_experiment(
+                self.config.get('experiments'), experiment.ID.STATELESS
+            )
+            or self.is_vm_board
         )
+        self._switch_vm_cmd: list[str] = ['./switch_cros_vm.py']
 
     def _verified_chromeos_prebuilt(self):
         if self.config['bypass_chromeos_prebuilt']:
@@ -134,10 +139,13 @@ class CrosDiagnoser:
         cros_localbuild_eval_cmd: list[str],
         is_custom_eval: bool = False,
     ):
-        def init_dut_to_old_cros(dut):
-            logger.info('init dut %s to old cros', dut)
+        def init_dut_to_old_cros(
+            dut_manager: dut_manager_module.DutManager,
+        ):
+            logger.info('init dut %s to old cros', dut_manager.dut)
             self._switch_chromeos_to_old(
-                dut, should_always_reflash=self.config['always_reflash']
+                dut_manager.dut,
+                should_always_reflash=self.config['always_reflash'],
             )
 
         def switch_test_harness_to_old(dut):
@@ -175,11 +183,26 @@ class CrosDiagnoser:
         self.states.add_history('start')
         self.states.save()
 
+        # For VM bisection, if vm_cros_version is defined in __init__ phase,
+        # the VM version should be consistent in whole
+        # BisectorWrapper.narrow_down() life time, and
+        # BisectorCommandLine._switch_and_eval() should not pass any arguments
+        # to change VM's version.
+        # This case is for bisecting ChromeOS version non-specific domains like
+        # Chrome, ARC, DLC or LaCrOS.
+
+        # OTOH, if vm_cros_version is not defined in __init__, the VM version
+        # decision will be deffered to BisectorCommandLine._switch_and_eval()
+        # level. BisectorCommandLine._switch_and_eval() must pass
+        # vm_cros_version argument when calling provision() each time.
+        # This case is for bisecting ChromeOS version specific domains like
+        # ChromeOS prebuilt and localbuild.
         dut_manager = dut_manager_module.DutManager(
-            'NoInit',
+            'InitLease',
             self.states,
             self.pre_allocated_dut,
             self.is_stateless,
+            vm_cros_version=self.config['old'] if self.is_vm_board else None,
         )
         if not self.config.get('board') or not self.config.get(
             'board_cpu_arch'
@@ -228,6 +251,12 @@ class CrosDiagnoser:
                 ]
 
         # Step 1: Narrows down ChromeOS prebuilt.
+        dut_manager = dut_manager_module.DutManager(
+            'PrebuiltChromeOS',
+            self.states,
+            self.pre_allocated_dut,
+            self.is_stateless,
+        )
         self.narrow_down_chromeos_prebuilt(
             dut_manager,
             self.config['cros_prebuilt_old'],
@@ -262,12 +291,17 @@ class CrosDiagnoser:
             ),
         )
 
-        def bisect_prebuilt_on_old_cros_dut_init_func(dut):
-            init_dut_to_old_cros(dut)
+        def bisect_prebuilt_on_old_cros_dut_init_func(
+            dut: str,
+        ):
+            if not self.is_vm_board:
+                init_dut_to_old_cros(dut)
             if switch_test_harness_cmd:
                 switch_test_harness_to_old(dut)
 
-        def bisect_prebuilt_on_old_cros_dut_leave_context_check_func(dut):
+        def bisect_prebuilt_on_old_cros_dut_leave_context_check_func(
+            dut: str,
+        ):
             logger.info('checking cros version on dut %s', dut)
             assert old_cros_version == cros_util.query_dut_short_version(
                 dut
@@ -280,6 +314,7 @@ class CrosDiagnoser:
             self.is_stateless,
             bisect_prebuilt_on_old_cros_dut_init_func,
             bisect_prebuilt_on_old_cros_dut_leave_context_check_func,
+            vm_cros_version=self.cros_old if self.is_vm_board else None,
         )
 
         # Step 2: Narrows down Android prebuilt. If the error can be reproduced,
@@ -343,13 +378,18 @@ class CrosDiagnoser:
         # Step 5: Narrows down Chrome local build. If the error can be reproduced,
         # returns the result and skips other steps.
 
-        def bisect_local_chrome_dut_init_func(dut):
-            init_dut_to_old_cros(dut)
+        def bisect_local_chrome_dut_init_func(
+            dut: str,
+        ):
+            if not self.is_vm_board:
+                init_dut_to_old_cros(dut)
             if switch_test_harness_cmd:
                 switch_test_harness_to_old(dut)
             init_autotest_deps_workaround(dut)
 
-        def bisect_local_chrome_dut_leave_context_check_func(dut):
+        def bisect_local_chrome_dut_leave_context_check_func(
+            dut: str,
+        ):
             logger.info('checking cros version on dut %s', dut)
             # If chrome is not deployed with cros image, do the sanity check to ensure
             # OS version.
@@ -368,6 +408,7 @@ class CrosDiagnoser:
             self.is_stateless,
             bisect_local_chrome_dut_init_func,
             bisect_local_chrome_dut_leave_context_check_func,
+            vm_cros_version=self.cros_old if self.is_vm_board else None,
         )
         buildbucket_buildable = cros_util.is_buildbucket_buildable(
             self.config['cros_prebuilt_old']
@@ -462,6 +503,17 @@ class CrosDiagnoser:
             if self.config['disable_snapshot']:
                 init_args.append('--disable-snapshot')
 
+            if dut_manager.is_vm:
+                switch_cmds = [
+                    self._switch_vm_cmd,
+                    switch_test_harness_cmd,
+                ]
+            else:
+                switch_cmds = [
+                    switch_cmd,
+                    switch_test_harness_cmd,
+                ]
+
             bisector = wrapper.BisectorWrapper(
                 'bisect_cros_version',
                 self.config['session'],
@@ -472,10 +524,7 @@ class CrosDiagnoser:
                 old,
                 new,
                 init_args=init_args,
-                switch_cmds=[
-                    switch_cmd,
-                    switch_test_harness_cmd,
-                ],
+                switch_cmds=switch_cmds,
                 eval_cmd=eval_cmd,
                 old_value=self.config['old_value'],
                 new_value=self.config['new_value'],
@@ -538,7 +587,9 @@ class CrosDiagnoser:
         )
 
     def _switch_chromeos_to_old(
-        self, dut: str, should_always_reflash: bool = False
+        self,
+        dut: str,
+        should_always_reflash: bool = False,
     ) -> None:
         """Switch ChromeOS version to old prebuilt.
 
@@ -1288,6 +1339,8 @@ class CrosDiagnoser:
             switch_cmd.append('--no-disable-rootfs-verification')
 
         switch_cmds = [switch_cmd]
+        if dut_manager.is_vm:
+            switch_cmds.append(self._switch_vm_cmd)
         if buildbucket_build:
             switch_cmds.append(switch_test_harness_cmd)
 

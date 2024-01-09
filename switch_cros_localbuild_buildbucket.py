@@ -571,7 +571,9 @@ def switch(opts) -> core.StepResult:
     if not opts.no_deploy or not opts.no_wait_for_build_completion:
         wait_for_build_completion(opts, buildbucket_id)
 
-    if opts.no_deploy:
+    if opts.no_deploy or cros_util.is_vm_board(opts.board):
+        if not opts.no_deploy:
+            logger.warning('skip cros_flash for vm boards')
         status = 'skip' if opts.no_wait_for_build_completion else 'old'
         return core.StepResult(
             status,

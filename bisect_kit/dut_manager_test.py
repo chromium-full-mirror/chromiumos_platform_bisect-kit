@@ -15,9 +15,11 @@ from unittest import mock
 
 from bisect_kit import core
 from bisect_kit import cros_lab_util
+from bisect_kit import cros_util
 from bisect_kit import dut_allocator
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
+from bisect_kit import vm_leaser
 
 
 logger = logging.getLogger(__name__)
@@ -49,6 +51,31 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_allocate_dut = self.enterContext(
             mock.patch.object(dut_allocator, 'allocate_dut', autospec=True)
         )
+        self.mock_wait_ssh_avaliable = self.enterContext(
+            mock.patch.object(
+                dut_manager_module.DutManager,
+                '_wait_ssh_avaliable',
+                autospec=True,
+            )
+        )
+        self.mock_is_vm = self.enterContext(
+            mock.patch.object(
+                dut_manager_module.DutManager,
+                'is_vm',
+                new_callable=mock.PropertyMock,
+            )
+        )
+        self.mock_search_image = self.enterContext(
+            mock.patch.object(cros_util, 'search_image', autospec=True)
+        )
+        self.mock_allocate_vm_dut = self.enterContext(
+            mock.patch.object(vm_leaser, 'allocate_dut')
+        )
+        self.mock_release_vm = self.enterContext(
+            mock.patch.object(
+                dut_manager_module.DutManager, '_release_vm', autospec=True
+            )
+        )
         self.mock_dut_init_func = mock.Mock()
         self.mock_dut_leave_context_check_func = mock.Mock()
         self.mock_delayed_dut_releaser_cls = self.enterContext(
@@ -62,6 +89,11 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_update_states.reset_mock()
         self.mock_dut_lease_status_monitor.reset_mock()
         self.mock_allocate_dut.reset_mock()
+        self.mock_wait_ssh_avaliable.reset_mock()
+        self.mock_is_vm.reset_mock(return_value=True)
+        self.mock_search_image.reset_mock()
+        self.mock_allocate_vm_dut.reset_mock(return_value=True)
+        self.mock_release_vm.reset_mock()
         self.mock_dut_init_func.reset_mock()
         self.mock_dut_leave_context_check_func.reset_mock()
         self.mock_delayed_dut_releaser_cls.reset_mock()
@@ -71,7 +103,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser.reset_mock()
 
     def dummy_mock_states(self):
-        dummy_allocate_spec = core.DutAllocateSpec()
+        dummy_allocate_spec = core.DutAllocateSpec(board='test_board')
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
             config={'session': 'stateless'},
@@ -79,7 +111,19 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         return mock_states
 
+    def dummy_allocate_vm_dut_result(self):
+        return vm_leaser.VMLeaseResult(
+            lease_id='lease_id',
+            private_host='127.0.0.1',
+            public_host='1.2.3.4',
+            gce_project='mock_project',
+            gce_region='mock_region',
+            gce_image_project='mock_project',
+            gce_image_name='mock_image',
+        )
+
     def test_dut_pre_allocated_should_auto_alloc(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
@@ -100,6 +144,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_dut_pre_allocated_should_not_auto_alloc(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
@@ -120,6 +165,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_dut_pre_allocated_force_monitoring(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
@@ -143,6 +189,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_dut_pre_allocated_only_initailize_once(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
@@ -158,6 +205,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.reset_all_mocks()
 
         # Second provision. dut_init_func should not be called again.
+        self.mock_is_vm.return_value = False
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'pre_allocated_dut')
 
@@ -171,6 +219,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_dut_pre_allocated_missing_dut_funcs(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
@@ -188,6 +237,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_leave_context_check_func.assert_not_called()
 
     def test_no_pre_allocated_dut_should_auto_alloc(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -218,6 +268,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_no_pre_allocated_dut_should_not_auto_alloc(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -236,6 +287,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_leave_context_check_func.assert_not_called()
 
     def test_no_pre_allocated_dut_auto_allocate_thorws_exception(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -258,6 +310,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_leave_context_check_func.assert_not_called()
 
     def test_no_pre_allocated_dut_auto_allocate_no_host_returned(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -280,6 +333,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_leave_context_check_func.assert_not_called()
 
     def test_consecutive_auto_allocate_restored_previous_dut(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -297,6 +351,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.reset_all_mocks()
 
         # Second lease.
+        self.mock_is_vm.return_value = False
         self.mock_dut_releaser.cancel.return_value = True
         self.mock_dut_releaser.get_dut.return_value = 'host.cros'
         with dut_manager.provision() as dut:
@@ -320,6 +375,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_consecutive_auto_allocate_lease_new_dut(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
@@ -337,6 +393,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.reset_all_mocks()
 
         # Second lease.
+        self.mock_is_vm.return_value = False
         self.mock_dut_releaser.cancel.return_value = False
         self.mock_allocate_dut.return_value = 'host2', 'board2'
         with dut_manager.provision() as dut:
@@ -362,6 +419,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_auto_release_on_exception(self):
+        self.mock_is_vm.return_value = False
         self.mock_allocate_dut.return_value = 'host', 'board'
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
@@ -397,6 +455,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_dut_leave_context_check_func_failed(self):
+        self.mock_is_vm.return_value = False
         self.mock_allocate_dut.return_value = 'host', 'board'
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
@@ -434,6 +493,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
 
     def test_dut(self):
+        self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate', self.mock_states, cros_lab_util.LAB_DUT, True
         )
@@ -455,6 +515,176 @@ class TestDutManagerAllocation(unittest.TestCase):
         with dut_manager.provision():
             self.assertEqual(dut_manager.dut, 'host.cros')
         self.assertEqual(dut_manager.dut, None)
+
+    def test_provision_invalid_vm_cros_version(self):
+        # The provision version format is invalid.
+        self.mock_is_vm.return_value = True
+        dut_manager = dut_manager_module.DutManager(
+            'VM',
+            self.mock_states,
+            None,
+            True,
+            should_force_monitoring=False,
+            # dut_init_func and dut_leave_context_check_func are missing.
+        )
+        with self.assertRaises(AssertionError):
+            with dut_manager.provision(vm_cros_version='invalid_version'):
+                pass
+
+    def test_init_invalid_vm_cros_version(self):
+        # The init version format is invalid.
+        self.mock_is_vm.return_value = True
+        with self.assertRaises(AssertionError):
+            _dut_manager = dut_manager_module.DutManager(
+                'VM',
+                self.mock_states,
+                None,
+                True,
+                should_force_monitoring=False,
+                vm_cros_version='invalid_version'
+                # dut_init_func and dut_leave_context_check_func are missing.
+            )
+
+    def test_redefine_vm_cros_version(self):
+        # vm_cros_version is re-defined.
+        self.mock_is_vm.return_value = True
+        dut_manager = dut_manager_module.DutManager(
+            'VM',
+            self.mock_states,
+            None,
+            True,
+            should_force_monitoring=False,
+            vm_cros_version='R102-19999.0.0-12345'
+            # dut_init_func and dut_leave_context_check_func are missing.
+        )
+        with self.assertRaises(AssertionError):
+            with dut_manager.provision(vm_cros_version='R102-19999.0.0-12345'):
+                pass
+
+    def test_non_vm_init_with_vm_cros_version(self):
+        # vm_cros_version should not be passed to init for non-VM case.
+        self.mock_is_vm.return_value = False
+        with self.assertRaises(AssertionError):
+            _dut_manager = dut_manager_module.DutManager(
+                'VM',
+                self.mock_states,
+                None,
+                True,
+                should_force_monitoring=False,
+                vm_cros_version='R102-19999.0.0-12345'
+                # dut_init_func and dut_leave_context_check_func are missing.
+            )
+
+    def test_non_vm_provision_with_vm_cros_version(self):
+        # vm_cros_version should not be passed to provision for non-VM case.
+        self.mock_is_vm.return_value = False
+        dut_manager = dut_manager_module.DutManager(
+            'VM',
+            self.mock_states,
+            None,
+            True,
+            should_force_monitoring=False,
+            # dut_init_func and dut_leave_context_check_func are missing.
+        )
+        with self.assertRaises(AssertionError):
+            with dut_manager.provision(vm_cros_version='R102-19999.0.0-12345'):
+                pass
+
+    def test_lease_vm_with_should_force_monitoring(self):
+        # should_force_monitoring shouldn't be True.
+        self.mock_is_vm.return_value = True
+        with self.assertRaises(AssertionError):
+            _dut_manager = dut_manager_module.DutManager(
+                'VM',
+                self.mock_states,
+                None,
+                True,
+                should_force_monitoring=True,
+                # dut_init_func and dut_leave_context_check_func are missing.
+            )
+
+    def test_lease_vm_with_undefined_vm_cros_version(self):
+        # vm_cros_version is not defined.
+        self.mock_is_vm.return_value = True
+        dut_manager = dut_manager_module.DutManager(
+            'VM',
+            self.mock_states,
+            None,
+            True,
+            should_force_monitoring=False,
+            # dut_init_func and dut_leave_context_check_func are missing.
+        )
+        with dut_manager.provision() as dut:
+            self.assertIsNone(dut)
+
+    def test_lease_vm_with_vm_cros_version_defined_in_init(self):
+        # Leases a VM by vm_cros_version in init.
+        self.mock_is_vm.return_value = True
+        self.mock_allocate_vm_dut.return_value = (
+            self.dummy_allocate_vm_dut_result()
+        )
+        dut_manager = dut_manager_module.DutManager(
+            'VM',
+            self.mock_states,
+            None,
+            True,
+            should_force_monitoring=False,
+            vm_cros_version='R102-19999.0.0-12345'
+            # dut_init_func and dut_leave_context_check_func are missing.
+        )
+        self.mock_allocate_vm_dut.assert_not_called()
+        with dut_manager.provision() as dut:
+            self.assertEqual(
+                dut, self.dummy_allocate_vm_dut_result().public_host
+            )
+            self.assertEqual(self.mock_allocate_vm_dut.call_count, 1)
+            self.assertEqual(self.mock_release_vm.call_count, 0)
+
+        self.mock_update_states.assert_called()
+        self.mock_dut_lease_status_monitor.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
+        self.mock_allocate_dut.assert_not_called()
+        self.mock_dut_init_func.assert_not_called()
+        self.mock_dut_leave_context_check_func.assert_not_called()
+        self.mock_allocate_vm_dut.assert_called()
+        self.assertEqual(self.mock_allocate_vm_dut.call_count, 1)
+        self.mock_release_vm.assert_called()
+        self.assertEqual(self.mock_release_vm.call_count, 1)
+
+    def test_lease_vm_with_vm_cros_version_defined_in_provision(self):
+        # Leases a VM by vm_cros_version in provision.
+        self.mock_is_vm.return_value = True
+        self.mock_allocate_vm_dut.return_value = (
+            self.dummy_allocate_vm_dut_result()
+        )
+        dut_manager = dut_manager_module.DutManager(
+            'VM',
+            self.mock_states,
+            None,
+            True,
+            should_force_monitoring=False,
+            # dut_init_func and dut_leave_context_check_func are missing.
+        )
+        self.mock_allocate_vm_dut.assert_not_called()
+        with dut_manager.provision(
+            vm_cros_version='R102-19999.0.0-12345'
+        ) as dut:
+            self.assertEqual(
+                dut, self.dummy_allocate_vm_dut_result().public_host
+            )
+            self.assertEqual(self.mock_allocate_vm_dut.call_count, 1)
+            self.assertEqual(self.mock_release_vm.call_count, 0)
+
+        self.mock_update_states.assert_called()
+        self.mock_dut_lease_status_monitor.assert_not_called()
+        self.mock_delayed_dut_releaser_cls.assert_not_called()
+        self.mock_allocate_dut.assert_not_called()
+        self.mock_dut_init_func.assert_not_called()
+        self.mock_dut_leave_context_check_func.assert_not_called()
+        self.mock_allocate_vm_dut.assert_called()
+        self.assertEqual(self.mock_allocate_vm_dut.call_count, 1)
+        self.mock_release_vm.assert_called()
+        self.assertEqual(self.mock_release_vm.call_count, 1)
 
 
 class TestDelayedDutReleaser(unittest.TestCase):
@@ -532,6 +762,13 @@ class TestAddDutLeasesRecord(unittest.TestCase):
         )
         self.mock_allocate_dut = self.enterContext(
             mock.patch.object(dut_allocator, 'allocate_dut', autospec=True)
+        )
+        self.mock_wait_ssh_avaliable = self.enterContext(
+            mock.patch.object(
+                dut_manager_module.DutManager,
+                '_wait_ssh_avaliable',
+                autospec=True,
+            )
         )
         self.mock_delayed_dut_releaser_cls = self.enterContext(
             mock.patch.object(
@@ -685,6 +922,13 @@ class TestConfigUpdated(unittest.TestCase):
         )
         self.mock_allocate_dut = self.enterContext(
             mock.patch.object(dut_allocator, 'allocate_dut', autospec=True)
+        )
+        self.mock_wait_ssh_avaliable = self.enterContext(
+            mock.patch.object(
+                dut_manager_module.DutManager,
+                '_wait_ssh_avaliable',
+                autospec=True,
+            )
         )
 
         # Supplementary mocks which make provision() work.
