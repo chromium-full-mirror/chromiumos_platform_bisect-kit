@@ -608,6 +608,7 @@ class CrosDiagnoser:
                 'Android flavor not found for cpu arch (%s). Unable to bisect Android'
                 % self.config['board_cpu_arch'],
             )
+            return verified
 
         if (
             self.config['bypass_android_prebuilt']
