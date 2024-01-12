@@ -87,8 +87,6 @@ class BuildbucketApi:
     buildbucket_api_path = '/prpc/buildbucket.v2.Builds/'
     cas_instance = 'chromeos-swarming'
     token_cache = os.path.expanduser('~/.isolated_oauth')
-    # 2020-05-12T00:00:00Z: remove cros_debug flag
-    old_artifact_cutoff = 1589241600
 
     def __new__(cls):
         if cls._instance is None:
@@ -373,7 +371,12 @@ class BuildbucketApi:
         # search old builds
         if not force_rebuild:
             build = self.search_usable_build(
-                board, bucket, chromeos_digest, chrome_digest, deps_src_ver
+                board,
+                bucket,
+                chromeos_digest,
+                chrome_digest,
+                deps_src_ver,
+                bisector_chromeos_version=chromeos_version,
             )
             if build:
                 return build
@@ -448,6 +451,7 @@ class BuildbucketApi:
         limit=100,
         start_time=None,
         end_time=None,
+        bisector_chromeos_version: typing.Optional[str] = None,
     ):
         """Search builds.
 
@@ -462,6 +466,8 @@ class BuildbucketApi:
           limit: Maximum numbers of builds to return. Defaults to 100.
           start_time: An integer timestamp indicates lower bound of start time.
           end_time: An integer timestamp indicates upper bound of start time.
+          bisector_chromeos_version: ChromeOS version index used to speed up
+              search.
 
         Returns:
           A list of builds.
@@ -476,6 +482,13 @@ class BuildbucketApi:
             status = Status.Value(status)
         if snapshot_commit:
             tags.append(StringPair(key='snapshot', value=snapshot_commit))
+        if bisector_chromeos_version:
+            tags.append(
+                StringPair(
+                    key='bisector_chromeos_version',
+                    value=bisector_chromeos_version,
+                )
+            )
 
         if start_time or end_time:
             create_time = TimeRange()
@@ -534,6 +547,7 @@ class BuildbucketApi:
         manifest_digest,
         deps_digest=None,
         deps_src_ver=None,
+        bisector_chromeos_version: typing.Optional[str] = None,
     ):
         """Search for recent successful build if exists.
 
@@ -546,6 +560,8 @@ class BuildbucketApi:
           deps_digest: Cas hash for Chrome DEPS file, leave None if no
               special buildspec for Chrome.
           deps_src_ver: The src revision inside deps.
+          bisector_chromeos_version: ChromeOS version index used to speed up
+              search.
 
         Returns:
           An build object if found, or None if no existing build.
@@ -554,7 +570,7 @@ class BuildbucketApi:
         builds = self.search_builds(
             bucket=bucket,
             builder='%s-%s' % (board, bucket),
-            start_time=self.old_artifact_cutoff,
+            bisector_chromeos_version=bisector_chromeos_version,
         )
         valid_status = [
             Status.Value('SCHEDULED'),
