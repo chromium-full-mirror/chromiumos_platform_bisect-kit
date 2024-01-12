@@ -13,7 +13,9 @@ import shutil
 import socket
 import ssl
 import tempfile
+import typing
 
+from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import util
@@ -261,13 +263,15 @@ class BuildbucketApi:
         self,
         board: str,
         manifest_xml: str,
-        recipe: str = 'build_postsubmit',
+        recipe: str = 'build_bisector',
         deps: str | None = None,
         git_auth: bool = True,
         bucket: str = 'bisector',
         force_rebuild: bool = False,
         search_only: bool = False,
         build_tags: dict[str, str] | None = None,
+        chromeos_version: typing.Optional[str] = None,
+        snapshot_commmit_id: typing.Optional[str] = None,
     ):
         """Schedule a build job in buildbucket.
 
@@ -282,6 +286,8 @@ class BuildbucketApi:
           search_only: If ture, search for exsiting builds only but do not
             schedule a new build even if the search fails.
           build_tags: Tags for buildbucket build object.
+          chromeos_version: The CrOS version will be built.
+          snapshot_commmit_id: The snapshot commit id used to find cache.
 
         Returns:
           A Build object if success.
@@ -322,6 +328,25 @@ class BuildbucketApi:
             'builder_name': '%s-%s' % (board, bucket),
             'recipe': recipe,
         }
+        if chromeos_version:
+            old_rev, new_rev, cl_count = codechange.parse_intra_rev(
+                chromeos_version
+            )
+            properties['$chromeos/sysroot_archive'] = {
+                'sysroot_enabled': {
+                    'gs_bucket': 'bisector-builds',
+                    'chromeos_start_version': old_rev,
+                    'chromeos_end_version': new_rev,
+                    'chromeos_cl_diff_counts': cl_count,
+                },
+            }
+        if snapshot_commmit_id:
+            properties['snapshot_commit'] = {
+                'host': 'chrome-internal.googlesource.com',
+                'id': snapshot_commmit_id,
+                'project': "chromeos/manifest-internal",
+                'ref': 'refs/heads/snapshot',
+            }
 
         chrome_digest = None
         deps_src_ver = None

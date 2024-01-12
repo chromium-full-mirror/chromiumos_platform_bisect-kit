@@ -14,6 +14,7 @@ import os
 import socket
 import sys
 import time
+import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import buildbucket_util
@@ -362,6 +363,65 @@ def search_build_image(buildbucket_id):
     return image_info
 
 
+def search_closest_snapshot_image(opts) -> typing.Optional[str]:
+    """Returns the first snapshot image after or equal to the CrOS version.
+
+    Returns:
+        The first CrOS snapshot version equal to or after the CrOS built, or
+        None if not found.
+    """
+    if cros_util.is_cros_snapshot_version(opts.chromeos_rev):
+        return opts.chromeos_rev
+    # Searches an earliest snapshot build in +10 major versions. Reasons:
+    #     1: In practical there should be a snapshot build in every major
+    #        versions.
+    #     2: The performance improvement of using a far prebuilt is not
+    #        significant.
+    search_end_major_version = (
+        int(cros_util.extract_major_version(opts.chromeos_rev)) + 10
+    )
+    search_end_version = f'{search_end_major_version}.0.0'
+    versions, _ = cros_util.list_chromeos_prebuilt_versions(
+        opts.board, opts.chromeos_rev, search_end_version, use_snapshot=True
+    )
+    for v in versions:
+        if cros_util.is_cros_snapshot_version(v):
+            return v
+    return None
+
+
+def search_closest_snapshot_commit(opts) -> typing.Optional[str]:
+    """Returns the first snapshot commit after or equal to the CrOS version.
+
+    Returns:
+        The first CrOS snapshot commit equal to or after the CrOS built, or
+        None if not found.
+    """
+    closest_version = search_closest_snapshot_image(opts)
+    if not closest_version:
+        return None
+    _, _, closest_snapshot_id = cros_util.snapshot_version_split(
+        closest_version
+    )
+
+    config = dict(
+        board=opts.board,
+        chromeos_root=opts.chromeos_root,
+        chromeos_mirror=opts.chromeos_mirror,
+    )
+    spec_manager = cros_util.ChromeOSSpecManager(config)
+    for (
+        _,
+        commit_id,
+        snapshot_id,
+    ) in spec_manager.lookup_snapshot_manifest_revisions(
+        closest_version, closest_version
+    ):
+        if int(snapshot_id) == int(closest_snapshot_id):
+            return commit_id
+    return None
+
+
 def search_and_schedule_build(opts) -> int | None:
     build_tags = {
         'bisector_chromeos_version': opts.chromeos_rev,
@@ -392,6 +452,10 @@ def search_and_schedule_build(opts) -> int | None:
         deps=deps,
         git_auth=git_auth,
         search_only=opts.no_build,
+        chromeos_version=opts.chromeos_rev,
+        # The snapshot commit hash used to search prebuilt cache, if specified
+        # buildbucket will incrementally build from old snapshot build.
+        snapshot_commmit_id=search_closest_snapshot_commit(opts),
     )
 
     if build_info is None:
