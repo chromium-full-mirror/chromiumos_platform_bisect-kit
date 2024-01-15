@@ -370,19 +370,20 @@ def search_closest_snapshot_image(opts) -> typing.Optional[str]:
         The first CrOS snapshot version equal to or after the CrOS built, or
         None if not found.
     """
-    if cros_util.is_cros_snapshot_version(opts.chromeos_rev):
-        return opts.chromeos_rev
+    _, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
+    if cros_util.is_cros_snapshot_version(new_rev):
+        return new_rev
     # Searches an earliest snapshot build in +10 major versions. Reasons:
     #     1: In practical there should be a snapshot build in every major
     #        versions.
     #     2: The performance improvement of using a far prebuilt is not
     #        significant.
     search_end_major_version = (
-        int(cros_util.extract_major_version(opts.chromeos_rev)) + 10
+        int(cros_util.extract_major_version(new_rev)) + 10
     )
     search_end_version = f'{search_end_major_version}.0.0'
     versions, _ = cros_util.list_chromeos_prebuilt_versions(
-        opts.board, opts.chromeos_rev, search_end_version, use_snapshot=True
+        opts.board, new_rev, search_end_version, use_snapshot=True
     )
     for v in versions:
         if cros_util.is_cros_snapshot_version(v):
