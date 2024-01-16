@@ -237,10 +237,7 @@ class NeedRecreateChrootException(Exception):
 class SnapshotStore:
     """Stores image version of snapshots."""
 
-    default_path = (
-        'gs://chromeos-image-archive/{board}-{bucket}'
-        '/{snapshot_version}-*/{filename}'
-    )
+    default_path = 'gs://chromeos-image-archive/{board}-{bucket}/{snapshot_version}-*/{filename}'
     images: dict[str, ImageInfo] = {}
 
     @classmethod
@@ -277,23 +274,21 @@ class SnapshotStore:
         Returns:
           A gs path for specific version or None if not exists.
         """
-        is_vm_board = vm_leaser.is_vm_board(board)
-        if is_vm_board:
-            query_files = [
-                vm_image_filename,
-            ]
-        else:
-            query_files = [
-                test_image_zip_filename,
-                sample_partition_filename,
-            ]
         if snapshot_version not in cls.images:
+            is_vm_board = vm_leaser.is_vm_board(board)
+            if is_vm_board:
+                query_files = [vm_image_filename]
+            else:
+                query_files = [
+                    test_image_zip_filename,
+                    sample_partition_filename,
+                ]
             logger.warning(
                 '%s not found in SnapshotStore, try to fetch from buckets %s',
                 snapshot_version,
                 snapshot_buckets,
             )
-            cls.images[snapshot_version] = ImageInfo()
+            image_info = ImageInfo()
             for bucket in snapshot_buckets:
                 for filename in query_files:
                     path = cls.default_path.format(
@@ -303,20 +298,18 @@ class SnapshotStore:
                         filename=filename,
                     )
                     output = gs_util.ls(path, ignore_errors=True)
-                    if output:
-                        img_type = ImageType.determine(output[0])
-                        if is_vm_board:
-                            image_path = (
-                                vm_leaser.gs_image_archive_to_gce_image_name(
-                                    output[0]
-                                )
-                            )
-                            if image_path:
-                                cls.images[snapshot_version][
-                                    img_type
-                                ] = image_path
-                        else:
-                            cls.images[snapshot_version][img_type] = output[0]
+                    if not output:
+                        continue
+
+                    img_type = ImageType.determine(output[0])
+                    if is_vm_board:
+                        if image_path := vm_leaser.gs_image_archive_to_gce_image_name(
+                            output[0]
+                        ):
+                            image_info[img_type] = image_path
+                    else:
+                        image_info[img_type] = output[0]
+            cls.images[snapshot_version] = image_info
 
         zip_image = cls.images[snapshot_version].get(ImageType.ZIP_FILE)
         partition_image = cls.images[snapshot_version].get(
@@ -1229,12 +1222,11 @@ def list_prebuilt_from_image_archive(
     """
     assert is_cros_full_version(old) or is_cros_snapshot_version(old)
     assert is_cros_full_version(new) or is_cros_snapshot_version(new)
-    if vm_leaser.is_vm_board(board):
-        is_vm = True
+    is_vm_board = vm_leaser.is_vm_board(board)
+    if is_vm_board:
         files_to_find = [vm_image_filename]
         files_to_find_snapshot = [vm_image_filename]
     else:
-        is_vm = False
         files_to_find = [
             disk_image_bundle_filename,
             sample_partition_filename,
@@ -1267,7 +1259,7 @@ def list_prebuilt_from_image_archive(
             result[version] = ImageInfo()
         img_type = ImageType.determine(gs_path)
         assert img_type
-        if is_vm:
+        if is_vm_board:
             image_path = vm_leaser.gs_image_archive_to_gce_image_name(gs_path)
         else:
             image_path = gs_path
@@ -1642,8 +1634,7 @@ def cros_flash(
             # Sleep to wait ap-update-manager start, which may take up to 27 seconds.
             # For simplicity, we wait 60 seconds here, which is the timeout value of
             # jetstream_host.
-            # https://chromium.googlesource.com/chromiumos/third_party/autotest
-            #     /+/HEAD/server/hosts/jetstream_host.py#27
+            # https://chromium.googlesource.com/chromiumos/third_party/autotest/+/HEAD/server/hosts/jetstream_host.py#27
             time.sleep(60)
             util.ssh_cmd(host, 'stop', 'ap-update-manager')
         except subprocess.CalledProcessError:
