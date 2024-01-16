@@ -960,7 +960,7 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
             # leased, but need to verify in case of race condition
             tasks = swarming_bot_tasks(lease_status.bot_id, limit=5)
             assert len(tasks) >= 2
-            assert tasks[0]['taskId'] == this_lease['taskId']
+            assert tasks[0]['taskId'] == this_lease.task_id
             for i, task in enumerate(tasks[1:], 1):
                 if task['taskId'] == lease_status.task_id:
                     if i > 1:
