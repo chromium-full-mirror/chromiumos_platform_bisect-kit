@@ -423,6 +423,18 @@ def search_closest_snapshot_commit(opts) -> typing.Optional[str]:
     return None
 
 
+def is_sysroot_archive_compatible(opts) -> bool:
+    """Returns if the version is sysroot archive compatible.
+
+    Returns:
+        True if the version has sysroot archive API call.
+    """
+    # Sysroot archive API in chromite is avaliable from 15742.0.0.
+    old_rev, _, _ = codechange.parse_intra_rev(opts.chromeos_rev)
+    old_cros_major_version = int(cros_util.extract_major_version(old_rev))
+    return old_cros_major_version >= 15742
+
+
 def search_and_schedule_build(opts) -> int | None:
     build_tags = {
         'bisector_chromeos_version': opts.chromeos_rev,
@@ -445,6 +457,9 @@ def search_and_schedule_build(opts) -> int | None:
         deps = None
         git_auth = True
 
+    save_sysroot_archive = use_sysroot_archive = is_sysroot_archive_compatible(
+        opts
+    )
     build_info = api.search_and_schedule_build(
         opts.board,
         manifest,
@@ -457,6 +472,8 @@ def search_and_schedule_build(opts) -> int | None:
         # The snapshot commit hash used to search prebuilt cache, if specified
         # buildbucket will incrementally build from old snapshot build.
         snapshot_commmit_id=search_closest_snapshot_commit(opts),
+        save_sysroot_archive=save_sysroot_archive,
+        use_sysroot_archive=use_sysroot_archive,
     )
 
     if build_info is None:

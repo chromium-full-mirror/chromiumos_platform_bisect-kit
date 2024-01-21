@@ -270,6 +270,8 @@ class BuildbucketApi:
         build_tags: dict[str, str] | None = None,
         chromeos_version: typing.Optional[str] = None,
         snapshot_commmit_id: typing.Optional[str] = None,
+        save_sysroot_archive: bool = False,
+        use_sysroot_archive: bool = False,
     ):
         """Schedule a build job in buildbucket.
 
@@ -286,6 +288,8 @@ class BuildbucketApi:
           build_tags: Tags for buildbucket build object.
           chromeos_version: The CrOS version will be built.
           snapshot_commmit_id: The snapshot commit id used to find cache.
+          save_sysroot_archive: Whether to save sysroot archive in gs bucket.
+          use_sysroot_archive: Whether to use sysroot archie in gs bucket.
 
         Returns:
           A Build object if success.
@@ -333,6 +337,8 @@ class BuildbucketApi:
             properties['$chromeos/sysroot_archive'] = {
                 'sysroot_enabled': {
                     'gs_bucket': 'bisector-builds',
+                    'save_sysroot_archive': save_sysroot_archive,
+                    'use_sysroot_archive': use_sysroot_archive,
                     'chromeos_start_version': old_rev,
                     'chromeos_end_version': new_rev,
                     'chromeos_cl_diff_counts': cl_count,
