@@ -8,6 +8,7 @@ import fnmatch
 import logging
 import os
 import subprocess
+import textwrap
 import unittest
 from unittest import mock
 
@@ -61,7 +62,8 @@ def _fake_query_milestone_by_version(_1, _2):
     return '63'
 
 
-def _fake_version_to_full(_board, version):
+# pylint: disable=unused-argument
+def _fake_version_to_full(_board, version, spec_manager=None):
     if version.startswith('R'):
         return version
     return 'R63-' + version
@@ -1037,30 +1039,45 @@ class TestCrosUtil(unittest.TestCase):
         self.assertEqual(cros_util.is_dut_kernel_ready('bar'), False)
 
     @mock.patch('os.path.exists')
-    @mock.patch('bisect_kit.util.check_output')
-    def test_query_repo_chromeos_version(
-        self, mock_check_output, mock_path_exists
-    ):
+    def test_query_repo_chromeos_version(self, mock_path_exists):
         mock_path_exists.return_value = True
-        mock_check_output.return_value = '''ChromiumOS version information:
-    CHROME_BRANCH=120
-    CHROME_VERSION=
-    CHROMEOS_BUILD=15651
-    CHROMEOS_BRANCH=0
-    CHROMEOS_PATCH=0
-    CHROMEOS_VERSION_STRING=15651.0.0'''
-
-        self.assertDictEqual(
-            cros_util.query_repo_chromeos_version('foo'),
-            {
-                'CHROME_BRANCH': '120',
-                'CHROME_VERSION': '',
-                'CHROMEOS_BUILD': '15651',
-                'CHROMEOS_BRANCH': '0',
-                'CHROMEOS_PATCH': '0',
-                'CHROMEOS_VERSION_STRING': '15651.0.0',
-            },
+        content = textwrap.dedent(
+            '''
+        ChromiumOS version information:
+        CHROME_BRANCH=120
+        CHROME_VERSION=
+        CHROMEOS_BUILD=15651
+        CHROMEOS_BRANCH=0
+        CHROMEOS_PATCH=0
+        CHROMEOS_VERSION_STRING=15651.0.0'''
         )
+        with mock.patch('builtins.open', mock.mock_open(read_data=content)):
+            self.assertEqual(
+                cros_util.ChromeOSVersionParser.query_repo_chromeos_version(
+                    'foo'
+                ),
+                cros_util.ChromeOSVersion(
+                    chrome_branch=120,
+                    chromeos_build=15651,
+                    chromeos_branch=0,
+                    chromeos_patch=0,
+                ),
+            )
+
+    def test_parse_chromeos_version(self):
+        with open(testing.get_testdata_path('chromeos_version.sh')) as f:
+            contents = f.read()
+        self.assertEqual(
+            cros_util.ChromeOSVersionParser.parse_chromeos_version(contents),
+            cros_util.ChromeOSVersion(
+                chrome_branch=121,
+                chromeos_build=15684,
+                chromeos_branch=71,
+                chromeos_patch=0,
+            ),
+        )
+        with self.assertRaises(ValueError):
+            cros_util.ChromeOSVersionParser.parse_chromeos_version('unparsable')
 
 
 if __name__ == '__main__':

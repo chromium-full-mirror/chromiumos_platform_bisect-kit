@@ -139,6 +139,20 @@ DEFAULT_REPAIR_DUT_ATTEMPTS = 3
 
 
 @dataclasses.dataclass
+class ChromeOSVersion:
+    """A data class to store ChromeOS Version info parsed.
+
+    The version keys are defined in:
+    https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/0357a0ff14d1de4fb99976a3edf453063cde8130/chromeos/config/chromeos_version.sh
+    """
+
+    chrome_branch: int
+    chromeos_build: int
+    chromeos_branch: int
+    chromeos_patch: int
+
+
+@dataclasses.dataclass
 class VersionInfo:
     """A data class represents version info."""
 
@@ -981,17 +995,26 @@ def has_release_prebuilt(board: str, version: str) -> bool:
     return bool(query_prebuilt_gs_path(board, version, [release_bucket]))
 
 
-def query_milestone_by_version(board: str, short_version: str) -> str | None:
+def query_milestone_by_version(
+    board: str,
+    short_version: str,
+    spec_manager: typing.Optional[ChromeOSSpecManager] = None,
+) -> str | None:
     """Query milestone by ChromeOS version number.
 
     Args:
       board: ChromeOS board name
       short_version: ChromeOS version number in short format, ex. 9300.0.0
+      spec_manager: ChromeOS spec manager, to query version info in overlays
 
     Returns:
       ChromeOS milestone number (string). For example, '58' for '9300.0.0'.
       None if failed.
     """
+    if spec_manager:
+        info = spec_manager.lookup_chromeos_version(short_version)
+        if info:
+            return info.chrome_branch
     for archive_path in _iter_valid_prebuilt_gs_path(board, short_version):
         if m := re.search(r'/R(?P<milestone>\d+)-', archive_path):
             return m.group('milestone')
@@ -1086,12 +1109,15 @@ def version_to_short(version):
     return short_version
 
 
-def version_to_full(board, version):
+def version_to_full(
+    board, version, spec_manager: typing.Optional[ChromeOSSpecManager] = None
+):
     """Convert ChromeOS version number to full format.
 
     Args:
       board: ChromeOS board name
       version: ChromeOS version number in short or full format
+      spec_manager: ChromeOS spec manager, to query version info in overlays
 
     Returns:
       version number in full format
@@ -1101,7 +1127,9 @@ def version_to_full(board, version):
         return make_cros_full_version(milestone, short_version)
     if is_cros_full_version(version):
         return version
-    milestone = query_milestone_by_version(board, version)
+    milestone = query_milestone_by_version(
+        board, version, spec_manager=spec_manager
+    )
     if not milestone:
         raise errors.ExternalError(
             'incorrect board=%s or version=%s ?' % (board, version)
@@ -1270,7 +1298,11 @@ def list_prebuilt_from_image_archive(
 
 
 def list_chromeos_prebuilt_versions(
-    board: str, old: str, new: str, use_snapshot: bool = False
+    board: str,
+    old: str,
+    new: str,
+    use_snapshot: bool = False,
+    spec_manager: typing.Optional[ChromeOSSpecManager] = None,
 ) -> tuple[list[str], dict[str, typing.Any]]:
     """Lists ChromeOS version numbers with prebuilt between given range
 
@@ -1279,6 +1311,7 @@ def list_chromeos_prebuilt_versions(
       old: start version (inclusive)
       new: end version (inclusive)
       use_snapshot: return snapshot versions if found
+      spec_manager: ChromeOS spec manager, to query version info in overlays
 
     Returns:
       (versions, details)
@@ -1288,9 +1321,9 @@ def list_chromeos_prebuilt_versions(
     """
     # Normalize.
     if is_cros_short_version(old):
-        old = version_to_full(board, old)
+        old = version_to_full(board, old, spec_manager=spec_manager)
     if is_cros_short_version(new):
-        new = version_to_full(board, new)
+        new = version_to_full(board, new, spec_manager=spec_manager)
 
     versions = []
     details: dict[str, typing.Any] = {}
@@ -2140,7 +2173,9 @@ def prepare_chroot(chromeos_root, replace=False):
     # But earlier versions need this file as well because of cipd ACL change.
     creds_path = '~/.config/chrome_infra/auth/creds.json'
     chromeos_build = int(
-        query_repo_chromeos_version(chromeos_root)['CHROMEOS_BUILD']
+        ChromeOSVersionParser.query_repo_chromeos_version(
+            chromeos_root
+        ).chromeos_build
     )
     if chromeos_build < 12866 and os.path.exists(
         os.path.expanduser(creds_path)
@@ -2745,6 +2780,10 @@ class ChromeOSSpecManager(codechange.SpecManager):
         self.historical_manifest_git_dir = os.path.join(
             self.config['chromeos_mirror'], 'chromeos/manifest-versions.git'
         )
+        self.chromiumos_overlay_git_dir = os.path.join(
+            self.config['chromeos_mirror'],
+            'chromiumos/overlays/chromiumos-overlay.git',
+        )
         self.historical_manifest_branch_name = 'refs/heads/main'
         if not os.path.exists(self.historical_manifest_git_dir):
             raise errors.InternalError(
@@ -3250,6 +3289,39 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # needs git tag information.
         repo_util.sync(self.config['chromeos_root'])
 
+    def lookup_chromeos_version(
+        self, version
+    ) -> typing.Optional[ChromeOSVersion]:
+        """Lookup ChromeOS version info from overlays history.
+
+        Args:
+            short_version: ChromeOS version.
+
+        Returns:
+            ChromeOS version info, or None if not found.
+        """
+        chromeos_version_path = 'chromeos/config/chromeos_version.sh'
+        short_version = version_to_short(version)
+
+        logs = git_util.get_history(
+            self.chromiumos_overlay_git_dir,
+            chromeos_version_path,
+            all_branch=True,
+            with_subject=True,
+        )
+        for log in logs:
+            if re.match(
+                rf'^Increment(ed)? to version.+{short_version}.*', log.subject
+            ):
+                return ChromeOSVersionParser.parse_chromeos_version(
+                    git_util.get_file_from_revision(
+                        self.chromiumos_overlay_git_dir,
+                        log.rev,
+                        chromeos_version_path,
+                    )
+                )
+        return None
+
 
 @contextlib.contextmanager
 def _prepare_results_stores(src: str, dst: str):
@@ -3339,23 +3411,56 @@ def normalize_test_name(test_name: str) -> str:
     return test_name.removeprefix('tauto.')
 
 
-def query_repo_chromeos_version(chromeos_root: str) -> dict[str, str]:
-    """Queries the version file inside chromeos_root.
+class ChromeOSVersionParser:
+    """Helper class to parse chromeos_version.sh."""
 
-    Args:
-      chromeos_root: the chromeos tree
+    _VERSION_RE_MAPPING = {
+        'chrome_branch': re.compile(r'\bCHROME_BRANCH=(\d+)\b'),
+        'chromeos_build': re.compile(r'\bCHROMEOS_BUILD=(\d+)\b'),
+        'chromeos_branch': re.compile(r'\bCHROMEOS_BRANCH=(\d+)\b'),
+        'chromeos_patch': re.compile(r'\bCHROMEOS_PATCH=(\d+)\b'),
+    }
 
-    Returns:
-      A dict indicates the version info inside the repo.
-      The version keys are defined in:
-      https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/0357a0ff14d1de4fb99976a3edf453063cde8130/chromeos/config/chromeos_version.sh
-    """
-    sh_path = os.path.join(
-        chromeos_root,
-        'src/third_party/chromiumos-overlay/chromeos/config/chromeos_version.sh',
-    )
-    if not os.path.exists(sh_path):
-        raise errors.InternalError('Unable to find chromeos_version.sh')
+    @classmethod
+    def query_repo_chromeos_version(cls, chromeos_root: str) -> ChromeOSVersion:
+        """Queries the version file inside chromeos_root.
 
-    output = util.check_output(sh_path)
-    return dict(re.findall(r'(\w+)=(.*)$', output, re.M))
+        Args:
+           chromeos_root: the chromeos tree
+
+         Returns:
+           The parsed version info.
+        """
+        sh_path = os.path.join(
+            chromeos_root,
+            'src/third_party/chromiumos-overlay/chromeos/config/chromeos_version.sh',
+        )
+        if not os.path.exists(sh_path):
+            raise errors.InternalError('Unable to find chromeos_version.sh')
+        with open(sh_path) as f:
+            contents = f.read()
+            return cls.parse_chromeos_version(contents)
+
+    @classmethod
+    def parse_chromeos_version(cls, contents: str) -> ChromeOSVersion:
+        """Parse version arguments from chromeos_version.sh.
+
+        Args:
+            contents: Content of chromeos_version.sh.
+
+        Raises:
+            ValueError: If the file is not parsable.
+
+        Returns:
+            The parsed version info.
+        """
+        version_args = {}
+        for k, regex in cls._VERSION_RE_MAPPING.items():
+            m = regex.search(contents)
+            if m is None:
+                raise ValueError(
+                    'pattern %r did not match chromeos_version.sh'
+                    % regex.pattern
+                )
+            version_args[k] = int(m.group(1))
+        return ChromeOSVersion(**version_args)

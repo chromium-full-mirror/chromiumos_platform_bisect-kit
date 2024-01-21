@@ -378,12 +378,25 @@ def search_closest_snapshot_image(opts) -> typing.Optional[str]:
     #        versions.
     #     2: The performance improvement of using a far prebuilt is not
     #        significant.
-    search_end_major_version = (
-        int(cros_util.extract_major_version(new_rev)) + 10
-    )
-    search_end_version = f'{search_end_major_version}.0.0'
+    spec_manager = get_chromeos_spec_manager(opts)
+    new_major_version = int(cros_util.extract_major_version(new_rev))
+    search_end_version = f'{new_major_version}.0.0'
+    # "{new_major_version+10}.0.0" may be an unexisting release, if it doesn't
+    # exist, we pick the latest released version as an upper_bound version.
+    for major_version in range(
+        new_major_version + 10, new_major_version - 1, -1
+    ):
+        if info := spec_manager.lookup_chromeos_version(f'{major_version}.0.0'):
+            search_end_version = (
+                f'R{info.chrome_branch}-{info.chromeos_build}.0.0'
+            )
+            break
     versions, _ = cros_util.list_chromeos_prebuilt_versions(
-        opts.board, new_rev, search_end_version, use_snapshot=True
+        opts.board,
+        new_rev,
+        search_end_version,
+        use_snapshot=True,
+        spec_manager=get_chromeos_spec_manager(opts),
     )
     for v in versions:
         if cros_util.is_cros_snapshot_version(v):
@@ -405,12 +418,7 @@ def search_closest_snapshot_commit(opts) -> typing.Optional[str]:
         closest_version
     )
 
-    config = dict(
-        board=opts.board,
-        chromeos_root=opts.chromeos_root,
-        chromeos_mirror=opts.chromeos_mirror,
-    )
-    spec_manager = cros_util.ChromeOSSpecManager(config)
+    spec_manager = get_chromeos_spec_manager(opts)
     for (
         _,
         commit_id,

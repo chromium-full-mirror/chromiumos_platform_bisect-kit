@@ -908,6 +908,7 @@ def get_history(
     padding_begin: bool = False,
     padding_end: bool = False,
     with_subject: bool = False,
+    all_branch: bool = False,
 ) -> list[Commit]:
     """Get commit history of given path.
 
@@ -925,7 +926,8 @@ def get_history(
           'after' time, if 'path' existed at that time.
       padding_end: If True, pads returned result with dummy record at exact
           'before' time, if 'path' existed at that time.
-      with_subject: If True, return commit subject together
+      with_subject: If True, return commit subject together.
+      all_branch: If True, returns git log regardless the branch name.
 
     Returns:
       List of (timestamp, git hash, subject); or (timestamp, git hash) depends
@@ -938,6 +940,7 @@ def get_history(
       words, `timestamp` is not necessary the commit time of `git hash` for the
       padded entries.
     """
+    assert not (all_branch and branch)
     log_format = '%ct %H' if not with_subject else '%ct %H %s'
     cmd = [
         'git',
@@ -955,6 +958,8 @@ def get_history(
     if branch:
         assert not is_git_rev(branch)
         cmd += [branch]
+    if all_branch:
+        cmd += ['--all']
     if path:
         # '--' is necessary otherwise if `path` is removed in current revision, git
         # will complain it's an ambiguous argument which may be path or something
