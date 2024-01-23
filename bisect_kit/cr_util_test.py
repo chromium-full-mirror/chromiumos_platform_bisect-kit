@@ -4,7 +4,7 @@
 
 """Test cr_util module"""
 
-import pathlib
+import os
 import unittest
 
 from bisect_kit import cr_util
@@ -97,14 +97,13 @@ class TestCrUtil(unittest.TestCase):
         )
 
     def test_get_RBE_environment_variables(self):
+        os.environ['SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'] = 'bisect_runner_path'
+
         # pylint: disable=protected-access
         env = cr_util.get_RBE_environment_variables()
 
         self.assertTrue('RBE_credential_file' in env)
-        self.assertEqual(
-            env['RBE_credential_file'],
-            pathlib.Path.home() / 'bisect-runner.json',
-        )
+        self.assertEqual(env['RBE_credential_file'], 'bisect_runner_path')
 
         self.assertTrue('RBE_use_application_default_credentials' in env)
         self.assertEqual(env['RBE_use_application_default_credentials'], 'true')

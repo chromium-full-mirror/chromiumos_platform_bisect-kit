@@ -7,7 +7,6 @@
 import json
 import logging
 import os
-import pathlib
 import re
 import shutil
 import subprocess
@@ -420,11 +419,17 @@ def get_RBE_environment_variables() -> dict[str, str]:
     """
     env = os.environ.copy()
 
-    bisect_runner_json_path = pathlib.Path.home() / 'bisect-runner.json'
+    bisect_runner_json_path = os.environ.get(
+        'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'
+    )
     env['RBE_credential_file'] = bisect_runner_json_path
     env['RBE_use_application_default_credentials'] = 'true'
     env['RBE_use_gce_credentials'] = 'false'
     env['RBE_automatic_auth'] = 'false'
+    # Autoninja does not allow external accounts on corp machines to
+    # authenticate with reproxy by default. This flag is used to skip
+    # that check. For more details, see b/320639792.
+    env['AUTONINJA_SKIP_EXTERNAL_ACCOUNT_CHECK'] = '1'
 
     return env
 
