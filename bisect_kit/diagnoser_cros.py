@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import sys
+import typing
 
 from bisect_kit import android_util
 from bisect_kit import bisector_cli
@@ -50,6 +51,24 @@ def run_switch_or_eval_cmd(cmd):
             'failed to run %s (%s): %s'
             % (cmd[0], result.get('exception'), result.get('reason'))
         )
+
+
+class InitOnce:
+    """A helper class to run an init func only once."""
+
+    def __init__(self, name: str, init_func: typing.Callable[[], None]):
+        self._name = name
+        self._init_func = init_func
+        self._initialized = False
+
+    def run(self):
+        if self._initialized:
+            logger.info('%s has been run, skipped', self._name)
+            return
+        logger.info('running init func %s', self._name)
+        self._init_func()
+        logger.info('%s completed', self._name)
+        self._initialized = True
 
 
 class CrosDiagnoser:
@@ -121,6 +140,19 @@ class CrosDiagnoser:
                 dut, should_always_reflash=self.config['always_reflash']
             )
 
+        def switch_test_harness_to_old(dut):
+            logger.info('switch test harness to old for %s', dut)
+            run_switch_or_eval_cmd(
+                switch_test_harness_cmd
+                + [
+                    self.cros_old,
+                    '--session',
+                    self.config['session'],
+                    '--dut',
+                    dut,
+                ]
+            )
+
         def init_autotest_deps_workaround(dut):
             """A workaround initialization for autotest.
 
@@ -143,55 +175,76 @@ class CrosDiagnoser:
         self.states.add_history('start')
         self.states.save()
 
-        # Steps 1 to 4 are prebuilt stages. So we can just use the same DUT in
-        # stateless bisection.
         dut_manager = dut_manager_module.DutManager(
-            'Prebuilt',
+            'NoInit',
             self.states,
             self.pre_allocated_dut,
             self.is_stateless,
         )
-        with dut_manager.provision() as dut:
-            # Query DUT dependent properties.
-            self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(dut)
-            self.states.save()
+        if not self.config.get('board') or not self.config.get(
+            'board_cpu_arch'
+        ):
+            logger.info('querying DUT related info')
+            # 1. For stateful bisection, a pre-allocated DUT should already exist.
+            # The following code would not lease DUT but only query
+            # 'board_cpu_arch' from the pre-allocated DUT. On the other hand,
+            # 'board' should already exist in self.config.
+            # 2. For stateless bisection, a DUT would be auto-leased by the
+            # following code. 'board' would be updated in
+            # dut_maaner.provision().
+            with dut_manager.provision() as dut:
+                # Query DUT dependent properties.
+                self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(
+                    dut
+                )
+                self.states.save()
 
-            # Fix commands which depend on "board".
-            if switch_test_harness_cmd:
-                switch_test_harness_cmd = switch_test_harness_cmd + [
-                    '--board',
-                    self.config['board'],
+        assert self.config.get('board'), '"board" is undetermined'
+        assert self.config.get(
+            'board_cpu_arch'
+        ), '"board_cpu_arch" is undetermined'
+
+        # Fix commands which depend on "board".
+        if switch_test_harness_cmd:
+            switch_test_harness_cmd = switch_test_harness_cmd + [
+                '--board',
+                self.config['board'],
+            ]
+        if not is_custom_eval and not is_autotest:
+            # So far only the `release` images support the `--prebuilt` option
+            if cros_util.has_release_prebuilt(
+                self.config['board'], self.config['old']
+            ):
+                cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + ['--prebuilt']
+                lacros_prebuilt_eval_cmd = lacros_prebuilt_eval_cmd + [
+                    '--prebuilt'
                 ]
-            if not is_custom_eval and not is_autotest:
-                # So far only the `release` images support the `--prebuilt` option
-                if cros_util.has_release_prebuilt(
-                    self.config['board'], self.config['old']
-                ):
-                    cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + [
-                        '--prebuilt'
-                    ]
-                    lacros_prebuilt_eval_cmd = lacros_prebuilt_eval_cmd + [
-                        '--prebuilt'
-                    ]
-                else:
-                    cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + [
-                        '--tast-build'
-                    ]
-                    lacros_prebuilt_eval_cmd = lacros_prebuilt_eval_cmd + [
-                        '--tast-build'
-                    ]
+            else:
+                cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + [
+                    '--tast-build'
+                ]
+                lacros_prebuilt_eval_cmd = lacros_prebuilt_eval_cmd + [
+                    '--tast-build'
+                ]
 
-            # Step 1: Narrows down ChromeOS prebuilt.
-            self.narrow_down_chromeos_prebuilt(
-                dut_manager,
-                self.config['cros_prebuilt_old'],
-                self.config['cros_prebuilt_new'],
-                cros_prebuilt_eval_cmd,
-                switch_test_harness_cmd=switch_test_harness_cmd,
-            )
+        # Step 1: Narrows down ChromeOS prebuilt.
+        self.narrow_down_chromeos_prebuilt(
+            dut_manager,
+            self.config['cros_prebuilt_old'],
+            self.config['cros_prebuilt_new'],
+            cros_prebuilt_eval_cmd,
+            switch_test_harness_cmd=switch_test_harness_cmd,
+        )
 
-            # Switches CrOS repository and DUT to narrowed down old version.
-            run_switch_or_eval_cmd(
+        old_cros_version = cros_util.version_to_short(self.cros_old)
+        logger.debug('old_cros_version, %s', old_cros_version)
+
+        # Switches CrOS repository and DUT to narrowed down old version.
+        # This is time consuming and only needs to be done once for domains
+        # which are based on old CrOS image.
+        switch_cros_repo_to_old = InitOnce(
+            'switch_cros_repo_to_old',
+            lambda: run_switch_or_eval_cmd(
                 [
                     './switch_cros_localbuild.py',
                     '--rich-result',
@@ -206,100 +259,94 @@ class CrosDiagnoser:
                     '--session',
                     self.config['session'],
                 ]
-            )
-            if switch_test_harness_cmd:
-                run_switch_or_eval_cmd(
-                    switch_test_harness_cmd
-                    + [
-                        self.cros_old,
-                        '--session',
-                        self.config['session'],
-                        '--dut',
-                        dut,
-                    ]
-                )
+            ),
+        )
+
+        def bisect_prebuilt_on_old_cros_dut_init_func(dut):
             init_dut_to_old_cros(dut)
-            dut_os_version = cros_util.query_dut_short_version(dut)
+            if switch_test_harness_cmd:
+                switch_test_harness_to_old(dut)
 
-            # Step 2: Narrows down Android prebuilt. If the error can be reproduced,
-            # returns the result and skips other steps.
-            try:
-                if self.narrow_down_android(
-                    dut_manager, android_prebuilt_eval_cmd
-                ):
-                    return
-            except errors.DiagnoseContradiction:
-                raise
-            except Exception as e:
-                if self.is_stateless and isinstance(
-                    e, errors.BisectRetriableError
-                ):
-                    raise
-                self.make_decision(
-                    'Exception in Android bisector before verification; '
-                    'assume the culprit is not inside Android and continue'
-                )
-            # Assume it's ok to leave random version of android prebuilt on DUT.
-            # Sanity check. The OS version should not change after android bisect.
-            assert dut_os_version == cros_util.query_dut_short_version(
+        def bisect_prebuilt_on_old_cros_dut_leave_context_check_func(dut):
+            logger.info('checking cros version on dut %s', dut)
+            assert old_cros_version == cros_util.query_dut_short_version(
                 dut
             ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
-            # Step 3: Narrows down Lacros prebuilt. If the error can be reproduced,
-            # Run the Chrome local build step with the narrowed down range.
-            # In case of failure, run the Chrome local build step with the previous range.
-            try:
-                self.narrow_down_lacros_prebuilt(
-                    dut_manager, lacros_prebuilt_eval_cmd
-                )
-            except errors.DiagnoseContradiction:
-                raise
-            except Exception as e:
-                if self.is_stateless and isinstance(
-                    e, errors.BisectRetriableError
-                ):
-                    raise
-                self.make_decision(
-                    'Exception in Lacros bisector before verification; '
-                    'assume the culprit is not inside Lacros and continue'
-                )
-            # Assume it's ok to leave random version of Lacros prebuilt on DUT.
-            # Sanity check. The OS version should not change after lacros bisect.
-            assert dut_os_version == cros_util.query_dut_short_version(
-                dut
-            ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+        dut_manager = dut_manager_module.DutManager(
+            'OldCros',
+            self.states,
+            self.pre_allocated_dut,
+            self.is_stateless,
+            bisect_prebuilt_on_old_cros_dut_init_func,
+            bisect_prebuilt_on_old_cros_dut_leave_context_check_func,
+        )
 
-            # Step 4: Narrows down DLC prebuilt.
-            try:
-                if self.narrow_down_dlc_prebuilt(
-                    dut_manager,
-                    self.config['old'],
-                    self.config['new'],
-                    cros_prebuilt_eval_cmd,
-                ):
-                    return
-            except errors.DiagnoseContradiction:
+        # Step 2: Narrows down Android prebuilt. If the error can be reproduced,
+        # returns the result and skips other steps.
+        try:
+            if self.narrow_down_android(
+                dut_manager,
+                android_prebuilt_eval_cmd,
+                init_once=switch_cros_repo_to_old,
+            ):
+                return
+        except errors.DiagnoseContradiction:
+            raise
+        except Exception as e:
+            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
                 raise
-            except Exception as e:
-                if self.is_stateless and isinstance(
-                    e, errors.BisectRetriableError
-                ):
-                    raise
-                self.make_decision(
-                    'Exception in DLC bisector before verification; '
-                    'assume the culprit is not inside DLC and continue'
-                )
-            # Assume it's ok to leave random version of DLC prebuilt on DUT.
-            # Sanity check. The OS version should not change after DLC bisect.
-            assert dut_os_version == cros_util.query_dut_short_version(
-                dut
-            ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+            self.make_decision(
+                'Exception in Android bisector before verification; '
+                'assume the culprit is not inside Android and continue'
+            )
+
+        # Step 3: Narrows down Lacros prebuilt. If the error can be reproduced,
+        # Run the Chrome local build step with the narrowed down range.
+        # In case of failure, run the Chrome local build step with the previous range.
+        try:
+            self.narrow_down_lacros_prebuilt(
+                dut_manager,
+                lacros_prebuilt_eval_cmd,
+                init_once=switch_cros_repo_to_old,
+            )
+        except errors.DiagnoseContradiction:
+            raise
+        except Exception as e:
+            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
+                raise
+            self.make_decision(
+                'Exception in Lacros bisector before verification; '
+                'assume the culprit is not inside Lacros and continue'
+            )
+
+        # Step 4: Narrows down DLC prebuilt.
+        try:
+            if self.narrow_down_dlc_prebuilt(
+                dut_manager,
+                self.config['old'],
+                self.config['new'],
+                cros_prebuilt_eval_cmd,
+                init_once=switch_cros_repo_to_old,
+            ):
+                return
+        except errors.DiagnoseContradiction:
+            raise
+        except Exception as e:
+            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
+                raise
+            self.make_decision(
+                'Exception in DLC bisector before verification; '
+                'assume the culprit is not inside DLC and continue'
+            )
 
         # Step 5: Narrows down Chrome local build. If the error can be reproduced,
         # returns the result and skips other steps.
 
         def bisect_local_chrome_dut_init_func(dut):
             init_dut_to_old_cros(dut)
+            if switch_test_harness_cmd:
+                switch_test_harness_to_old(dut)
             init_autotest_deps_workaround(dut)
 
         def bisect_local_chrome_dut_leave_context_check_func(dut):
@@ -310,7 +357,7 @@ class CrosDiagnoser:
                 not self.config['chrome_deploy_image']
                 and not self.config['enable_buildbucket_chrome']
             ):
-                assert dut_os_version == cros_util.query_dut_short_version(
+                assert old_cros_version == cros_util.query_dut_short_version(
                     dut
                 ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
@@ -329,6 +376,7 @@ class CrosDiagnoser:
             if self.narrow_down_chrome(
                 dut_manager,
                 chrome_localbuild_eval_cmd,
+                init_once=switch_cros_repo_to_old,
                 buildbucket_build=buildbucket_buildable
                 and self.config['enable_buildbucket_chrome'],
                 should_build_with_tests=should_build_chrome_localbuild_with_tests,
@@ -583,6 +631,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
+        init_once: InitOnce,
     ) -> bool:
         """Bisect with Android prebuilt and localbuild.
 
@@ -591,6 +640,7 @@ class CrosDiagnoser:
         Args:
           dut_manager: a DutManager instance.
           eval_cmd: command to reproduce the regression
+          init_once: init func which should be called once.
 
         Returns:
           True: culprit is inside Android
@@ -638,6 +688,9 @@ class CrosDiagnoser:
                 self.is_stateless,
             )
             try:
+                if bisector.check_done():
+                    return True
+
                 bisector.init_if_necessary(
                     self.old_info.android_build_id,
                     self.new_info.android_build_id,
@@ -662,8 +715,13 @@ class CrosDiagnoser:
                     noisy=self.noisy,
                     endpoint_verification=self.config['endpoint_verification'],
                 )
-
-                android_old, android_new, self.noisy = bisector.narrow_down()
+                init_once.run()
+                with dut_manager.provision():
+                    (
+                        android_old,
+                        android_new,
+                        self.noisy,
+                    ) = bisector.narrow_down()
                 verified = True
             except errors.VerifyOldBehaviorFailed as e:
                 self.make_decision(
@@ -729,6 +787,8 @@ class CrosDiagnoser:
             self.is_stateless,
         )
         try:
+            if bisector.check_done():
+                return True
             bisector.init_if_necessary(
                 android_old,
                 android_new,
@@ -760,7 +820,9 @@ class CrosDiagnoser:
                 endpoint_verification=self.config['endpoint_verification'],
             )
 
-            android_old, android_new, self.noisy = bisector.narrow_down()
+            init_once.run()
+            with dut_manager.provision():
+                android_old, android_new, self.noisy = bisector.narrow_down()
             verified = True
         except errors.VerificationFailed as e:
             if verified:
@@ -792,6 +854,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
+        init_once: InitOnce,
     ) -> bool:
         """Bisect with Lacros Prebuilt.
 
@@ -800,6 +863,7 @@ class CrosDiagnoser:
         Args:
           dut_manager: a DutManager instance.
           eval_cmd: command to reproduce the regression
+          init_once: init func which should be called once.
 
         Returns:
           True: culprit is inside Lacros
@@ -854,6 +918,8 @@ class CrosDiagnoser:
         ]
 
         try:
+            if bisector.check_done():
+                return True
             bisector.init_if_necessary(
                 self.old_info.cr_version,
                 self.new_info.cr_version,
@@ -869,7 +935,9 @@ class CrosDiagnoser:
                 endpoint_verification=self.config['endpoint_verification'],
             )
 
-            lacros_old, lacros_new, self.noisy = bisector.narrow_down()
+            init_once.run()
+            with dut_manager.provision():
+                lacros_old, lacros_new, self.noisy = bisector.narrow_down()
 
             # If lacros prebuilt successfully narrow down to a range,
             # Run chrome bisection from that range
@@ -899,6 +967,7 @@ class CrosDiagnoser:
         old: str,
         new: str,
         eval_cmd: list[str],
+        init_once: InitOnce,
     ) -> bool:
         """Bisect ChromeOS DLC prebuilt.
 
@@ -907,6 +976,7 @@ class CrosDiagnoser:
           old: the old version of the prebuilt.
           new: the new version of the prebuilt.
           eval_cmd: command to reproduce the regression.
+          init_once: init func which should be called once.
 
         Returns:
           True if the bisection is successful.
@@ -930,14 +1000,7 @@ class CrosDiagnoser:
             )
             return False
 
-        dut = dut_manager.dut or self.config['dut']
-        if not borealis_util.is_installable(dut):
-            self.make_decision(
-                'The bisection with borealis DLC is bypassed because '
-                'it is not supported by the board/model/version of the DUT.'
-            )
-            return False
-
+        logger.info('bisect dlc prebuilt')
         self.states.add_history(
             'bisect',
             text='bisect borealis dlc prebuilt',
@@ -981,7 +1044,17 @@ class CrosDiagnoser:
         )
 
         try:
-            bisector.narrow_down()
+            if bisector.check_done():
+                return True
+            init_once.run()
+            with dut_manager.provision() as dut:
+                if not borealis_util.is_installable(dut):
+                    self.make_decision(
+                        'The bisection with borealis DLC is bypassed because '
+                        'it is not supported by the board/model/version of the DUT.'
+                    )
+                    return False
+                bisector.narrow_down()
         except errors.VerifyOldBehaviorFailed:
             self.make_decision(
                 f'Unable to reproduce the old behavior ({self.config["term_old"]}). '
@@ -1000,6 +1073,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
+        init_once: InitOnce,
         buildbucket_build: bool = False,
         should_build_with_tests: bool = True,
     ) -> bool:
@@ -1012,6 +1086,7 @@ class CrosDiagnoser:
           eval_cmd: command to reproduce the regression
           buildbucket_build: to build Chrome image on buildbucket
           should_build_with_tests: build test binaries as well
+          init_once: init func which should be called once.
 
         Returns:
           True: culprit is inside Chrome
@@ -1091,6 +1166,8 @@ class CrosDiagnoser:
             self.is_stateless,
         )
         try:
+            if bisector.check_done():
+                return True
             bisector.init_if_necessary(
                 self.old_info.cr_version,
                 self.new_info.cr_version,
@@ -1111,6 +1188,7 @@ class CrosDiagnoser:
                 endpoint_verification=self.config['endpoint_verification'],
             )
 
+            init_once.run()
             bisector.narrow_down()
         except errors.VerifyOldBehaviorFailed as e:
             self.make_decision(

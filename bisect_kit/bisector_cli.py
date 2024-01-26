@@ -1450,6 +1450,45 @@ class BisectorCommandLine:
             saved_states=self.states.strategy_states,
         )
 
+    def check_done(self, session: typing.Optional[str] = None) -> bool:
+        """Checks whether the bisection is done by looking at the history.
+
+        If the bisection is successful (i.e., culprits are found in the bisection), returns True.
+        If the bisection can not be reproduced (e.g., verification error), exceptions are raised.
+
+        Args:
+          session: The session name.
+
+        Returns:
+          True if the bisection already has a verdict.
+
+        Raises:
+          errors.VerificationFailed
+          errors.WrongAssumption
+        """
+        logger.debug('checking past state of %s', self.domain_cls.__name__)
+        self._create_states(session=session)
+        if not self.states.inited and not self.states.load_states():
+            logger.debug(
+                'failed to load state for %s', self.domain_cls.__name__
+            )
+            return False
+
+        self.strategy = self._strategy_factory()
+        if self.strategy.is_done():
+            logger.debug('%s done', self.domain_cls.__name__)
+            return True
+        # Try to get the next rev idx in order to know whether the bisection is
+        # completed or not.
+        # Raise VerificationFailed related errors if the bisection has been
+        # failed in the past.
+        # Since the cost_table is irrelevant to whether the bisection is
+        # completed or not (i.e., whether idx = None or not), pass None to it.
+        idx = self.strategy.next_idx(cost_table=None)
+        logger.debug('idx for %s: %s', self.domain_cls.__name__, idx)
+        # None means no more work to do.
+        return idx is None
+
     def current_status(self, session=None):
         """Gets current bisect status.
 

@@ -47,6 +47,17 @@ class BisectorWrapper:
         bisector = bisector_cli.BisectorCommandLine(self.domain_cls)
         return bisector.current_status(session=self.session)
 
+    def check_done(self) -> bool:
+        """Checks whether the bisection is done by looking at the history.
+
+        If not, we can shortcut and not call narrow_down() at all.
+
+        Returns:
+          True if the bisection already has a verdict.
+        """
+        bisector = bisector_cli.BisectorCommandLine(self.domain_cls)
+        return bisector.check_done(session=self.session)
+
     def init_if_necessary(
         self,
         old: str,
