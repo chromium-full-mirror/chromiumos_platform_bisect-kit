@@ -217,5 +217,17 @@ class TestMethodTimer(unittest.TestCase):
         mock_callback.assert_called_once_with(c, 1689336888.1, 1689336988.1)
 
 
+class TestInitOnce(unittest.TestCase):
+    """Test InitOnce()"""
+
+    def test_run_once(self):
+        mock_func = mock.Mock()
+        init_once = util.InitOnce("some_func", mock_func)
+        init_once.run()
+        mock_func.assert_called_once()
+        init_once.run()
+        mock_func.assert_called_once()
+
+
 if __name__ == '__main__':
     unittest.main()

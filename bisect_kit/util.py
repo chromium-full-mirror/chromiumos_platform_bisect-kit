@@ -735,3 +735,21 @@ class MethodTimer:
                 self._callback(wrapped_self, start_timestamp, time.time())
 
         return wrapper
+
+
+class InitOnce:
+    """A helper class to run an init func only once."""
+
+    def __init__(self, name: str, init_func: typing.Callable[[], None]):
+        self._name = name
+        self._init_func = init_func
+        self._initialized = False
+
+    def run(self):
+        if self._initialized:
+            logger.info('init once func "%s" has been run, skipped', self._name)
+            return
+        logger.info('running init once func "%s"', self._name)
+        self._init_func()
+        logger.info('init once func "%s" completed', self._name)
+        self._initialized = True

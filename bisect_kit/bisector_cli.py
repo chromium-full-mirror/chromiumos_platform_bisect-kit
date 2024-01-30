@@ -1509,7 +1509,7 @@ class BisectorCommandLine:
         # None means no more work to do.
         return idx is None
 
-    def current_status(self, session=None):
+    def current_status(self, session=None) -> dict:
         """Gets current bisect status.
 
         Returns:

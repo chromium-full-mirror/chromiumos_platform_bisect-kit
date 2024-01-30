@@ -8,10 +8,12 @@ import contextlib
 import importlib
 import logging
 import sys
+import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import core
 from bisect_kit import errors
+from bisect_kit import util
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,7 @@ class BisectorWrapper:
         with contextlib.redirect_stdout(stdout):
             bisector.main(*full_args, prog=self.name)
 
-    def current_status(self):
+    def current_status(self) -> dict:
         bisector = bisector_cli.BisectorCommandLine(self.domain_cls)
         return bisector.current_status(session=self.session)
 
@@ -122,7 +124,32 @@ class BisectorWrapper:
                 'config', 'future_build', '--mode=bisectkit', *future_build_cmd
             )
 
-    def narrow_down(self) -> tuple[str, str, str | None]:
+    def narrow_down(
+        self,
+        should_allocate_dut: bool,
+        init_once: util.InitOnce | None = None,
+        dut_precondition: typing.Callable[[str], bool] | None = None,
+    ) -> tuple[str, str, str | None]:
+        """Run bisection on the given domain.
+          It first looks at the history session file to see if the bisection
+          already has a verdict.
+          If yes, it returns immediately with previous result directly.
+          If not, it start/continue running the bisection.
+
+        Args:
+            should_allocate_dut: whether a DUT should be allocated by
+              self.dut_manager before running the bisection.
+            init_once: init function which should be executed before
+              actual run the bisection.
+            dut_precondition: a predicate which checks some DUT precondition.
+              When given, should_allocate_dut must be True.
+              It is called with the allocated DUT as the argument and returns
+              a bool. If the function returns False, an
+              errors.DutPreconditionNotMet is raised.
+
+        Returns:
+            (narrowed done old version, narrowed done new version, estimated noise)
+        """
         status = self.current_status()
         logger.info(
             '%s old=%s, new=%s, done=%s',
@@ -131,8 +158,36 @@ class BisectorWrapper:
             status['new'],
             status['done'],
         )
+
+        def get_result() -> tuple[str, str, str | None]:
+            """Gets bisection result from current status."""
+            status = self.current_status()
+            logger.info(
+                '%s result old=%s, new=%s, noisy=%s, done=%s',
+                self.name,
+                status['old'],
+                status['new'],
+                status['estimated_noise'],
+                status['done'],
+            )
+            self.call('view')
+            return status['old'], status['new'], status['estimated_noise']
+
+        # Shortcut if no further action should be done.
+        # If there were verification errors, exceptions are thrown.
+        if self.check_done():
+            return get_result()
+
+        if init_once:
+            init_once.run()
         try:
-            self.call('run')
+            if should_allocate_dut:
+                with self.dut_manager.provision() as dut:
+                    if dut_precondition and not dut_precondition(dut):
+                        raise errors.DutPreconditionNotMet()
+                    self.call('run')
+            else:
+                self.call('run')
         except Exception as e:
             if self.is_stateless and isinstance(e, errors.BisectRetriableError):
                 logger.debug('Retriable error %s, abort immeidately', e)
@@ -154,16 +209,4 @@ class BisectorWrapper:
                 )
             else:
                 raise
-        else:
-            status = self.current_status()
-
-        logger.info(
-            '%s result old=%s, new=%s, noisy=%s, done=%s',
-            self.name,
-            status['old'],
-            status['new'],
-            status['estimated_noise'],
-            status['done'],
-        )
-        self.call('view')
-        return status['old'], status['new'], status['estimated_noise']
+        return get_result()

@@ -205,6 +205,10 @@ class SshConnectionError(BisectionTemporaryError):
     """SSH connection error."""
 
 
+class DutPreconditionNotMet(Exception):
+    """DUT precondition doesn't met so the bisection can not proceed."""
+
+
 def reconstruct_from_string(cls_name: str, error_msg: str) -> Exception | None:
     """Reconstruct an exception from its class name and error message.
 

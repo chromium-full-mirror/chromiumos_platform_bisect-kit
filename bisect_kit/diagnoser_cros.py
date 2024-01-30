@@ -13,7 +13,6 @@ import json
 import logging
 import os
 import sys
-import typing
 
 from bisect_kit import android_util
 from bisect_kit import bisector_cli
@@ -51,24 +50,6 @@ def run_switch_or_eval_cmd(cmd):
             'failed to run %s (%s): %s'
             % (cmd[0], result.get('exception'), result.get('reason'))
         )
-
-
-class InitOnce:
-    """A helper class to run an init func only once."""
-
-    def __init__(self, name: str, init_func: typing.Callable[[], None]):
-        self._name = name
-        self._init_func = init_func
-        self._initialized = False
-
-    def run(self):
-        if self._initialized:
-            logger.info('%s has been run, skipped', self._name)
-            return
-        logger.info('running init func %s', self._name)
-        self._init_func()
-        logger.info('%s completed', self._name)
-        self._initialized = True
 
 
 class CrosDiagnoser:
@@ -271,7 +252,7 @@ class CrosDiagnoser:
         # Switches CrOS repository and DUT to narrowed down old version.
         # This is time consuming and only needs to be done once for domains
         # which are based on old CrOS image.
-        switch_cros_repo_to_old = InitOnce(
+        switch_cros_repo_to_old = util.InitOnce(
             'switch_cros_repo_to_old',
             lambda: run_switch_or_eval_cmd(
                 [
@@ -535,7 +516,11 @@ class CrosDiagnoser:
                 endpoint_verification=self.config['endpoint_verification'],
             )
 
-            self.cros_old, self.cros_new, self.noisy = bisector.narrow_down()
+            (
+                self.cros_old,
+                self.cros_new,
+                self.noisy,
+            ) = bisector.narrow_down(should_allocate_dut=True)
 
         prebuilt_states = core.BisectStates.from_bisector_class(
             'ChromeOSVersionDomain', self.config['session']
@@ -682,7 +667,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
-        init_once: InitOnce,
+        init_once: util.InitOnce,
     ) -> bool:
         """Bisect with Android prebuilt and localbuild.
 
@@ -739,9 +724,6 @@ class CrosDiagnoser:
                 self.is_stateless,
             )
             try:
-                if bisector.check_done():
-                    return True
-
                 bisector.init_if_necessary(
                     self.old_info.android_build_id,
                     self.new_info.android_build_id,
@@ -766,13 +748,13 @@ class CrosDiagnoser:
                     noisy=self.noisy,
                     endpoint_verification=self.config['endpoint_verification'],
                 )
-                init_once.run()
-                with dut_manager.provision():
-                    (
-                        android_old,
-                        android_new,
-                        self.noisy,
-                    ) = bisector.narrow_down()
+                (
+                    android_old,
+                    android_new,
+                    self.noisy,
+                ) = bisector.narrow_down(
+                    should_allocate_dut=True, init_once=init_once
+                )
                 verified = True
             except errors.VerifyOldBehaviorFailed as e:
                 self.make_decision(
@@ -838,8 +820,6 @@ class CrosDiagnoser:
             self.is_stateless,
         )
         try:
-            if bisector.check_done():
-                return True
             bisector.init_if_necessary(
                 android_old,
                 android_new,
@@ -871,9 +851,9 @@ class CrosDiagnoser:
                 endpoint_verification=self.config['endpoint_verification'],
             )
 
-            init_once.run()
-            with dut_manager.provision():
-                android_old, android_new, self.noisy = bisector.narrow_down()
+            android_old, android_new, self.noisy = bisector.narrow_down(
+                should_allocate_dut=True, init_once=init_once
+            )
             verified = True
         except errors.VerificationFailed as e:
             if verified:
@@ -905,7 +885,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
-        init_once: InitOnce,
+        init_once: util.InitOnce,
     ) -> bool:
         """Bisect with Lacros Prebuilt.
 
@@ -969,8 +949,6 @@ class CrosDiagnoser:
         ]
 
         try:
-            if bisector.check_done():
-                return True
             bisector.init_if_necessary(
                 self.old_info.cr_version,
                 self.new_info.cr_version,
@@ -986,9 +964,9 @@ class CrosDiagnoser:
                 endpoint_verification=self.config['endpoint_verification'],
             )
 
-            init_once.run()
-            with dut_manager.provision():
-                lacros_old, lacros_new, self.noisy = bisector.narrow_down()
+            lacros_old, lacros_new, self.noisy = bisector.narrow_down(
+                should_allocate_dut=True, init_once=init_once
+            )
 
             # If lacros prebuilt successfully narrow down to a range,
             # Run chrome bisection from that range
@@ -1018,7 +996,7 @@ class CrosDiagnoser:
         old: str,
         new: str,
         eval_cmd: list[str],
-        init_once: InitOnce,
+        init_once: util.InitOnce,
     ) -> bool:
         """Bisect ChromeOS DLC prebuilt.
 
@@ -1095,17 +1073,17 @@ class CrosDiagnoser:
         )
 
         try:
-            if bisector.check_done():
-                return True
-            init_once.run()
-            with dut_manager.provision() as dut:
-                if not borealis_util.is_installable(dut):
-                    self.make_decision(
-                        'The bisection with borealis DLC is bypassed because '
-                        'it is not supported by the board/model/version of the DUT.'
-                    )
-                    return False
-                bisector.narrow_down()
+            bisector.narrow_down(
+                should_allocate_dut=True,
+                init_once=init_once,
+                dut_precondition=borealis_util.is_installable,
+            )
+        except errors.DutPreconditionNotMet:
+            self.make_decision(
+                'The bisection with borealis DLC is bypassed because '
+                'it is not supported by the board/model/version of the DUT.'
+            )
+            return False
         except errors.VerifyOldBehaviorFailed:
             self.make_decision(
                 f'Unable to reproduce the old behavior ({self.config["term_old"]}). '
@@ -1124,7 +1102,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
-        init_once: InitOnce,
+        init_once: util.InitOnce,
         buildbucket_build: bool = False,
         should_build_with_tests: bool = True,
     ) -> bool:
@@ -1217,8 +1195,6 @@ class CrosDiagnoser:
             self.is_stateless,
         )
         try:
-            if bisector.check_done():
-                return True
             bisector.init_if_necessary(
                 self.old_info.cr_version,
                 self.new_info.cr_version,
@@ -1239,8 +1215,7 @@ class CrosDiagnoser:
                 endpoint_verification=self.config['endpoint_verification'],
             )
 
-            init_once.run()
-            bisector.narrow_down()
+            bisector.narrow_down(should_allocate_dut=False, init_once=init_once)
         except errors.VerifyOldBehaviorFailed as e:
             self.make_decision(
                 'Expect old Chrome has old behavior (%s) but failed'
@@ -1370,7 +1345,7 @@ class CrosDiagnoser:
         )
 
         try:
-            bisector.narrow_down()
+            bisector.narrow_down(should_allocate_dut=False)
         except errors.VerifyNewBehaviorFailed as e:
             raise errors.DiagnoseContradiction(
                 '%s that the issue could be reproduced with chromeos prebuilt; '
