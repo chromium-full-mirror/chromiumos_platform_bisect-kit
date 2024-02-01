@@ -483,11 +483,12 @@ class BisectStates(States):
         """Inherit from States."""
         return self.data
 
-    def get_rev_info(self, term_map=None) -> list[RevInfo]:
+    def get_rev_info(self, term_map=None, ignore_skip=False) -> list[RevInfo]:
         """Gets aggregated rev info.
 
         Args:
           term_map: Alternative term for states
+          ignore_skip: Whether to ignore 'skip' entries.
 
         Returns:
           list of RevInfo, which aggregated previous test samples.
@@ -498,6 +499,8 @@ class BisectStates(States):
             rev_info.append(RevInfo(rev, term_map=term_map))
         for entry in self.data['history']:
             if entry.get('event', 'sample') != 'sample':
+                continue
+            if ignore_skip and entry.get('status') == 'skip':
                 continue
             idx = self.rev2idx(entry['rev'])
             rev_info[idx].add_sample(**entry)

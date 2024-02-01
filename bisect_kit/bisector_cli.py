@@ -1447,14 +1447,30 @@ class BisectorCommandLine:
                     if 'link' in action:
                         print('\t%s' % action['link'])
 
-    def _strategy_factory(self):
+    def _strategy_factory(
+        self, ignore_skip=False
+    ) -> strategy.NoisyBinarySearch:
+        """Create a strategy.NoisyBinarySearch instance.
+
+        Past bisect history are loaded via BisectStates, if any.
+
+        Args:
+          ignore_skip: Whether to ignore 'skip' entries.
+            It is useful when retring a bisection since 'skip' are likely to be temporary errors.
+            By ignoring the 'skip' entries, we are able to retry a bisection which was failed
+            due to errors.TooManyTemporaryErrors previously.
+
+        Returns:
+          A strategy.NoisyBinarySearch instance.
+
+        """
         if not self.states.inited:
             return None
         term_map = {
             'old': self.config['term_old'],
             'new': self.config['term_new'],
         }
-        rev_info = self.states.get_rev_info(term_map)
+        rev_info = self.states.get_rev_info(term_map, ignore_skip=ignore_skip)
         assert rev_info
         return strategy.NoisyBinarySearch(
             rev_info,
@@ -1955,6 +1971,12 @@ class BisectorCommandLine:
             if not self.states.inited and not self.states.load_states():
                 raise errors.Uninitialized
             self.domain = self.domain_cls(self.states.config)
-            self.strategy = self._strategy_factory()
+            # Only ignore "skip" entries when running a bisection, since they are
+            # likely to be temporary errors and we want to give it a chance of
+            # retry.
+            # For other operations like cmd_view, we keep the full history.
+            self.strategy = self._strategy_factory(
+                ignore_skip=opts.command == 'run'
+            )
 
         return opts.func(opts)
