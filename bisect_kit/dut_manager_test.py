@@ -15,7 +15,6 @@ from unittest import mock
 
 from bisect_kit import core
 from bisect_kit import cros_lab_util
-from bisect_kit import cros_util
 from bisect_kit import dut_allocator
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
@@ -65,8 +64,10 @@ class TestDutManagerAllocation(unittest.TestCase):
                 new_callable=mock.PropertyMock,
             )
         )
-        self.mock_search_image = self.enterContext(
-            mock.patch.object(cros_util, 'search_image', autospec=True)
+        self.mock_search_vm_image = self.enterContext(
+            mock.patch.object(
+                dut_manager_module.DutManager, '_search_vm_image', autospec=True
+            )
         )
         self.mock_allocate_vm_dut = self.enterContext(
             mock.patch.object(vm_leaser, 'allocate_dut')
@@ -91,7 +92,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_allocate_dut.reset_mock()
         self.mock_wait_ssh_avaliable.reset_mock()
         self.mock_is_vm.reset_mock(return_value=True)
-        self.mock_search_image.reset_mock()
+        self.mock_search_vm_image.reset_mock()
         self.mock_allocate_vm_dut.reset_mock(return_value=True)
         self.mock_release_vm.reset_mock()
         self.mock_dut_init_func.reset_mock()
@@ -544,22 +545,6 @@ class TestDutManagerAllocation(unittest.TestCase):
                 vm_cros_version='invalid_version'
                 # dut_init_func and dut_leave_context_check_func are missing.
             )
-
-    def test_redefine_vm_cros_version(self):
-        # vm_cros_version is re-defined.
-        self.mock_is_vm.return_value = True
-        dut_manager = dut_manager_module.DutManager(
-            'VM',
-            self.mock_states,
-            None,
-            True,
-            should_force_monitoring=False,
-            vm_cros_version='R102-19999.0.0-12345'
-            # dut_init_func and dut_leave_context_check_func are missing.
-        )
-        with self.assertRaises(AssertionError):
-            with dut_manager.provision(vm_cros_version='R102-19999.0.0-12345'):
-                pass
 
     def test_non_vm_init_with_vm_cros_version(self):
         # vm_cros_version should not be passed to init for non-VM case.

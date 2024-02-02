@@ -319,6 +319,8 @@ class SnapshotStore:
                     image_info[img_type] = output[0]
             cls.images[snapshot_version] = image_info
 
+        if is_vm_board(board):
+            return cls.images[snapshot_version].get(ImageType.VM_IMAGE)
         zip_image = cls.images[snapshot_version].get(ImageType.ZIP_FILE)
         partition_image = cls.images[snapshot_version].get(
             ImageType.PARTITION_IMAGE

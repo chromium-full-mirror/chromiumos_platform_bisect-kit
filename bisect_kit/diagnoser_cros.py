@@ -123,11 +123,11 @@ class CrosDiagnoser:
         is_custom_eval: bool = False,
     ):
         def init_dut_to_old_cros(
-            dut_manager: dut_manager_module.DutManager,
+            dut: str,
         ):
-            logger.info('init dut %s to old cros', dut_manager.dut)
+            logger.info('init dut %s to old cros', dut)
             self._switch_chromeos_to_old(
-                dut_manager.dut,
+                dut,
                 should_always_reflash=self.config['always_reflash'],
             )
 
@@ -422,6 +422,7 @@ class CrosDiagnoser:
             self.states,
             self.pre_allocated_dut,
             self.is_stateless,
+            is_cros_localbuild_vm=self.is_vm_board,
         )
         self.narrow_down_chromeos_localbuild(
             dut_manager,

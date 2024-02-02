@@ -11,7 +11,6 @@ import time
 from typing import Optional
 import uuid
 
-from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import util
@@ -79,7 +78,7 @@ def grpc(server: str, method: str, content: dict) -> str:
         server,
         method,
     ]
-    if not common.under_luci_context() and service_account_json:
+    if service_account_json:
         cmd += ['-service-account-json', service_account_json]
 
     with tempfile.TemporaryFile(mode='w', suffix='.json') as temp:
@@ -226,7 +225,6 @@ def insert_image(
     time.sleep(90)
     for _ in range(0, MAX_RETRIES):
         status = get_image(name, gcp_project=gcp_project).status
-        print('status = ', status)
         if status == 'READY':
             break
         time.sleep(RETRY_PERIOD_SECONDS)

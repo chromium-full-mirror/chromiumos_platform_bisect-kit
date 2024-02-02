@@ -20,14 +20,17 @@ import time
 import typing
 from typing import Optional
 
+from bisect_kit import buildbucket_util
 from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import dut_allocator
 from bisect_kit import errors
+from bisect_kit import gs_util
 from bisect_kit import util
 from bisect_kit import vm_leaser
+from google.protobuf import json_format
 
 
 logger = logging.getLogger(__name__)
@@ -158,6 +161,7 @@ class DutManager:
         | None = None,
         should_force_monitoring: bool = False,
         vm_cros_version: Optional[str] = None,
+        is_cros_localbuild_vm: bool = False,
     ):
         """initializer.
 
@@ -178,6 +182,7 @@ class DutManager:
             should_force_monitoring: Whether to spawn a thread to monitor DUT lease
                 status.
             vm_cros_version: ChromeOS version used to boot up a VM machine.
+            is_cros_localbuild_vm: True if bisecting localbuild images for VM.
         """
         self._name: str = name
         self._states: typing.Type[core.DiagnoseStates] | None = states
@@ -209,6 +214,7 @@ class DutManager:
         # Arguments for VM bisection.
         self._vm_cros_version: Optional[str] = vm_cros_version
         self._allocated_vm: Optional[vm_leaser.VMLeaseResult] = None
+        self._is_cros_localbuild_vm = is_cros_localbuild_vm
         if self.is_vm:
             assert not should_force_monitoring
             # Currently only allow one board input for VM bisection.
@@ -220,6 +226,7 @@ class DutManager:
             )
         else:
             assert self._vm_cros_version is None
+            assert not self._is_cros_localbuild_vm
 
     @property
     def config(self):
@@ -280,17 +287,55 @@ class DutManager:
             retry_interval=3,
         )
 
+    # TODO(zjchang): refactor according to
+    # http://crrev.com/c/5266043/comment/9865e85b_1c0486ac/
+    def _search_vm_image(self) -> str:
+        """Returns gs path of image used to boot up VM.
+
+        Returns:
+            GS image path of local build image.
+
+        Raises:
+            subprocess.CalledProcessError: If path not exists.
+        """
+        if not self._is_cros_localbuild_vm:
+            return cros_util.search_image(
+                self.dut_allocate_spec.board, self._vm_cros_version
+            )[cros_util.ImageType.VM_IMAGE]
+
+        # TODO(zjchang): Currently it's not possible for build script to pass
+        # gs path to dut_manager. We should have a way to communicate between
+        # them.
+        # TODO(zjchang): Handle the error here gracefully as same as normal
+        # switch script.
+        api = buildbucket_util.BuildbucketApi()
+        build = api.search_usable_build(
+            board=self.dut_allocate_spec.board,
+            filter_digests=False,
+            bisector_chromeos_version=self._vm_cros_version,
+            return_ongoing_builds=False,
+        )
+        assert build
+
+        output_properties = json_format.MessageToDict(build.output.properties)
+        gs_bucket = output_properties['artifacts']['gs_bucket']
+        gs_path = output_properties['artifacts']['gs_path']
+        gs_image_path = (
+            f'gs://{gs_bucket}/{gs_path}/{cros_util.vm_image_filename}'
+        )
+        gs_util.ls(gs_image_path)
+        return gs_image_path
+
     def _lease_dut(self):
         """Lease a DUT."""
         if self.is_vm:
             if not self._vm_cros_version:
                 logger.error('vm_cros_version not set, ignore allocating VM')
                 return
-            gs_vm_image_path = cros_util.search_image(
-                self.dut_allocate_spec.board, self._vm_cros_version
-            )[cros_util.ImageType.VM_IMAGE]
             self._allocated_vm = vm_leaser.allocate_dut(
-                self.dut_allocate_spec, gs_vm_image_path, self._vm_cros_version
+                self.dut_allocate_spec,
+                self._search_vm_image(),
+                self._vm_cros_version,
             )
             host = self._allocated_vm.public_host
             builder = self.dut_allocate_spec.board
@@ -462,11 +507,9 @@ class DutManager:
         """
         if self.is_vm:
             if self._vm_cros_version is None and vm_cros_version is None:
+                logger.warning('vm version is not defined, skip provision')
                 yield None
                 return
-            assert (
-                vm_cros_version is None or self._vm_cros_version is None
-            ), 'vm_cros_version is re-defined'
             if vm_cros_version:
                 assert cros_util.is_cros_or_snapshot_version(vm_cros_version)
                 self._vm_cros_version = vm_cros_version

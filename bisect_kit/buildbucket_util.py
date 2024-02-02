@@ -458,6 +458,7 @@ class BuildbucketApi:
         start_time=None,
         end_time=None,
         bisector_chromeos_version: typing.Optional[str] = None,
+        bisector_session: typing.Optional[str] = None,
     ):
         """Search builds.
 
@@ -474,6 +475,7 @@ class BuildbucketApi:
           end_time: An integer timestamp indicates upper bound of start time.
           bisector_chromeos_version: ChromeOS version index used to speed up
               search.
+          bisector_session: Session name of the bisector run.
 
         Returns:
           A list of builds.
@@ -493,6 +495,13 @@ class BuildbucketApi:
                 StringPair(
                     key='bisector_chromeos_version',
                     value=bisector_chromeos_version,
+                )
+            )
+        if bisector_session:
+            tags.append(
+                StringPair(
+                    key='bisector_session',
+                    value=bisector_session,
                 )
             )
 
@@ -549,15 +558,16 @@ class BuildbucketApi:
     def search_usable_build(
         self,
         board,
-        bucket,
-        manifest_digest,
-        deps_digest=None,
-        deps_src_ver=None,
+        bucket: str = 'bisector',
+        manifest_digest: typing.Optional[str] = None,
+        deps_digest: typing.Optional[str] = None,
+        deps_src_ver: typing.Optional[str] = None,
+        filter_digests: bool = True,
         bisector_chromeos_version: typing.Optional[str] = None,
+        bisector_session: typing.Optional[str] = None,
+        return_ongoing_builds: bool = True,
     ):
         """Search for recent successful build if exists.
-
-        Note that it won't return builds in progress.
 
         Args:
           board: ChromeOS board name.
@@ -566,8 +576,13 @@ class BuildbucketApi:
           deps_digest: Cas hash for Chrome DEPS file, leave None if no
               special buildspec for Chrome.
           deps_src_ver: The src revision inside deps.
+          filter_digests: Whether to filter out builds with different digest
+              hash.
           bisector_chromeos_version: ChromeOS version index used to speed up
               search.
+          bisector_session: Session name of the bisector run.
+          return_ongoing_builds: If True, also returns builds that are ongoing
+              and scheduled.
 
         Returns:
           An build object if found, or None if no existing build.
@@ -577,12 +592,16 @@ class BuildbucketApi:
             bucket=bucket,
             builder='%s-%s' % (board, bucket),
             bisector_chromeos_version=bisector_chromeos_version,
+            bisector_session=bisector_session,
         )
-        valid_status = [
-            Status.Value('SCHEDULED'),
-            Status.Value('STARTED'),
-            Status.Value('SUCCESS'),
-        ]
+        valid_status = [Status.Value('SUCCESS')]
+        if return_ongoing_builds:
+            valid_status.extend(
+                [
+                    Status.Value('SCHEDULED'),
+                    Status.Value('STARTED'),
+                ]
+            )
 
         for build in builds:
             if build.status not in valid_status:
@@ -611,12 +630,11 @@ class BuildbucketApi:
                 not gs_bucket or not gs_path
             ):
                 continue
-            if (
-                build_manifest_hash == manifest_digest
-                and build_deps_hash == deps_digest
-                and build_src_ver == deps_src_ver
-                and gs_bucket
-                and gs_path
+            if filter_digests and (
+                build_manifest_hash != manifest_digest
+                or build_deps_hash != deps_digest
+                or build_src_ver != deps_src_ver
             ):
-                return build
+                continue
+            return build
         return None

@@ -228,6 +228,9 @@ def is_git_bare_dir(path: str) -> bool:
 
 def git(cmd: list[str], **kwargs):
     with PatchGitConfig() as new_env:
+        if 'env' in kwargs:
+            new_env = kwargs['env'] | new_env
+            del kwargs['env']
         cmd = ['git'] + cmd
         util.check_call(*cmd, env=new_env, **kwargs)
 
@@ -240,6 +243,9 @@ def git_output(cmd: list[str], **kwargs):
         if val:
             return util.check_output(*cmd, **kwargs)
     with PatchGitConfig() as new_env:
+        if 'env' in kwargs:
+            new_env = kwargs['env'] | new_env
+            del kwargs['env']
         return util.check_output(*cmd, env=new_env, **kwargs)
 
 
