@@ -77,8 +77,7 @@ def config(
     if url:
         cmd.append(url)
 
-    with git_util.PatchGitConfig() as new_env:
-        util.check_call(*cmd, cwd=gclient_dir, env=new_env)
+    util.check_call(*cmd, cwd=gclient_dir)
 
     # 'target_os' is mandatory for chromeos build, but 'gclient config' doesn't
     # recognize it. Here add it to gclient file explicitly.
@@ -134,8 +133,7 @@ def sync(
     except IOError:
         old_projects = {}
 
-    with git_util.PatchGitConfig() as new_env:
-        util.check_call(*cmd, cwd=gclient_dir, env=new_env)
+    util.check_call(*cmd, cwd=gclient_dir)
 
     # Remove dead .git folder after sync.
     # Ideally, this should be handled by gclient but sometimes gclient didn't
@@ -175,8 +173,7 @@ def runhook(gclient_dir, jobs=8, gclientfile=None):
     cmd = ['gclient', 'runhook', '--job', str(jobs)]
     if gclientfile:
         cmd += ['--gclientfile', gclientfile]
-    with git_util.PatchGitConfig() as new_env:
-        util.check_call(*cmd, cwd=gclient_dir, env=new_env)
+    util.check_call(*cmd, cwd=gclient_dir)
 
 
 def load_gclient_entries(gclient_dir):
@@ -225,8 +222,7 @@ def mirror(code_storage, repo_url):
     git_root = code_storage.cached_git_root(repo_url)
     assert not os.path.exists(git_root)
 
-    with git_util.PatchGitConfig() as new_env:
-        util.check_call('git', 'init', '--bare', cwd=tmp_dir, env=new_env)
+    util.check_call('git', 'init', '--bare', cwd=tmp_dir)
 
     # These config parameters are copied from gclient.
     git_util.config(tmp_dir, 'gc.autodetach', '0')

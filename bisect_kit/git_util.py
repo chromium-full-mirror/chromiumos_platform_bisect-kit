@@ -11,7 +11,6 @@ import dataclasses
 import logging
 import os
 import re
-import shutil
 import stat
 import subprocess
 import tempfile
@@ -100,19 +99,6 @@ class CommitMeta:
         return meta.message.splitlines()[0]
 
 
-@dataclasses.dataclass(eq=True, frozen=True)
-class Reference:
-    """A data class represents a git reference."""
-
-    commit_hash: str
-    reference_name: str
-
-    @staticmethod
-    def from_ls_remote_line(line: str) -> Reference:
-        commit_hash, reference_name = line.split(maxsplit=1)
-        return Reference(commit_hash, reference_name)
-
-
 @dataclasses.dataclass(order=True, eq=True, frozen=True)
 class Period:
     """A data class represents an inclusive period of time."""
@@ -128,55 +114,6 @@ class Period:
         raise TypeError(
             'The membership test only accepts a `Period` or an `int`'
         )
-
-
-class PatchGitConfig:
-    """Generates temparory git config to avoid bare repository issue."""
-
-    def __enter__(self) -> typing.Optional[dict]:
-        """Generates temparory git config.
-
-        Returns:
-            A dict with GIT_CONFIG_GLOBAL if should apply new config, or None
-            if should not apply.
-        """
-        home_directory = os.path.expanduser('~')
-        bare_repository = config(
-            home_directory,
-            '--global',
-            'safe.bareRepository',
-            disable_patch_config=True,
-        )
-        if bare_repository.strip() != 'explicit':
-            return None
-
-        patched_config = '/tmp/bisector.gitconfig'
-        new_env = os.environ.copy()
-        new_env['GIT_CONFIG_GLOBAL'] = patched_config
-        old_safe_repository_config = config(
-            home_directory,
-            '--global',
-            'safe.bareRepository',
-            env=new_env,
-            disable_patch_config=True,
-        )
-        if (
-            not os.path.exists(patched_config)
-            or old_safe_repository_config == 'explicit'
-        ):
-            shutil.copy(os.path.expanduser('~/.gitconfig'), patched_config)
-            config(
-                home_directory,
-                '--global',
-                'safe.bareRepository',
-                'all',
-                env=new_env,
-                disable_patch_config=True,
-            )
-        return new_env
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        return
 
 
 def is_git_rev(rev: str) -> bool:
@@ -210,31 +147,13 @@ def is_git_bare_dir(path: str) -> bool:
         return False
     try:
         return (
-            git_output(
-                ['rev-parse', '--is-bare-repository'],
-                cwd=path,
+            util.check_output(
+                'git', 'rev-parse', '--is-bare-repository', cwd=path
             )
             == 'true\n'
         )
     except subprocess.CalledProcessError:
         return False
-
-
-def git(cmd: list[str], **kwargs):
-    with PatchGitConfig() as new_env:
-        cmd = ['git'] + cmd
-        util.check_call(*cmd, env=new_env, **kwargs)
-
-
-def git_output(cmd: list[str], **kwargs):
-    cmd = ['git'] + cmd
-    if 'disable_patch_config' in kwargs:
-        val = kwargs['disable_patch_config']
-        del kwargs['disable_patch_config']
-        if val:
-            return util.check_output(*cmd, **kwargs)
-    with PatchGitConfig() as new_env:
-        return util.check_output(*cmd, env=new_env, **kwargs)
 
 
 def clone(git_repo: str, repo_url: str, reference: str | None = None) -> None:
@@ -247,10 +166,10 @@ def clone(git_repo: str, repo_url: str, reference: str | None = None) -> None:
     """
     if not os.path.exists(git_repo):
         os.makedirs(git_repo)
-    cmd = ['clone', repo_url, '.']
+    cmd = ['git', 'clone', repo_url, '.']
     if reference:
         cmd += ['--reference', reference]
-    git(cmd, cwd=git_repo)
+    util.check_call(*cmd, cwd=git_repo)
 
 
 def checkout_version(git_repo: str, rev: str) -> None:
@@ -260,7 +179,7 @@ def checkout_version(git_repo: str, rev: str) -> None:
       git_repo: path of git repo.
       rev: git commit revision to checkout.
     """
-    git(['checkout', '-q', '-f', rev], cwd=git_repo)
+    util.check_call('git', 'checkout', '-q', '-f', rev, cwd=git_repo)
 
 
 def init(git_repo: str, initial_branch: str = 'main') -> None:
@@ -275,11 +194,13 @@ def init(git_repo: str, initial_branch: str = 'main') -> None:
     if not os.path.exists(git_repo):
         os.makedirs(git_repo)
 
-    git(['init', '-q', '--initial-branch', initial_branch], cwd=git_repo)
+    util.check_call(
+        'git', 'init', '-q', '--initial-branch', initial_branch, cwd=git_repo
+    )
 
 
 def pull(git_repo: str) -> None:
-    git(['pull'], cwd=git_repo)
+    util.check_call('git', 'pull', cwd=git_repo)
 
 
 def commit_file(
@@ -316,18 +237,20 @@ def commit_file(
     with open(full_path, 'w') as f:
         f.write(content)
 
-    git(['add', path], cwd=git_repo)
-    git(['commit', '-q', '-m', message, path], cwd=git_repo, env=env)
+    util.check_call('git', 'add', path, cwd=git_repo)
+    util.check_call(
+        'git', 'commit', '-q', '-m', message, path, cwd=git_repo, env=env
+    )
 
 
-def config(git_repo: str, *args, **kwargs) -> str:
+def config(git_repo: str, *args) -> None:
     """Wrapper of 'git config'.
 
     Args:
       git_repo: path of git repo.
       args: parameters pass to 'git config'
     """
-    return git_output(['config', *args], cwd=git_repo, **kwargs)
+    util.check_call('git', 'config', *args, cwd=git_repo)
 
 
 def fetch(git_repo: str, *args, retry_prune_if_conflict: bool = False) -> None:
@@ -343,8 +266,10 @@ def fetch(git_repo: str, *args, retry_prune_if_conflict: bool = False) -> None:
         tries += 1
         stderr_lines: list[str] = []
         try:
-            git(
-                ['fetch', *args],
+            util.check_call(
+                'git',
+                'fetch',
+                *args,
                 cwd=git_repo,
                 stderr_callback=stderr_lines.append,
             )
@@ -530,10 +455,9 @@ def is_containing_commit(git_repo: str, rev: str) -> bool:
         pass
 
     try:
-        return git_output(['cat-file', '-t', rev], cwd=git_repo) in [
-            'commit\n',
-            'tag\n',
-        ]
+        return util.check_output(
+            'git', 'cat-file', '-t', rev, cwd=git_repo
+        ) in ['commit\n', 'tag\n']
     except subprocess.CalledProcessError:
         return False
     except OSError:
@@ -555,39 +479,18 @@ def is_ancestor_commit(git_repo: str, old: str, new: str) -> bool:
     """
     try:
         return (
-            git_output(
-                ['rev-list', '--ancestry-path', '-1', '%s..%s' % (old, new)],
+            util.check_output(
+                'git',
+                'rev-list',
+                '--ancestry-path',
+                '-1',
+                '%s..%s' % (old, new),
                 cwd=git_repo,
             )
             != ''
         )
     except subprocess.CalledProcessError:
         return False
-
-
-def ls_remote(
-    git_repo: str,
-    repository: str | None = None,
-    refs: list[str] | None = None,
-) -> list[Reference]:
-    """List references in a remote repository.
-
-    Args:
-        git_repo: path of git repo.
-        repository: remote repository name to query.
-        refs: reference matching patterns.
-    """
-    if refs and not repository:
-        raise errors.InternalError(
-            'ls-remote: repository is not assigned while refs has value'
-        )
-    cmd = ['ls-remote']
-    if repository:
-        cmd.append(repository)
-    if refs:
-        cmd += refs
-    lines = git_output(cmd, cwd=git_repo).splitlines()
-    return [Reference.from_ls_remote_line(x) for x in lines]
 
 
 @cache_util.Cache.default_disabled
@@ -609,7 +512,9 @@ def get_commit_metadata(git_repo: str, rev: str) -> CommitMeta:
         committer_time: commit timestamp (without timezone information)
         message: commit message text
     """
-    data = git_output(['cat-file', '-p', rev], cwd=git_repo, log_stdout=False)
+    data = util.check_output(
+        'git', 'cat-file', '-p', rev, cwd=git_repo, log_stdout=False
+    )
     return CommitMeta.from_git_commit_object(data)
 
 
@@ -624,14 +529,9 @@ def get_batch_commit_metadata(
         # The `util.check_output_in_bytes()` function doesn't support stdin, so use
         # shell redirect instead.
         # Call binary version because we need to count size in bytes later.
-        with PatchGitConfig() as new_env:
-            data = util.check_output_in_bytes(
-                'sh',
-                '-c',
-                'git cat-file --batch < ' + f.name,
-                cwd=git_repo,
-                env=new_env,
-            )
+        data = util.check_output_in_bytes(
+            'sh', '-c', 'git cat-file --batch < ' + f.name, cwd=git_repo
+        )
 
     metas: dict[str, CommitMeta | None] = {}
     while data:
@@ -668,12 +568,13 @@ def get_revlist(git_repo: str, old: str, new: str) -> list[str]:
     assert old
     assert new
     cmd = [
+        'git',
         'rev-list',
         '--first-parent',
         '--reverse',
         '%s^..%s' % (old, new),
     ]
-    revlist = git_output(cmd, cwd=git_repo).splitlines()
+    revlist = util.check_output(*cmd, cwd=git_repo).splitlines()
     return revlist
 
 
@@ -687,8 +588,8 @@ def get_commit_log(git_repo: str, rev: str) -> str:
     Returns:
       commit log message
     """
-    cmd = ['log', '-1', '--format=%B', rev]
-    msg = git_output(cmd, cwd=git_repo)
+    cmd = ['git', 'log', '-1', '--format=%B', rev]
+    msg = util.check_output(*cmd, cwd=git_repo)
     return msg
 
 
@@ -708,8 +609,8 @@ def get_commit_hash(git_repo: str, rev: str) -> str:
     try:
         # Use '^{commit}' to restrict search only commits.
         # Use '--' to avoid ambiguity, like matching rev against path name.
-        output = git_output(
-            ['rev-parse', '%s^{commit}' % rev, '--'], cwd=git_repo
+        output = util.check_output(
+            'git', 'rev-parse', '%s^{commit}' % rev, '--', cwd=git_repo
         )
         git_rev = output.rstrip('-\n')
     except subprocess.CalledProcessError as e:
@@ -731,10 +632,10 @@ def get_commit_time(git_repo: str, rev: str, path: str | None = None) -> int:
     Returns:
       timestamp (int)
     """
-    cmd = ['log', '-1', '--format=%ct', rev]
+    cmd = ['git', 'log', '-1', '--format=%ct', rev]
     if path:
         cmd += ['--', path]
-    line = git_output(cmd, cwd=git_repo)
+    line = util.check_output(*cmd, cwd=git_repo)
     return int(line)
 
 
@@ -754,8 +655,8 @@ def is_symbolic_link(git_repo: str, rev: str, path: str) -> bool:
     """
     # format: 120000 blob 8735a8c1dd96ede39a21d983d5c96792fd15c1a5 default.xml
     # TODO(kcwu): handle escaped path with special characters
-    parts = git_output(
-        ['ls-tree', rev, '--full-name', path], cwd=git_repo
+    parts = util.check_output(
+        'git', 'ls-tree', rev, '--full-name', path, cwd=git_repo
     ).split()
     if len(parts) >= 4 and parts[3] == path:
         return stat.S_ISLNK(int(parts[0], 8))
@@ -777,8 +678,8 @@ def get_file_from_revision(git_repo: str, rev: str, path: str) -> str:
     Returns:
       file content (str)
     """
-    result = git_output(
-        ['show', '%s:%s' % (rev, path)], cwd=git_repo, log_stdout=False
+    result = util.check_output(
+        'git', 'show', '%s:%s' % (rev, path), cwd=git_repo, log_stdout=False
     )
 
     # It might be a symbolic link.
@@ -805,8 +706,11 @@ def list_dir_from_revision(git_repo: str, rev: str, path: str) -> list[str]:
     Raises:
       subprocess.CalledProcessError: if `path` doesn't exists in `rev`
     """
-    return git_output(
-        ['ls-tree', '--name-only', '%s:%s' % (rev, path)],
+    return util.check_output(
+        'git',
+        'ls-tree',
+        '--name-only',
+        '%s:%s' % (rev, path),
         cwd=git_repo,
         log_stdout=False,
     ).splitlines()
@@ -837,6 +741,7 @@ def get_rev_by_time(
             pass
 
     cmd = [
+        'git',
         'rev-list',
         '--first-parent',
         '-1',
@@ -848,7 +753,7 @@ def get_rev_by_time(
     if path:
         cmd += [path]
 
-    result = git_output(cmd, cwd=git_repo).strip()
+    result = util.check_output(*cmd, cwd=git_repo).strip()
     return result or None
 
 
@@ -856,34 +761,32 @@ def get_revlist_by_period(
     git_repo: str, branch: str, period: Period
 ) -> list[Commit]:
     # Find the last commit before the begin of given period.
-    text = git_output(
-        [
-            'rev-list',
-            '--first-parent',
-            '--timestamp',
-            '-1',
-            '--before',
-            str(period.begin - 1),
-            branch,
-            '--',
-        ],
+    text = util.check_output(
+        'git',
+        'rev-list',
+        '--first-parent',
+        '--timestamp',
+        '-1',
+        '--before',
+        str(period.begin - 1),
+        branch,
+        '--',
         cwd=git_repo,
     )
 
     # Find commits in the period.
-    text += git_output(
-        [
-            'rev-list',
-            '--first-parent',
-            '--timestamp',
-            '--reverse',
-            '--after',
-            str(period.begin),
-            '--before',
-            str(period.end),
-            branch,
-            '--',
-        ],
+    text += util.check_output(
+        'git',
+        'rev-list',
+        '--first-parent',
+        '--timestamp',
+        '--reverse',
+        '--after',
+        str(period.begin),
+        '--before',
+        str(period.end),
+        branch,
+        '--',
         cwd=git_repo,
     )
 
@@ -898,7 +801,7 @@ def reset_hard(git_repo: str) -> None:
     Args:
       git_repo: path of git repo.
     """
-    git_output(['reset', '--hard'], cwd=git_repo)
+    util.check_call('git', 'reset', '--hard', cwd=git_repo)
 
 
 def clean(
@@ -931,7 +834,7 @@ def clean(
     for exclude_pattern in exclude_list:
         args.append('--exclude')
         args.append(exclude_pattern)
-    git_output(['clean', *args], cwd=git_repo)
+    util.check_call('git', 'clean', *args, cwd=git_repo)
 
 
 def list_untracked(
@@ -953,8 +856,12 @@ def list_untracked(
             exclude_flags += ['--exclude', '/' + re.escape(exclude)]
 
     result = []
-    for path in git_output(
-        ['ls-files', '--others', '--exclude-standard', *exclude_flags],
+    for path in util.check_output(
+        'git',
+        'ls-files',
+        '--others',
+        '--exclude-standard',
+        *exclude_flags,
         cwd=git_repo,
     ).splitlines():
         # Remove the trailing slash, which means directory.
@@ -1036,6 +943,7 @@ def get_history(
     assert not (all_branch and branch)
     log_format = '%ct %H' if not with_subject else '%ct %H %s'
     cmd = [
+        'git',
         'log',
         '--reverse',
         '--first-parent',
@@ -1058,7 +966,7 @@ def get_history(
         # else (like git branch name, tag name, etc.)
         cmd += ['--', path]
 
-    lines = git_output(cmd, cwd=git_repo).splitlines()
+    lines = util.check_output(*cmd, cwd=git_repo).splitlines()
     result = [Commit.from_rev_line(line) for line in lines]
 
     if padding_end:
@@ -1202,7 +1110,7 @@ def get_branches(
     Returns:
       list of branch names
     """
-    cmd = ['branch', '--format=%(refname)']
+    cmd = ['git', 'branch', '--format=%(refname)']
     if all_branches:
         cmd += ['-a']
     if commit:
@@ -1211,32 +1119,36 @@ def get_branches(
         cmd.append('--remote')
 
     result = []
-    for line in git_output(cmd, cwd=git_repo).splitlines():
+    for line in util.check_output(*cmd, cwd=git_repo).splitlines():
         result.append(line.strip())
     return result
 
 
 def get_tags(git_repo):
-    cmd = ['tag', '--list']
+    cmd = ['git', 'tag', '--list']
     result = []
-    for line in git_output(cmd, cwd=git_repo, log_stdout=False).splitlines():
+    for line in util.check_output(
+        *cmd, cwd=git_repo, log_stdout=False
+    ).splitlines():
         result.append(line.strip())
     return result
 
 
 def get_remotes(git_repo):
     """Gets lists of git remote."""
-    return git_output(['remote'], cwd=git_repo).splitlines()
+    return util.check_output('git', 'remote', cwd=git_repo).splitlines()
 
 
 def get_remote_url(git_repo, remote_name):
     """Gets url of given remote."""
-    return git_output(['remote', 'get-url', remote_name], cwd=git_repo).strip()
+    return util.check_output(
+        'git', 'remote', 'get-url', remote_name, cwd=git_repo
+    ).strip()
 
 
 def set_remote_url(git_repo, remote_name, url):
     """Sets url of given remote."""
-    git(['remote', 'set-url', remote_name, url], cwd=git_repo)
+    util.check_call('git', 'remote', 'set-url', remote_name, url, cwd=git_repo)
 
 
 def list_commits_between_commits(git_repo, old, new):
@@ -1258,14 +1170,13 @@ def list_commits_between_commits(git_repo, old, new):
     # --first-parent is necessary for Android, see following link for more
     # discussion.
     # https://docs.google.com/document/d/1c8qiq14_ObRRjLT62sk9r5V5cyCGHX66dLYab4MVnks/edit#heading=h.n3i6mt2n6xuu
-    lines = git_output(
-        [
-            'rev-list',
-            '--timestamp',
-            '--reverse',
-            '--first-parent',
-            '%s..%s' % (old, new),
-        ],
+    lines = util.check_output(
+        'git',
+        'rev-list',
+        '--timestamp',
+        '--reverse',
+        '--first-parent',
+        '%s..%s' % (old, new),
         cwd=git_repo,
     ).splitlines()
     commits = [Commit.from_rev_line(line) for line in lines]

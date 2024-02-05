@@ -464,7 +464,9 @@ class TestGitOperation(unittest.TestCase):
         self.assertFalse(git_util.is_git_bare_dir(self.git_repo))
 
         # git bare dir
-        git_util.git(['init', '-q', '--bare'], cwd=self.git_repo)
+        subprocess.check_call(
+            ['git', 'init', '-q', '--bare'], cwd=self.git_repo
+        )
         self.assertTrue(git_util.is_git_bare_dir(self.git_repo))
 
     def test_get_commit_hash(self):
