@@ -180,7 +180,7 @@ class InternalError(Exception):
     """
 
 
-class BisectionTemporaryError(Exception):
+class BisectionTemporaryError(BisectRetriableError):
     """Temporary error during bisection switch/eval step.
 
     This error might be temporary and would be recovered next time. In term of
@@ -188,9 +188,12 @@ class BisectionTemporaryError(Exception):
     undecidable to have old or new behavior, should skip the result of this
     run, retry may help".
 
-    It differs from BisectRetriableError in that the bisection would not be halted
-    when it happens. Instead it retries internally until some retry limit is
-    reached.
+    It is a subset of BisectRetriableError in that we expect this errors to be
+    more transient. That is, an immediate retry may help. If an error is
+    BisectRetriableError but not BisectionTemporaryError, we tend to halt this
+    execution and retry later.
+    Currently, some BisectionTemporaryError are retried in the same execution,
+    but not all.
     """
 
 
