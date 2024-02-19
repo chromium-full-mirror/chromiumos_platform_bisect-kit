@@ -25,10 +25,12 @@ class ID(StrEnum):
     """Enum of all available experiments."""
 
     STATELESS = 'stateless'
+    VM = 'vm'
 
 
 _VERSION_MAP = {
     ID.STATELESS: '20230901',
+    ID.VM: '20240207',
 }
 
 
