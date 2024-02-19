@@ -83,7 +83,9 @@ class CrosDiagnoser:
         self.old_info: cros_util.VersionInfo = cros_util.VersionInfo()
         self.new_info: cros_util.VersionInfo = cros_util.VersionInfo()
 
-        self.is_vm_board = cros_util.is_vm_board(self.config.get('board'))
+        self.is_vm_board = cros_util.is_vm_board(
+            self.states.dut_allocate_spec.board
+        )
         self.is_stateless = (
             experiment.is_in_experiment(
                 self.config.get('experiments'), experiment.ID.STATELESS
@@ -520,7 +522,7 @@ class CrosDiagnoser:
                 self.cros_old,
                 self.cros_new,
                 self.noisy,
-            ) = bisector.narrow_down(should_allocate_dut=True)
+            ) = bisector.narrow_down(should_allocate_dut=not self.is_vm_board)
 
         prebuilt_states = core.BisectStates.from_bisector_class(
             'ChromeOSVersionDomain', self.config['session']

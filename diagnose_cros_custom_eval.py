@@ -93,7 +93,9 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         try:
             # Allocate a DUT globally only if not performing a stateless bisect.
             logger.info('experiments: %s', self.config['experiments'])
-            is_vm_board = cros_util.is_vm_board(self.config.get('board'))
+            is_vm_board = cros_util.is_vm_board(
+                self.states.dut_allocate_spec.board
+            )
             should_auto_allocate = (
                 not experiment.is_in_experiment(
                     self.config.get('experiments'), experiment.ID.STATELESS
