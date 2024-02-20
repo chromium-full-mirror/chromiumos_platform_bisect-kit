@@ -133,18 +133,27 @@ class Period:
 class PatchGitConfig:
     """Generates temparory git config to avoid bare repository issue."""
 
+    # TODO(zjchang): remove the workaround when gclient supports
+    # safe.bareRepository = explict.
+    def __init__(self):
+        self.patched_system_config = None
+
     def __enter__(self) -> typing.Optional[dict]:
         """Generates temparory git config.
 
         Returns:
-            A dict with GIT_CONFIG_GLOBAL if should apply new config, or None
+            A dict with GIT_CONFIG_SYSTEM if should apply new config, or None
             if should not apply.
         """
         home_directory = os.path.expanduser('~')
+        origin_system_config = '/etc/gitconfig'
+        # This config is auto synced by gLinux.
+        origin_core_config = '/usr/share/git-core/config'
         try:
             bare_repository = config(
                 home_directory,
-                '--global',
+                '-f',
+                origin_core_config,
                 'safe.bareRepository',
                 disable_patch_config=True,
             )
@@ -153,36 +162,26 @@ class PatchGitConfig:
         if bare_repository.strip() != 'explicit':
             return None
 
-        patched_config = '/tmp/bisector.gitconfig'
+        self.patched_system_config = tempfile.NamedTemporaryFile(
+            delete=False
+        ).name
+        shutil.copy(origin_system_config, self.patched_system_config)
+        # patch system config
+        config(
+            home_directory,
+            '-f',
+            self.patched_system_config,
+            'safe.bareRepository',
+            'all',
+            disable_patch_config=True,
+        )
         new_env = os.environ.copy()
-        new_env['GIT_CONFIG_GLOBAL'] = patched_config
-        try:
-            old_safe_repository_config = config(
-                home_directory,
-                '--global',
-                'safe.bareRepository',
-                env=new_env,
-                disable_patch_config=True,
-            )
-        except subprocess.CalledProcessError:
-            old_safe_repository_config = ''
-        if (
-            not os.path.exists(patched_config)
-            or old_safe_repository_config == 'explicit'
-        ):
-            shutil.copy(os.path.expanduser('~/.gitconfig'), patched_config)
-            config(
-                home_directory,
-                '--global',
-                'safe.bareRepository',
-                'all',
-                env=new_env,
-                disable_patch_config=True,
-            )
+        new_env['GIT_CONFIG_SYSTEM'] = self.patched_system_config
         return new_env
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        return
+        if self.patched_system_config:
+            os.unlink(self.patched_system_config)
 
 
 def is_git_rev(rev: str) -> bool:
