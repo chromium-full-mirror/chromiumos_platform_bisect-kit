@@ -19,6 +19,7 @@ import logging
 from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
 from bisect_kit import dut_manager as dut_manager_module
+from bisect_kit import errors
 from bisect_kit import util
 import experiment
 
@@ -119,6 +120,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                 'failed',
                 text='%s: %s' % (exception_name, e),
                 exception=exception_name,
+                error_type=errors.error_type(e),
             )
 
 

@@ -5,6 +5,7 @@
 """Exception classes."""
 
 import argparse
+from enum import StrEnum
 import logging
 import sys
 
@@ -12,7 +13,25 @@ import sys
 logger = logging.getLogger(__name__)
 
 
-class ArgumentError(Exception):
+# The enum should be in sync with the error types defined in
+# google3/googleclient/chrome/chromeos_bisector/common/bisect.go
+class ErrorType(StrEnum):
+    """Defines error types."""
+
+    Unknown = "Unknown"
+    Retriable = "Retriable"
+    Contradiction = "Contradiction"
+    Fatal = "Fatal"
+
+
+class BisectException(Exception):
+    """Base exception."""
+
+    def error_type(self) -> str:
+        return ErrorType.Unknown
+
+
+class ArgumentError(BisectException):
     """Bad command line argument."""
 
     def __init__(self, argument_name, message):
@@ -24,6 +43,9 @@ class ArgumentError(Exception):
         if self.argument_name:
             return 'argument %s: %s' % (self.argument_name, self.message)
         return self.message
+
+    def error_type(self) -> str:
+        return ErrorType.Fatal
 
 
 class ArgTypeError(argparse.ArgumentTypeError):
@@ -46,19 +68,28 @@ class ArgTypeError(argparse.ArgumentTypeError):
         )
         super().__init__(full_msg)
 
+    def error_type(self) -> str:
+        return ErrorType.Fatal
 
-class Uninitialized(Exception):
+
+class Uninitialized(BisectException):
     """'init' must succeed before other subcommands."""
 
+    def error_type(self) -> str:
+        return ErrorType.Fatal
 
-class ExecutionFatalError(Exception):
+
+class ExecutionFatalError(BisectException):
     """Fatal error and bisect should not continue.
 
     Switch or eval commands return fatal exit code.
     """
 
+    def error_type(self) -> str:
+        return ErrorType.Fatal
 
-class BisectRetriableError(Exception):
+
+class BisectRetriableError(BisectException):
     """The top level class of exceptions which may be transient.
 
     An automatically retry is worthwhile.
@@ -67,6 +98,9 @@ class BisectRetriableError(Exception):
     BisectionTemporaryError where it doesn't halt the bisection unless retry
     limit is reached.
     """
+
+    def error_type(self) -> str:
+        return ErrorType.Retriable
 
 
 class DutException(BisectRetriableError):
@@ -96,7 +130,35 @@ class TooManyTemporaryErrors(BisectRetriableError):
     """Unable to narrow bisect range further due to too many temporary errors."""
 
 
-class WrongAssumption(Exception):
+class BisectionTemporaryError(BisectRetriableError):
+    """Temporary error during bisection switch/eval step.
+
+    This error might be temporary and would be recovered next time. In term of
+    bisection decision, this is "skip", which means "the current candidate is
+    undecidable to have old or new behavior, should skip the result of this
+    run, retry may help".
+
+    It is a subset of BisectRetriableError in that we expect this errors to be
+    more transient. That is, an immediate retry may help. If an error is
+    BisectRetriableError but not BisectionTemporaryError, we tend to halt this
+    execution and retry later.
+    Currently, some BisectionTemporaryError are retried in the same execution,
+    but not all.
+    """
+
+
+class ExternalError(BisectionTemporaryError):
+    """Errors in external dependency.
+
+    Like configuration errors, network errors, DUT issues, etc.
+    """
+
+
+class SshConnectionError(BisectionTemporaryError):
+    """SSH connection error."""
+
+
+class WrongAssumption(BisectException):
     """Wrong assumption.
 
     For non-noisy binary search, the assumption is all versions with old behavior
@@ -109,17 +171,26 @@ class WrongAssumption(Exception):
     Suggestion: try noisy search instead (--noisy).
     """
 
+    def error_type(self) -> str:
+        return ErrorType.Contradiction
 
-class DiagnoseContradiction(Exception):
+
+class DiagnoseContradiction(BisectException):
     """Contradiction happened during diagnose.
 
     Test result of individual component/version is unreliable/untrustable
     (something wrong and/or flakiness out of control).
     """
 
+    def error_type(self) -> str:
+        return ErrorType.Contradiction
 
-class VerificationFailed(Exception):
+
+class VerificationFailed(BisectException):
     """Bisection range is verified false."""
+
+    def error_type(self) -> str:
+        return ErrorType.Contradiction
 
 
 class VerifyBehaviorFailed(VerificationFailed):
@@ -172,47 +243,27 @@ class TooFewRevisionsError(VerificationFailed):
     """Too few revisions to search."""
 
 
-class InternalError(Exception):
+class InternalError(BisectException):
     """bisect-kit internal error.
 
     In general, it means something wrong or not implemented in bisect-kit and
     needs fix.
     """
 
-
-class BisectionTemporaryError(BisectRetriableError):
-    """Temporary error during bisection switch/eval step.
-
-    This error might be temporary and would be recovered next time. In term of
-    bisection decision, this is "skip", which means "the current candidate is
-    undecidable to have old or new behavior, should skip the result of this
-    run, retry may help".
-
-    It is a subset of BisectRetriableError in that we expect this errors to be
-    more transient. That is, an immediate retry may help. If an error is
-    BisectRetriableError but not BisectionTemporaryError, we tend to halt this
-    execution and retry later.
-    Currently, some BisectionTemporaryError are retried in the same execution,
-    but not all.
-    """
+    def error_type(self) -> str:
+        return ErrorType.Fatal
 
 
-class ExternalError(BisectionTemporaryError):
-    """Errors in external dependency.
-
-    Like configuration errors, network errors, DUT issues, etc.
-    """
-
-
-class SshConnectionError(BisectionTemporaryError):
-    """SSH connection error."""
-
-
-class DutPreconditionNotMet(Exception):
+class DutPreconditionNotMet(BisectException):
     """DUT precondition doesn't met so the bisection can not proceed."""
 
+    def error_type(self) -> str:
+        return ErrorType.Fatal
 
-def reconstruct_from_string(cls_name: str, error_msg: str) -> Exception | None:
+
+def reconstruct_from_string(
+    cls_name: str, error_msg: str
+) -> BisectException | None:
     """Reconstruct an exception from its class name and error message.
 
     It can be useful when an exception is derived from a subprocess call where
@@ -233,3 +284,10 @@ def reconstruct_from_string(cls_name: str, error_msg: str) -> Exception | None:
     else:
         return cls(error_msg)
     return None
+
+
+def error_type(e: Exception) -> str:
+    """Returns the type of an exception."""
+    if isinstance(e, BisectException):
+        return e.error_type()
+    return ErrorType.Unknown
