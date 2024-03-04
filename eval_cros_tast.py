@@ -147,11 +147,12 @@ def tast_cmd(opts, cmd, *args):
         ]
         flags += ['-remotedatadir', os.path.join(tast_dir, 'data')]
         flags += ['-remoterunner', os.path.join(tast_dir, 'remote_test_runner')]
-        if cmd == 'run':
-            flags += [
-                '-defaultvarsdir',
-                os.path.join(tast_dir, 'vars', 'private'),
-            ]
+        flags += [
+            '-defaultvarsdir',
+            os.path.join(tast_dir, 'vars', 'private'),
+            '-defaultvarsdir',
+            os.path.join(tast_dir, 'vars', 'public'),
+        ]
     else:
         tast_bin = 'tast'
 
