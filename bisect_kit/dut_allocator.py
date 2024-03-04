@@ -305,7 +305,11 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
     pools = None
     if spec.pool:
         pools = ['label-pool:%s' % p for p in spec.pool.split(',')]
-        pools = _filter_dimensions_by_lab(pools, raise_unknown=True)
+        pools = _filter_dimensions_by_lab(pools, raise_unknown=False)
+        if not pools:
+            raise errors.DutLeaseException(
+                'all specified pools "%s" are not available in lab' % spec.pool
+            )
 
     # Note: board, model, sku, and dut_name are mutual exclusive so at most one
     # of them is present.
