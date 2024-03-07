@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import os
 import tempfile
 import time
@@ -15,11 +16,13 @@ from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import util
 from google.api_core.client_options import ClientOptions
+from google.api_core.exceptions import NotFound
 from google.api_core.extended_operation import ExtendedOperation
 from google.cloud import compute_v1
 from google.oauth2 import service_account
-from googleapiclient import discovery
 
+
+logger = logging.getLogger(__name__)
 
 # TODO(zjchang): extend to multiple projects
 # TODO(zjchang): use typed API instead of discovery.build
@@ -165,11 +168,17 @@ def release_vm(vm: VMLeaseResult) -> bool:
         'gceRegion': vm.gce_region,
         'gceProject': vm.gce_project,
     }
-    response = json.loads(grpc(VMLEASER_PROD_SERVER, method, content))
-    return response.get('leaseId') == vm.lease_id
+    for _ in range(0, 10):
+        response = json.loads(grpc(VMLEASER_PROD_SERVER, method, content))
+        assert response.get('leaseId') == vm.lease_id
+        time.sleep(5)
+        if _get_vm_instance(vm) is None:
+            return True
+    logger.warning('cannot delete vm: %s', vm)
+    return False
 
 
-def _get_public_ip(gce_instance) -> Optional[str]:
+def _get_public_ip(gce_instance: compute_v1.Instance) -> Optional[str]:
     """Get the public IP from gce instance object.
 
     Args:
@@ -178,10 +187,10 @@ def _get_public_ip(gce_instance) -> Optional[str]:
     Returns:
         The public IP address, or None if not found.
     """
-    for interface in gce_instance['networkInterfaces']:
-        for config in interface['accessConfigs']:
-            if config['name'] == 'External NAT':
-                return config['natIP']
+    for interface in gce_instance.network_interfaces:
+        for config in interface.access_configs:
+            if config.name == 'External NAT':
+                return config.nat_i_p
     return None
 
 
@@ -271,7 +280,30 @@ def delete_image(
     return client.delete(request=request)
 
 
-def get_vm_public_ip(vm: VMLeaseResult) -> str:
+def _get_vm_instance(vm: VMLeaseResult) -> Optional[compute_v1.Instance]:
+    """Get the compute instance object.
+
+    Args:
+      vm: The vm to be queried.
+
+    Returns:
+      A compute_v1.Instance object from API, or None if not found.
+    """
+    client = compute_v1.InstancesClient(
+        client_options=get_default_client_option()
+    )
+    request = compute_v1.GetInstanceRequest(
+        project=vm.gce_project,
+        zone=vm.gce_region,
+        instance=vm.lease_id,
+    )
+    try:
+        return client.get(request)
+    except NotFound:
+        return None
+
+
+def get_vm_public_ip(vm: VMLeaseResult) -> Optional[str]:
     """Get the public of vm.
 
     Args:
@@ -280,46 +312,10 @@ def get_vm_public_ip(vm: VMLeaseResult) -> str:
     Returns:
       public IP address.
     """
-    service = discovery.build(
-        'compute', 'v1', credentials=get_default_credential()
-    )
-    response = (
-        service.instances()
-        .get(project=vm.gce_project, zone=vm.gce_region, instance=vm.lease_id)
-        .execute()
-    )
-
-    return _get_public_ip(response)
-
-
-def get_vm_name_from_public_ip(
-    ip: str, gcp_project: str = VMLEASER_DEFAULT_PROJECT
-) -> Optional[str]:
-    """Get the VM name from public IP.
-
-    Args:
-      ip: The public IP for VM.
-      gcp_project: GCP project to find GCE instances.
-
-    Returns:
-      VM name, or None if not found.
-    """
-    service = discovery.build(
-        'compute', 'v1', credentials=get_default_credential()
-    )
-    request = service.instances().aggregatedList(project=gcp_project)
-    while request is not None:
-        response = request.execute()
-        zone = response.get('items', {})
-        for zone_element in zone.values():
-            for instance in zone_element.get('instances', []):
-                public_ip = _get_public_ip(instance)
-                if public_ip == ip:
-                    return instance['name']
-        request = service.instances().aggregatedList_next(
-            previous_request=request, previous_response=response
-        )
-    return None
+    instance = _get_vm_instance(vm)
+    if instance is None:
+        return None
+    return _get_public_ip(instance)
 
 
 def allocate_dut(
