@@ -417,7 +417,7 @@ class NoisyBinarySearch:
             assert self.prob
 
     def add_sample(self, idx, status=None, **kwargs):
-        sample = dict(status=status, **kwargs)
+        sample = {"status": status, **kwargs}
         self.rev_info[idx].add_sample(**sample)
         self.dirty = True
 

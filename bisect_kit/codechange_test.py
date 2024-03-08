@@ -91,60 +91,60 @@ class TestAction(unittest.TestCase):
     """Test Action and ActionGroup classes"""
 
     def test_serialization(self):
-        group_data = dict(
-            timestamp=1660000000,
-            name='dummy_name',
-            comment='dummy_comment',
-            actions=[
+        group_data = {
+            "timestamp": 1660000000,
+            "name": 'dummy_name',
+            "comment": 'dummy_comment',
+            "actions": [
                 (
                     'GitAddRepo',
-                    dict(
-                        timestamp=1660000001,
-                        path='dummy_path',
-                        repo_url='dummy_repo_url',
-                        rev='dummy_rev',
-                    ),
+                    {
+                        "timestamp": 1660000001,
+                        "path": 'dummy_path',
+                        "repo_url": 'dummy_repo_url',
+                        "rev": 'dummy_rev',
+                    },
                 ),
                 (
                     'GitCheckoutCommit',
-                    dict(
-                        timestamp=1660000002,
-                        path='dummy_path',
-                        repo_url='dummy_repo_url',
-                        rev='dummy_rev',
-                    ),
+                    {
+                        "timestamp": 1660000002,
+                        "path": 'dummy_path',
+                        "repo_url": 'dummy_repo_url',
+                        "rev": 'dummy_rev',
+                    },
                 ),
                 (
                     'GitRemoveRepo',
-                    dict(
-                        timestamp=1660000003,
-                        path='dummy_path',
-                    ),
+                    {
+                        "timestamp": 1660000003,
+                        "path": 'dummy_path',
+                    },
                 ),
             ],
-        )
+        }
         self.assertEqual(
             group_data,
             codechange.ActionGroup.deserialize(group_data).serialize(),
         )
 
     def test_deserialize_unknown_class_name(self):
-        group_data = dict(
-            timestamp=1660000000,
-            name='dummy_name',
-            comment='dummy_comment',
-            actions=[
+        group_data = {
+            "timestamp": 1660000000,
+            "name": 'dummy_name',
+            "comment": 'dummy_comment',
+            "actions": [
                 (
                     'UnknownClass',
-                    dict(
-                        timestamp=1660000001,
-                        path='dummy_path',
-                        repo_url='dummy_repo_url',
-                        rev='dummy_rev',
-                    ),
+                    {
+                        "timestamp": 1660000001,
+                        "path": 'dummy_path',
+                        "repo_url": 'dummy_repo_url',
+                        "rev": 'dummy_rev',
+                    },
                 ),
             ],
-        )
+        }
         self.assertRaises(
             ValueError, codechange.ActionGroup.deserialize, group_data
         )

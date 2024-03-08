@@ -330,12 +330,12 @@ class ActionGroup:
         self.actions.append(action)
 
     def serialize(self):
-        return dict(
-            timestamp=self.timestamp,
-            name=self.name,
-            comment=self.comment,
-            actions=[a.serialize() for a in self.actions],
-        )
+        return {
+            "timestamp": self.timestamp,
+            "name": self.name,
+            "comment": self.comment,
+            "actions": [a.serialize() for a in self.actions],
+        }
 
     def summary(self) -> dict:
         result = {}
@@ -412,14 +412,14 @@ class GitCheckoutCommit(Action):
         git_util.checkout_version(git_repo, self.rev)
 
     def summary(self) -> dict:
-        return dict(
-            timestamp=self.timestamp,
-            action_type='commit',
-            path=self.path,
-            repo_url=self.repo_url,
-            rev=self.rev,
-            text=f'commit {self.rev[:10]} {self.path}',
-        )
+        return {
+            "timestamp": self.timestamp,
+            "action_type": 'commit',
+            "path": self.path,
+            "repo_url": self.repo_url,
+            "rev": self.rev,
+            "text": f'commit {self.rev[:10]} {self.path}',
+        }
 
 
 @dataclasses.dataclass
@@ -456,14 +456,14 @@ class GitAddRepo(Action):
         code_storage.add_to_project_list(root_dir, self.path, self.repo_url)
 
     def summary(self) -> dict:
-        return dict(
-            timestamp=self.timestamp,
-            action_type='add_repo',
-            path=self.path,
-            repo_url=self.repo_url,
-            rev=self.rev,
-            text=f'add repo {self.path} from {self.repo_url}@{self.rev[:10]}',
-        )
+        return {
+            "timestamp": self.timestamp,
+            "action_type": 'add_repo',
+            "path": self.path,
+            "repo_url": self.repo_url,
+            "rev": self.rev,
+            "text": f'add repo {self.path} from {self.repo_url}@{self.rev[:10]}',
+        }
 
 
 @dataclasses.dataclass
@@ -495,12 +495,12 @@ class GitRemoveRepo(Action):
         code_storage.remove_from_project_list(root_dir, self.path)
 
     def summary(self) -> dict:
-        return dict(
-            timestamp=self.timestamp,
-            action_type='remove_repo',
-            path=self.path,
-            text='remove repo %s' % self.path,
-        )
+        return {
+            "timestamp": self.timestamp,
+            "action_type": 'remove_repo',
+            "path": self.path,
+            "text": 'remove repo %s' % self.path,
+        }
 
 
 def apply_actions(

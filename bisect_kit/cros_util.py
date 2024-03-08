@@ -1195,7 +1195,7 @@ def _find_files_from_image_archive(
                     )
                     async_results.append(
                         pool.apply_async(
-                            gs_util.ls, [gs_path], dict(ignore_errors=True)
+                            gs_util.ls, [gs_path], {"ignore_errors": True}
                         )
                     )
 

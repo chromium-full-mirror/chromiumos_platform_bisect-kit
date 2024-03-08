@@ -131,14 +131,14 @@ class ChromeSrcDomain(core.BisectDomain):
                 % (old, new),
             )
 
-        config = dict(
-            chrome_root=opts.chrome_root,
-            old=old,
-            new=new,
-            board=opts.board,
-            dut=opts.dut,
-            chrome_mirror=opts.chrome_mirror,
-        )
+        config = {
+            "chrome_root": opts.chrome_root,
+            "old": old,
+            "new": new,
+            "board": opts.board,
+            "dut": opts.dut,
+            "chrome_mirror": opts.chrome_mirror,
+        }
 
         spec_manager = cr_util.ChromeSpecManager(config)
         cache = gclient_util.GclientCache(opts.chrome_mirror)

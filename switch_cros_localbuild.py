@@ -254,11 +254,11 @@ def switch(opts):
 
     if not opts.no_sync_code:
         logger.info('switch source code')
-        config = dict(
-            board=opts.board,
-            chromeos_root=opts.chromeos_root,
-            chromeos_mirror=opts.chromeos_mirror,
-        )
+        config = {
+            "board": opts.board,
+            "chromeos_root": opts.chromeos_root,
+            "chromeos_mirror": opts.chromeos_mirror,
+        }
         spec_manager = cros_util.ChromeOSSpecManager(config)
         cache = repo_util.RepoMirror(opts.chromeos_mirror)
         code_manager = codechange.CodeManager(

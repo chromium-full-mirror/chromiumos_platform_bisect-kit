@@ -179,11 +179,11 @@ def run_once(opts):
     """
     cmdline = subprocess.list2cmdline([opts.exec_cmd] + opts.exec_args)
 
-    output_result = dict(
-        output_matched=False,
-        precondition_output_matched=False,
-        meet_terminate=False,
-    )
+    output_result = {
+        "output_matched": False,
+        "precondition_output_matched": False,
+        "meet_terminate": False,
+    }
 
     def output_handler(line):
         if output_result['meet_terminate']:
@@ -323,14 +323,14 @@ def main(args=None):
         logger.info(
             '%(ith)d/%(num)d old=%(old)d, new=%(new)d, skip=%(skip)d;'
             ' avg time=%(avgtime).2f',
-            dict(
-                ith=i + 1,
-                num=opts.repeat,
-                old=counter[OLD],
-                new=counter[NEW],
-                skip=counter[SKIP],
-                avgtime=float(sum(runtime)) / len(runtime),
-            ),
+            {
+                "ith": i + 1,
+                "num": opts.repeat,
+                "old": counter[OLD],
+                "new": counter[NEW],
+                "skip": counter[SKIP],
+                "avgtime": float(sum(runtime)) / len(runtime),
+            },
         )
 
         if status == SKIP:
@@ -359,13 +359,13 @@ def main(args=None):
     logger.info(
         'Runner final result %(status)s: old=%(old)d, new=%(new)d, skip=%(skip)d;'
         ' avg time=%(avgtime).2f',
-        dict(
-            status=status,
-            old=counter[OLD],
-            new=counter[NEW],
-            skip=counter[SKIP],
-            avgtime=float(sum(runtime)) / len(runtime),
-        ),
+        {
+            "status": status,
+            "old": counter[OLD],
+            "new": counter[NEW],
+            "skip": counter[SKIP],
+            "avgtime": float(sum(runtime)) / len(runtime),
+        },
     )
 
     return status

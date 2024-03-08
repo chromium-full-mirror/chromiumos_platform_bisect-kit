@@ -180,14 +180,14 @@ class ChromeSrcMasterDomain(core.BisectDomain):
         # `old`.
         old = revlist[0]
 
-        config = dict(
-            chrome_root=opts.chrome_root,
-            chrome_src=chrome_src,
-            old=old,
-            new=new,
-            board=opts.board,
-            dut=opts.dut,
-        )
+        config = {
+            "chrome_root": opts.chrome_root,
+            "chrome_src": chrome_src,
+            "old": old,
+            "new": new,
+            "board": opts.board,
+            "dut": opts.dut,
+        }
 
         details = {}
         for rev in revlist:

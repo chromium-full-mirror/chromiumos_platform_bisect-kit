@@ -25,78 +25,79 @@ class TestRunner(unittest.TestCase):
     def test_is_meet_finished(self):
         self.assertEqual(
             runner.criteria_is_met(
-                ('=', 0), dict(new=0, old=0, skip=1), 0, 'new'
+                ('=', 0), {"new": 0, "old": 0, "skip": 1}, 0, 'new'
             ),
             None,
         )
 
         self.assertEqual(
-            runner.criteria_is_met(('=', 0), dict(new=0, old=3), 0, 'new'), True
-        )
-        self.assertEqual(
-            runner.criteria_is_met(('<', 0.4), dict(new=3, old=7), 0, 'new'),
+            runner.criteria_is_met(('=', 0), {"new": 0, "old": 3}, 0, 'new'),
             True,
         )
         self.assertEqual(
-            runner.criteria_is_met(('<=', 0.4), dict(new=3, old=7), 0, 'new'),
+            runner.criteria_is_met(('<', 0.4), {"new": 3, "old": 7}, 0, 'new'),
             True,
         )
         self.assertEqual(
-            runner.criteria_is_met(('>', 0.2), dict(new=3, old=7), 0, 'new'),
+            runner.criteria_is_met(('<=', 0.4), {"new": 3, "old": 7}, 0, 'new'),
             True,
         )
         self.assertEqual(
-            runner.criteria_is_met(('>=', 0.2), dict(new=3, old=7), 0, 'new'),
+            runner.criteria_is_met(('>', 0.2), {"new": 3, "old": 7}, 0, 'new'),
+            True,
+        )
+        self.assertEqual(
+            runner.criteria_is_met(('>=', 0.2), {"new": 3, "old": 7}, 0, 'new'),
             True,
         )
 
     def test_is_meet_rest(self):
         self.assertEqual(
             runner.criteria_is_met(
-                ('=', 0), dict(new=0, old=0, skip=1), 1, 'new'
+                ('=', 0), {"new": 0, "old": 0, "skip": 1}, 1, 'new'
             ),
             None,
         )
 
         # Between 0.45 and 0.63
         self.assertEqual(
-            runner.criteria_is_met(('>', 0.5), dict(old=4, new=5), 2, 'new'),
+            runner.criteria_is_met(('>', 0.5), {"old": 4, "new": 5}, 2, 'new'),
             None,
         )
         # Between 0.5 and 0.6
         self.assertEqual(
-            runner.criteria_is_met(('>', 0.5), dict(old=4, new=5), 1, 'new'),
+            runner.criteria_is_met(('>', 0.5), {"old": 4, "new": 5}, 1, 'new'),
             None,
         )
         # Between 0.5 and 0.6
         self.assertEqual(
-            runner.criteria_is_met(('>=', 0.5), dict(old=4, new=5), 1, 'new'),
+            runner.criteria_is_met(('>=', 0.5), {"old": 4, "new": 5}, 1, 'new'),
             True,
         )
         # Between 0.4 and 0.5
         self.assertEqual(
-            runner.criteria_is_met(('>=', 0.5), dict(old=5, new=4), 1, 'new'),
+            runner.criteria_is_met(('>=', 0.5), {"old": 5, "new": 4}, 1, 'new'),
             None,
         )
         # Between 0.4 and 0.5
         self.assertEqual(
-            runner.criteria_is_met(('<', 0.5), dict(old=5, new=4), 1, 'new'),
+            runner.criteria_is_met(('<', 0.5), {"old": 5, "new": 4}, 1, 'new'),
             None,
         )
         # Between 0.5 and 0.6
         self.assertEqual(
-            runner.criteria_is_met(('<=', 0.5), dict(old=4, new=5), 1, 'new'),
+            runner.criteria_is_met(('<=', 0.5), {"old": 4, "new": 5}, 1, 'new'),
             None,
         )
         # Between 0.83 and 1.0
         self.assertEqual(
-            runner.criteria_is_met(('=', 1.0), dict(old=0, new=5), 1, 'new'),
+            runner.criteria_is_met(('=', 1.0), {"old": 0, "new": 5}, 1, 'new'),
             None,
         )
 
         # It's certain because the result count is impossible non-integer.
         self.assertEqual(
-            runner.criteria_is_met(('=', 0.5), dict(old=1, new=1), 1, 'new'),
+            runner.criteria_is_met(('=', 0.5), {"old": 1, "new": 1}, 1, 'new'),
             False,
         )
 

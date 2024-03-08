@@ -299,7 +299,7 @@ def _additional_chrome_mirror_sync(chrome_cache):
                 pool.apply_async(
                     git_util.fetch,
                     (git_repo,),
-                    dict(retry_prune_if_conflict=True),
+                    {"retry_prune_if_conflict": True},
                 )
             )
         for r in results:

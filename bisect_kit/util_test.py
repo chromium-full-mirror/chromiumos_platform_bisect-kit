@@ -68,7 +68,7 @@ class TestPopen(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             util.check_output('false')
 
-        output = util.check_output('env', env=dict(foo='bar'))
+        output = util.check_output('env', env={"foo": 'bar'})
         self.assertEqual(output, 'foo=bar\n')
 
     def test_check_output_in_bytes(self):
@@ -84,7 +84,7 @@ class TestPopen(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             util.check_output_in_bytes('false')
 
-        output = util.check_output_in_bytes('env', env=dict(foo='bar'))
+        output = util.check_output_in_bytes('env', env={"foo": 'bar'})
         self.assertEqual(output, b'foo=bar\n')
 
     def test_check_call(self):

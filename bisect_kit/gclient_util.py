@@ -948,7 +948,7 @@ class DepsParser:
         def str_function(name):
             return str(name)
 
-        global_scope = dict(Var=var_function, Str=str_function)
+        global_scope = {"Var": var_function, "Str": str_function}
         local_scope = {}
         # pylint: disable=exec-used
         exec(content, global_scope, local_scope)

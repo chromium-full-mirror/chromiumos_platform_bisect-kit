@@ -50,7 +50,7 @@ class GitDomain(core.BisectDomain):
         except ValueError as e:
             raise errors.ArgumentError('--new', str(e))
 
-        config = dict(git_repo=opts.git_repo)
+        config = {"git_repo": opts.git_repo}
         revlist = git_util.get_revlist(opts.git_repo, opts.old, opts.new)
 
         details = {}

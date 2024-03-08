@@ -125,7 +125,7 @@ class ChromeOSVersionDomain(core.BisectDomain):
             opts.new,
             use_snapshot=not opts.disable_snapshot,
         )
-        config = dict(dut=opts.dut, board=opts.board, old=old, new=new)
+        config = {"dut": opts.dut, "board": opts.board, "old": old, "new": new}
 
         for i in range(1, len(revlist)):
             link = cros_util.get_crosland_link(revlist[i - 1], revlist[i])

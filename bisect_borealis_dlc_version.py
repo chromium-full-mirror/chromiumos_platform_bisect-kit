@@ -116,11 +116,11 @@ class BorealisVersionDomain(core.BisectDomain):
                     '%s is not ancestor of %s' % (opts.old, opts.new),
                 )
             spec_manager = cros_util.ChromeOSSpecManager(
-                dict(
-                    board=opts.board,
-                    chromeos_root=opts.chromeos_root,
-                    chromeos_mirror=opts.chromeos_mirror,
-                )
+                {
+                    "board": opts.board,
+                    "chromeos_root": opts.chromeos_root,
+                    "chromeos_mirror": opts.chromeos_mirror,
+                }
             )
             fixed_specs = spec_manager.collect_fixed_spec(opts.old, opts.new)
             old_timestamp = fixed_specs[0].timestamp
@@ -141,12 +141,12 @@ class BorealisVersionDomain(core.BisectDomain):
             )
 
         logger.info('borealis rev list: %s', revlist)
-        config = dict(
-            dut=opts.dut,
-            board=opts.board,
-            chromeos_root=opts.chromeos_root,
-            chromeos_mirror=opts.chromeos_mirror,
-        )
+        config = {
+            "dut": opts.dut,
+            "board": opts.board,
+            "chromeos_root": opts.chromeos_root,
+            "chromeos_mirror": opts.chromeos_mirror,
+        }
 
         if revlist:
             config['old'] = revlist[0]

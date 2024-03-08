@@ -117,14 +117,14 @@ class LacrosVersionDomain(core.BisectDomain):
         revlist = lacros_util.get_lacros_prebuilt_versions_between(
             opts.old, opts.new, lacros_folder_name
         )
-        config = dict(
-            dut=opts.dut,
-            board=opts.board,
-            old=opts.old,
-            new=opts.new,
-            chromeos_root=opts.chromeos_root,
-            board_cpu_arch=opts.board_cpu_arch,
-        )
+        config = {
+            "dut": opts.dut,
+            "board": opts.board,
+            "old": opts.old,
+            "new": opts.new,
+            "chromeos_root": opts.chromeos_root,
+            "board_cpu_arch": opts.board_cpu_arch,
+        }
 
         details = {}
         for i in range(1, len(revlist)):
@@ -146,7 +146,7 @@ class LacrosVersionDomain(core.BisectDomain):
         if 'current_range' in summary:
             old, new = summary['current_range']
             url = diff_url_template.format(old=old, new=new)
-            summary['links'] = [dict(name='change_list', url=url)]
+            summary['links'] = [{"name": 'change_list', "url": url}]
 
 
 if __name__ == '__main__':

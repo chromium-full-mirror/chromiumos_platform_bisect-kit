@@ -68,10 +68,10 @@ class GitOperation:
         """
         if author_time is None:
             author_time = commit_time
-        env = dict(
-            GIT_AUTHOR_DATE=str(author_time),
-            GIT_COMMITTER_DATE=str(commit_time),
-        )
+        env = {
+            "GIT_AUTHOR_DATE": str(author_time),
+            "GIT_COMMITTER_DATE": str(commit_time),
+        }
 
         full_path = os.path.join(self.git_repo, path)
 
@@ -430,7 +430,7 @@ class TestGitOperation(unittest.TestCase):
         subprocess.check_call(
             ['git', 'merge', '--no-edit', branch_foo],
             cwd=self.git_repo,
-            env=dict(GIT_COMMITTER_DATE='2017-02-05T00:00:00'),
+            env={"GIT_COMMITTER_DATE": '2017-02-05T00:00:00'},
         )
 
         rev_c = subprocess.check_output(

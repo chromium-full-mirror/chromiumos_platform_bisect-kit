@@ -71,11 +71,11 @@ def create_argument_parser():
 
 
 def switch(opts):
-    config = dict(
-        android_root=opts.android_root,
-        flavor=opts.flavor,
-        android_mirror=opts.android_mirror,
-    )
+    config = {
+        "android_root": opts.android_root,
+        "flavor": opts.flavor,
+        "android_mirror": opts.android_mirror,
+    }
     if not opts.no_sync_code:
         logger.info('switch source code')
         spec_manager = android_util.AndroidSpecManager(config)

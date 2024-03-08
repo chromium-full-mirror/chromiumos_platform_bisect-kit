@@ -179,9 +179,10 @@ def switch_main(args: tuple[str] | None):
     opts.rev = bisect_cr_localbuild_internal.guess_chrome_version(
         opts, opts.rev
     )
-    config = dict(
-        chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror
-    )
+    config = {
+        "chrome_root": opts.chrome_root,
+        "chrome_mirror": opts.chrome_mirror,
+    }
 
     chrome_cache = None
     lacros_cache = None

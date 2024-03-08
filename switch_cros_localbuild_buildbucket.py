@@ -200,9 +200,10 @@ def get_last_float_spec(float_specs, timestamp):
 
 def get_chrome_managers(opts):
     cache_manager = gclient_util.GclientCache(opts.chrome_mirror)
-    config = dict(
-        chrome_root=opts.chrome_root, chrome_mirror=opts.chrome_mirror
-    )
+    config = {
+        "chrome_root": opts.chrome_root,
+        "chrome_mirror": opts.chrome_mirror,
+    }
     spec_manager = cr_util.ChromeSpecManager(config)
     code_manager = codechange.CodeManager(
         opts.chrome_root,
@@ -243,11 +244,11 @@ def get_chrome_buildspec_by_time(opts, timestamp, old_rev, new_rev):
 
 
 def get_chromeos_spec_manager(opts):
-    config = dict(
-        board=opts.board,
-        chromeos_root=opts.chromeos_root,
-        chromeos_mirror=opts.chromeos_mirror,
-    )
+    config = {
+        "board": opts.board,
+        "chromeos_root": opts.chromeos_root,
+        "chromeos_mirror": opts.chromeos_mirror,
+    }
     return cros_util.ChromeOSSpecManager(config)
 
 
@@ -532,11 +533,11 @@ def wait_for_build_completion(opts, build_id: int):
 
 def build_revlist(opts):
     old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
-    config = dict(
-        board=opts.board,
-        chromeos_root=opts.chromeos_root,
-        chromeos_mirror=opts.chromeos_mirror,
-    )
+    config = {
+        "board": opts.board,
+        "chromeos_root": opts.chromeos_root,
+        "chromeos_mirror": opts.chromeos_mirror,
+    }
     spec_manager = cros_util.ChromeOSSpecManager(config)
     cache = repo_util.RepoMirror(opts.chromeos_mirror)
     code_manager = codechange.CodeManager(

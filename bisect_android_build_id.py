@@ -77,7 +77,7 @@ class AndroidBuildIDDomain(core.BisectDomain):
 
     @staticmethod
     def init(opts):
-        config = dict(branch=opts.branch, flavor=opts.flavor)
+        config = {"branch": opts.branch, "flavor": opts.flavor}
         if opts.dut:
             config['dut'] = opts.dut
 
@@ -121,7 +121,7 @@ class AndroidBuildIDDomain(core.BisectDomain):
                 old=old,
                 new=new,
             )
-            summary['links'] = [dict(name='change_list', url=url)]
+            summary['links'] = [{"name": 'change_list', url: url}]
 
 
 if __name__ == '__main__':

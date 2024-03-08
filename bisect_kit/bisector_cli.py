@@ -1542,20 +1542,20 @@ class BisectorCommandLine:
         if not self.states.inited and not self.states.load_states():
             # load_states() is called, but unable to load session file or
             # initialization is unsuccessful.
-            return dict(inited=False)
+            return {"inited": False}
 
         self.strategy = self._strategy_factory()
         left, right = self.strategy.get_range()
         estimated_noise = self.strategy.get_noise_observation()
 
-        result = dict(
-            inited=True,
-            old=self.states.idx2rev(left),
-            new=self.states.idx2rev(right),
-            verified=self.strategy.check_reproduced(),
-            estimated_noise=estimated_noise,
-            done=self.strategy.is_done(),
-        )
+        result = {
+            "inited": True,
+            "old": self.states.idx2rev(left),
+            "new": self.states.idx2rev(right),
+            "verified": self.strategy.check_reproduced(),
+            "estimated_noise": estimated_noise,
+            "done": self.strategy.is_done(),
+        }
         return result
 
     def cmd_log(self, opts):

@@ -32,14 +32,14 @@ class DummyDomain(core.BisectDomain):
 
     @staticmethod
     def init(opts):
-        config = dict(
-            ans=opts.ans,
-            old_p=opts.old_p,
-            new_p=opts.new_p,
-            old=opts.old,
-            new=opts.new,
-            dut=opts.dut,
-        )
+        config = {
+            "ans": opts.ans,
+            "old_p": opts.old_p,
+            "new_p": opts.new_p,
+            "old": opts.old,
+            "new": opts.new,
+            "dut": opts.dut,
+        }
 
         revlist = [str(i) for i in range(opts.num)]
         return config, {'revlist': revlist}
@@ -391,9 +391,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         total_wrong_count = 0
 
         cases = [
-            dict(rate=(0.1, 0.9), times=100, expect_correct_rate=0.99),
-            dict(rate=(0.2, 0.8), times=50, expect_correct_rate=0.99),
-            dict(rate=(0.3, 0.7), times=50, expect_correct_rate=0.8),
+            {"rate": (0.1, 0.9), "times": 100, "expect_correct_rate": 0.99},
+            {"rate": (0.2, 0.8), "times": 50, "expect_correct_rate": 0.99},
+            {"rate": (0.3, 0.7), "times": 50, "expect_correct_rate": 0.8},
         ]
         correct_rate_list = []
 

@@ -379,7 +379,7 @@ class DiagnoseStates(States):
         return self._data['statistics']
 
     def add_history(self, event, **kwargs):
-        entry = dict(timestamp=time.time(), event=event, **kwargs)
+        entry = {"timestamp": time.time(), "event": event, **kwargs}
         self.history.append(entry)
         self.save()
 
@@ -399,11 +399,11 @@ class BisectStates(States):
         """
         super().__init__(session_file)
 
-        self.data = dict(
+        self.data = {
             # What have been done so far. Each entry contains at least
             # timestamp, rev, and result.
-            history=[]
-        )
+            "history": []
+        }
 
         # Mapping of rev to idx; constructed from data['revlist'].
         self.rev_index = {}
@@ -525,7 +525,7 @@ class BisectStates(States):
     def add_history(self, event, **kwargs):
         # This function is allowed to be called before fully initialized
         # (self.inited=False) in order to record error events.
-        entry = dict(event=event, timestamp=time.time(), **kwargs)
+        entry = {"event": event, "timestamp": time.time(), **kwargs}
         self.data['history'].append(entry)
 
 

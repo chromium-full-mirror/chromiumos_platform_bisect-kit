@@ -52,7 +52,7 @@ def copy_tree(src: PathLike, dst: PathLike) -> None:
     # Make sure dst do not exist, otherwise it becomes "dst/name" (one extra
     # depth) instead of "dst".
     if not dst.exists():
-        FileExistsError(dst)
+        raise FileExistsError(dst)
 
     if is_btrfs_subvolume(src):
         util.check_call('btrfs', 'subvolume', 'snapshot', src, dst)

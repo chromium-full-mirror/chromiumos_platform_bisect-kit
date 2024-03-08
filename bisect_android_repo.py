@@ -143,15 +143,15 @@ class AndroidRepoDomain(core.BisectDomain):
                 '--old and --new', 'bad bisect range (%s, %s)' % (old, new)
             )
 
-        config = dict(
-            dut=opts.dut,
-            android_root=opts.android_root,
-            android_mirror=opts.android_mirror,
-            branch=opts.branch,
-            flavor=opts.flavor,
-            old=old,
-            new=new,
-        )
+        config = {
+            "dut": opts.dut,
+            "android_root": opts.android_root,
+            "android_mirror": opts.android_mirror,
+            "branch": opts.branch,
+            "flavor": opts.flavor,
+            "old": old,
+            "new": new,
+        }
 
         spec_manager = android_util.AndroidSpecManager(config)
         cache = repo_util.RepoMirror(opts.android_mirror)
