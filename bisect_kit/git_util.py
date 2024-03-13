@@ -138,13 +138,14 @@ class PatchGitConfig:
     def __init__(self):
         self.patched_system_config = None
 
-    def __enter__(self) -> typing.Optional[dict]:
+    def __enter__(self) -> dict:
         """Generates temparory git config.
 
         Returns:
-            A dict with GIT_CONFIG_SYSTEM if should apply new config, or None
-            if should not apply.
+            A dict with GIT_CONFIG_SYSTEM if should apply new config.
         """
+        new_env = os.environ.copy()
+
         home_directory = os.path.expanduser('~')
         origin_system_config = '/etc/gitconfig'
         # This config is auto synced by gLinux.
@@ -160,7 +161,7 @@ class PatchGitConfig:
         except subprocess.CalledProcessError:
             bare_repository = ''
         if bare_repository.strip() != 'explicit':
-            return None
+            return new_env
 
         self.patched_system_config = tempfile.NamedTemporaryFile(
             delete=False
@@ -175,7 +176,6 @@ class PatchGitConfig:
             'all',
             disable_patch_config=True,
         )
-        new_env = os.environ.copy()
         new_env['GIT_CONFIG_SYSTEM'] = self.patched_system_config
         return new_env
 
