@@ -13,6 +13,7 @@ import os
 import pprint
 import queue
 import shutil
+import subprocess
 import sys
 import tempfile
 import urllib.parse
@@ -856,7 +857,11 @@ class TimeSeriesTree:
             deps: Deps object of given project
             end_flag: True indicates this is the last event of this deps tree
         """
-        assert self.snapshots
+        if not self.snapshots:
+            # This substree is broken (e.g., deps files are removed
+            # accidentally but still referenced by its parent).
+            return []
+
         assert self.alive_children is None, (
             'events() is valid only after ' 'no_more_snapshot() is invoked'
         )
@@ -1136,9 +1141,19 @@ class DepsParser:
 
         # TODO(kcwu): optimization: history[-1] is unused
         for commit in history[:-1]:
-            content = git_util.get_file_from_revision(
-                git_repo, commit.rev, deps_file
-            )
+            try:
+                content = git_util.get_file_from_revision(
+                    git_repo, commit.rev, deps_file
+                )
+            except subprocess.CalledProcessError:
+                logger.error(
+                    'Failed to get %s:%s from repo %s. Skip this snapshot. '
+                    'It usually means somebody messed up the deps file.',
+                    commit.rev,
+                    deps_file,
+                    git_repo,
+                )
+                continue
 
             deps = self.parse_single_deps(
                 content,
