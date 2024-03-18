@@ -1032,6 +1032,22 @@ class TestCrosUtil(unittest.TestCase):
         )
 
     @mock.patch('bisect_kit.util.ssh_cmd')
+    def test_query_dut_test_runner_availability(self, mock_ssh_cmd):
+        mock_ssh_cmd.side_effect = ['/usr/local/bin/local_test_runner']
+        self.assertTrue(
+            cros_util.query_dut_test_runner_availability('dut_host')
+        )
+        mock_ssh_cmd.side_effect = ['wrong_output']
+        self.assertFalse(
+            cros_util.query_dut_test_runner_availability('dut_host')
+        )
+
+        mock_ssh_cmd.side_effect = subprocess.CalledProcessError(255, 'ssh_cmd')
+        self.assertFalse(
+            cros_util.query_dut_test_runner_availability('dut_host')
+        )
+
+    @mock.patch('bisect_kit.util.ssh_cmd')
     def test_is_dut_kernel_ready(self, mock_ssh_cmd):
         mock_ssh_cmd.side_effect = ['/dev/mmcblk0', '/dev/mmcblk0p5', '1']
         self.assertEqual(cros_util.is_dut_kernel_ready('foo'), True)

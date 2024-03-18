@@ -134,6 +134,7 @@ DEFAULT_QUERY_ROOT_PARTITION_ATTPEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_CHECK_KERNEL_READY_ATTPEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_CHECK_GOOD_DUT_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_QUERY_BOOT_ID_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
+DEFAULT_QUERY_TEST_RUNNER_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_REPAIR_DUT_ATTEMPTS = 3
 
 VM_BOARDS = ['betty-arc-r']
@@ -702,6 +703,35 @@ def query_dut_root_partition(
         raise errors.ExternalError('unable to query dut root partition') from e
 
 
+def query_dut_test_runner_availability(
+    host: str, max_attempts: int = DEFAULT_QUERY_TEST_RUNNER_ATTEMPTS
+) -> bool:
+    """Query the availability of /usr/local/bin/local_test_runner
+
+    The /usr/local/bin/local_test_runner can occasionally disappear after running a test.
+
+    Args:
+      host: the DUT address
+      max_attempts: the number of attempts to query the DUT
+
+    Returns:
+        A boolean, indicates if the local_test_runner is available.
+
+    Raise:
+        errors.ExternalError: SSH connection error.
+    """
+    test_runner_path = '/usr/local/bin/local_test_runner'
+    try:
+        output = util.ssh_cmd(
+            host, 'ls', test_runner_path, max_attempts=max_attempts
+        ).strip()
+        if output == test_runner_path:
+            return True
+    except subprocess.CalledProcessError as e:
+        logger.warning('query_dut_test_runner_availability failed: %s', e)
+    return False
+
+
 def is_dut_kernel_ready(
     host: str, max_attempts: int = DEFAULT_CHECK_KERNEL_READY_ATTPEMPTS
 ) -> bool:
@@ -785,7 +815,9 @@ def is_good_dut(
     # Sometimes python is broken after 'cros flash'.
     try:
         util.ssh_cmd(host, 'python', '-c', '1', max_attempts=max_attempts)
-        return True
+        return query_dut_test_runner_availability(
+            host, max_attempts=max_attempts
+        )
     except (subprocess.CalledProcessError, errors.SshConnectionError):
         return False
 

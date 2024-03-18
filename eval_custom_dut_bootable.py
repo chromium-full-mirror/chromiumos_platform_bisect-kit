@@ -5,6 +5,7 @@
 
 """Evaluate if a DUT is bootable"""
 
+import logging
 import os
 import sys
 
@@ -15,6 +16,9 @@ from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_argument_parser():
@@ -64,6 +68,11 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
         raise errors.BrokenDutException(
             '%r is not a valid DUT address' % opts.dut
         )
+
+    if not cros_util.is_good_dut(opts.dut):
+        logger.fatal('%r is not a good DUT', opts.dut)
+        if not cros_lab_util.repair(opts.dut, opts.chromeos_root):
+            raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
 
     if is_dut_bootable(opts.dut):
         return core.StepResult('old', 'DUT is bootable')

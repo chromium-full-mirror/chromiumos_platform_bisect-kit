@@ -440,6 +440,11 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
         raise errors.BrokenDutException(
             '%r is not a valid DUT address' % opts.dut
         )
+    if not cros_util.is_good_dut(opts.dut):
+        logger.fatal('%r is not a good DUT', opts.dut)
+        if not cros_lab_util.repair(opts.dut, opts.chromeos_root):
+            raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
+
     dut_os_version = cros_util.query_dut_short_version(opts.dut)
     if opts.test_name:
         opts.test_name = cros_util.normalize_test_name(opts.test_name)

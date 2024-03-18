@@ -1180,7 +1180,7 @@ def reflash_dut(
     """
     logger.info('Trying to reflash the DUT with existing image')
     try:
-        cros_short_version = cros_util.query_dut_short_version(dut)
+        cros_short_version = cros_util.query_dut_prebuilt_version(dut)
         dut_board = cros_util.query_dut_board(dut)
         cros_full_version = cros_util.version_to_full(
             dut_board, cros_short_version
