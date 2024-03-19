@@ -320,6 +320,12 @@ class BuildbucketApi:
                     'digest': chromeos_digest,
                 },
             },
+            '$chromeos/build_menu': {
+                'build_target': {
+                    'name': board,
+                },
+                'container_version_format': '{build-target}-bisect.{cros-version}-{bbid}',
+            },
             '$kitchen': {
                 'devshell': True,
                 'git_auth': git_auth,
@@ -328,6 +334,7 @@ class BuildbucketApi:
                 'name': board,
             },
             'builder_name': '%s-%s' % (board, bucket),
+            'container_version_format': '{build-target}-bisect.{cros-version}-{bbid}',
             'recipe': recipe,
         }
         if chromeos_version:
