@@ -1069,7 +1069,14 @@ def reboot_via_servo(dut):
     except subprocess.CalledProcessError:
         pass  # servod is already running
 
-    util.ssh_cmd(servo_host, 'servodutil', 'wait-for-active', '-p', servo_port)
+    util.ssh_cmd(
+        servo_host,
+        'servodutil',
+        'wait-for-active',
+        '-p',
+        servo_port,
+        connect_timeout=120,
+    )
     util.ssh_cmd(
         servo_host, 'dut-control', '--port', servo_port, 'power_state:reset'
     )
@@ -1093,8 +1100,17 @@ def repair(dut: str, chromeos_root: str = ''):
         logger.warning('%s is not DUT in lab; skip repair', dut)
         return False
 
-    logger.debug('Reset using servo for repair')
-    reboot_via_servo(dut)
+    try:
+        logger.debug('Reset using servo for repair')
+        boot_id = cros_util.query_dut_boot_id(dut)
+        # Perform a normal reboot to avoid servod command failure
+        cros_util.reboot(dut)
+        reboot_via_servo(dut)
+        cros_util.wait_reboot_done(dut, boot_id)
+    except (errors.SshConnectionError, subprocess.CalledProcessError) as e:
+        logger.error('reboot via servo failed %s', e)
+        return False
+
     if cros_util.is_good_dut(dut):
         return True
 
