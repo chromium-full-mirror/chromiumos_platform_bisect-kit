@@ -405,7 +405,6 @@ def step_main_wrapper(
         result = step_main(args)
     except (
         OSError,
-        subprocess.SubprocessError,
         errors.BisectionTemporaryError,
     ) as e:
         # These exceptions are kind of external dependencies. So we classify them
