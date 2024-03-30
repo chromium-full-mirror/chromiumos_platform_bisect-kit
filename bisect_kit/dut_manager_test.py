@@ -357,7 +357,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser.get_dut.return_value = 'host.cros'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host.cros')
-            self.assertTrue(dut_manager.is_restored_dut())
+            self.assertTrue(dut_manager.is_previous_dut())
 
         self.mock_update_states.assert_called_once_with(
             dut_manager, 'host.cros'
@@ -399,7 +399,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_allocate_dut.return_value = 'host2', 'board2'
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host2.cros')
-            self.assertFalse(dut_manager.is_restored_dut())
+            self.assertFalse(dut_manager.is_previous_dut())
 
         self.mock_update_states.assert_called_once_with(
             dut_manager, 'host2.cros'

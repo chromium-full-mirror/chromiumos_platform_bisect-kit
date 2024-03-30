@@ -242,9 +242,13 @@ class DutManager:
             return False
         return cros_util.is_vm_board(self._states.dut_allocate_spec.board)
 
-    def is_restored_dut(self):
-        logger.info('is_restored_dut: %s', self._is_restored_dut)
-        return self._is_restored_dut
+    def is_previous_dut(self):
+        logger.info(
+            'pre_allocated_dut: %s, is_restored_dut: %s',
+            self._pre_allocated_dut,
+            self._is_restored_dut,
+        )
+        return self._pre_allocated_dut is not None or self._is_restored_dut
 
     @property
     def dut(self) -> str:

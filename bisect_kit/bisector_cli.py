@@ -968,77 +968,17 @@ class BisectorCommandLine:
 
         # Shortcut if no DUT is needed for both switch and eval.
         if not switch_build_deploy_cmds and not switch_with_dut_cmds:
+            # Only one of eval_without_dut_cmd and eval_without_dut_cmd should
+            # exist.
             if eval_without_dut_cmd:
                 self._evaluate(
                     eval_without_dut_cmd, rev, sample, EvalAction.WITHOUT_DUT
                 )
                 return 'eval', sample
 
-        # A DUT can be specified via "--dut" flag when running domain_cls
-        # scripts with "init" sub command, either via command line execution or
-        # through wrapper.py. If the config presents, it takes precedence over
-        # dut_manager. In the way the domain_cls scripts can be executed alone
-        # from the command line (b/299388823).
-        dut = self.config.get('dut')
-        logger.debug('pre-configured DUT: %s', dut)
-        if not dut and self.dut_manager:
-            dut = self.dut_manager.dut
-            logger.debug('DUT from dut_maanger: %s', dut)
-        # DUT is already allocated. Do switch (build + deploy) all at
-        # once if needed.
-        if dut:
-            if prev_rev != rev:
-                for cmd in switch_build_deploy_cmds:
-                    if not (
-                        self._switch(
-                            cmd,
-                            rev,
-                            sample,
-                            SwitchAction.BUILD_AND_DEPLOY,
-                            switch_log,
-                            dut,
-                        )
-                    ):
-                        return 'switch', sample
-                for cmd in switch_with_dut_cmds:
-                    if not (
-                        self._switch(
-                            cmd,
-                            rev,
-                            sample,
-                            SwitchAction.WITH_DUT,
-                            switch_log,
-                            dut,
-                        )
-                    ):
-                        return 'switch', sample
-
-            # Even switch requires a DUT, eval might not (e.g., eval manually).
-            # So try both cases.
-            if eval_with_dut_cmd:
-                self._evaluate(
-                    eval_with_dut_cmd, rev, sample, EvalAction.WITH_DUT, dut
-                )
-                return 'eval', sample
-            if eval_without_dut_cmd:
-                self._evaluate(
-                    eval_without_dut_cmd, rev, sample, EvalAction.WITHOUT_DUT
-                )
-                return 'eval', sample
-
-            # One of 'eval_with_dut_cmd' or 'eval_without_dut_cmd' should exist.
-            raise errors.InternalError('Control flow should not reach here.')
-
-        logger.debug(
-            'DUT has not been allocated yet, delegate allocation to dut_manager'
-        )
-        # If dut has not been allocated, dut_manager must exist.
-        assert (
-            self.dut_manager
-        ), 'dut_manager must not be None if DUT is not pre-configured'
-
-        # A DUT has not been allocated yet. Do switch in two steps (build then
-        # deploy). Auto allocate a DUT at the deploy step.
+        # A DUT is required for switch and/or eval operation.
+        # First, build the image. DUT does not need to present at this point
+        # yet.
         if prev_rev != rev:
             for cmd in switch_build_deploy_cmds:
                 if not (
@@ -1048,49 +988,89 @@ class BisectorCommandLine:
                 ):
                     return 'switch', sample
 
-        with self.dut_manager.provision(vm_cros_version=vm_cros_version) as dut:
-            # Deploy is needed if a new version is to be deployed, or a new DUT
-            # has been allocated. If it's the same version and the same DUT,
-            # we don't need to deploy again.
-            if prev_rev != rev or not self.dut_manager.is_restored_dut():
-                for cmd in switch_build_deploy_cmds:
-                    if not (
-                        self._switch(
-                            cmd,
-                            rev,
-                            sample,
-                            SwitchAction.DEPLOY,
-                            switch_log,
-                            dut,
-                        )
-                    ):
-                        return 'switch', sample
-                for cmd in switch_with_dut_cmds:
-                    if not (
-                        self._switch(
-                            cmd,
-                            rev,
-                            sample,
-                            SwitchAction.WITH_DUT,
-                            switch_log,
-                            dut,
-                        )
-                    ):
-                        return 'switch', sample
-            # Even switch requires a DUT, eval might not (e.g., eval manually).
-            # However, eval manully might still depend on the auto allocated
-            # DUT, so run it inside the dut manager context.
+        def _do_switch_with_dut(dut: str) -> bool:
+            """switch with the specific DUT.
+
+            Args:
+              dut: the DUT.
+
+            Returns:
+              successful or not.
+            """
+            for cmd in switch_build_deploy_cmds:
+                if not (
+                    self._switch(
+                        cmd,
+                        rev,
+                        sample,
+                        SwitchAction.DEPLOY,
+                        switch_log,
+                        dut,
+                    )
+                ):
+                    return False
+            for cmd in switch_with_dut_cmds:
+                if not (
+                    self._switch(
+                        cmd,
+                        rev,
+                        sample,
+                        SwitchAction.WITH_DUT,
+                        switch_log,
+                        dut,
+                    )
+                ):
+                    return False
+            return True
+
+        # A DUT can be specified via "--dut" flag when running domain_cls
+        # scripts with "init" sub command, either via command line execution or
+        # through wrapper.py. If the config presents, it takes precedence over
+        # dut_manager. In the way the domain_cls scripts can be executed alone
+        # from the command line (b/299388823).
+        pre_configured_dut = self.config.get('dut')
+        logger.debug('pre-configured DUT: %s', pre_configured_dut)
+        assert (
+            pre_configured_dut or self.dut_manager
+        ), 'either pre-configured DUT or dut manager must be present'
+
+        if pre_configured_dut:
+            if prev_rev != rev:
+                if not _do_switch_with_dut(pre_configured_dut):
+                    return 'switch', sample
             if eval_with_dut_cmd:
                 self._evaluate(
-                    eval_with_dut_cmd, rev, sample, EvalAction.WITH_DUT, dut
+                    eval_with_dut_cmd,
+                    rev,
+                    sample,
+                    EvalAction.WITH_DUT,
+                    pre_configured_dut,
                 )
                 return 'eval', sample
-            if eval_without_dut_cmd:
-                self._evaluate(
-                    eval_without_dut_cmd, rev, sample, EvalAction.WITHOUT_DUT
-                )
-                return 'eval', sample
+        else:
+            with self.dut_manager.provision(
+                vm_cros_version=vm_cros_version
+            ) as dut:
+                # Deploy is needed if a new version is to be deployed, or a new DUT
+                # has been allocated. If it's the same version and the same DUT,
+                # we don't need to deploy again.
+                if prev_rev != rev or not self.dut_manager.is_previous_dut():
+                    if not _do_switch_with_dut(dut):
+                        return 'switch', sample
+                if eval_with_dut_cmd:
+                    self._evaluate(
+                        eval_with_dut_cmd, rev, sample, EvalAction.WITH_DUT, dut
+                    )
+                    return 'eval', sample
 
+        # Even switch requires a DUT, eval might not (e.g., eval manually).
+        if eval_without_dut_cmd:
+            self._evaluate(
+                eval_without_dut_cmd, rev, sample, EvalAction.WITHOUT_DUT
+            )
+            return 'eval', sample
+
+        # One of 'eval_with_dut_cmd' or 'eval_without_dut_cmd' should exist.
         raise errors.InternalError('Control flow should not reach here.')
 
     def estimate_cost(self, prev_rev):
