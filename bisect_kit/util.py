@@ -80,14 +80,13 @@ class Popen:
                 'stderr argument not allowed, it will be overridden.'
             )
 
+        self.log_stdout = log_stdout
         self.binary_mode = binary
         if self.binary_mode:
             assert not kwargs.get('encoding')
             self.encoding = None
-            self.log_stdout = False
         else:
             self.encoding = kwargs.get('encoding', 'utf8')
-            self.log_stdout = log_stdout
         kwargs['encoding'] = self.encoding
 
         self.stdout_callback = stdout_callback
@@ -131,8 +130,11 @@ class Popen:
         """
 
         def _reader_thread(fd_name: str, fd: typing.IO) -> None:
-            for line in fd:
-                self.queue.put((fd_name, line))
+            try:
+                for line in fd:
+                    self.queue.put((fd_name, line))
+            except Exception:
+                logger.exception('reader thread %s throws exception', fd_name)
             self.queue.put((fd_name, ''))
             fd.close()
 

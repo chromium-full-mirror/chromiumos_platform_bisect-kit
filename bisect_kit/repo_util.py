@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 REPO_META_DIR = '.repo'
 LOCAL_MANIFESTS_DIR = os.path.join(REPO_META_DIR, 'local_manifests')
 
+# If repo sync takes too long, it may hang forever.
+REPO_SYNC_TIMEOUT_SECONDS = 3 * 60 * 60
+
 
 def get_manifest_url(manifest_dir):
     """Get manifest URL of repo project.
@@ -72,7 +75,7 @@ def _get_repo_sync_env():
     return env
 
 
-def _repo_cmd(*cmd, repo_dir):
+def _repo_cmd(*cmd, repo_dir, timeout=None):
     env = _get_repo_sync_env()
     try:
         util.check_call('update_depot_tools', cwd=repo_dir, env=env)
@@ -81,7 +84,16 @@ def _repo_cmd(*cmd, repo_dir):
     # repo command spawn repo_launcher subprocesses, wrap it in a subshell so
     # the stdout can be printed for debug purpose.
     # This can be reverted once we no longer need the log.
-    util.check_call('bash', '-c', shlex.join(cmd), cwd=repo_dir, env=env)
+    # Set binary=True because the command ever return non-UTF8 chars.
+    util.check_call(
+        'bash',
+        '-c',
+        shlex.join(cmd),
+        cwd=repo_dir,
+        env=env,
+        binary=True,
+        timeout=timeout,
+    )
 
 
 def init(
@@ -180,6 +192,17 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
     # (http://crbug.com/881783).
     cleanup_repo_generated_files(repo_dir)
 
+    # Previous failed "repo sync" may leave some "repo_launcher" subprocesses,
+    # which could hang new "repo sync" commands.
+    try:
+        util.check_call('pkill', '-f', 'repo_launcher')
+    except subprocess.CalledProcessError:
+        logger.debug(
+            'failed to pkill previous repo_launcher. '
+            'Maybe there is no such processes left. '
+            'This is in general harmless.'
+        )
+
     cmd = ['repo', 'sync', '-v', '--force-sync', '--no-use-superproject']
     if jobs:
         cmd += ['-j', str(jobs)]
@@ -187,7 +210,7 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
         cmd += ['--manifest-name', manifest_name]
     if current_branch is not None:
         cmd += ['--current-branch' if current_branch else '--no-current-branch']
-    _repo_cmd(*cmd, repo_dir=repo_dir)
+    _repo_cmd(*cmd, repo_dir=repo_dir, timeout=REPO_SYNC_TIMEOUT_SECONDS)
 
 
 def abandon(repo_dir, branch_name):
