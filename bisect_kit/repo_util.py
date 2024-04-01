@@ -12,6 +12,7 @@ import logging
 import multiprocessing
 import os
 import re
+import shlex
 import subprocess
 import urllib.parse
 import xml.etree.ElementTree
@@ -77,7 +78,10 @@ def _repo_cmd(*cmd, repo_dir):
         util.check_call('update_depot_tools', cwd=repo_dir, env=env)
     except subprocess.CalledProcessError:
         logger.warning('update_depot_tools failed')
-    util.check_call(*cmd, cwd=repo_dir, env=env)
+    # repo command spawn repo_launcher subprocesses, wrap it in a subshell so
+    # the stdout can be printed for debug purpose.
+    # This can be reverted once we no longer need the log.
+    util.check_call('bash', '-c', shlex.join(cmd), cwd=repo_dir, env=env)
 
 
 def init(
@@ -176,7 +180,7 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
     # (http://crbug.com/881783).
     cleanup_repo_generated_files(repo_dir)
 
-    cmd = ['repo', 'sync', '-q', '--force-sync', '--no-use-superproject']
+    cmd = ['repo', 'sync', '-v', '--force-sync', '--no-use-superproject']
     if jobs:
         cmd += ['-j', str(jobs)]
     if manifest_name:
