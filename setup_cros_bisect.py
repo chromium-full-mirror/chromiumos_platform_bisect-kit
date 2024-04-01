@@ -476,14 +476,14 @@ def do_sync_template(opts):
         except Exception:
             # b/222638221: repo may be broken due to infra issues
             # re-create the whole repo and sync again
-            logger.warning(
+            logger.exception(
                 'chromeos sync failed, re-init chromeos repo '
                 '(this takes hours; be patient)'
             )
             chromeos_tree = template_factory.get_chromeos_tree()
-            use_btrfs = btrfs_util.is_btrfs_subvolume(chromeos_tree)
-            btrfs_util.delete_tree(chromeos_tree)
-            _setup_chromeos_repos(template_factory, use_btrfs)
+            btrfs_util.delete_tree(chromeos_tree, missing_ok=True)
+            # Alaways re-create it in btrfs.
+            _setup_chromeos_repos(template_factory, use_btrfs=True)
     if sync_all or opts.chrome:
         use_btrfs = btrfs_util.is_btrfs_subvolume(
             template_factory.get_chrome_tree()

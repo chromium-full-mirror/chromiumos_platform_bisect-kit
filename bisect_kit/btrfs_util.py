@@ -4,14 +4,18 @@
 
 """BTRFS utility."""
 
+import logging
 import os
 import pathlib
+import time
 
 from bisect_kit import common
 from bisect_kit import util
 
 
 PathLike = os.PathLike | str
+
+logger = logging.getLogger(__name__)
 
 
 def is_btrfs_subvolume(path: PathLike, raise_error=True) -> bool:
@@ -71,5 +75,11 @@ def delete_tree(path: PathLike, missing_ok=False) -> None:
         # btrfs should be mounted with 'user_subvol_rm_allowed' option and thus
         # normal user permission is enough.
         util.check_call('btrfs', 'subvolume', 'delete', path)
-    else:
-        util.check_call('sudo', 'rm', '-rf', path)
+        for i in range(10):
+            if not common.check_dir_existence(path, raise_error=False):
+                return
+            logger.debug('waiting for %s to be deleted', path)
+            time.sleep(2**i)
+        raise TimeoutError('could not delete %s' % path)
+
+    util.check_call('sudo', 'rm', '-rf', path)
