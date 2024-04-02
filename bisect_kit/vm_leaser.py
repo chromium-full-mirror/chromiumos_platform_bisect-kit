@@ -125,6 +125,10 @@ def lease_vm(
     # TODO(zjchang): add lease_vm into switch time.
     inserted_image = insert_image(gs_vm_image_path, board, full_version)
     content = {
+        # prpc may retry automatically and is unable to remove timeout creation,
+        # use this key to compute vm name to ensure everytime it creates the
+        # VM on cloud with same instance name.
+        'idempotency_key': str(uuid.uuid4()),
         'host_reqs': {
             'gce_image': _to_vm_leaser_image_link(
                 VMLEASER_DEFAULT_PROJECT, inserted_image
@@ -134,7 +138,7 @@ def lease_vm(
             'gce_network': VMLEASER_DEFAULT_NETWORK,
             'gce_machine_type': VMLEASER_DEFAULT_MACHINE_TYPE,
             'gce_disk_size': VMLEASER_DEFAULT_DISK_SIZE,
-        }
+        },
     }
     response = json.loads(grpc(VMLEASER_PROD_SERVER, method, content))
     assert response['leaseId']
