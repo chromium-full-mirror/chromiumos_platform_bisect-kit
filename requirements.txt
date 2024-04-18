@@ -1,5 +1,6 @@
 google-api-python-client
 google-cloud-compute
+google-cloud-datastore
 googleapis_common_protos
 # b/187806838 chrome cannot find system google.protobuf, but user local's works.
 # b/236854886 lock version to avoid python complaining pb_2 too old.

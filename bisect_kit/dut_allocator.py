@@ -19,6 +19,7 @@ from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import shared_dut_pool
 
 
 logger = logging.getLogger(__name__)
@@ -249,8 +250,14 @@ def _normalize_board_name(chromeos_root, board):
     return boards_info[board]
 
 
-def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
+def allocate_dut(
+    spec: core.DutAllocateSpec, enable_shared_dut_pool=False
+) -> typing.Tuple[str, str]:
     """Helper of cmd_allocate_dut.
+
+    Args:
+      spec: the DutAllocateSpec
+      enable_shared_dut_pool: whether to enable shared DUT pool.
 
     Returns:
       (host, board_to_build)
@@ -456,10 +463,26 @@ def allocate_dut(spec: core.DutAllocateSpec) -> typing.Tuple[str, str]:
             else:
                 board_to_build = host_board
 
+            # Add the leased DUT to the shared pool.
+            if enable_shared_dut_pool:
+                add_dut_to_shared_pool(bots[0], spec.session)
             return host, board_to_build
         time.sleep(1)
 
     logger.warning('unable to lease DUT in time limit')
     raise errors.DutLeaseTimeout(
         'Unable to lease DUT in %s seconds' % spec.time_limit
+    )
+
+
+def add_dut_to_shared_pool(bot: dict, session: str):
+    dut_name = bot['dimensions']['dut_name'][0]
+    logger.info('putting %s into the shared DUT pool', dut_name)
+    pool_manager = shared_dut_pool.SharedDutPoolManager()
+    pool_manager.insert(
+        dut_name,
+        bot['dimensions'],
+        shared_dut_pool.DutState.BUSY,
+        session,
+        session,
     )

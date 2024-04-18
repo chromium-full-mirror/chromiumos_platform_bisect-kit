@@ -30,6 +30,7 @@ from bisect_kit import errors
 from bisect_kit import gs_util
 from bisect_kit import util
 from bisect_kit import vm_leaser
+import experiment
 from google.protobuf import json_format
 
 
@@ -351,7 +352,13 @@ class DutManager:
                 host,
             )
         else:
-            host, builder = dut_allocator.allocate_dut(self.dut_allocate_spec)
+            host, builder = dut_allocator.allocate_dut(
+                self.dut_allocate_spec,
+                enable_shared_dut_pool=experiment.is_in_experiment(
+                    self.config.get('experiments'),
+                    experiment.ID.SHARED_DUT_POOL,
+                ),
+            )
             if not host:
                 # This should not happen.
                 raise errors.InternalError('Leased DUT invalid: %s' % host)

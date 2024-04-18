@@ -25,6 +25,7 @@ class ID(StrEnum):
 
     STATELESS = 'stateless'
     VM = 'vm'
+    SHARED_DUT_POOL = 'shared_dut_pool'
 
 
 # TODO b/328452015: either record the version when an experimental bisection

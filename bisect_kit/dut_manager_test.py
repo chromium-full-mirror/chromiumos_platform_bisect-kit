@@ -107,7 +107,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dummy_allocate_spec = core.DutAllocateSpec(board='test_board')
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
-            config={'session': 'stateless'},
+            config={'session': 'stateless', 'experiments': []},
             dut_allocate_spec=dummy_allocate_spec,
         )
         return mock_states
@@ -261,7 +261,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
-            dut_manager.dut_allocate_spec
+            dut_manager.dut_allocate_spec,
+            enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_called_once_with('host.cros')
         self.mock_dut_leave_context_check_func.assert_called_once_with(
@@ -305,7 +306,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_called_once_with(
-            dut_manager.dut_allocate_spec
+            dut_manager.dut_allocate_spec,
+            enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_not_called()
         self.mock_dut_leave_context_check_func.assert_not_called()
@@ -328,7 +330,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_lease_status_monitor.assert_not_called()
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_called_once_with(
-            dut_manager.dut_allocate_spec
+            dut_manager.dut_allocate_spec,
+            enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_not_called()
         self.mock_dut_leave_context_check_func.assert_not_called()
@@ -412,7 +415,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
-            dut_manager.dut_allocate_spec
+            dut_manager.dut_allocate_spec,
+            enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_called_once_with('host2.cros')
         self.mock_dut_leave_context_check_func.assert_called_once_with(
@@ -448,7 +452,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
-            dut_manager.dut_allocate_spec
+            dut_manager.dut_allocate_spec,
+            enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_called_once_with('host.cros')
         self.mock_dut_leave_context_check_func.assert_called_once_with(
@@ -486,7 +491,8 @@ class TestDutManagerAllocation(unittest.TestCase):
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
-            dut_manager.dut_allocate_spec
+            dut_manager.dut_allocate_spec,
+            enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_called_once_with('host.cros')
         self.mock_dut_leave_context_check_func.assert_called_once_with(
@@ -772,7 +778,7 @@ class TestAddDutLeasesRecord(unittest.TestCase):
         dummy_allocate_spec = core.DutAllocateSpec()
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
-            config={'session': 'stateless'},
+            config={'session': 'stateless', 'experiments': []},
             dut_allocate_spec=dummy_allocate_spec,
         )
         return mock_states
@@ -945,6 +951,7 @@ class TestConfigUpdated(unittest.TestCase):
 
         config = {
             'session': 'stateless',
+            'experiments': [],
         }
         dut_allocate_spec = core.DutAllocateSpec(board='board1')
         with self.fake_states(config, dut_allocate_spec) as states:
@@ -996,6 +1003,7 @@ class TestConfigUpdated(unittest.TestCase):
 
         config = {
             'session': 'stateless',
+            'experiments': [],
             'metric': 'some_metric',
         }
         dut_allocate_spec = core.DutAllocateSpec(model='model1')
@@ -1035,6 +1043,7 @@ class TestConfigUpdated(unittest.TestCase):
     def testNoAutoAllocate(self):
         config = {
             'session': 'stateless',
+            'experiments': [],
             'board': 'board1',
         }
         dut_allocate_spec = core.DutAllocateSpec(model='model1')
