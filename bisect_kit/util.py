@@ -598,18 +598,34 @@ def forward_ssh(from_host: str, to_port: int):
             from_host,
             to_port,
         )
-        p = Popen(
-            [
-                'go',
-                'run',
-                os.path.expanduser(
-                    '~/chromiumos/src/platform/dev/contrib/sshwatcher/sshwatcher.go'
-                ),
-                from_host,
-                str(to_port),
-            ]
-        )
-        wait_until(is_port_in_use, 60, 1, to_port)
+        try_count = 0
+        while True:
+            try:
+                p = Popen(
+                    [
+                        'go',
+                        'run',
+                        os.path.expanduser(
+                            '~/chromiumos/src/platform/dev/contrib/sshwatcher/sshwatcher.go'
+                        ),
+                        from_host,
+                        str(to_port),
+                    ]
+                )
+                wait_until(is_port_in_use, 60, 1, to_port)
+            except TimeoutExpired:
+                logger.debug(
+                    'failed to establish ssh forwarding connection to %s at retry %s',
+                    from_host,
+                    try_count,
+                )
+                if try_count >= 10:
+                    raise
+                time.sleep(30)
+                try_count += 1
+            else:
+                break
+
         logger.debug(
             'ssh forwarding connection is established: from_host: %s, to_port: %d',
             from_host,
