@@ -223,12 +223,13 @@ def crosfleet_dut_info(dut_name):
     return None
 
 
-def swarming_grpc(method: str, content: dict) -> str:
+def swarming_grpc(method: str, content: dict, log_stdout: bool = True) -> str:
     """Call swarming prpc.
 
     Args:
       method (str): grpc method name.
       content (dict): content send to grpc method.
+      log_stdout (bool): Whether to write the stdout output of the child process to log.
 
     Returns:
       A string, the result of grpc call.
@@ -250,6 +251,7 @@ def swarming_grpc(method: str, content: dict) -> str:
         return util.check_output(
             *cmd,
             stdin=temp,
+            log_stdout=log_stdout,
         )
 
 
@@ -296,7 +298,9 @@ def _simplify_bot_dimensions(dimensions_pairs):
 def swarming_bots_dimensions():
     method = 'swarming.v2.Bots.GetBotDimensions'
     return _simplify_bot_dimensions(
-        json.loads(swarming_grpc(method, {}))['botsDimensions']
+        json.loads(swarming_grpc(method, {}, log_stdout=False))[
+            'botsDimensions'
+        ]
     )
 
 
