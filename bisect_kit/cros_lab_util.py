@@ -214,13 +214,24 @@ def crosfleet_dut_info(dut_name):
 
     Args:
       dut_name: A skylab dut name without .cros suffix.
+    Returns:
+      A dict of dut info.
     """
-    duts = json.loads(crosfleet_cmd('dut info', '-json', dut_name)).get(
-        'DUTs', []
-    )
-    if len(duts) > 0:
-        return duts[0]
-    return None
+    info = {}
+    # Sample stdout:
+    #
+    # DUT_HOSTNAME=chromeos8-row13-rack17-host2
+    # MODEL=willow
+    # BOARD=jacuzzi
+    # SERVO_HOSTNAME=chromeos8-row13-rack17-labstation1
+    # SERVO_PORT=9998
+    # SERVO_SERIAL=SERVOV4P1-S-2204211229
+    #
+    for line in crosfleet_cmd('dut info', dut_name).split('\n'):
+        m = re.fullmatch(r'(\S+)=(\S+)', line)
+        if m:
+            info[m.group(1).lower()] = m.group(2)
+    return info
 
 
 def swarming_grpc(method: str, content: dict, log_stdout: bool = True) -> str:
@@ -769,7 +780,6 @@ def crosfleet_lease_dut(dut_name, reason, duration=None, timeout=None):
             reason,
             '-host',
             dut_name_to_address(dut_name),
-            '-json',
             stdout_callback=stdout_lines.append,
             stderr_callback=stderr_lines.append,
             timeout=timeout,
@@ -1052,22 +1062,13 @@ def reboot_via_servo(dut):
     if not is_lab_dut(dut):
         return False
 
-    servo_info = util.dict_get(
-        crosfleet_dut_info(dut_host_name(dut)),
-        'LabSetup',
-        'chromeosMachineLse',
-        'deviceLse',
-        'dut',
-        'peripherals',
-        'servo',
-    )
-    servo_host = util.dict_get(servo_info, 'servoHostname')
-    servo_port = util.dict_get(servo_info, 'servoPort')
+    dut_info = crosfleet_dut_info(dut_host_name(dut))
+    servo_host = dut_info.get('servo_hostname', None)
+    servo_port = dut_info.get('servo_port', None)
     if not servo_host or not servo_port:
         logger.debug('this DUT has no servo?')
         return False
 
-    servo_port = str(servo_port)
     try:
         util.ssh_cmd(servo_host, 'start', 'servod', 'PORT=' + servo_port)
     except subprocess.CalledProcessError:
