@@ -137,7 +137,7 @@ DEFAULT_QUERY_BOOT_ID_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_QUERY_TEST_RUNNER_ATTEMPTS = DEFAULT_SSH_ATTEMPTS
 DEFAULT_REPAIR_DUT_ATTEMPTS = 3
 
-VM_BOARDS = ['betty-arc-r', 'betty-arc-t']
+VM_BOARDS = ['amd64-generic', 'betty-arc-r', 'betty-arc-t']
 
 
 @dataclasses.dataclass
