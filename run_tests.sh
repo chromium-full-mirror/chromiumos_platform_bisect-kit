@@ -9,6 +9,9 @@ set -x
 # Exit immediately if any command exits with a non-zero status
 set -e
 
+# b/236854886: workaround before buildbucket re-generates its python proto.
+export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+
 # Change pwd to the directory containing this script
 cd "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")"
 
