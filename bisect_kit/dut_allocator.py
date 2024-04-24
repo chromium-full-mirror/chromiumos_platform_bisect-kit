@@ -420,7 +420,62 @@ def allocate_dut(
             )
         variants = filtered
 
+    def resolve_builder_by_host(host: str) -> str:
+        """Resolve the builder by the leased DUT.
+
+        Since the dut allocate spec may contain multiple builders and boards,
+        we need to know the corresponding builder by the leased board.
+        """
+        if cros_lab_util.is_satlab_dut(host):
+            cros_lab_util.write_satlab_ssh_config(host)
+        # Resolve what board we should build during bisection.
+        board_to_build = None
+        bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])
+        if not bots:
+            raise errors.DutLeaseException(
+                'unable to get dut info of %s when resolving builder' % host
+            )
+        try:
+            host_board = bots[0]['dimensions']['label-board'][0]
+        except (KeyError, IndexError) as e:
+            raise errors.DutLeaseException(
+                'malformed bots info %s' % bots
+            ) from e
+
+        if spec.builder_hint:
+            for builder in spec.builder_hint.split(','):
+                if (
+                    _normalize_board_name(spec.chromeos_root, builder)
+                    == host_board
+                ):
+                    board_to_build = builder
+                    break
+            else:
+                raise errors.DutLeaseException(
+                    'DUT with unexpected board:%s' % host_board
+                )
+        else:
+            board_to_build = host_board
+        return board_to_build
+
     filter_func = functools.partial(_is_acceptable_bot, boards_with_prebuilt)
+    if enable_shared_dut_pool:
+        pool_manager = shared_dut_pool.SharedDutPoolManager()
+        idle_duts = pool_manager.query(
+            dimensions, variants, pools, shared_dut_pool.DutState.IDLE
+        )
+        logger.debug(
+            '%s idle duts in pool: %s',
+            len(idle_duts),
+            [dut.dut_name for dut in idle_duts],
+        )
+        if idle_duts:
+            # Pick a random one for now.
+            host = idle_duts[0].dut_name
+            logger.info('leased %s from the shared DUT pool', host)
+            pool_manager.update(name=host, state=shared_dut_pool.DutState.BUSY)
+            return host, resolve_builder_by_host(host)
+
     while True:
         # Query every time because each iteration takes a few minutes
         bots = _sample_available_bots_with_retry(
@@ -442,31 +497,10 @@ def allocate_dut(
             async_dut_leaser.lease_parallelly(),
         )
         if host:
-            if cros_lab_util.is_satlab_dut(host):
-                cros_lab_util.write_satlab_ssh_config(host)
-            # Resolve what board we should build during bisection.
-            board_to_build = None
-            bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])
-            host_board = bots[0]['dimensions']['label-board'][0]
-            if spec.builder_hint:
-                for builder in spec.builder_hint.split(','):
-                    if (
-                        _normalize_board_name(spec.chromeos_root, builder)
-                        == host_board
-                    ):
-                        board_to_build = builder
-                        break
-                else:
-                    raise errors.DutLeaseException(
-                        'DUT with unexpected board:%s' % host_board
-                    )
-            else:
-                board_to_build = host_board
-
             # Add the leased DUT to the shared pool.
             if enable_shared_dut_pool:
                 add_dut_to_shared_pool(bots[0], spec.session)
-            return host, board_to_build
+            return host, resolve_builder_by_host(host)
         time.sleep(1)
 
     logger.warning('unable to lease DUT in time limit')
