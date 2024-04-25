@@ -166,3 +166,48 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                 )
             )
         return duts
+
+    def update(
+        self,
+        name: str | None = None,
+        dimensions: dict | None = None,
+        state: DutState | None = None,
+        owner: str | None = None,
+        user: str | None = None,
+    ) -> bool:
+        """Update a DUT.
+
+        If the DUT does not exist in the shared pool, returns False.
+        If a field is not given or is None, leave it intact.
+
+        Args:
+          name: The name of the DUT.
+          dimensions: A dict for all the DUT dimensions.
+          state: a DutState enum.
+          owner: the owner bisection ID.
+          user: the user bisection ID.
+        """
+        with self._client.transaction():
+            key = self._client.key(self._KIND, name)
+            dut = self._client.get(key)
+            if dut is None:
+                logger.warning('DUT %s does not exist in the pool', name)
+                return False
+            to_update = {
+                k: v
+                for k, v in {
+                    'name': name,
+                    'dimensions': dimensions,
+                    'state': state,
+                    'owner': owner,
+                    'user': user,
+                    'last_update_time': datetime.datetime.now(
+                        tz=datetime.timezone.utc
+                    ),
+                }.items()
+                if v is not None
+            }
+            logger.debug('dut to be updated with: %s', to_update)
+            dut.update(to_update)
+            self._client.put(dut)
+            return True

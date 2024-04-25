@@ -28,6 +28,7 @@ from bisect_kit import cros_util
 from bisect_kit import dut_allocator
 from bisect_kit import errors
 from bisect_kit import gs_util
+from bisect_kit import shared_dut_pool
 from bisect_kit import util
 from bisect_kit import vm_leaser
 import experiment
@@ -86,15 +87,20 @@ class DelayedDutReleaser:
     _DELAYED_SECONDS = 60
 
     def __init__(
-        self, dut, callback: typing.Callable[[float], None] | None = None
+        self,
+        dut,
+        enable_shared_dut_pool: bool = False,
+        callback: typing.Callable[[float], None] | None = None,
     ):
         """Initializer.
 
         Args:
             dut: the DUT.
+            enable_shared_dut_pool: whether to enable the shared DUT pool.
             callback: a callback to call when the DUT is released. It accepts an argument as the DUT release timestamp.
         """
         self._dut = dut
+        self._enable_shared_dut_pool = enable_shared_dut_pool
         self._callback = callback
 
         self._timer = None
@@ -125,9 +131,26 @@ class DelayedDutReleaser:
             if self._has_canceled:
                 return
             logger.info('releasing DUT %s', self._dut)
-            cros_lab_util.crosfleet_release_dut(
-                cros_lab_util.dut_host_name(self._dut)
-            )
+            if self._enable_shared_dut_pool:
+                logger.info(
+                    'returning the DUT to the shared DUT pool instead of the ChromeOS lab'
+                )
+                pool_manager = shared_dut_pool.SharedDutPoolManager()
+                if not pool_manager.update(
+                    name=cros_lab_util.dut_host_name(self._dut),
+                    state=shared_dut_pool.DutState.IDLE,
+                    user='',
+                ):
+                    logger.info(
+                        'failed to return the DUT to the shared DUT pool, try returning to the ChromeOS lab directly'
+                    )
+                else:
+                    self._has_released = True
+
+            if not self._has_released:
+                cros_lab_util.crosfleet_release_dut(
+                    cros_lab_util.dut_host_name(self._dut)
+                )
             self._has_released = True
 
         if self._callback:
@@ -478,6 +501,10 @@ class DutManager:
 
         self._dut_releaser = DelayedDutReleaser(
             self._auto_allocated_dut,
+            experiment.is_in_experiment(
+                self.config.get('experiments'),
+                experiment.ID.SHARED_DUT_POOL,
+            ),
             functools.partial(add_dut_lease_record, self._auto_allocated_time),
         )
         self._dut_releaser.start()

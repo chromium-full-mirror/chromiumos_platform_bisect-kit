@@ -18,6 +18,7 @@ from bisect_kit import cros_lab_util
 from bisect_kit import dut_allocator
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
+from bisect_kit import shared_dut_pool
 from bisect_kit import vm_leaser
 
 
@@ -257,7 +258,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
-            'host.cros', mock.ANY
+            'host.cros', mock.ANY, mock.ANY
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
@@ -369,7 +370,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
-            'host.cros', mock.ANY
+            'host.cros', mock.ANY, mock.ANY
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_not_called()
@@ -411,7 +412,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             'host2.cros', cros_lab_util.make_lease_reason('stateless')
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
-            'host2.cros', mock.ANY
+            'host2.cros', mock.ANY, mock.ANY
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
@@ -448,7 +449,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
-            'host.cros', mock.ANY
+            'host.cros', mock.ANY, mock.ANY
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
@@ -487,7 +488,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
-            'host.cros', mock.ANY
+            'host.cros', mock.ANY, mock.ANY
         )
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
@@ -691,6 +692,12 @@ class TestDelayedDutReleaser(unittest.TestCase):
         self.mock_thread = self.enterContext(
             mock.patch.object(threading, 'Timer', autospec=True)
         )
+        self.mock_dut_pool_manager_cls = self.enterContext(
+            mock.patch.object(
+                shared_dut_pool, 'SharedDutPoolManager', autospec=True
+            )
+        )
+        self.mock_dut_pool_manager = self.mock_dut_pool_manager_cls.return_value
 
     def testCancelBeforeTimeUp(self):
         dut_releaser = dut_manager_module.DelayedDutReleaser('host.cros')
@@ -724,6 +731,46 @@ class TestDelayedDutReleaser(unittest.TestCase):
         func()
 
         self.mock_crosfleet_release_dut.assert_not_called()
+
+    def testReturnToSharedDutPool(self):
+        dut_releaser = dut_manager_module.DelayedDutReleaser(
+            'host.cros', enable_shared_dut_pool=True
+        )
+        dut_releaser.start()
+
+        self.mock_dut_pool_manager.update.return_value = True
+
+        # func is the function to be called when initializing the timer, which
+        # is dut_releaser.run().
+        func = self.mock_thread.call_args.args[1]
+        func()
+
+        self.assertFalse(dut_releaser.cancel())
+        self.mock_dut_pool_manager.update.assert_called_once_with(
+            name='host', state=mock.ANY, user=''
+        )
+        self.mock_crosfleet_release_dut.assert_not_called()
+
+    def testReturnToSharedDutPoolFailed(self):
+        dut_releaser = dut_manager_module.DelayedDutReleaser(
+            'host.cros', enable_shared_dut_pool=True
+        )
+        dut_releaser.start()
+
+        self.mock_dut_pool_manager.update.return_value = False
+
+        # func is the function to be called when initializing the timer, which
+        # is dut_releaser.run().
+        func = self.mock_thread.call_args.args[1]
+        func()
+
+        self.assertFalse(dut_releaser.cancel())
+        # Returns False
+        self.mock_dut_pool_manager.update.assert_called_once_with(
+            name='host', state=mock.ANY, user=''
+        )
+        # Returned to the ChromeOS lab instead.
+        self.mock_crosfleet_release_dut.assert_called_once_with('host')
 
 
 class TestAddDutLeasesRecord(unittest.TestCase):
@@ -803,7 +850,7 @@ class TestAddDutLeasesRecord(unittest.TestCase):
 
         # Trigger the callback function manually.
         # end_timestamp
-        self.mock_delayed_dut_releaser_cls.call_args.args[1](1689179950.1)
+        self.mock_delayed_dut_releaser_cls.call_args.args[2](1689179950.1)
 
         with open(log_file) as f:
             records = json.load(f)
@@ -854,7 +901,7 @@ class TestAddDutLeasesRecord(unittest.TestCase):
 
         # Trigger the callback function manually.
         # end_timestamp
-        self.mock_delayed_dut_releaser_cls.call_args.args[1](1689179950.1)
+        self.mock_delayed_dut_releaser_cls.call_args.args[2](1689179950.1)
 
         with open(log_file) as f:
             records = json.load(f)
