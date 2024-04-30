@@ -13,9 +13,9 @@ import logging
 
 from bisect_kit import cli
 from bisect_kit import common
-from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import dut_allocate_spec
 from bisect_kit import dut_allocator
 from bisect_kit import errors
 
@@ -86,7 +86,7 @@ class AllocateDutResult:
     text: str | None = None
 
 
-def allocate_dut(spec: core.DutAllocateSpec):
+def allocate_dut(spec: dut_allocate_spec.DutAllocateSpec):
     result = AllocateDutResult()
     try:
         host, board = dut_allocator.allocate_dut(spec)
@@ -105,23 +105,7 @@ def allocate_dut(spec: core.DutAllocateSpec):
 
 
 def cmd_allocate_dut(opts):
-    spec = core.DutAllocateSpec(
-        pool=opts.pool,
-        dimensions=opts.dimensions,
-        board=opts.board,
-        model=opts.model,
-        sku=opts.sku,
-        dut_name=opts.dut_name,
-        satlab_ip=opts.satlab_ip,
-        version_hint=opts.version_hint,
-        builder_hint=opts.builder_hint,
-        time_limit=opts.time_limit,
-        duration=opts.duration,
-        parallel=opts.parallel,
-        chromeos_root=opts.chromeos_root,
-        session=opts.session,
-    )
-
+    spec = dut_allocate_spec.parse_from_command_line_args(opts)
     result = allocate_dut(spec)
     print(json.dumps(dataclasses.asdict(result)))
 
@@ -187,7 +171,7 @@ def add_allocate_dut_arguments(
     )
     group.add_argument(
         flag_name('dut-name'),
-        help='allocation criteria; comma separated',
+        help='allocation criteria;',
     )
 
     parser.add_argument(

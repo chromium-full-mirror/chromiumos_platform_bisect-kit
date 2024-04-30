@@ -12,7 +12,6 @@ import time
 from typing import Optional
 import uuid
 
-from bisect_kit import core
 from bisect_kit import cros_util
 from bisect_kit import util
 from google.api_core.client_options import ClientOptions
@@ -323,27 +322,16 @@ def get_vm_public_ip(vm: VMLeaseResult) -> Optional[str]:
 
 
 def allocate_dut(
-    spec: core.DutAllocateSpec, gs_vm_image_path: str, full_version: str
+    board: str, gs_vm_image_path: str, full_version: str
 ) -> VMLeaseResult:
     """Allocate a VM DUT.
 
     Args:
-        spec: dut allocation spec.
+        booard: board name.
         gs_vm_image_path: GS path of GCE image tarball.
         full_version: full ChromeOS version.
 
     Returns:
         Leased VM info.
     """
-    # pool is ignored
-    spec.pool = None
-    assert cros_util.is_cros_or_snapshot_version(full_version)
-    assert spec.board
-    assert not spec.model
-    assert not spec.sku
-    assert not spec.dut_name
-    assert not spec.satlab_ip
-    if not spec.builder_hint:
-        spec.builder_hint = spec.board
-    vm = lease_vm(gs_vm_image_path, spec.board, full_version)
-    return vm
+    return lease_vm(gs_vm_image_path, board, full_version)

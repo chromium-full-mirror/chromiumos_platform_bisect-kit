@@ -295,6 +295,7 @@ class States:
         shutil.move(tmp_fn, self.session_file)
 
 
+# TODO(cylee): deprecated. Use dut_allocator.DutAllocateSpec.
 @dataclasses.dataclass
 class DutAllocateSpec:
     """A class to keep parameters used to allocate DUTs."""
@@ -332,11 +333,10 @@ class DiagnoseStates(States):
         super().__init__(session_file)
         self._data = {}
 
-    def init_states(self, config: dict, dut_allocate_spec: DutAllocateSpec):
+    def init_states(self, config: dict):
         self._data = {
             'config': config,
             'history': [],
-            'dut_allocate_spec': dut_allocate_spec,
             'statistics': DiagnoseStatistics(),
         }
 
@@ -348,7 +348,6 @@ class DiagnoseStates(States):
         if (
             'config' in self._data
             and 'history' in self._data
-            and 'dut_allocate_spec' in self._data
             and 'statistics' in self._data
         ):
             self._init_done()
@@ -368,11 +367,6 @@ class DiagnoseStates(States):
     def history(self) -> list:
         assert self.inited
         return self._data['history']
-
-    @property
-    def dut_allocate_spec(self) -> DutAllocateSpec:
-        assert self.inited
-        return self._data['dut_allocate_spec']
 
     @property
     def statistics(self) -> DiagnoseStatistics:

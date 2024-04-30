@@ -15,6 +15,7 @@ from unittest import mock
 
 from bisect_kit import core
 from bisect_kit import cros_lab_util
+from bisect_kit import dut_allocate_spec as dut_allocate_spec_module
 from bisect_kit import dut_allocator
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
@@ -35,6 +36,9 @@ class TestDutManagerAllocation(unittest.TestCase):
     def setUp(self):
         super().setUp()
         self.mock_states = self.dummy_mock_states()
+        self.mock_dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
+            boards=['test_board']
+        )
 
         self.mock_update_states = self.enterContext(
             mock.patch.object(
@@ -105,11 +109,9 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser.reset_mock()
 
     def dummy_mock_states(self):
-        dummy_allocate_spec = core.DutAllocateSpec(board='test_board')
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
             config={'session': 'stateless', 'experiments': []},
-            dut_allocate_spec=dummy_allocate_spec,
         )
         return mock_states
 
@@ -129,6 +131,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             'pre_allocated_dut',
             True,
             self.mock_dut_init_func,
@@ -150,6 +153,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             'pre_allocated_dut',
             False,
             self.mock_dut_init_func,
@@ -171,6 +175,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             'pre_allocated_dut',
             True,
             self.mock_dut_init_func,
@@ -195,6 +200,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             'pre_allocated_dut',
             True,
             self.mock_dut_init_func,
@@ -225,6 +231,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             'pre_allocated_dut',
             True
             # dut_init_func and dut_leave_context_check_func are missing.
@@ -243,6 +250,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
             self.mock_dut_init_func,
@@ -275,6 +283,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             False,
             self.mock_dut_init_func,
@@ -294,6 +303,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
             self.mock_dut_init_func,
@@ -318,6 +328,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
             self.mock_dut_init_func,
@@ -342,6 +353,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
             self.mock_dut_init_func,
@@ -384,6 +396,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
             self.mock_dut_init_func,
@@ -430,6 +443,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
             self.mock_dut_init_func,
@@ -467,6 +481,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
             self.mock_dut_init_func,
@@ -503,18 +518,27 @@ class TestDutManagerAllocation(unittest.TestCase):
     def test_dut(self):
         self.mock_is_vm.return_value = False
         dut_manager = dut_manager_module.DutManager(
-            'NoPreAllocate', self.mock_states, cros_lab_util.LAB_DUT, True
+            'NoPreAllocate',
+            self.mock_states,
+            self.mock_dut_allocate_spec,
+            cros_lab_util.LAB_DUT,
+            True,
         )
         self.assertEqual(dut_manager.dut, None)
 
         dut_manager = dut_manager_module.DutManager(
-            'PreAllocate', self.mock_states, 'pre_allocated_dut', True
+            'PreAllocate',
+            self.mock_states,
+            self.mock_dut_allocate_spec,
+            'pre_allocated_dut',
+            True,
         )
         self.assertEqual(dut_manager.dut, 'pre_allocated_dut')
 
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
         )
@@ -530,6 +554,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'VM',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             None,
             True,
             should_force_monitoring=False,
@@ -546,6 +571,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             _dut_manager = dut_manager_module.DutManager(
                 'VM',
                 self.mock_states,
+                self.mock_dut_allocate_spec,
                 None,
                 True,
                 should_force_monitoring=False,
@@ -560,6 +586,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             _dut_manager = dut_manager_module.DutManager(
                 'VM',
                 self.mock_states,
+                self.mock_dut_allocate_spec,
                 None,
                 True,
                 should_force_monitoring=False,
@@ -573,6 +600,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'VM',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             None,
             True,
             should_force_monitoring=False,
@@ -589,6 +617,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             _dut_manager = dut_manager_module.DutManager(
                 'VM',
                 self.mock_states,
+                self.mock_dut_allocate_spec,
                 None,
                 True,
                 should_force_monitoring=True,
@@ -601,6 +630,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'VM',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             None,
             True,
             should_force_monitoring=False,
@@ -618,6 +648,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'VM',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             None,
             True,
             should_force_monitoring=False,
@@ -652,6 +683,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'VM',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             None,
             True,
             should_force_monitoring=False,
@@ -777,6 +809,10 @@ class TestAddDutLeasesRecord(unittest.TestCase):
     """Test dut lease record is written when leaving DutManager context manager."""
 
     def setUp(self):
+        self.mock_dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
+            boards=['test_board']
+        )
+
         self._mock_dut_leases_log_path = self.enterContext(
             mock.patch.object(
                 dut_manager_module.DutManager,
@@ -822,11 +858,9 @@ class TestAddDutLeasesRecord(unittest.TestCase):
         )
 
     def dummy_mock_states(self):
-        dummy_allocate_spec = core.DutAllocateSpec()
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
-            config={'session': 'stateless', 'experiments': []},
-            dut_allocate_spec=dummy_allocate_spec,
+            config={'session': 'stateless', 'experiments': []}
         )
         return mock_states
 
@@ -842,6 +876,7 @@ class TestAddDutLeasesRecord(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
         )
@@ -893,6 +928,7 @@ class TestAddDutLeasesRecord(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'NoPreAllocate',
             self.mock_states,
+            self.mock_dut_allocate_spec,
             cros_lab_util.LAB_DUT,
             True,
         )
@@ -930,19 +966,30 @@ class TestConfigUpdated(unittest.TestCase):
     """Test the states is updated correctly on provision."""
 
     @contextlib.contextmanager
-    def fake_states(self, config, dut_allocate_spec):
+    def fake_states(self, config):
         """Returns a fake DiagnoseStates() backed by a temporary file."""
         # The temporary file is removed automatically.
         with tempfile.NamedTemporaryFile() as f:
             fake_states = core.DiagnoseStates(f.name)
-            fake_states.init_states(
-                config=config,
-                dut_allocate_spec=dut_allocate_spec,
-            )
+            fake_states.init_states(config=config)
             yield fake_states
 
     def setUp(self):
         super().setUp()
+
+        self.fake_dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
+            boards=['test_board']
+        )
+        self.mock_save_dut_allocate_spec = self.enterContext(
+            mock.patch.object(
+                self.fake_dut_allocate_spec,
+                'save',
+                autospec=True,
+            )
+        )
+
+        self.mock_dut_allocate_spec = self.fake_dut_allocate_spec
+
         # Mocks relevant to the functionality under testing.
         self.mock_swarming_bot_list = self.enterContext(
             mock.patch.object(
@@ -1000,11 +1047,11 @@ class TestConfigUpdated(unittest.TestCase):
             'session': 'stateless',
             'experiments': [],
         }
-        dut_allocate_spec = core.DutAllocateSpec(board='board1')
-        with self.fake_states(config, dut_allocate_spec) as states:
+        with self.fake_states(config) as states:
             dut_manager = dut_manager_module.DutManager(
                 'NoPreAllocate',
                 states,
+                self.mock_dut_allocate_spec,
                 cros_lab_util.LAB_DUT,
                 True,
             )
@@ -1013,23 +1060,20 @@ class TestConfigUpdated(unittest.TestCase):
                 pass
 
             # 'board1' has been cleared.
-            expected_dut_allocate_spec = core.DutAllocateSpec(model='model1')
+            expected_dut_allocate_spec = (
+                dut_allocate_spec_module.DutAllocateSpec(models=['model1'])
+            )
+            self.assertEqual(
+                dut_manager.dut_allocate_spec, expected_dut_allocate_spec
+            )
+
             expected_config = config | {
                 'board': 'board1',
                 'allocated_dut': 'host.cros',
             }
-            self.assertEqual(
-                states.dut_allocate_spec, expected_dut_allocate_spec
-            )
             self.assertEqual(states.config, expected_config)
 
-            # Verify the states is saved to file.
-            loaded_states = core.DiagnoseStates(states.session_file)
-            loaded_states.load_states()
-            self.assertEqual(
-                loaded_states.dut_allocate_spec, expected_dut_allocate_spec
-            )
-            self.assertEqual(loaded_states.config, expected_config)
+        self.mock_save_dut_allocate_spec.assert_called_once()
 
         self.mock_swarming_bot_list.assert_called_once_with(['dut_name:host'])
         self.mock_swarming_bot_info.assert_called_once_with('bot_id_1')
@@ -1053,11 +1097,11 @@ class TestConfigUpdated(unittest.TestCase):
             'experiments': [],
             'metric': 'some_metric',
         }
-        dut_allocate_spec = core.DutAllocateSpec(model='model1')
-        with self.fake_states(config, dut_allocate_spec) as states:
+        with self.fake_states(config) as states:
             dut_manager = dut_manager_module.DutManager(
                 'NoPreAllocate',
                 states,
+                self.mock_dut_allocate_spec,
                 cros_lab_util.LAB_DUT,
                 True,
             )
@@ -1066,23 +1110,20 @@ class TestConfigUpdated(unittest.TestCase):
                 pass
 
             # 'model1' has been cleared.
-            expected_dut_allocate_spec = core.DutAllocateSpec(sku='sku1')
+            expected_dut_allocate_spec = (
+                dut_allocate_spec_module.DutAllocateSpec(skus=['sku1'])
+            )
+            self.assertEqual(
+                dut_manager.dut_allocate_spec, expected_dut_allocate_spec
+            )
+
             expected_config = config | {
                 'board': 'board1',
                 'allocated_dut': 'host.cros',
             }
-            self.assertEqual(
-                states.dut_allocate_spec, expected_dut_allocate_spec
-            )
             self.assertEqual(states.config, expected_config)
 
-            # Verify the states is saved to file.
-            loaded_states = core.DiagnoseStates(states.session_file)
-            loaded_states.load_states()
-            self.assertEqual(
-                loaded_states.dut_allocate_spec, expected_dut_allocate_spec
-            )
-            self.assertEqual(loaded_states.config, expected_config)
+        self.mock_save_dut_allocate_spec.assert_called_once()
 
         self.mock_swarming_bot_list.assert_called_once_with(['dut_name:host'])
         self.mock_swarming_bot_info.assert_called_once_with('bot_id_1')
@@ -1093,11 +1134,11 @@ class TestConfigUpdated(unittest.TestCase):
             'experiments': [],
             'board': 'board1',
         }
-        dut_allocate_spec = core.DutAllocateSpec(model='model1')
-        with self.fake_states(config, dut_allocate_spec) as states:
+        with self.fake_states(config) as states:
             dut_manager = dut_manager_module.DutManager(
                 'PreAllocate',
                 states,
+                self.mock_dut_allocate_spec,
                 'pre_allocated_dut',
                 True,
             )
@@ -1106,7 +1147,10 @@ class TestConfigUpdated(unittest.TestCase):
                 pass
 
             # Verify the configs are left intact.
-            self.assertEqual(states.dut_allocate_spec, dut_allocate_spec)
+            self.assertEqual(
+                dut_manager.dut_allocate_spec,
+                dut_allocate_spec_module.DutAllocateSpec(boards=['test_board']),
+            )
             self.assertEqual(states.config, config)
 
         self.mock_swarming_bot_list.assert_not_called()

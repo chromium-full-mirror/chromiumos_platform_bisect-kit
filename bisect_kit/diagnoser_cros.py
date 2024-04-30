@@ -22,6 +22,7 @@ from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import dut_allocate_spec as dut_allocate_spec_module
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
 from bisect_kit import util
@@ -83,8 +84,13 @@ class CrosDiagnoser:
         self.old_info: cros_util.VersionInfo = cros_util.VersionInfo()
         self.new_info: cros_util.VersionInfo = cros_util.VersionInfo()
 
+        self.dut_allocate_spec = dut_allocate_spec_module.load(
+            self.config['session']
+        )
         self.is_vm_board = cros_util.is_vm_board(
-            self.states.dut_allocate_spec.board
+            self.dut_allocate_spec.boards[0]
+            if self.dut_allocate_spec.boards
+            else None
         )
         self.is_stateless = (
             experiment.is_in_experiment(
@@ -183,6 +189,7 @@ class CrosDiagnoser:
         dut_manager = dut_manager_module.DutManager(
             'InitLease',
             self.states,
+            self.dut_allocate_spec,
             self.pre_allocated_dut,
             self.is_stateless,
             vm_cros_version=self.config['old'] if self.is_vm_board else None,
@@ -237,6 +244,7 @@ class CrosDiagnoser:
         dut_manager = dut_manager_module.DutManager(
             'PrebuiltChromeOS',
             self.states,
+            self.dut_allocate_spec,
             self.pre_allocated_dut,
             self.is_stateless,
         )
@@ -293,6 +301,7 @@ class CrosDiagnoser:
         dut_manager = dut_manager_module.DutManager(
             'OldCros',
             self.states,
+            self.dut_allocate_spec,
             self.pre_allocated_dut,
             self.is_stateless,
             bisect_prebuilt_on_old_cros_dut_init_func,
@@ -387,6 +396,7 @@ class CrosDiagnoser:
         dut_manager = dut_manager_module.DutManager(
             'LocalChrome',
             self.states,
+            self.dut_allocate_spec,
             self.pre_allocated_dut,
             self.is_stateless,
             bisect_local_chrome_dut_init_func,
@@ -420,6 +430,7 @@ class CrosDiagnoser:
         dut_manager = dut_manager_module.DutManager(
             'LocalChromeOS',
             self.states,
+            self.dut_allocate_spec,
             self.pre_allocated_dut,
             self.is_stateless,
             is_cros_localbuild_vm=self.is_vm_board,
@@ -1643,28 +1654,6 @@ class DiagnoseCommandLineBase:
     def init_hook(self, opts):
         pass  # implemented by subclass if necessary
 
-    @staticmethod
-    def _dut_allocate_spec_from_args(
-        opts: argparse.Namespace,
-    ) -> core.DutAllocateSpec:
-        """Creates a DutAllocateSpec from command line args."""
-        return core.DutAllocateSpec(
-            pool=opts.allocate_dut_pool,
-            dimensions=opts.allocate_dut_dimensions,
-            board=opts.allocate_dut_board,
-            model=opts.allocate_dut_model,
-            sku=opts.allocate_dut_sku,
-            dut_name=opts.allocate_dut_dut_name,
-            satlab_ip=opts.allocate_dut_satlab_ip,
-            version_hint=opts.allocate_dut_version_hint,
-            builder_hint=opts.allocate_dut_builder_hint,
-            time_limit=opts.allocate_dut_time_limit,
-            duration=opts.allocate_dut_duration,
-            parallel=opts.allocate_dut_parallel,
-            chromeos_root=opts.chromeos_root,
-            session=opts.session,
-        )
-
     def write_total_execution_time(self, start_timestamp, end_timestamp):
         statistics = self.states.statistics
         statistics.start_timestamp = start_timestamp
@@ -1749,7 +1738,14 @@ class DiagnoseCommandLineBase:
             "experiments": opts.experiments,
         }
 
-        self.states.init_states(config, self._dut_allocate_spec_from_args(opts))
+        dut_allocate_spec = (
+            dut_allocate_spec_module.parse_from_dut_allocate_command_line_args(
+                opts
+            )
+        )
+        dut_allocate_spec.save()
+
+        self.states.init_states(config)
         self.init_hook(opts)
         self.states.save()
 

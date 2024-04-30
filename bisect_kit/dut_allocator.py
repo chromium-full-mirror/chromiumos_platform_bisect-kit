@@ -15,9 +15,9 @@ import random
 import time
 import typing
 
-from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import dut_allocate_spec
 from bisect_kit import errors
 from bisect_kit import shared_dut_pool
 
@@ -251,7 +251,7 @@ def _normalize_board_name(chromeos_root, board):
 
 
 def allocate_dut(
-    spec: core.DutAllocateSpec, enable_shared_dut_pool=False
+    spec: dut_allocate_spec.DutAllocateSpec, enable_shared_dut_pool=False
 ) -> typing.Tuple[str, str]:
     """Helper of cmd_allocate_dut.
 
@@ -266,25 +266,24 @@ def allocate_dut(
 
     Raises:
         errors.ArgumentError if the input DutAllocateSpec is invalid.
-        errors.NoDutAvailable if the DutAllocateSpec could not match any device
-          in lab.
+        errors.NoDutAvailable if the DutAllocateSpec could not match any device in lab.
         errors.DutLeaseTimeout if the DUT lease take too long.
         errors.DutLeaseException if other exception happens.
     """
     if spec.dut_name:
         # If dut_name is specified, pool is ignored.
-        spec.pool = None
+        spec.pools = []
 
         if cros_lab_util.is_satlab_dut(spec.dut_name):
             cros_lab_util.write_satlab_ssh_config(spec.dut_name)
-        if not spec.builder_hint:
-            spec.builder_hint = cros_util.query_dut_board(spec.dut_name)
-    elif not spec.pool:
+        if not spec.builder_hints:
+            spec.builder_hints = [cros_util.query_dut_board(spec.dut_name)]
+    elif not spec.pools:
         raise errors.ArgumentError(
             '--pool', 'need to be specified if not --dut-name'
         )
-    if spec.version_hint:
-        for v in spec.version_hint.split(','):
+    if spec.version_hints:
+        for v in spec.version_hints:
             if cros_util.is_cros_version(
                 v
             ) or cros_util.is_cros_snapshot_version(v):
@@ -305,24 +304,24 @@ def allocate_dut(
         cros_lab_util.write_satlab_ssh_config(spec.dut_name, spec.satlab_ip)
 
     t0 = time.time()
-    dimensions = [f'{key}:{value}' for key, value in spec.dimensions]
+    dimensions = spec.dimensions[:]
     dimensions.append('dut_state:ready')
     dimensions = _filter_dimensions_by_lab(dimensions, raise_unknown=True)
 
     pools = None
-    if spec.pool:
-        pools = ['label-pool:%s' % p for p in spec.pool.split(',')]
+    if spec.pools:
+        pools = ['label-pool:%s' % p for p in spec.pools]
         pools = _filter_dimensions_by_lab(pools, raise_unknown=False)
         if not pools:
-            raise errors.DutLeaseException(
-                'all specified pools "%s" are not available in lab' % spec.pool
+            raise errors.NoDutAvailable(
+                'all specified pools "%s" are not available in lab' % spec.pools
             )
 
     # Note: board, model, sku, and dut_name are mutual exclusive so at most one
     # of them is present.
     variants: list[str] = []
-    if spec.board:
-        for board in spec.board.split(','):
+    if spec.boards:
+        for board in spec.boards:
             variants.append(
                 'label-board:'
                 + _normalize_board_name(spec.chromeos_root, board)
@@ -330,11 +329,11 @@ def allocate_dut(
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
-                'Invalid constraints: no board=%s in the lab' % spec.board
+                'Invalid constraints: no board=%s in the lab' % spec.boards
             )
 
-    if spec.model:
-        for model in spec.model.split(','):
+    if spec.models:
+        for model in spec.models:
             if model in _models_to_avoid:
                 logger.warning(
                     'model=%s is bad (reason:%s), ignore',
@@ -350,23 +349,22 @@ def allocate_dut(
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
-                'Invalid constraints: no model=%s in the lab' % spec.model
+                'Invalid constraints: no model=%s in the lab' % spec.models
             )
 
-    if spec.sku:
-        for sku in spec.sku.split(','):
+    if spec.skus:
+        for sku in spec.skus:
             variants.append(
                 'label-hwid_sku:' + cros_lab_util.normalize_sku_name(sku)
             )
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
-                'Invalid constraints: no sku=%s in the lab' % spec.sku
+                'Invalid constraints: no sku=%s in the lab' % spec.skus
             )
 
     if spec.dut_name:
-        for dut_name in spec.dut_name.split(','):
-            variants.append('dut_name:' + dut_name)
+        variants.append('dut_name:' + spec.dut_name)
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
             raise errors.NoDutAvailable(
@@ -375,21 +373,21 @@ def allocate_dut(
 
     # Filter variants by prebuilt images.
     boards_with_prebuilt: list[str] | None = None
-    if spec.version_hint:
-        if not spec.builder_hint:
-            spec.builder_hint = spec.board
-        if not spec.builder_hint:
+    if spec.version_hints:
+        if not spec.builder_hints:
+            spec.builder_hints = spec.boards
+        if not spec.builder_hints:
             raise errors.ArgumentError(
                 '--builder-hint', 'must be specified along with --version-hint'
             )
         boards_with_prebuilt = []
-        versions = spec.version_hint.split(',')
-        for builder in spec.builder_hint.split(','):
+        versions = spec.version_hints
+        for builder in spec.builder_hints:
             if not all(cros_util.has_test_image(builder, v) for v in versions):
                 logger.warning(
                     'builder=%s does not have prebuilt test image for %s, ignore',
                     builder,
-                    spec.version_hint,
+                    spec.version_hints,
                 )
                 continue
             boards_with_prebuilt.append(
@@ -399,7 +397,7 @@ def allocate_dut(
         if not boards_with_prebuilt:
             raise errors.ArgumentError(
                 '--version-hint',
-                'given builders have no prebuilt for %s' % spec.version_hint,
+                'given builders have no prebuilt for %s' % spec.version_hints,
             )
         filtered = _filter_dimensions_by_board(
             boards_with_prebuilt, variants, None
@@ -416,7 +414,7 @@ def allocate_dut(
         if not filtered:
             raise errors.NoDutAvailable(
                 'The lab has %s devices; but there are no such devices in pool=%s'
-                % (variants, spec.pool)
+                % (variants, spec.pools)
             )
         variants = filtered
 
@@ -442,8 +440,8 @@ def allocate_dut(
                 'malformed bots info %s' % bots
             ) from e
 
-        if spec.builder_hint:
-            for builder in spec.builder_hint.split(','):
+        if spec.builder_hints:
+            for builder in spec.builder_hints:
                 if (
                     _normalize_board_name(spec.chromeos_root, builder)
                     == host_board
@@ -458,7 +456,6 @@ def allocate_dut(
             board_to_build = host_board
         return board_to_build
 
-    filter_func = functools.partial(_is_acceptable_bot, boards_with_prebuilt)
     if enable_shared_dut_pool:
         pool_manager = shared_dut_pool.SharedDutPoolManager()
         idle_duts = pool_manager.query(
@@ -476,6 +473,7 @@ def allocate_dut(
             pool_manager.update(name=host, state=shared_dut_pool.DutState.BUSY)
             return host, resolve_builder_by_host(host)
 
+    filter_func = functools.partial(_is_acceptable_bot, boards_with_prebuilt)
     while True:
         # Query every time because each iteration takes a few minutes
         bots = _sample_available_bots_with_retry(

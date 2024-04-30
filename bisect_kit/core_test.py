@@ -68,11 +68,6 @@ class TestDiagnoseStates(unittest.TestCase):
             'old_value': 'version_old',
             'new_value': 'version_new',
         }
-        self._fake_dut_allocate_spec = core.DutAllocateSpec(
-            pool='default_pool',
-            board='board1',
-            duration=1000,
-        )
 
     def tearDown(self):
         if os.path.exists(self.session_file):
@@ -80,20 +75,18 @@ class TestDiagnoseStates(unittest.TestCase):
 
     def test_init_states(self):
         states = core.DiagnoseStates(self.session_file)
-        states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+        states.init_states(self._fake_config)
 
         self.assertTrue(states.inited)
         self.assertEqual(states.config, self._fake_config)
         self.assertEqual(states.history, [])
-        self.assertEqual(states.dut_allocate_spec, self._fake_dut_allocate_spec)
         self.assertEqual(states.statistics, core.DiagnoseStatistics())
 
     def test_save_and_load(self):
         states = core.DiagnoseStates(self.session_file)
-        states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+        states.init_states(self._fake_config)
 
         states.config['board'] = 'board1'
-        states.dut_allocate_spec.duration = 2000
         states.statistics.dut_leases_log_path = (
             '/some/other/path/to/dut_leases_log'
         )
@@ -114,14 +107,6 @@ class TestDiagnoseStates(unittest.TestCase):
         )
         self.assertEqual(loaded_states.history, [])
         self.assertEqual(
-            loaded_states.dut_allocate_spec,
-            core.DutAllocateSpec(
-                pool='default_pool',
-                board='board1',
-                duration=2000,
-            ),
-        )
-        self.assertEqual(
             loaded_states.statistics,
             core.DiagnoseStatistics(
                 dut_leases_log_path='/some/other/path/to/dut_leases_log'
@@ -138,7 +123,7 @@ class TestDiagnoseStates(unittest.TestCase):
 
     def test_add_history(self):
         states = core.DiagnoseStates(self.session_file)
-        states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+        states.init_states(self._fake_config)
 
         states.add_history(event='event1', text='text1')
         states.add_history(event='event2', text='text2')
@@ -156,14 +141,14 @@ class TestDiagnoseStates(unittest.TestCase):
 
     def test_reset(self):
         states = core.DiagnoseStates(self.session_file)
-        states.init_states(self._fake_config, self._fake_dut_allocate_spec)
+        states.init_states(self._fake_config)
         states.save()
 
         states = core.DiagnoseStates(self.session_file)
         states.reset()
         self.assertFalse(states.inited)
 
-        states = core.BisectStates(self.session_file)
+        states = core.DiagnoseStates(self.session_file)
         # failed because the file doesn't exist.
         self.assertFalse(states.load_states())
         self.assertFalse(states.inited)

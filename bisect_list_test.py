@@ -33,6 +33,7 @@ class TestListDomain(unittest.TestCase):
         dut_manager = dut_manager_module.DutManager(
             'PreAllocate',
             states=None,
+            dut_allocate_spec=None,
             pre_allocated_dut='pre_allocated_dut',
             should_auto_allocate=False,
         )

@@ -25,6 +25,7 @@ from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
+from bisect_kit import dut_allocate_spec as dut_allocate_spec_module
 from bisect_kit import dut_allocator
 from bisect_kit import errors
 from bisect_kit import gs_util
@@ -177,7 +178,8 @@ class DutManager:
     def __init__(
         self,
         name: str,
-        states: typing.Type[core.DiagnoseStates] | None,
+        states: core.DiagnoseStates | None,
+        dut_allocate_spec: dut_allocate_spec_module.DutAllocateSpec | None,
         pre_allocated_dut: str | None,
         should_auto_allocate: bool,
         dut_init_func: typing.Callable[[DutManager], None] | None = None,
@@ -209,7 +211,10 @@ class DutManager:
             is_cros_localbuild_vm: True if bisecting localbuild images for VM.
         """
         self._name: str = name
-        self._states: typing.Type[core.DiagnoseStates] | None = states
+        self._states: core.DiagnoseStates | None = states
+        self._dut_allocate_spec: dut_allocate_spec_module.DutAllocateSpec | None = (
+            dut_allocate_spec
+        )
         self._should_auto_allocate: bool = should_auto_allocate
         self._pre_allocated_dut: str | None = None
         if pre_allocated_dut != cros_lab_util.LAB_DUT:
@@ -242,8 +247,7 @@ class DutManager:
         if self.is_vm:
             assert not should_force_monitoring
             # Currently only allow one board input for VM bisection.
-            assert self.dut_allocate_spec.board is not None
-            assert ',' not in self.dut_allocate_spec.board
+            assert len(self.dut_allocate_spec.boards) == 1
             assert (
                 self._vm_cros_version is None
                 or cros_util.is_cros_or_snapshot_version(self._vm_cros_version)
@@ -258,13 +262,13 @@ class DutManager:
 
     @property
     def dut_allocate_spec(self):
-        return self._states.dut_allocate_spec
+        return self._dut_allocate_spec
 
     @property
     def is_vm(self):
-        if not self._states or not self._states.dut_allocate_spec:
+        if not self.dut_allocate_spec or not self.dut_allocate_spec.boards:
             return False
-        return cros_util.is_vm_board(self._states.dut_allocate_spec.board)
+        return cros_util.is_vm_board(self.dut_allocate_spec.boards[0])
 
     def is_previous_dut(self):
         logger.info(
@@ -328,7 +332,7 @@ class DutManager:
         """
         if not self._is_cros_localbuild_vm:
             return cros_util.search_image(
-                self.dut_allocate_spec.board, self._vm_cros_version
+                self.dut_allocate_spec.boards[0], self._vm_cros_version
             )[cros_util.ImageType.VM_IMAGE]
 
         # TODO(zjchang): Currently it's not possible for build script to pass
@@ -338,7 +342,7 @@ class DutManager:
         # switch script.
         api = buildbucket_util.BuildbucketApi()
         build = api.search_usable_build(
-            board=self.dut_allocate_spec.board,
+            board=self.dut_allocate_spec.boards[0],
             filter_digests=False,
             bisector_chromeos_version=self._vm_cros_version,
             return_ongoing_builds=False,
@@ -361,12 +365,12 @@ class DutManager:
                 logger.error('vm_cros_version not set, ignore allocating VM')
                 return
             self._allocated_vm = vm_leaser.allocate_dut(
-                self.dut_allocate_spec,
+                self.dut_allocate_spec.boards[0],
                 self._search_vm_image(),
                 self._vm_cros_version,
             )
             host = self._allocated_vm.public_host
-            builder = self.dut_allocate_spec.board
+            builder = self.dut_allocate_spec.boards[0]
             leased_dut = host
             logger.debug(
                 'Leased VM cros version: %s, builder: %s, host: %s',
@@ -627,26 +631,27 @@ class DutManager:
             return d[k][0]
 
         if self.config.get('metric'):
-            self.dut_allocate_spec.board = None
-            self.dut_allocate_spec.model = None
-            self.dut_allocate_spec.sku = get_first_element_at_key(
-                dimensions, 'label-hwid_sku'
-            )
+            self.dut_allocate_spec.boards = []
+            self.dut_allocate_spec.models = []
+            self.dut_allocate_spec.skus = [
+                get_first_element_at_key(dimensions, 'label-hwid_sku')
+            ]
             self.dut_allocate_spec.dut_name = None
             logger.info(
                 'perf bisection, set dut allocation spec to sku: %s',
-                self.dut_allocate_spec.sku,
+                self.dut_allocate_spec.skus,
             )
         else:
-            self.dut_allocate_spec.board = None
-            self.dut_allocate_spec.model = get_first_element_at_key(
-                dimensions, 'label-model'
-            )
-            self.dut_allocate_spec.sku = None
+            self.dut_allocate_spec.boards = []
+            self.dut_allocate_spec.models = [
+                get_first_element_at_key(dimensions, 'label-model')
+            ]
+
+            self.dut_allocate_spec.skus = []
             self.dut_allocate_spec.dut_name = None
             logger.info(
                 'funtional bisection, set dut allocation spec to model: %s',
-                self.dut_allocate_spec.model,
+                self.dut_allocate_spec.models,
             )
 
     def _update_states(self, dut):
@@ -674,6 +679,7 @@ class DutManager:
         # TODO(cylee): Not sure if this is needed. Remove if not used.
         self.config['allocated_dut'] = dut
         self._states.save()
+        self.dut_allocate_spec.save()
 
     def dut_leases_log_path(self):
         statistics = self._states.statistics
