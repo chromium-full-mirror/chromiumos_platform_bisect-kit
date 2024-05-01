@@ -10,40 +10,32 @@ import dataclasses
 import json
 import logging
 
+from bisect_kit import bisect_db
 from bisect_kit import common
+from bisect_kit import dut_allocate_spec_type
 
 
 logger = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
-class DutAllocateSpec:
-    """A class to keep parameters used to allocate DUTs."""
+# Type alias for easier use.
+DutAllocateSpec = dut_allocate_spec_type.DutAllocateSpec
 
-    pools: str | None = None
-    # List of "key:val".
-    dimensions: list[str] = dataclasses.field(default_factory=list)
-    boards: list[str] = dataclasses.field(default_factory=list)
-    models: list[str] = dataclasses.field(default_factory=list)
-    skus: list[str] = dataclasses.field(default_factory=list)
-    dut_name: str | None = None
-    satlab_ip: str | None = None
-    version_hints: list[str] = dataclasses.field(default_factory=list)
-    builder_hints: list[str] = dataclasses.field(default_factory=list)
-    time_limit: int = 540
-    duration: float | None = None
-    parallel: int = 3
-    chromeos_root: str | None = None
-    session: str | None = None
-    sync_with_db: bool = False
 
-    def save(self):
-        assert self.session
-        if not self.sync_with_db:
-            session_file = _session_file_name(self.session)
-            logger.debug('writing %s to %s', self, session_file)
-            with open(session_file, 'w') as f:
-                json.dump(dataclasses.asdict(self), f)
+def save(spec: DutAllocateSpec, sync_with_db=False):
+    assert spec.session
+    if not sync_with_db:
+        session_file = _session_file_name(spec.session)
+        logger.debug('writing %s to %s', spec, session_file)
+        with open(session_file, 'w') as f:
+            json.dump(dataclasses.asdict(spec), f, indent=4)
+    else:
+        logger.debug('writing dut allocate spec back to bisect database')
+        ds_client = bisect_db.Client()
+        if ds_client.update_retry_device_spec(spec):
+            logger.debug('dut allocate spec written to bisect database')
+        else:
+            logger.debug('failed to write dut allocate spec to bisect database')
 
 
 def _session_file_name(session: str) -> str:
@@ -62,7 +54,9 @@ def load(session: str, sync_with_db=False) -> DutAllocateSpec | None:
     assert session
     if not sync_with_db:
         return _load_from_local_file(session)
-    return None
+
+    ds_client = bisect_db.Client()
+    return ds_client.load_dut_allocate_spec(session)
 
 
 def _str_to_list(val):
@@ -87,10 +81,9 @@ def parse_from_command_line_args(opts: argparse.Namespace) -> DutAllocateSpec:
         satlab_ip=opts.satlab_ip,
         version_hints=_str_to_list(opts.version_hint),
         builder_hints=_str_to_list(opts.builder_hint),
-        time_limit=opts.time_limit,
-        duration=opts.duration,
+        time_limit_seconds=opts.time_limit,
+        lease_duration_seconds=opts.duration,
         parallel=opts.parallel,
-        chromeos_root=opts.chromeos_root,
         session=opts.session,
     )
 
@@ -112,9 +105,8 @@ def parse_from_dut_allocate_command_line_args(
         satlab_ip=opts.allocate_dut_satlab_ip,
         version_hints=_str_to_list(opts.allocate_dut_version_hint),
         builder_hints=_str_to_list(opts.allocate_dut_builder_hint),
-        time_limit=opts.allocate_dut_time_limit,
-        duration=opts.allocate_dut_duration,
+        time_limit_seconds=opts.allocate_dut_time_limit,
+        lease_duration_seconds=opts.allocate_dut_duration,
         parallel=opts.allocate_dut_parallel,
-        chromeos_root=opts.chromeos_root,
         session=opts.session,
     )

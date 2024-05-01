@@ -85,7 +85,8 @@ class CrosDiagnoser:
         self.new_info: cros_util.VersionInfo = cros_util.VersionInfo()
 
         self.dut_allocate_spec = dut_allocate_spec_module.load(
-            self.config['session']
+            self.config['session'],
+            self.config['sync_dut_allocate_spec_with_db'],
         )
         self.is_vm_board = cros_util.is_vm_board(
             self.dut_allocate_spec.boards[0]
@@ -1563,10 +1564,12 @@ class DiagnoseCommandLineBase:
                 and not opts.allocate_dut_model
                 and not opts.allocate_dut_sku
                 and not opts.allocate_dut_dut_name
+                and not opts.sync_dut_allocate_spec_with_db
             ):
                 self.argument_parser.error(
                     'either --allocate-dut-board, --allocate-dut-model, '
-                    '--allocate-dut-sku, or --allocate-dut-dut-name '
+                    '--allocate-dut-sku, --allocate-dut-dut-name, or '
+                    '--sync-dut-allocate-spec-with-db '
                     'need to be specified if DUT is missing or "%s"'
                     % cros_lab_util.LAB_DUT
                 )
@@ -1736,14 +1739,14 @@ class DiagnoseCommandLineBase:
             "endpoint_verification": opts.endpoint_verification,
             "consider_test_crash_as_failure": opts.consider_test_crash_as_failure,
             "experiments": opts.experiments,
+            "sync_dut_allocate_spec_with_db": opts.sync_dut_allocate_spec_with_db,
         }
 
-        dut_allocate_spec = (
-            dut_allocate_spec_module.parse_from_dut_allocate_command_line_args(
+        if not opts.sync_dut_allocate_spec_with_db:
+            dut_allocate_spec = dut_allocate_spec_module.parse_from_dut_allocate_command_line_args(
                 opts
             )
-        )
-        dut_allocate_spec.save()
+            dut_allocate_spec_module.save(dut_allocate_spec, sync_with_db=False)
 
         self.states.init_states(config)
         self.init_hook(opts)
@@ -1850,6 +1853,17 @@ class DiagnoseCommandLineBase:
                 'Address of DUT (Device Under Test). If omitted, DUT will be '
                 'automatically allocated from the lab. If present, all other'
                 'options in the argument gruop are ignored.'
+            ),
+        )
+        group.add_argument(
+            '--sync-dut-allocate-spec-with-db',
+            metavar='SYNC_DUT_ALLOCATE_SPEC_WITH_DB',
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help=(
+                'If true, the dut allocate spec is loaded and written back to '
+                'the bisect database. Otherwise, it is loaded from the command '
+                'line args and written to a local file "DutAllocateSpec"'
             ),
         )
         cros_helper.add_allocate_dut_arguments(

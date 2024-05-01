@@ -111,7 +111,11 @@ class TestDutManagerAllocation(unittest.TestCase):
     def dummy_mock_states(self):
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
-            config={'session': 'stateless', 'experiments': []},
+            config={
+                'session': 'stateless',
+                'experiments': [],
+                'chromeos_root': 'PATH_TO_CHROMEOS_ROOT',
+            },
         )
         return mock_states
 
@@ -271,6 +275,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
             enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_called_once_with('host.cros')
@@ -318,6 +323,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
             enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_not_called()
@@ -343,6 +349,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
             enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_not_called()
@@ -430,6 +437,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
             enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_called_once_with('host2.cros')
@@ -468,6 +476,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
             enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_called_once_with('host.cros')
@@ -508,6 +517,7 @@ class TestDutManagerAllocation(unittest.TestCase):
         self.mock_dut_releaser.start.assert_called_once()
         self.mock_allocate_dut.assert_called_once_with(
             dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
             enable_shared_dut_pool=False,
         )
         self.mock_dut_init_func.assert_called_once_with('host.cros')
@@ -860,7 +870,11 @@ class TestAddDutLeasesRecord(unittest.TestCase):
     def dummy_mock_states(self):
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
-            config={'session': 'stateless', 'experiments': []}
+            config={
+                'session': 'stateless',
+                'experiments': [],
+                'chromeos_root': 'PATH_TO_CHROMEOS_ROOT',
+            },
         )
         return mock_states
 
@@ -977,18 +991,17 @@ class TestConfigUpdated(unittest.TestCase):
     def setUp(self):
         super().setUp()
 
-        self.fake_dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
-            boards=['test_board']
-        )
         self.mock_save_dut_allocate_spec = self.enterContext(
             mock.patch.object(
-                self.fake_dut_allocate_spec,
+                dut_allocate_spec_module,
                 'save',
                 autospec=True,
             )
         )
 
-        self.mock_dut_allocate_spec = self.fake_dut_allocate_spec
+        self.mock_dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
+            boards=['test_board']
+        )
 
         # Mocks relevant to the functionality under testing.
         self.mock_swarming_bot_list = self.enterContext(
@@ -1046,6 +1059,7 @@ class TestConfigUpdated(unittest.TestCase):
         config = {
             'session': 'stateless',
             'experiments': [],
+            'sync_dut_allocate_spec_with_db': False,
         }
         with self.fake_states(config) as states:
             dut_manager = dut_manager_module.DutManager(
@@ -1073,7 +1087,10 @@ class TestConfigUpdated(unittest.TestCase):
             }
             self.assertEqual(states.config, expected_config)
 
-        self.mock_save_dut_allocate_spec.assert_called_once()
+        self.mock_save_dut_allocate_spec.assert_called_once_with(
+            self.mock_dut_allocate_spec,
+            sync_with_db=False,
+        )
 
         self.mock_swarming_bot_list.assert_called_once_with(['dut_name:host'])
         self.mock_swarming_bot_info.assert_called_once_with('bot_id_1')
@@ -1096,6 +1113,7 @@ class TestConfigUpdated(unittest.TestCase):
             'session': 'stateless',
             'experiments': [],
             'metric': 'some_metric',
+            'sync_dut_allocate_spec_with_db': False,
         }
         with self.fake_states(config) as states:
             dut_manager = dut_manager_module.DutManager(
@@ -1123,7 +1141,10 @@ class TestConfigUpdated(unittest.TestCase):
             }
             self.assertEqual(states.config, expected_config)
 
-        self.mock_save_dut_allocate_spec.assert_called_once()
+        self.mock_save_dut_allocate_spec.assert_called_once_with(
+            self.mock_dut_allocate_spec,
+            sync_with_db=False,
+        )
 
         self.mock_swarming_bot_list.assert_called_once_with(['dut_name:host'])
         self.mock_swarming_bot_info.assert_called_once_with('bot_id_1')
@@ -1133,6 +1154,7 @@ class TestConfigUpdated(unittest.TestCase):
             'session': 'stateless',
             'experiments': [],
             'board': 'board1',
+            'sync_dut_allocate_spec_with_db': False,
         }
         with self.fake_states(config) as states:
             dut_manager = dut_manager_module.DutManager(

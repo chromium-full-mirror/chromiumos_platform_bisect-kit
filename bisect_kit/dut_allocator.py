@@ -251,7 +251,9 @@ def _normalize_board_name(chromeos_root, board):
 
 
 def allocate_dut(
-    spec: dut_allocate_spec.DutAllocateSpec, enable_shared_dut_pool=False
+    spec: dut_allocate_spec.DutAllocateSpec,
+    chromeos_root: str,
+    enable_shared_dut_pool=False,
 ) -> typing.Tuple[str, str]:
     """Helper of cmd_allocate_dut.
 
@@ -292,7 +294,10 @@ def allocate_dut(
                 '--version-hint',
                 'should be ChromeOS version numbers, separated by comma',
             )
-    if spec.duration is not None and spec.duration < 60:
+    if (
+        spec.lease_duration_seconds is not None
+        and spec.lease_duration_seconds < 60
+    ):
         raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
 
     if spec.satlab_ip:
@@ -323,8 +328,7 @@ def allocate_dut(
     if spec.boards:
         for board in spec.boards:
             variants.append(
-                'label-board:'
-                + _normalize_board_name(spec.chromeos_root, board)
+                'label-board:' + _normalize_board_name(chromeos_root, board)
             )
         variants = _filter_dimensions_by_lab(variants)
         if not variants:
@@ -391,7 +395,7 @@ def allocate_dut(
                 )
                 continue
             boards_with_prebuilt.append(
-                _normalize_board_name(spec.chromeos_root, builder)
+                _normalize_board_name(chromeos_root, builder)
             )
         logger.info('boards with prebuilt: %s', boards_with_prebuilt)
         if not boards_with_prebuilt:
@@ -442,10 +446,7 @@ def allocate_dut(
 
         if spec.builder_hints:
             for builder in spec.builder_hints:
-                if (
-                    _normalize_board_name(spec.chromeos_root, builder)
-                    == host_board
-                ):
+                if _normalize_board_name(chromeos_root, builder) == host_board:
                     board_to_build = builder
                     break
             else:
@@ -480,7 +481,7 @@ def allocate_dut(
             dimensions, variants, pools, spec.parallel, filter_func
         )
 
-        remaining_time = spec.time_limit - (time.time() - t0)
+        remaining_time = spec.time_limit_seconds - (time.time() - t0)
         if remaining_time <= 0:
             break
         timeout = min(120, remaining_time)
@@ -488,7 +489,7 @@ def allocate_dut(
         async_dut_leaser = cros_lab_util.AsyncDutLeaser(
             [bot['dimensions']['dut_name'][0] for bot in bots],
             reason,
-            spec.duration,
+            spec.lease_duration_seconds,
             timeout,
         )
         host = asyncio.run(
@@ -503,7 +504,7 @@ def allocate_dut(
 
     logger.warning('unable to lease DUT in time limit')
     raise errors.DutLeaseTimeout(
-        'Unable to lease DUT in %s seconds' % spec.time_limit
+        'Unable to lease DUT in %s seconds' % spec.time_limit_seconds
     )
 
 

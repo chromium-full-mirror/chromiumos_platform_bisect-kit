@@ -127,7 +127,8 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             # Allocate a DUT globally only if not performing a stateless bisect.
             logger.info('experiments: %s', self.config['experiments'])
             dut_allocate_spec = dut_allocate_spec_module.load(
-                self.config['session']
+                self.config['session'],
+                self.config['sync_dut_allocate_spec_with_db'],
             )
             is_vm_board = cros_util.is_vm_board(
                 dut_allocate_spec.boards[0]

@@ -86,10 +86,10 @@ class AllocateDutResult:
     text: str | None = None
 
 
-def allocate_dut(spec: dut_allocate_spec.DutAllocateSpec):
+def allocate_dut(spec: dut_allocate_spec.DutAllocateSpec, chromeos_root: str):
     result = AllocateDutResult()
     try:
-        host, board = dut_allocator.allocate_dut(spec)
+        host, board = dut_allocator.allocate_dut(spec, chromeos_root)
         result.result = 'ready'
         if host:
             result.leased_dut = cros_lab_util.dut_name_to_address(host)
@@ -106,7 +106,7 @@ def allocate_dut(spec: dut_allocate_spec.DutAllocateSpec):
 
 def cmd_allocate_dut(opts):
     spec = dut_allocate_spec.parse_from_command_line_args(opts)
-    result = allocate_dut(spec)
+    result = allocate_dut(spec, opts.chromeos_root)
     print(json.dumps(dataclasses.asdict(result)))
 
 

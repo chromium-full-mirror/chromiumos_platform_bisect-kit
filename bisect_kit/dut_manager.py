@@ -381,6 +381,7 @@ class DutManager:
         else:
             host, builder = dut_allocator.allocate_dut(
                 self.dut_allocate_spec,
+                self.config.get('chromeos_root'),
                 enable_shared_dut_pool=experiment.is_in_experiment(
                     self.config.get('experiments'),
                     experiment.ID.SHARED_DUT_POOL,
@@ -679,7 +680,10 @@ class DutManager:
         # TODO(cylee): Not sure if this is needed. Remove if not used.
         self.config['allocated_dut'] = dut
         self._states.save()
-        self.dut_allocate_spec.save()
+        dut_allocate_spec_module.save(
+            self.dut_allocate_spec,
+            self.config['sync_dut_allocate_spec_with_db'],
+        )
 
     def dut_leases_log_path(self):
         statistics = self._states.statistics

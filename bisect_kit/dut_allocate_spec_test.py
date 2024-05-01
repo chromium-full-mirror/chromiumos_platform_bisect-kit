@@ -39,7 +39,7 @@ class TestDutAllocateSpec(unittest.TestCase):
             dimensions=['dim1', 'dim2', 'dim3'],
             session=session_name,
         )
-        spec.save()
+        dut_allocate_spec_module.save(spec, sync_with_db=False)
 
         loaded_spec = dut_allocate_spec_module.load(session_name)
         self.assertEqual(spec, loaded_spec)

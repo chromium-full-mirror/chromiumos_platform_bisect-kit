@@ -58,7 +58,7 @@ SWARMING_PRPC_SERVER = 'chromeos-swarming.appspot.com'
 # https://chromium.googlesource.com/infra/luci/luci-py/+/733d5d3b5299408cbc6a5e5b33b1a461ea9e0acd/appengine/swarming/proto/api_v2/swarming.proto#162
 SWARMING_PRPC_QUERY_ALL = 10
 SWARMING_PRPC_DEFAULT_LIMIT = 1000
-LEASE_DURATION = 1439 * 60
+LEASE_DURATION_SECONDS = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
 
 
@@ -75,7 +75,7 @@ class LeaseStatus:
             fields are not available.
         leased_by: User id leases the dut.
         is_leased_by_me: Whether is leased by current account.
-        duration: Lease duration in seconds.
+        lease_duration_seconds: Lease duration in seconds.
         start_time: Lease start timestamp. (seconds since unix epoch time)
     """
 
@@ -86,7 +86,7 @@ class LeaseStatus:
     is_leased: bool = False
     leased_by: typing.Optional[str] = None
     is_leased_by_me: typing.Optional[bool] = None
-    duration: typing.Optional[int] = None
+    lease_duration_seconds: typing.Optional[int] = None
     start_time: typing.Optional[int] = None
 
 
@@ -569,10 +569,14 @@ async def create_async_crosfleet_proc(cmd: str, *args, **kwargs):
 class AsyncDutLeaser:
     """A class to lease lab DUTs asynchronously."""
 
-    def __init__(self, hosts, reason, duration=None, timeout=None):
+    def __init__(
+        self, hosts, reason, lease_duration_seconds=None, timeout=None
+    ):
         self._hosts: list[str] = hosts
         self._reason: str = reason
-        self._duration: int = duration or LEASE_DURATION
+        self._lease_duration_seconds: int = (
+            lease_duration_seconds or LEASE_DURATION_SECONDS
+        )
         self._timeout: int | None = timeout
 
         # Guard self._is_dut_leased
@@ -612,7 +616,7 @@ class AsyncDutLeaser:
     async def _lease(self, dut_name):
         args = [
             '-minutes',
-            '%d' % (self._duration // 60),
+            '%d' % (self._lease_duration_seconds // 60),
             '-reason',
             self._reason,
             '-host',
@@ -753,12 +757,14 @@ def make_lease_reason(session):
     return 'bisector: %s' % session[:18]
 
 
-def crosfleet_lease_dut(dut_name, reason, duration=None, timeout=None):
+def crosfleet_lease_dut(
+    dut_name, reason, lease_duration_seconds=None, timeout=None
+):
     """Lease DUT from crosfleet.
 
     Args:
       dut_name: DUT name
-      duration: lease duration, in seconds. Default is LEASE_DURATION if None.
+      lease_duration_seconds: lease duration, in seconds. Default is LEASE_DURATION_SECONDS if None.
       timeout: lease wait limit, in seconds.
       reason: lease reason
 
@@ -766,8 +772,8 @@ def crosfleet_lease_dut(dut_name, reason, duration=None, timeout=None):
       dict of lease status if successful, otherwise None
     """
     logger.debug('crosfleet_lease_dut %s', dut_name)
-    if not duration:
-        duration = LEASE_DURATION
+    if not lease_duration_seconds:
+        lease_duration_seconds = LEASE_DURATION_SECONDS
     stdout_lines = []
     stderr_lines = []
     orphan_task = True
@@ -775,7 +781,7 @@ def crosfleet_lease_dut(dut_name, reason, duration=None, timeout=None):
         crosfleet_cmd(
             'dut lease',
             '-minutes',
-            '%d' % (duration // 60),
+            '%d' % (lease_duration_seconds // 60),
             '-reason',
             reason,
             '-host',
@@ -813,7 +819,11 @@ def crosfleet_lease_dut(dut_name, reason, duration=None, timeout=None):
             if pending_lease:
                 cancel_pending_lease(pending_lease)
 
-    logger.info('leased dut %s for %.1f hours', dut_name, duration // 60 / 60.0)
+    logger.info(
+        'leased dut %s for %.1f hours',
+        dut_name,
+        lease_duration_seconds // 60 / 60.0,
+    )
     return status
 
 
@@ -897,7 +907,9 @@ def query_lease_status(dut_name, verbose_log=True) -> LeaseStatus:
     status.leased_by = request['authenticated']
     # format change, ignore the detail information (b/179461101)
     status.is_leased_by_me = bool(status.leased_by)
-    status.duration = int(request['properties']['executionTimeoutSecs'])
+    status.lease_duration_seconds = int(
+        request['properties']['executionTimeoutSecs']
+    )
 
     result = swarming_task_result(status.task_id, verbose_log=verbose_log)
     status.start_time = parse_timestamp_from_swarming(result['startedTs'])
@@ -945,7 +957,9 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
                 )
             previous_status = lease_status
 
-            expire_time = lease_status.start_time + lease_status.duration
+            expire_time = (
+                lease_status.start_time + lease_status.lease_duration_seconds
+            )
             # We need buffer time (like querying lease status, network latency, etc.)
             # before actual lease request, 100 must be enough.
             to_lease_again = expire_time - 100
