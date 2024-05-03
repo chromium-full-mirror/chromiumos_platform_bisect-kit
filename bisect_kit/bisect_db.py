@@ -5,6 +5,7 @@
 
 """Communicates to bisect database in Datastore."""
 
+import datetime
 import enum
 import logging
 
@@ -90,6 +91,17 @@ def to_dut_allocate_spec(
         spec.models = device_spec_value
     elif device_spec_type == DeviceSpecType.SKU:
         spec.skus = device_spec_value
+
+    if (
+        not spec.boards
+        and not spec.models
+        and not spec.skus
+        and not spec.dut_name
+    ):
+        raise errors.DutAllocateSpecError(
+            'none of board/model/sku/dut_name specified'
+        )
+
     spec.session = b.get('ID')
 
     return spec
@@ -158,3 +170,58 @@ class Client(gcloud.DataStoreClient):
                 return False
             self._client.put(b)
         return True
+
+    # google3/googleclient/chrome/chromeos_bisector/public/bisect.proto
+    #   STATUS_UNSPECIFIED = 0;
+    #   DONE = 3;
+    #   FAILED = 4;
+    _BISECT_FINISHED_STATUS = [0, 3, 4]
+
+    _KIND_BISECT = 'Bisect'
+
+    # The number of days to lookback when querying unfinished bisects.
+    _UNFINISHED_BISECT_LOOKBACK_DAYS = 7
+
+    def _unfinished_bisects(self) -> list[datastore.Entity]:
+        """Queries recent unfinished bisections."""
+        q = self._client.query(kind=self._KIND_BISECT)
+
+        start_date = datetime.datetime.now(
+            tz=datetime.timezone.utc
+        ) - datetime.timedelta(days=self._UNFINISHED_BISECT_LOOKBACK_DAYS)
+        filters = [
+            datastore.query.PropertyFilter(
+                'Status', 'NOT_IN', self._BISECT_FINISHED_STATUS
+            ),
+            datastore.query.PropertyFilter('UpdatedAt', '>=', start_date),
+        ]
+
+        logging.debug('querying unfinished bisects: %s', filters)
+        q.add_filter(filter=datastore.query.And(filters))
+
+        return list(q.fetch())
+
+    def dut_alloc_spec_for_unfinished_bisects(
+        self,
+    ) -> dict[str, dut_allocate_spec_type.DutAllocateSpec]:
+        """Returns DutAllocateSpec of recent unfinished bisections."""
+        bisects = self._unfinished_bisects()
+        logging.debug('%s unfinished bisects', len(bisects))
+
+        specs = {}
+        for b in bisects:
+            bisect_id = b.get('ID')
+            try:
+                spec = to_dut_allocate_spec(b)
+            except errors.DutAllocateSpecError as e:
+                # Ignore errors, since the records in Datastore might be malformed.
+                logging.warning(
+                    'unable to create DutAllocateSpec for %s: %s',
+                    bisect_id,
+                    e,
+                )
+            else:
+                specs[bisect_id] = spec
+
+        logging.debug('%s unfinished bisects with valid spec', len(specs))
+        return specs

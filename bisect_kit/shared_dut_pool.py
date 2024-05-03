@@ -13,6 +13,8 @@ from enum import StrEnum
 import logging
 import typing
 
+from bisect_kit import bisect_db
+from bisect_kit import dut_allocate_spec_type
 from bisect_kit import gcloud
 from google.cloud import datastore
 
@@ -39,10 +41,76 @@ class Dut:
     last_update_time: datetime.datetime | None
 
 
+def dut_matches_spec(
+    dut: datastore.Entity, spec: dut_allocate_spec_type.DutAllocateSpec
+) -> bool:
+    """Checks whether a DUT matches a DutAllocateSpec.
+
+    Args:
+      dut: the DUT Entity loaded the Datastore.
+      spec: the DutAllocateSpec to check.
+    Returns:
+      matched or not.
+    """
+
+    def field_matched(field_name, values_to_match: any) -> bool:
+        value = dut.get('dimensions', {}).get(field_name)
+        if not value:
+            return False
+
+        if isinstance(value, list):
+            values = set(value)
+        else:
+            values = set([value])
+
+        if not isinstance(values_to_match, list):
+            values_to_match = [values_to_match]
+
+        return bool(values.intersection(values_to_match))
+
+    if spec.dut_name:
+        return field_matched('dut_name', spec.dut_name)
+
+    if spec.pools and not field_matched('label-pool', spec.pools):
+        return False
+    if spec.boards and not field_matched('label-board', spec.boards):
+        return False
+    if spec.models and not field_matched('label-model', spec.models):
+        return False
+    if spec.skus and not field_matched('label-hwid_sku', spec.skus):
+        return False
+    if spec.dimensions:
+        for dimension in spec.dimensions:
+            key, value = dimension.split(':', 1)
+            if not field_matched(key, value):
+                return False
+    return True
+
+
 class SharedDutPoolManager(gcloud.DataStoreClient):
     """Class manages the shared DUT pool."""
 
-    _KIND = 'DUT'
+    _KIND_DUT = 'DUT'
+
+    def _common_parent_key(self):
+        """Default common parent key
+
+        Datastore transactions requires all participated entities to be in the same entity group.
+        So make all DUTs children of the default entity.
+        """
+        return self._client.key('DutGroup', 'default')
+
+    def _default_key(self, name):
+        """Constructs a key under the default common entity group."""
+        return self._client.key(
+            self._KIND_DUT, name, parent=self._common_parent_key()
+        )
+
+    def _default_query(self):
+        """Performs a query under the default common entity group."""
+        return self._client.query(
+            kind=self._KIND_DUT, ancestor=self._common_parent_key()
+        )
 
     def insert(
         self,
@@ -63,7 +131,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
           owner: the owner bisection ID.
           user: the user bisection ID.
         """
-        key = self._client.key(self._KIND, name)
+        key = self._default_key(name)
         existing_dut = self._client.get(key)
         if existing_dut is not None:
             logger.warning(
@@ -76,6 +144,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         dut = self._client.entity(key)
         dut.update(
             {
+                'name': name,
                 'dimensions': dimensions,
                 'state': state,
                 'owner': owner,
@@ -141,8 +210,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             and_filters.append(
                 datastore.query.PropertyFilter('state', '=', state),
             )
-
-        q = self._client.query(kind=self._KIND)
+        q = self._default_query()
         q.add_filter(filter=datastore.query.And(and_filters))
 
         logger.debug('filters: %s', and_filters)
@@ -188,10 +256,12 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
           user: the user bisection ID.
         """
         with self._client.transaction():
-            key = self._client.key(self._KIND, name)
+            key = self._default_key(name)
             dut = self._client.get(key)
             if dut is None:
-                logger.warning('DUT %s does not exist in the pool', name)
+                logger.warning(
+                    'DUT %s does not exist in the shared DUT pool', name
+                )
                 return False
             to_update = {
                 k: v
@@ -207,7 +277,101 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                 }.items()
                 if v is not None
             }
-            logger.debug('dut to be updated with: %s', to_update)
+            logger.debug('dut %s to be updated with: %s', name, to_update)
             dut.update(to_update)
             self._client.put(dut)
             return True
+
+    def transfer_owner(self, dut_name: str, bisect_id: str) -> bool:
+        """Transfer the owner of a DUT to another bisection.
+
+        The transfer is not successful if the receiver biscetion has already
+        owned some DUTs becuase one bisection is only allowed to own one dUT.
+
+        Args:
+          dut_name: the DUT to be transferred.
+          bisect_id: the bisection ID to recieve the DUT.
+
+        Returns:
+          Success or not.
+        """
+        with self._client.transaction():
+            query_owned_duts = self._default_query()
+            query_owned_duts.add_filter(
+                filter=datastore.query.PropertyFilter("owner", "=", bisect_id)
+            )
+            owned_duts = list(query_owned_duts.fetch())
+            if owned_duts:
+                logger.debug(
+                    'bisection %s already owns dut(s) %s',
+                    bisect_id,
+                    [d.get('name') for d in owned_duts],
+                )
+                return False
+
+            key = self._default_key(dut_name)
+            dut = self._client.get(key)
+            if not dut:
+                logger.error(
+                    "to-be-transferred dut %s not in the shared DUT pool",
+                    dut_name,
+                )
+                return False
+
+            dut.update({'owner': bisect_id, 'state': DutState.IDLE})
+            self._client.put(dut)
+            logger.info('DUT %s transferred to %s', dut_name, bisect_id)
+        return True
+
+    def yield_duts(self, session: str) -> (list[str], list[str]):
+        """Yields all DUTs owned by this session to some other bisections.
+
+        It searches for all unfinished bisections. If some other bisection
+        does not own any DUT and its DutAllocateSpec matches a DUT owned by this
+        session, the DUT is transferred to that bisection.
+
+        Args:
+          session: the session ID of this bisection.
+        Returns:
+          (list of yielded DUTs, list of not yielded DUTs)
+        """
+        query_owned_duts = self._default_query()
+        query_owned_duts.add_filter(
+            filter=datastore.query.PropertyFilter("owner", "=", session)
+        )
+        owned_duts = list(query_owned_duts.fetch())
+        if not owned_duts:
+            logger.info('no duts for session %s to yield.', session)
+            return [], []
+        logger.info(
+            '%s DUT(s) to yield: %s',
+            len(owned_duts),
+            [d.get('name') for d in owned_duts],
+        )
+
+        bisect_db_client = bisect_db.Client()
+        specs = bisect_db_client.dut_alloc_spec_for_unfinished_bisects()
+
+        duts_yielded = []
+        for dut in owned_duts:
+            dut_name = dut.get('name')
+            for bisect_id, spec in specs.items():
+                logger.debug(
+                    'checking dut %s against spec %s\ndut: %s\nspec: %s\n',
+                    dut_name,
+                    bisect_id,
+                    dut,
+                    spec,
+                )
+                if dut_matches_spec(dut, spec):
+                    logger.debug('yielding DUT %s to %s', dut_name, bisect_id)
+                    if self.transfer_owner(dut_name, bisect_id):
+                        duts_yielded.append(dut_name)
+                        break
+
+        duts_not_yielded = [
+            d.get('name')
+            for d in owned_duts
+            if d.get('name') not in duts_yielded
+        ]
+        return duts_yielded, duts_not_yielded

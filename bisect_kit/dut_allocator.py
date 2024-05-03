@@ -498,7 +498,7 @@ def allocate_dut(
         if host:
             # Add the leased DUT to the shared pool.
             if enable_shared_dut_pool:
-                add_dut_to_shared_pool(bots[0], spec.session)
+                add_dut_to_shared_pool(host, spec.session)
             return host, resolve_builder_by_host(host)
         time.sleep(1)
 
@@ -508,12 +508,16 @@ def allocate_dut(
     )
 
 
-def add_dut_to_shared_pool(bot: dict, session: str):
-    dut_name = bot['dimensions']['dut_name'][0]
-    logger.info('putting %s into the shared DUT pool', dut_name)
+def add_dut_to_shared_pool(host: str, session: str):
+    logger.info('putting %s into the shared DUT pool', host)
+
+    bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])
+    assert len(bots) == 1
+    bot = bots[0]
+
     pool_manager = shared_dut_pool.SharedDutPoolManager()
     pool_manager.insert(
-        dut_name,
+        host,
         bot['dimensions'],
         shared_dut_pool.DutState.BUSY,
         session,
