@@ -689,7 +689,7 @@ class ChromeSpecManager(codechange.SpecManager):
             git_util.checkout_version(self.chrome_src, rev)
             custom_var_list = [
                 'checkout_src_internal=True',
-                'cros_boards="arm-generic:amd64-generic"',
+                'cros_boards="arm-generic:arm64-generic:amd64-generic"',
                 'checkout_lacros_sdk=True',
                 'download_remoteexec_cfg=True',
             ]

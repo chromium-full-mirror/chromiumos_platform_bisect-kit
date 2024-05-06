@@ -1095,6 +1095,30 @@ class TestCrosUtil(unittest.TestCase):
         with self.assertRaises(ValueError):
             cros_util.ChromeOSVersionParser.parse_chromeos_version('unparsable')
 
+    @mock.patch('bisect_kit.util.ssh_cmd')
+    def test_query_dut_cpu_arch(self, mock_ssh_cmd):
+        self.assertEqual(
+            cros_util.query_dut_cpu_arch('kukui_dut', 'kukui'), 'arm64'
+        )
+        self.assertEqual(
+            cros_util.query_dut_cpu_arch('kukui_dut', 'kukui64'), 'arm'
+        )
+
+        mock_ssh_cmd.side_effect = [
+            '/sbin/init: ELF 32-bit LSB pie executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 3.2.0, BuildID[xxHash]=d2e2abeee457e477, stripped'
+        ]
+        self.assertEqual(cros_util.query_dut_cpu_arch('arm32_dut'), 'arm')
+
+        mock_ssh_cmd.side_effect = [
+            '/sbin/init: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.7.0, BuildID[xxHash]=eda6b35bdcd5907c, stripped'
+        ]
+        self.assertEqual(cros_util.query_dut_cpu_arch('arm64_dut'), 'arm64')
+
+        mock_ssh_cmd.side_effect = [
+            '/sbin/init: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[xxHash]=9e6ae0d456eb48d8, stripped'
+        ]
+        self.assertEqual(cros_util.query_dut_cpu_arch('x86_64_dut'), 'x86_64')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -22,8 +22,13 @@ class TestLacrosUtil(unittest.TestCase):
         )
 
         self.assertEqual(
-            lacros_util.get_lacros_folder_name('aarch64'),
-            lacros_util.BOARD_ARCHITECTURES['aarch64']['lacros_dir'],
+            lacros_util.get_lacros_folder_name('arm64'),
+            lacros_util.BOARD_ARCHITECTURES['arm64']['lacros_dir'],
+        )
+
+        self.assertEqual(
+            lacros_util.get_lacros_folder_name('arm'),
+            lacros_util.BOARD_ARCHITECTURES['arm']['lacros_dir'],
         )
 
         with self.assertRaises(errors.InternalError):
@@ -38,8 +43,14 @@ class TestLacrosUtil(unittest.TestCase):
 
         self.assertEqual(
             # pylint: disable=protected-access
-            lacros_util._get_device_architecture_arg_for_gn('aarch64'),
-            lacros_util.BOARD_ARCHITECTURES['aarch64']['arg_for_gn'],
+            lacros_util._get_device_architecture_arg_for_gn('arm64'),
+            lacros_util.BOARD_ARCHITECTURES['arm64']['arg_for_gn'],
+        )
+
+        self.assertEqual(
+            # pylint: disable=protected-access
+            lacros_util._get_device_architecture_arg_for_gn('arm'),
+            lacros_util.BOARD_ARCHITECTURES['arm']['arg_for_gn'],
         )
 
         with self.assertRaises(errors.InternalError):

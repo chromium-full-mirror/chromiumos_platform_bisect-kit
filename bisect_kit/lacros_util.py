@@ -35,9 +35,13 @@ BOARD_ARCHITECTURES = {
         'lacros_dir': 'lacros64',
         'arg_for_gn': 'amd64',
     },
-    'aarch64': {
+    'arm': {
         'lacros_dir': 'lacros-arm32',
         'arg_for_gn': 'arm',
+    },
+    'arm64': {
+        'lacros_dir': 'lacros-arm64',
+        'arg_for_gn': 'arm64',
     },
 }
 _DEFAULT_OUT_DEVICE_LACROS_DIR = os.path.join('out_device_lacros', 'Release')

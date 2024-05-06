@@ -618,30 +618,57 @@ def query_dut_os_release(
 
 
 def query_dut_cpu_arch(
-    host: str, max_attempts: int = DEFAULT_QUERY_CPU_ARCH_ATTEMPTS
-) -> str:
+    host: str,
+    builder: str = '',
+    max_attempts: int = DEFAULT_QUERY_CPU_ARCH_ATTEMPTS,
+) -> str | None:
     """Query CPU architecture of the given DUT.
 
     Args:
-      host: the DUT address.
+        host: the DUT address.
+        builder: Builder of the target CrOS image.
+        max_attempts: the number of attempts to query the DUT
 
     Returns:
-      CPU architecture in string.
-      max_attempts: the number of attempts to query the DUT
+      CPU architecture in string or None if not found.
 
     Raise:
       errors.SshConnectionError: cannot connect to host.
-      errors.ExternalError: failed to run 'uname -m' on the given DUT.
+      errors.ExternalError: failed to run 'file /sbin/init' on the given DUT.
     """
+    # Some boards(e.g. jacuzzi,kukui) have moved to 64 bit userspace, however some experimental
+    # builder variantions of them(e.g. jacuzzi64, kukui64) are moved to 32 bit temporarily.
+    # The experimental builders will be shut down soon and we can remove these checks then.
+    # See b/338497470#comment13 for more context.
+    if builder in ['kukui', 'jacuzzi', 'cherry', 'asurada']:
+        return 'arm64'
+
+    if builder in ['kukui64', 'jacuzzi64', 'cherry64', 'asurada64']:
+        return 'arm'
+
     try:
-        arch = util.ssh_cmd(
-            host, 'uname', '-m', max_attempts=max_attempts
+        output = util.ssh_cmd(
+            host, 'file', '/sbin/init', max_attempts=max_attempts
         ).strip()
+
+        arm64_match = re.search(r"ARM aarch64", output)
+        arm32_match = re.search(r"ARM,", output)  # Ensure it's not aarch64
+        x86_64_match = re.search(r"x86-64", output)
+
+        if arm64_match:
+            return "arm64"
+        if arm32_match:
+            return "arm"
+        if x86_64_match:
+            return "x86_64"
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError(
-            'unable to get DUT architecture by "uname -m"'
+            'unable to get DUT architecture by "file /sbin/init"'
         ) from e
-    return arch
+    logger.debug(
+        "query_dut_cpu_arch failed to match the architecture with any of the arm, arm64, or x86_64."
+    )
+    return None
 
 
 def query_dut_root_partition(

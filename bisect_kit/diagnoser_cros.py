@@ -255,11 +255,14 @@ class CrosDiagnoser:
             # 'board' should already exist in self.config.
             # 2. For stateless bisection, a DUT would be auto-leased by the
             # following code. 'board' would be updated in
-            # dut_maaner.provision().
+            # dut_manager.provision().
             with dut_manager.provision() as dut:
                 # Query DUT dependent properties.
                 self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(
-                    dut
+                    dut, self.config.get('board', "")
+                )
+                logger.info(
+                    'board_cpu_arch = %s', self.config['board_cpu_arch']
                 )
                 self.states.save()
 

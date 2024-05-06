@@ -64,7 +64,10 @@ class TestAndroidUtil(unittest.TestCase):
             android_util.get_flavor('bertha', 'x86_64'), 'bertha_x86_64-user'
         )
         self.assertEqual(
-            android_util.get_flavor('bertha', 'aarch64'), 'bertha_arm64-user'
+            android_util.get_flavor('bertha', 'arm64'), 'bertha_arm64-user'
+        )
+        self.assertEqual(
+            android_util.get_flavor('bertha', 'arm'), 'bertha_arm-user'
         )
         self.assertEqual(
             android_util.get_flavor('bertha', 'unknown_arch'), None

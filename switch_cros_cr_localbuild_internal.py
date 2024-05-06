@@ -234,7 +234,7 @@ def switch_main(args: tuple[str] | None):
             gclientfile = '.gclient-for-runhook'
             custom_var_list = [
                 'checkout_src_internal=True',
-                'cros_boards="arm-generic:amd64-generic"',
+                'cros_boards="arm-generic:amd64-generic:arm64-generic"',
                 'checkout_lacros_sdk=True',
                 'download_remoteexec_cfg=True',
             ]

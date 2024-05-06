@@ -38,11 +38,6 @@ BUILD_IDS_BETWEEN_URL_TEMPLATE = (
 )
 BUILD_INFO_URL_TEMPLATE = ANDROID_URL_BASE + '/builds?id={build_id}'
 
-BOARD_CPU_ARCH_TO_ANDROID_ARCH = {
-    'x86_64': 'x86_64',
-    'aarch64': 'arm64',
-}
-
 
 def get_flavor(android_target: str, board_cpu_arch: str) -> str | None:
     """Returns the android flavor.
@@ -59,10 +54,9 @@ def get_flavor(android_target: str, board_cpu_arch: str) -> str | None:
         android_target,
         board_cpu_arch,
     )
-    android_arch = BOARD_CPU_ARCH_TO_ANDROID_ARCH.get(board_cpu_arch)
-    if android_arch is None:
+    if board_cpu_arch not in ['arm', 'arm64', 'x86_64']:
         return None
-    android_flavor = '%s_%s-user' % (android_target, android_arch)
+    android_flavor = '%s_%s-user' % (android_target, board_cpu_arch)
     return android_flavor
 
 
