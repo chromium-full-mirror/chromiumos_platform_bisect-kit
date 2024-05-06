@@ -9,7 +9,9 @@ import unittest
 from unittest import mock
 
 from bisect_kit import bisect_db
+from bisect_kit import cros_lab_util
 from bisect_kit import dut_allocate_spec_type
+from bisect_kit import errors
 from bisect_kit import shared_dut_pool
 from google.cloud import datastore
 
@@ -183,6 +185,101 @@ class TestTransferOwner(unittest.TestCase):
                 'owner': 'bisect_2',
                 'state': shared_dut_pool.DutState.IDLE,
             }
+        )
+
+
+class TestYieldDutsForSession(unittest.TestCase):
+    """Test yield_duts_for_session"""
+
+    def setUp(self):
+        super().setUp()
+        self._mock_shared_dut_pool_manager_cls = self.enterContext(
+            mock.patch.object(
+                shared_dut_pool,
+                'SharedDutPoolManager',
+                autospec=True,
+            )
+        )
+        self._mock_yield_duts = (
+            self._mock_shared_dut_pool_manager_cls.return_value.yield_duts
+        )
+        self._mock_crosfleet_lease_dut = self.enterContext(
+            mock.patch.object(
+                cros_lab_util,
+                'crosfleet_lease_dut',
+                autospec=True,
+            )
+        )
+        self._mock_crosfleet_release_dut = self.enterContext(
+            mock.patch.object(
+                cros_lab_util,
+                'crosfleet_release_dut',
+                autospec=True,
+            )
+        )
+        self.maxDiff = None
+
+    def test_ok(self):
+        self._mock_yield_duts.return_value = (
+            ['dut1', 'dut2'],
+            ['dut3', 'dut4'],
+        )
+        shared_dut_pool.yield_duts_for_session('session1')
+        self._mock_crosfleet_lease_dut.assert_has_calls(
+            [
+                mock.call(
+                    'dut1',
+                    'session1',
+                    # pylint: disable=protected-access
+                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
+                ),
+                mock.call(
+                    'dut2',
+                    'session1',
+                    # pylint: disable=protected-access
+                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
+                ),
+            ]
+        )
+        self._mock_crosfleet_release_dut.assert_has_calls(
+            [
+                mock.call('dut3'),
+                mock.call('dut4'),
+            ]
+        )
+
+    def test_raise_exception(self):
+        self._mock_yield_duts.return_value = (
+            ['dut1', 'dut2'],
+            ['dut3', 'dut4'],
+        )
+        self._mock_crosfleet_release_dut.side_effect = [
+            None,
+            errors.DutLeaseException('failed to release DUT'),
+        ]
+
+        shared_dut_pool.yield_duts_for_session('session1')
+        self._mock_crosfleet_lease_dut.assert_has_calls(
+            [
+                mock.call(
+                    'dut1',
+                    'session1',
+                    # pylint: disable=protected-access
+                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
+                ),
+                mock.call(
+                    'dut2',
+                    'session1',
+                    # pylint: disable=protected-access
+                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
+                ),
+            ]
+        )
+        self._mock_crosfleet_release_dut.assert_has_calls(
+            [
+                mock.call('dut3'),
+                mock.call('dut4'),
+            ]
         )
 
 

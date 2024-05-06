@@ -25,6 +25,7 @@ from bisect_kit import cros_util
 from bisect_kit import dut_allocate_spec as dut_allocate_spec_module
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
+from bisect_kit import shared_dut_pool
 from bisect_kit import util
 from bisect_kit import wrapper
 from bisect_kit.dlc import borealis_util
@@ -51,6 +52,52 @@ def run_switch_or_eval_cmd(cmd):
             'failed to run %s (%s): %s'
             % (cmd[0], result.get('exception'), result.get('reason'))
         )
+
+
+def release_dut_wrapper(func):
+    """A decorator to return DUTs to the lab when a bisection finishes.
+
+    It should be used to decorate a member method of class CrosDiagnoser.
+    """
+
+    def wrapper_func(self, *args, **kwargs):
+        """The wrapper function.
+
+        Args:
+          self: a CrosDiagnoser object.
+          *args: remaining args of the wrapped method.
+          *kwargs: remaining kwargs of the wrapped method.
+        """
+        enable_shared_dut_pool = experiment.is_in_experiment(
+            self.config.get('experiments'),
+            experiment.ID.SHARED_DUT_POOL,
+        )
+        if not enable_shared_dut_pool:
+            # Do nothing but run the wrapped method directly.
+            func(self, *args, **kwargs)
+            return
+
+        can_be_retried = False
+        try:
+            func(self, *args, **kwargs)
+        except Exception as e:
+            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
+                can_be_retried = True
+            raise
+        finally:
+            session = self.config.get('session')
+
+            # If the bisection can be retried, do not yield DUTs because we
+            # expect the bisection is scheduled for retry soon.
+            if can_be_retried:
+                logger.info(
+                    'bisection %s would be retried, do not yield DUTs.',
+                    session,
+                )
+            else:
+                shared_dut_pool.yield_duts_for_session(session)
+
+    return wrapper_func
 
 
 class CrosDiagnoser:
@@ -117,6 +164,7 @@ class CrosDiagnoser:
             logger.info('decision: %s', text)
         self.states.add_history('decision', text=text)
 
+    @release_dut_wrapper
     def diagnose(
         self,
         is_autotest: bool,

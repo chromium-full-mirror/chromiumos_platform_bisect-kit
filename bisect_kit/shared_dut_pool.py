@@ -14,7 +14,9 @@ import logging
 import typing
 
 from bisect_kit import bisect_db
+from bisect_kit import cros_lab_util
 from bisect_kit import dut_allocate_spec_type
+from bisect_kit import errors
 from bisect_kit import gcloud
 from google.cloud import datastore
 
@@ -85,6 +87,42 @@ def dut_matches_spec(
             if not field_matched(key, value):
                 return False
     return True
+
+
+_EXTENDED_LEASE_DURATION_SECONDS = 60 * 60 * 8
+
+
+def yield_duts_for_session(session: str):
+    """Yields DUTs owned by a bisect.
+
+    See SharedDutPoolManager.yield_duts().
+
+    For all DUTs yielded, extend the lease time.
+    For all DUTs not yielded, return it back to the lab.
+
+    Args:
+      session: the session name.
+    """
+    logger.info('yielding DUTs held by %s', session)
+    pool_manager = SharedDutPoolManager()
+    duts_yielded, duts_not_yielded = pool_manager.yield_duts(session)
+    logger.info('DUT to extend leasing time: %s', duts_yielded)
+    for d in duts_yielded:
+        # By defaults extends the leasing time to 8 hours.
+        # We expect the bisection which needs it would be executed
+        # soon.
+        logger.info('extending DUT leasing time for %s', d)
+        cros_lab_util.crosfleet_lease_dut(
+            d, session, _EXTENDED_LEASE_DURATION_SECONDS
+        )
+
+    logger.info('DUT to return to the lab: %s', duts_not_yielded)
+    for d in duts_not_yielded:
+        logger.info('returning DUT %s to the lab', d)
+        try:
+            cros_lab_util.crosfleet_release_dut(d)
+        except errors.DutLeaseException as e:
+            logger.warning('failed to return DUT %s to the lab: %s', d, e)
 
 
 class SharedDutPoolManager(gcloud.DataStoreClient):
