@@ -21,12 +21,15 @@ class TestReleaseDutWrapper(unittest.TestCase):
 
     def setUp(self):
         super().setUp()
-        self._mock_yield_duts_for_session = self.enterContext(
+        self._mock_shared_dut_pool_manager_cls = self.enterContext(
             mock.patch.object(
                 shared_dut_pool,
-                'yield_duts_for_session',
+                'SharedDutPoolManager',
                 autospec=True,
             )
+        )
+        self._mock_clean_up_by_owner = (
+            self._mock_shared_dut_pool_manager_cls.return_value.clean_up_duts_by_owner
         )
         self.maxDiff = None
 
@@ -43,7 +46,7 @@ class TestReleaseDutWrapper(unittest.TestCase):
 
         fake_diagnoser = FakeDiagnoser(config={'experiments': []})
         fake_diagnoser.func()
-        self._mock_yield_duts_for_session.assert_not_called()
+        self._mock_clean_up_by_owner.assert_not_called()
 
     def test_no_exception_raises(self):
         class FakeDiagnoser:
@@ -69,7 +72,7 @@ class TestReleaseDutWrapper(unittest.TestCase):
 
         fake_diagnoser.func()
 
-        self._mock_yield_duts_for_session.assert_called_once_with('session1')
+        self._mock_clean_up_by_owner.assert_called_once_with('session1')
 
     def test_retraible_error(self):
         class FakeDiagnoser:
@@ -94,7 +97,7 @@ class TestReleaseDutWrapper(unittest.TestCase):
         with self.assertRaises(errors.BisectRetriableError):
             fake_diagnoser.func()
 
-        self._mock_yield_duts_for_session.assert_not_called()
+        self._mock_clean_up_by_owner.assert_not_called()
 
     def test_fatal_error(self):
         class FakeDiagnoser:
@@ -121,4 +124,4 @@ class TestReleaseDutWrapper(unittest.TestCase):
         with self.assertRaises(errors.ExecutionFatalError):
             fake_diagnoser.func()
 
-        self._mock_yield_duts_for_session.assert_called_once_with('session1')
+        self._mock_clean_up_by_owner.assert_called_once_with('session1')

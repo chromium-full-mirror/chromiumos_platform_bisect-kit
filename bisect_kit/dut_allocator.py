@@ -12,9 +12,11 @@ import collections.abc
 import functools
 import logging
 import random
+import threading
 import time
 import typing
 
+from bisect_kit import bisect_db
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import dut_allocate_spec
@@ -459,19 +461,21 @@ def allocate_dut(
 
     if enable_shared_dut_pool:
         pool_manager = shared_dut_pool.SharedDutPoolManager()
-        idle_duts = pool_manager.query(
-            dimensions, variants, pools, shared_dut_pool.DutState.IDLE
+        host, orig_owner = pool_manager.lease_for_session(
+            spec.session, dimensions, variants, pools
         )
-        logger.debug(
-            '%s idle duts in pool: %s',
-            len(idle_duts),
-            [dut.dut_name for dut in idle_duts],
+        logger.info(
+            'leased %s with original owner %s from the shared DUT pool',
+            host,
+            orig_owner,
         )
-        if idle_duts:
-            # Pick a random one for now.
-            host = idle_duts[0].dut_name
-            logger.info('leased %s from the shared DUT pool', host)
-            pool_manager.update(name=host, state=shared_dut_pool.DutState.BUSY)
+        if host is not None:
+            if orig_owner != spec.session:
+                # The bisect robs the DUT owned by |orig_owner|, so lease a DUT
+                # for |orig_owner| as a compensation in the background.
+                lease_dut_in_background_for_session(
+                    orig_owner, chromeos_root, enable_shared_dut_pool
+                )
             return host, resolve_builder_by_host(host)
 
     filter_func = functools.partial(_is_acceptable_bot, boards_with_prebuilt)
@@ -516,10 +520,75 @@ def add_dut_to_shared_pool(host: str, session: str):
     bot = bots[0]
 
     pool_manager = shared_dut_pool.SharedDutPoolManager()
-    pool_manager.insert(
+    owner = pool_manager.insert_dut(
         host,
+        session,
         bot['dimensions'],
-        shared_dut_pool.DutState.BUSY,
-        session,
-        session,
     )
+    if owner:
+        logger.info(
+            'dut %s with owner %s inserted to the shared DUT pool '
+            'successfully.',
+            host,
+            session,
+        )
+    else:
+        logger.info(
+            'failed to insert dut %s with owner %s to the shared DUT pool ',
+            host,
+            session,
+        )
+
+
+_BACKGROUND_LEASING_INTERVAL_SECONDS = 60 * 10
+
+
+def lease_dut_in_background_for_session(
+    session: str, chromeos_root: str, enable_shared_dut_pool: bool
+):
+    def _lease(spec: dut_allocate_spec.DutAllocateSpec):
+        pool_manager = shared_dut_pool.SharedDutPoolManager()
+        while True:
+            owned_duts = pool_manager.query_by_owner(session)
+            if owned_duts:
+                # The original owner might have taken it back or leased a new
+                # one by itself.
+                logger.info(
+                    'bisect %s already owned DUT(s) %s, stop trying to lease another one.',
+                    session,
+                    owned_duts,
+                )
+                return
+            logger.info('try leasing a DUT for %s in the background', session)
+            try:
+                host, _ = allocate_dut(
+                    spec, chromeos_root, enable_shared_dut_pool
+                )
+            except errors.DutLeaseTimeout as e:
+                logger.debug(
+                    'failed to lease a DUT for %s: %s, '
+                    'trying to lease later in %s seconds',
+                    session,
+                    e,
+                    _BACKGROUND_LEASING_INTERVAL_SECONDS,
+                )
+                time.sleep(_BACKGROUND_LEASING_INTERVAL_SECONDS)
+            else:
+                if host:
+                    logger.info(
+                        'leased dut %s successfully in the background', host
+                    )
+                    return
+
+    ds_client = bisect_db.Client()
+    try:
+        spec = ds_client.load_dut_allocate_spec(session)
+    except errors.DutAllocateSpecError:
+        logger.warning('unable to get DutAllocateSpec for %s', session)
+        return
+
+    logger.info(
+        'start leasing a DUT for %s in the background: %s', session, spec
+    )
+    thread = threading.Thread(target=_lease, args=(spec,), daemon=True)
+    thread.start()

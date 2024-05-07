@@ -16,7 +16,6 @@ import typing
 from bisect_kit import bisect_db
 from bisect_kit import cros_lab_util
 from bisect_kit import dut_allocate_spec_type
-from bisect_kit import errors
 from bisect_kit import gcloud
 from google.cloud import datastore
 
@@ -43,20 +42,46 @@ class Dut:
     last_update_time: datetime.datetime | None
 
 
+class SuccessorFinder:
+    """Find unfinished bisections which can take over a DUT.
+
+    It queries the bisect database for all recent unfinished bisections.
+    If the DutAllocateSpec of some bisection matches a DUT, the DUT can be
+    transferred to the bisection.
+    """
+
+    def __init__(self):
+        bisect_db_client = bisect_db.Client()
+        self._specs = bisect_db_client.dut_alloc_spec_for_unfinished_bisects()
+
+    def match(self, dimensions: dict) -> list[str]:
+        """Given a dict of dimensions, returns all matched bisections."""
+
+        matched = []
+        for bisect_id, spec in self._specs.items():
+            logger.debug(
+                'matching dimensions %s against spec %s', dimensions, spec
+            )
+            if dut_matches_spec(dimensions, spec):
+                matched.append(bisect_id)
+        logger.debug('all matched bisections: %s', matched)
+        return matched
+
+
 def dut_matches_spec(
-    dut: datastore.Entity, spec: dut_allocate_spec_type.DutAllocateSpec
+    dimensions: dict, spec: dut_allocate_spec_type.DutAllocateSpec
 ) -> bool:
     """Checks whether a DUT matches a DutAllocateSpec.
 
     Args:
-      dut: the DUT Entity loaded the Datastore.
+      dimensions: a dict of DUT dimensions.
       spec: the DutAllocateSpec to check.
     Returns:
       matched or not.
     """
 
     def field_matched(field_name, values_to_match: any) -> bool:
-        value = dut.get('dimensions', {}).get(field_name)
+        value = dimensions.get(field_name)
         if not value:
             return False
 
@@ -89,40 +114,10 @@ def dut_matches_spec(
     return True
 
 
+# If a DUT is transferred, extending its lease time to 8 hours.
+# We expect the bisection which needs it would be executed
+# soon.
 _EXTENDED_LEASE_DURATION_SECONDS = 60 * 60 * 8
-
-
-def yield_duts_for_session(session: str):
-    """Yields DUTs owned by a bisect.
-
-    See SharedDutPoolManager.yield_duts().
-
-    For all DUTs yielded, extend the lease time.
-    For all DUTs not yielded, return it back to the lab.
-
-    Args:
-      session: the session name.
-    """
-    logger.info('yielding DUTs held by %s', session)
-    pool_manager = SharedDutPoolManager()
-    duts_yielded, duts_not_yielded = pool_manager.yield_duts(session)
-    logger.info('DUT to extend leasing time: %s', duts_yielded)
-    for d in duts_yielded:
-        # By defaults extends the leasing time to 8 hours.
-        # We expect the bisection which needs it would be executed
-        # soon.
-        logger.info('extending DUT leasing time for %s', d)
-        cros_lab_util.crosfleet_lease_dut(
-            d, session, _EXTENDED_LEASE_DURATION_SECONDS
-        )
-
-    logger.info('DUT to return to the lab: %s', duts_not_yielded)
-    for d in duts_not_yielded:
-        logger.info('returning DUT %s to the lab', d)
-        try:
-            cros_lab_util.crosfleet_release_dut(d)
-        except errors.DutLeaseException as e:
-            logger.warning('failed to return DUT %s to the lab: %s', d, e)
 
 
 class SharedDutPoolManager(gcloud.DataStoreClient):
@@ -150,57 +145,83 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             kind=self._KIND_DUT, ancestor=self._common_parent_key()
         )
 
-    def insert(
+    def insert_dut(
         self,
         name: str,
-        dimensions: dict,
-        state: DutState,
         owner: str,
-        user: str,
-    ):
-        """Insert a DUT.
+        dimensions: dict,
+    ) -> str:
+        """Insert a DUT to the shared DUT pool.
 
-        If the DUT already exists, the original record is overwritten.
+        If the owner has already owned some DUTs, try finding a successor
+        of the DUT.
+        If succeeded, set the owner to the successor. Otherwise, do not
+        insert the DUT.
+
+        In theory the DUT should not already exist in the pool.
+        In case it happens, the existing records is probably stale.
+        So overwrite the existing record.
 
         Args:
           name: The name of the DUT.
-          dimensions: A dict for all the DUT dimensions.
-          state: a DutState enum.
           owner: the owner bisection ID.
-          user: the user bisection ID.
+          dimensions: a dict for all the DUT dimensions.
+
+        Returns:
+          The owner of the DUT or None if failed to insert the DUT.
         """
-        key = self._default_key(name)
-        existing_dut = self._client.get(key)
-        if existing_dut is not None:
-            logger.warning(
-                'The newly released DUT %s already exist in the shared pool: %s. '
-                'It probably means the record is not cleaned up correctly',
-                name,
-                existing_dut,
+        with self._client.transaction():
+            owned_duts = self.query_by_owner(owner)
+            if owned_duts:
+                logger.info(
+                    'owner %s already owned duts %s, trying to find a successor',
+                    owner,
+                    list(owned_duts),
+                )
+                finder = SuccessorFinder()
+                matched = finder.match(dimensions)
+                if matched:
+                    owner = matched[0]
+                    logger.info('found successor %s', owner)
+                else:
+                    logger.info(
+                        'unable to find successor, do not insert the DUT'
+                    )
+                    return None
+
+            # Checking only, write the record no matter it exists or not.
+            key = self._default_key(name)
+            existing_dut = self._client.get(key)
+            if existing_dut is not None:
+                logger.warning(
+                    'The newly released DUT %s already exist in the shared pool: %s. '
+                    'It probably means the record is not cleaned up correctly',
+                    name,
+                    existing_dut,
+                )
+
+            dut = self._client.entity(key)
+            dut.update(
+                {
+                    'name': name,
+                    'owner': owner,
+                    'state': DutState.IDLE,
+                    'dimensions': dimensions,
+                    'last_update_time': datetime.datetime.now(
+                        tz=datetime.timezone.utc
+                    ),
+                }
             )
+            self._client.put(dut)
+        return owner
 
-        dut = self._client.entity(key)
-        dut.update(
-            {
-                'name': name,
-                'dimensions': dimensions,
-                'state': state,
-                'owner': owner,
-                'user': user,
-                'last_update_time': datetime.datetime.now(
-                    tz=datetime.timezone.utc
-                ),
-            }
-        )
-        self._client.put(dut)
-
-    def query(
+    def _build_query(
         self,
         dimensions: list[str],
         variants: list[str],
         pools: list[str] | None = None,
         state: DutState | None = None,
-    ) -> list[Dut]:
+    ) -> datastore.Query:
         """query DUTs in the shared pool by the given conditions.
 
         Args:
@@ -209,7 +230,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
           pools: a list of dimension pool where any of one of them would do. Optional.
           state the state to query. Optional.
         Returns:
-          A list of DUT matches AND(AND(dimensions), OR(variants), OR(pools)).
+          A datastore query object which matches AND(AND(dimensions), OR(variants), OR(pools), state).
         """
 
         def split_dimensions(
@@ -252,26 +273,20 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         q.add_filter(filter=datastore.query.And(and_filters))
 
         logger.debug('filters: %s', and_filters)
+        return q
 
-        duts = []
-        for entity in q.fetch():
-            try:
-                dut_name = entity['dimensions']['dut_name'][0]
-            except (KeyError, IndexError):
-                logger.warning('malformed DUT entity: %s', entity)
-                continue
+    def query_by_owner(self, owner: str) -> list[str]:
+        """Query DUTs owned by some owner.
 
-            duts.append(
-                Dut(
-                    dut_name,
-                    entity.get('dimensions', None),
-                    entity.get('state', None),
-                    entity.get('owner', None),
-                    entity.get('user', None),
-                    entity.get('last_update_time', None),
-                )
-            )
-        return duts
+        Args:
+          owner: the owner in query.
+
+        Returns:
+          A list of DUT names owned by the owner.
+        """
+        q = self._default_query()
+        q.add_filter(filter=datastore.query.PropertyFilter('owner', '=', owner))
+        return [d.get('name') for d in q.fetch()]
 
     def update(
         self,
@@ -279,7 +294,6 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         dimensions: dict | None = None,
         state: DutState | None = None,
         owner: str | None = None,
-        user: str | None = None,
     ) -> bool:
         """Update a DUT.
 
@@ -291,7 +305,6 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
           dimensions: A dict for all the DUT dimensions.
           state: a DutState enum.
           owner: the owner bisection ID.
-          user: the user bisection ID.
         """
         with self._client.transaction():
             key = self._default_key(name)
@@ -308,7 +321,6 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                     'dimensions': dimensions,
                     'state': state,
                     'owner': owner,
-                    'user': user,
                     'last_update_time': datetime.datetime.now(
                         tz=datetime.timezone.utc
                     ),
@@ -356,60 +368,154 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                 )
                 return False
 
-            dut.update({'owner': bisect_id, 'state': DutState.IDLE})
+            dut.update(
+                {
+                    'owner': bisect_id,
+                    'state': DutState.IDLE,
+                    'last_update_time': datetime.datetime.now(
+                        tz=datetime.timezone.utc
+                    ),
+                }
+            )
             self._client.put(dut)
             logger.info('DUT %s transferred to %s', dut_name, bisect_id)
         return True
 
-    def yield_duts(self, session: str) -> (list[str], list[str]):
-        """Yields all DUTs owned by this session to some other bisections.
+    def yield_duts(self, dut_names: list[str]) -> (list[str], list[str]):
+        """Yields a list of DUTs to some other bisections.
 
         It searches for all unfinished bisections. If some other bisection
         does not own any DUT and its DutAllocateSpec matches a DUT owned by this
         session, the DUT is transferred to that bisection.
 
         Args:
-          session: the session ID of this bisection.
+          dut_names: list of DUT names.
         Returns:
           (list of yielded DUTs, list of not yielded DUTs)
         """
-        query_owned_duts = self._default_query()
-        query_owned_duts.add_filter(
-            filter=datastore.query.PropertyFilter("owner", "=", session)
-        )
-        owned_duts = list(query_owned_duts.fetch())
-        if not owned_duts:
-            logger.info('no duts for session %s to yield.', session)
+        if not dut_names:
+            logger.info('no DUT to yield')
             return [], []
-        logger.info(
-            '%s DUT(s) to yield: %s',
-            len(owned_duts),
-            [d.get('name') for d in owned_duts],
-        )
 
-        bisect_db_client = bisect_db.Client()
-        specs = bisect_db_client.dut_alloc_spec_for_unfinished_bisects()
+        duts = self._client.get_multi([self._default_key(d) for d in dut_names])
+
+        finder = SuccessorFinder()
 
         duts_yielded = []
-        for dut in owned_duts:
+        for dut in duts:
             dut_name = dut.get('name')
-            for bisect_id, spec in specs.items():
-                logger.debug(
-                    'checking dut %s against spec %s\ndut: %s\nspec: %s\n',
-                    dut_name,
-                    bisect_id,
-                    dut,
-                    spec,
-                )
-                if dut_matches_spec(dut, spec):
-                    logger.debug('yielding DUT %s to %s', dut_name, bisect_id)
-                    if self.transfer_owner(dut_name, bisect_id):
-                        duts_yielded.append(dut_name)
-                        break
+            logger.debug('checking dut %s', dut_name)
+            bisect_ids = finder.match(dut.get('dimensions', {}))
+            for bisect_id in bisect_ids:
+                logger.debug('try yielding DUT %s to %s', dut_name, bisect_id)
+                if self.transfer_owner(dut_name, bisect_id):
+                    duts_yielded.append(dut_name)
+                    break
 
         duts_not_yielded = [
-            d.get('name')
-            for d in owned_duts
-            if d.get('name') not in duts_yielded
+            d.get('name') for d in duts if d.get('name') not in duts_yielded
         ]
         return duts_yielded, duts_not_yielded
+
+    def clean_up_duts_by_owner(self, session: str):
+        """Clean up DUTs owned by a bisect.
+
+        Yields owned DUTs to other bisects if possible.
+
+        For all DUTs yielded, extend the lease time.
+        For all DUTs not yielded, return it back to the lab.
+
+        Args:
+          session: the session name.
+        """
+        logger.info('Clean up DUTs held by %s', session)
+
+        dut_names = self.query_by_owner(session)
+        logger.info('%s DUT(s) to clean up: %s', len(dut_names), dut_names)
+
+        duts_yielded, duts_not_yielded = self.yield_duts(dut_names)
+        logger.info('DUTs to extend leasing time: %s', duts_yielded)
+        for d in duts_yielded:
+            logger.info('extending DUT leasing time for %s', d)
+            try:
+                cros_lab_util.crosfleet_lease_dut(
+                    d, session, _EXTENDED_LEASE_DURATION_SECONDS
+                )
+            except Exception as e:
+                logger.warning('failed to lease DUT %s from the lab: %s', d, e)
+
+        logger.info('DUTs to return to the lab: %s', duts_not_yielded)
+        for d in duts_not_yielded:
+            logger.info('returning DUT %s to the lab', d)
+            try:
+                cros_lab_util.crosfleet_release_dut(d)
+            except Exception as e:
+                logger.warning('failed to return DUT %s to the lab: %s', d, e)
+
+    def lease_for_session(
+        self,
+        session: str,
+        dimensions: list[str],
+        variants: list[str],
+        pools: list[str],
+    ) -> (str | None, str | None):
+        """Try leasing a DUT for a bisect.
+
+        It searches for all idle DUTs in the shared DUT pool which match the given spec.
+        Always favor a DUT owned by the bisect itself. If the bisect doesn't own a DUT,
+        a DUT owned by some other bisects may be returned.
+        If no idel DUTs, the lease fails.
+
+        If the lease is successful, the DUT is tranferred to this bisect (if not already).
+
+        Args:
+          session: the ID of the bisect.
+          dimensions: all DUT dimensions which needs to be satisfied.
+          variants: DUT variants (e.g., board/model/sku) where any one of them would do.
+          pools: a list of dimension pool where any of one of them would do. Optional.
+
+        Returns:
+          A pair of (DUT, original owner).
+          If DUT is None, it means there is no idle DUTs which satisfies the requirement.
+        """
+        with self._client.transaction():
+            q = self._build_query(
+                dimensions, variants, pools, state=DutState.IDLE
+            )
+            matched_duts = list(q.fetch())
+            logger.debug(
+                'leasing DUT for %s: %s matched idle duts in the shared DUT pool: %s',
+                session,
+                len(matched_duts),
+                [d.get('name') for d in matched_duts],
+            )
+            if not matched_duts:
+                return None, None
+
+            dut = None
+            orig_owner = None
+            for d in matched_duts:
+                if d.get('owner') == session:
+                    dut = d
+                    break
+
+            if dut is None:
+                # matched_duts is not empty and none of them is owned by |session|.
+                # Returns the first one for now.
+                dut = matched_duts[0]
+
+            dut_name = dut.get('name')
+            orig_owner = dut.get('owner')
+
+            dut.update(
+                {
+                    'owner': session,
+                    'state': DutState.BUSY,
+                    'last_update_time': datetime.datetime.now(
+                        tz=datetime.timezone.utc
+                    ),
+                }
+            )
+            self._client.put(dut)
+
+            return dut_name, orig_owner

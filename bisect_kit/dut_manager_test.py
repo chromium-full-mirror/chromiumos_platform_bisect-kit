@@ -789,7 +789,8 @@ class TestDelayedDutReleaser(unittest.TestCase):
 
         self.assertFalse(dut_releaser.cancel())
         self.mock_dut_pool_manager.update.assert_called_once_with(
-            name='host', state=mock.ANY, user=''
+            name='host',
+            state=mock.ANY,
         )
         self.mock_crosfleet_release_dut.assert_not_called()
 
@@ -809,7 +810,7 @@ class TestDelayedDutReleaser(unittest.TestCase):
         self.assertFalse(dut_releaser.cancel())
         # Returns False
         self.mock_dut_pool_manager.update.assert_called_once_with(
-            name='host', state=mock.ANY, user=''
+            name='host', state=mock.ANY
         )
         # Returned to the ChromeOS lab instead.
         self.mock_crosfleet_release_dut.assert_called_once_with('host')

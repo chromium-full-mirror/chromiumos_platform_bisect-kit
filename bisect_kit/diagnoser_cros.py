@@ -95,7 +95,8 @@ def release_dut_wrapper(func):
                     session,
                 )
             else:
-                shared_dut_pool.yield_duts_for_session(session)
+                pool_manager = shared_dut_pool.SharedDutPoolManager()
+                pool_manager.clean_up_duts_by_owner(session)
 
     return wrapper_func
 

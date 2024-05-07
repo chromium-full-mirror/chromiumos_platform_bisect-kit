@@ -29,22 +29,19 @@ class TestDutMatchesSpec(unittest.TestCase):
     def test_dut_matches_dut_name(self):
         dut_name = 'chromeos8-row3-rack10-host39'
 
-        dut = datastore.Entity()
-        dut['dimensions'] = {'dut_name': [dut_name]}
+        dimensions = {'dut_name': [dut_name]}
         spec = dut_allocate_spec_type.DutAllocateSpec(dut_name=dut_name)
-        self.assertTrue(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertTrue(shared_dut_pool.dut_matches_spec(dimensions, spec))
 
     def test_dut_not_match_dut_name(self):
         dut_name = 'chromeos8-row3-rack10-host39'
 
-        dut = datastore.Entity()
-        dut['dimensions'] = {'dut_name': [dut_name]}
+        dimensions = {'dut_name': [dut_name]}
         spec = dut_allocate_spec_type.DutAllocateSpec(dut_name='some_other_dut')
-        self.assertFalse(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertFalse(shared_dut_pool.dut_matches_spec(dimensions, spec))
 
     def test_dut_matches_pool_board(self):
-        dut = datastore.Entity()
-        dut['dimensions'] = {
+        dimensions = {
             'label-pool': ['healthmon-satlab'],
             'label-board': ['strongbad'],
         }
@@ -52,11 +49,10 @@ class TestDutMatchesSpec(unittest.TestCase):
             pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
             boards=['strongbad', 'dedede'],
         )
-        self.assertTrue(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertTrue(shared_dut_pool.dut_matches_spec(dimensions, spec))
 
     def test_dut_not_match_board(self):
-        dut = datastore.Entity()
-        dut['dimensions'] = {
+        dimensions = {
             'label-pool': ['healthmon-satlab'],
             'label-board': ['strongbad'],
         }
@@ -64,11 +60,10 @@ class TestDutMatchesSpec(unittest.TestCase):
             pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
             boards=['dedede'],
         )
-        self.assertFalse(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertFalse(shared_dut_pool.dut_matches_spec(dimensions, spec))
 
     def test_dut_matches_pool_model(self):
-        dut = datastore.Entity()
-        dut['dimensions'] = {
+        dimensions = {
             'label-pool': ['healthmon-satlab'],
             'label-model': ['quackingstick'],
         }
@@ -76,11 +71,10 @@ class TestDutMatchesSpec(unittest.TestCase):
             pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
             models=['quackingstick'],
         )
-        self.assertTrue(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertTrue(shared_dut_pool.dut_matches_spec(dimensions, spec))
 
     def test_dut_not_match_pool_model(self):
-        dut = datastore.Entity()
-        dut['dimensions'] = {
+        dimensions = {
             'label-pool': ['healthmon-satlab'],
             'label-model': ['quackingstick'],
         }
@@ -88,11 +82,10 @@ class TestDutMatchesSpec(unittest.TestCase):
             pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
             models=['coachz', 'homestar'],
         )
-        self.assertFalse(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertFalse(shared_dut_pool.dut_matches_spec(dimensions, spec))
 
     def test_dut_matches_pool_sku(self):
-        dut = datastore.Entity()
-        dut['dimensions'] = {
+        dimensions = {
             'label-pool': ['healthmon-satlab'],
             'label-hwid_sku': ['quackingstick_QSIP7180_4GB'],
         }
@@ -100,11 +93,10 @@ class TestDutMatchesSpec(unittest.TestCase):
             pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
             skus=['quackingstick_QSIP7180_4GB'],
         )
-        self.assertTrue(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertTrue(shared_dut_pool.dut_matches_spec(dimensions, spec))
 
     def test_dut_matches_pool_model_dimensions(self):
-        dut = datastore.Entity()
-        dut['dimensions'] = {
+        dimensions = {
             'label-pool': ['healthmon-satlab'],
             'label-model': ['quackingstick'],
             'label-touchscreen': ['True'],
@@ -114,15 +106,80 @@ class TestDutMatchesSpec(unittest.TestCase):
             models=['quackingstick'],
             dimensions=['label-touchscreen:True'],
         )
-        self.assertTrue(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertTrue(shared_dut_pool.dut_matches_spec(dimensions, spec))
 
     def test_dut_not_match_missing_dimensions(self):
-        dut = datastore.Entity()
-        dut['dimensions'] = {'label-touchscreen': ['True']}
+        dimensions = {'label-touchscreen': ['True']}
         spec = dut_allocate_spec_type.DutAllocateSpec(
             dimensions=['label-touchscreen:True', 'label-servo:True'],
         )
-        self.assertFalse(shared_dut_pool.dut_matches_spec(dut, spec))
+        self.assertFalse(shared_dut_pool.dut_matches_spec(dimensions, spec))
+
+
+class TestSuccessorFinder(unittest.TestCase):
+    """Tests SuccessorFinder."""
+
+    def setUp(self):
+        super().setUp()
+        self._mock_bisect_db_client_cls = self.enterContext(
+            mock.patch.object(
+                bisect_db,
+                'Client',
+                autospec=True,
+            )
+        )
+        self._mock_specs = (
+            self._mock_bisect_db_client_cls.return_value.dut_alloc_spec_for_unfinished_bisects
+        )
+
+        self._mock_specs.return_value = {
+            'bisect_1': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                boards=['strongbad', 'dedede'],
+            ),
+            'bisect_2': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                models=['coachz', 'homestar'],
+            ),
+            'bisect_3': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA'],
+                boards=['strongbad'],
+            ),
+            'bisect_4': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                models=['coachz', 'homestar'],
+                dimensions=['label-touchscreen:True'],
+            ),
+        }
+
+    def test_matched(self):
+        finder = shared_dut_pool.SuccessorFinder()
+        matched = finder.match(
+            {
+                'label-pool': ['DUT_POOL_QUOTA'],
+                'label-board': ['strongbad'],
+            }
+        )
+        self.assertEqual(matched, ['bisect_1', 'bisect_3'])
+
+        matched = finder.match(
+            {
+                'label-pool': ['healthmon-satlab'],
+                'label-model': ['homestar'],
+                'label-touchscreen': ['True'],
+            }
+        )
+        self.assertEqual(matched, ['bisect_2', 'bisect_4'])
+
+    def test_unmatched(self):
+        finder = shared_dut_pool.SuccessorFinder()
+        matched = finder.match(
+            {
+                'label-pool': ['DUT_POOL_QUOTA'],
+                'label-model': ['quackingstick'],
+            }
+        )
+        self.assertEqual(matched, [])
 
 
 class FakeSharedDutPoolManager(shared_dut_pool.SharedDutPoolManager):
@@ -132,6 +189,157 @@ class FakeSharedDutPoolManager(shared_dut_pool.SharedDutPoolManager):
         # pylint: disable=super-init-not-called
         # It is intentional to mock self._client
         self._client = client
+
+
+class TestInsertDut(unittest.TestCase):
+    """Test insert_dut()"""
+
+    def setUp(self):
+        super().setUp()
+        self._mock_client = self.enterContext(
+            mock.patch.object(
+                datastore,
+                'Client',
+                autospec=True,
+            )
+        )
+        self._mock_client.get.return_value = None
+
+        self._mock_bisect_db_client_cls = self.enterContext(
+            mock.patch.object(
+                bisect_db,
+                'Client',
+                autospec=True,
+            )
+        )
+        self._mock_specs = (
+            self._mock_bisect_db_client_cls.return_value.dut_alloc_spec_for_unfinished_bisects
+        )
+
+        self.maxDiff = None
+
+    def test_already_owned_duts_found_successor(self):
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        owned_duts = ['dut_name_%s' % (i + 1) for i in range(3)]
+        dimensions = {
+            'label-pool': ['healthmon-satlab'],
+            'label-model': ['quackingstick'],
+        }
+        self._mock_specs.return_value = {
+            'bisect_1': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                boards=['strongbad', 'dedede'],
+            ),
+            # bisect_2 matches |dimensions|.
+            'bisect_2': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                models=['quackingstick'],
+            ),
+            'bisect_3': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                models=['homestar'],
+            ),
+        }
+        self._mock_client.entity.return_value = datastore.Entity()
+        with mock.patch.object(
+            pool_manager, 'query_by_owner', autospec=True
+        ) as mock_query:
+            mock_query.return_value = owned_duts
+            self.assertEqual(
+                'bisect_2',
+                pool_manager.insert_dut('dut_name_4', 'bisect_4', dimensions),
+            )
+
+        self._mock_client.put.assert_called_once()
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual('dut_name_4', updated_dut['name'])
+        # Transferred to bisect_2.
+        self.assertEqual('bisect_2', updated_dut['owner'])
+        self.assertEqual(shared_dut_pool.DutState.IDLE, updated_dut['state'])
+        self.assertEqual(dimensions, updated_dut['dimensions'])
+
+    def test_already_owned_duts_no_successor(self):
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        owned_duts = ['dut_name_%s' % (i + 1) for i in range(3)]
+        dimensions = {
+            'label-pool': ['healthmon-satlab'],
+            'label-model': ['quackingstick'],
+        }
+        self._mock_specs.return_value = {
+            'bisect_1': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                boards=['strongbad', 'dedede'],
+            ),
+            'bisect_2': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                skus=['quackingstick_QSIP7180_4GB'],
+            ),
+            'bisect_3': dut_allocate_spec_type.DutAllocateSpec(
+                pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
+                models=['homestar'],
+            ),
+        }
+        with mock.patch.object(
+            pool_manager, 'query_by_owner', autospec=True
+        ) as mock_query:
+            mock_query.return_value = owned_duts
+            self.assertEqual(
+                None,
+                pool_manager.insert_dut('dut_name_4', 'bisect_4', dimensions),
+            )
+
+        self._mock_client.put.assert_not_called()
+
+    def test_existing_dut(self):
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+
+        existing_dut = datastore.Entity()
+        existing_dut.update(
+            {
+                'name': 'dut_name_1',
+                'owner': 'bisect_2',
+            }
+        )
+        self._mock_client.get.return_value = existing_dut
+
+        self._mock_client.entity.return_value = datastore.Entity()
+        dimensions = {'dim1:value1', 'dim2:value2'}
+        with mock.patch.object(
+            pool_manager, 'query_by_owner', autospec=True
+        ) as mock_query:
+            mock_query.return_value = []
+            self.assertEqual(
+                'bisect_1',
+                pool_manager.insert_dut('dut_name_1', 'bisect_1', dimensions),
+            )
+
+        self._mock_client.put.assert_called_once()
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual('dut_name_1', updated_dut['name'])
+        self.assertEqual('bisect_1', updated_dut['owner'])
+        self.assertEqual(shared_dut_pool.DutState.IDLE, updated_dut['state'])
+        self.assertEqual(dimensions, updated_dut['dimensions'])
+
+    def test_no_existing_dut(self):
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+
+        self._mock_client.entity.return_value = datastore.Entity()
+        dimensions = {'dim1:value1', 'dim2:value2'}
+        with mock.patch.object(
+            pool_manager, 'query_by_owner', autospec=True
+        ) as mock_query:
+            mock_query.return_value = []
+            self.assertEqual(
+                'bisect_1',
+                pool_manager.insert_dut('dut_name_1', 'bisect_1', dimensions),
+            )
+
+        self._mock_client.put.assert_called_once()
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual('dut_name_1', updated_dut['name'])
+        self.assertEqual('bisect_1', updated_dut['owner'])
+        self.assertEqual(shared_dut_pool.DutState.IDLE, updated_dut['state'])
+        self.assertEqual(dimensions, updated_dut['dimensions'])
 
 
 class TestTransferOwner(unittest.TestCase):
@@ -148,7 +356,7 @@ class TestTransferOwner(unittest.TestCase):
         )
         self.maxDiff = None
 
-    def testReceiverAlreadyOwnsDuts(self):
+    def test_receiver_already_owns_duts(self):
         dut = datastore.Entity()
         dut.update(
             {
@@ -161,13 +369,13 @@ class TestTransferOwner(unittest.TestCase):
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         self.assertFalse(pool_manager.transfer_owner('dut_name_1', 'bisect_2'))
 
-    def testDutNotFound(self):
+    def test_dut_not_found(self):
         self._mock_client.get.return_value = None
 
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         self.assertFalse(pool_manager.transfer_owner('dut_name_1', 'bisect_2'))
 
-    def testTransferred(self):
+    def test_transferred(self):
         dut = datastore.Entity()
         dut.update(
             {
@@ -179,107 +387,12 @@ class TestTransferOwner(unittest.TestCase):
 
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         self.assertTrue(pool_manager.transfer_owner('dut_name_1', 'bisect_2'))
-        self._mock_client.put.assert_called_once_with(
-            {
-                'name': 'dut_name_1',
-                'owner': 'bisect_2',
-                'state': shared_dut_pool.DutState.IDLE,
-            }
-        )
 
-
-class TestYieldDutsForSession(unittest.TestCase):
-    """Test yield_duts_for_session"""
-
-    def setUp(self):
-        super().setUp()
-        self._mock_shared_dut_pool_manager_cls = self.enterContext(
-            mock.patch.object(
-                shared_dut_pool,
-                'SharedDutPoolManager',
-                autospec=True,
-            )
-        )
-        self._mock_yield_duts = (
-            self._mock_shared_dut_pool_manager_cls.return_value.yield_duts
-        )
-        self._mock_crosfleet_lease_dut = self.enterContext(
-            mock.patch.object(
-                cros_lab_util,
-                'crosfleet_lease_dut',
-                autospec=True,
-            )
-        )
-        self._mock_crosfleet_release_dut = self.enterContext(
-            mock.patch.object(
-                cros_lab_util,
-                'crosfleet_release_dut',
-                autospec=True,
-            )
-        )
-        self.maxDiff = None
-
-    def test_ok(self):
-        self._mock_yield_duts.return_value = (
-            ['dut1', 'dut2'],
-            ['dut3', 'dut4'],
-        )
-        shared_dut_pool.yield_duts_for_session('session1')
-        self._mock_crosfleet_lease_dut.assert_has_calls(
-            [
-                mock.call(
-                    'dut1',
-                    'session1',
-                    # pylint: disable=protected-access
-                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
-                ),
-                mock.call(
-                    'dut2',
-                    'session1',
-                    # pylint: disable=protected-access
-                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
-                ),
-            ]
-        )
-        self._mock_crosfleet_release_dut.assert_has_calls(
-            [
-                mock.call('dut3'),
-                mock.call('dut4'),
-            ]
-        )
-
-    def test_raise_exception(self):
-        self._mock_yield_duts.return_value = (
-            ['dut1', 'dut2'],
-            ['dut3', 'dut4'],
-        )
-        self._mock_crosfleet_release_dut.side_effect = [
-            None,
-            errors.DutLeaseException('failed to release DUT'),
-        ]
-
-        shared_dut_pool.yield_duts_for_session('session1')
-        self._mock_crosfleet_lease_dut.assert_has_calls(
-            [
-                mock.call(
-                    'dut1',
-                    'session1',
-                    # pylint: disable=protected-access
-                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
-                ),
-                mock.call(
-                    'dut2',
-                    'session1',
-                    # pylint: disable=protected-access
-                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
-                ),
-            ]
-        )
-        self._mock_crosfleet_release_dut.assert_has_calls(
-            [
-                mock.call('dut3'),
-                mock.call('dut4'),
-            ]
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual('dut_name_1', updated_dut.get('name'))
+        self.assertEqual('bisect_2', updated_dut.get('owner'))
+        self.assertEqual(
+            shared_dut_pool.DutState.IDLE, updated_dut.get('state')
         )
 
 
@@ -319,8 +432,8 @@ class TestYieldsDuts(unittest.TestCase):
 
         return mock_transfer_owner
 
-    def testAllYielded(self):
-        owned_duts = []
+    def test_all_yielded(self):
+        duts = []
         for i in range(3):
             dut = datastore.Entity()
             dut.update(
@@ -332,10 +445,8 @@ class TestYieldsDuts(unittest.TestCase):
                     },
                 }
             )
-            owned_duts.append(dut)
-        self._mock_client.query.return_value.fetch.return_value = iter(
-            owned_duts
-        )
+            duts.append(dut)
+        self._mock_client.get_multi.return_value = duts
 
         self._mock_bisect_db_client.dut_alloc_spec_for_unfinished_bisects.return_value = {
             'bisect_id_1': dut_allocate_spec_type.DutAllocateSpec(
@@ -361,12 +472,14 @@ class TestYieldsDuts(unittest.TestCase):
             'transfer_owner',
             new_callable=self._gen_mock_transfer_owner,
         ):
-            yielded, not_yielded = pool_manager.yield_duts('session')
+            yielded, not_yielded = pool_manager.yield_duts(
+                [d.get('name') for d in duts]
+            )
         self.assertEqual(['dut_name_1', 'dut_name_2', 'dut_name_3'], yielded)
         self.assertEqual([], not_yielded)
 
-    def testPartiallyYielded(self):
-        owned_duts = []
+    def test_partially_yielded(self):
+        duts = []
         for i in range(3):
             dut = datastore.Entity()
             dut.update(
@@ -378,10 +491,8 @@ class TestYieldsDuts(unittest.TestCase):
                     },
                 }
             )
-            owned_duts.append(dut)
-        self._mock_client.query.return_value.fetch.return_value = iter(
-            owned_duts
-        )
+            duts.append(dut)
+        self._mock_client.get_multi.return_value = duts
 
         self._mock_bisect_db_client.dut_alloc_spec_for_unfinished_bisects.return_value = {
             'bisect_id_1': dut_allocate_spec_type.DutAllocateSpec(
@@ -401,6 +512,212 @@ class TestYieldsDuts(unittest.TestCase):
             'transfer_owner',
             new_callable=self._gen_mock_transfer_owner,
         ):
-            yielded, not_yielded = pool_manager.yield_duts('session')
+            yielded, not_yielded = pool_manager.yield_duts(
+                [d.get('name') for d in duts]
+            )
         self.assertEqual(['dut_name_1', 'dut_name_2'], yielded)
         self.assertEqual(['dut_name_3'], not_yielded)
+
+
+class TestCleanDutsByOwner(unittest.TestCase):
+    """Test clean_up_duts_by_owner()"""
+
+    def setUp(self):
+        super().setUp()
+        self._mock_client = self.enterContext(
+            mock.patch.object(
+                datastore,
+                'Client',
+                autospec=True,
+            )
+        )
+        self._mock_query_by_owner = self.enterContext(
+            mock.patch.object(
+                shared_dut_pool.SharedDutPoolManager,
+                'query_by_owner',
+                autospec=True,
+            )
+        )
+        self._mock_yield_duts = self.enterContext(
+            mock.patch.object(
+                shared_dut_pool.SharedDutPoolManager,
+                'yield_duts',
+                autospec=True,
+            )
+        )
+        self._mock_crosfleet_lease_dut = self.enterContext(
+            mock.patch.object(
+                cros_lab_util,
+                'crosfleet_lease_dut',
+                autospec=True,
+            )
+        )
+        self._mock_crosfleet_release_dut = self.enterContext(
+            mock.patch.object(
+                cros_lab_util,
+                'crosfleet_release_dut',
+                autospec=True,
+            )
+        )
+        self.maxDiff = None
+
+    def test_ok(self):
+        owned_duts = ['dut1', 'dut2', 'dut3', 'dut4']
+        self._mock_query_by_owner.return_value = owned_duts
+        self._mock_yield_duts.return_value = (
+            ['dut1', 'dut2'],
+            ['dut3', 'dut4'],
+        )
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        pool_manager.clean_up_duts_by_owner('session1')
+
+        self._mock_yield_duts.assert_called_once_with(mock.ANY, owned_duts)
+        self._mock_crosfleet_lease_dut.assert_has_calls(
+            [
+                mock.call(
+                    'dut1',
+                    'session1',
+                    # pylint: disable=protected-access
+                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
+                ),
+                mock.call(
+                    'dut2',
+                    'session1',
+                    # pylint: disable=protected-access
+                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
+                ),
+            ]
+        )
+        self._mock_crosfleet_release_dut.assert_has_calls(
+            [
+                mock.call('dut3'),
+                mock.call('dut4'),
+            ]
+        )
+
+    def test_raise_exception(self):
+        owned_duts = ['dut1', 'dut2', 'dut3', 'dut4']
+        self._mock_query_by_owner.return_value = owned_duts
+        self._mock_yield_duts.return_value = (
+            ['dut1', 'dut2'],
+            ['dut3', 'dut4'],
+        )
+        self._mock_crosfleet_lease_dut.side_effect = [
+            Exception('some exception'),
+            None,
+        ]
+        self._mock_crosfleet_release_dut.side_effect = [
+            None,
+            errors.DutLeaseException('failed to release DUT'),
+        ]
+
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        pool_manager.clean_up_duts_by_owner('session1')
+
+        self._mock_yield_duts.assert_called_once_with(mock.ANY, owned_duts)
+        self._mock_crosfleet_lease_dut.assert_has_calls(
+            [
+                mock.call(
+                    'dut1',
+                    'session1',
+                    # pylint: disable=protected-access
+                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
+                ),
+                mock.call(
+                    'dut2',
+                    'session1',
+                    # pylint: disable=protected-access
+                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
+                ),
+            ]
+        )
+        self._mock_crosfleet_release_dut.assert_has_calls(
+            [
+                mock.call('dut3'),
+                mock.call('dut4'),
+            ]
+        )
+
+
+class TestLeaseForSession(unittest.TestCase):
+    """Test lease_for_session()"""
+
+    def setUp(self):
+        super().setUp()
+        self._mock_client = self.enterContext(
+            mock.patch.object(
+                datastore,
+                'Client',
+                autospec=True,
+            )
+        )
+        self.maxDiff = None
+
+    def test_no_matched_duts(self):
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        with mock.patch.object(
+            pool_manager, '_build_query', autospec=True
+        ) as mock_query_obj:
+            mock_query_obj.return_value.fetch.return_value = iter([])
+            dut_name, orig_owner = pool_manager.lease_for_session(
+                'bisect_1', [], [], []
+            )
+        self.assertEqual(None, dut_name)
+        self.assertEqual(None, orig_owner)
+        self._mock_client.put.assert_not_called()
+
+    def test_has_owned_dut(self):
+        duts = []
+        for i in range(3):
+            dut = datastore.Entity()
+            dut.update(
+                {
+                    'name': 'dut_name_%s' % str(i + 1),
+                    'owner': 'bisect_%s' % str(i + 1),
+                }
+            )
+            duts.append(dut)
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        with mock.patch.object(
+            pool_manager, '_build_query', autospec=True
+        ) as mock_query_obj:
+            mock_query_obj.return_value.fetch.return_value = iter(duts)
+            dut_name, orig_owner = pool_manager.lease_for_session(
+                'bisect_2', [], [], []
+            )
+        self.assertEqual('dut_name_2', dut_name)
+        self.assertEqual('bisect_2', orig_owner)
+
+        self._mock_client.put.assert_called_once()
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual('dut_name_2', updated_dut['name'])
+        self.assertEqual('bisect_2', updated_dut['owner'])
+        self.assertEqual(shared_dut_pool.DutState.BUSY, updated_dut['state'])
+
+    def test_has_no_owned_dut(self):
+        duts = []
+        for i in range(3):
+            dut = datastore.Entity()
+            dut.update(
+                {
+                    'name': 'dut_name_%s' % str(i + 1),
+                    'owner': 'bisect_%s' % str(i + 1),
+                }
+            )
+            duts.append(dut)
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        with mock.patch.object(
+            pool_manager, '_build_query', autospec=True
+        ) as mock_query_obj:
+            mock_query_obj.return_value.fetch.return_value = iter(duts)
+            dut_name, orig_owner = pool_manager.lease_for_session(
+                'bisect_4', [], [], []
+            )
+        self.assertEqual('dut_name_1', dut_name)
+        self.assertEqual('bisect_1', orig_owner)
+
+        self._mock_client.put.assert_called_once()
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual('dut_name_1', updated_dut['name'])
+        self.assertEqual('bisect_4', updated_dut['owner'])
+        self.assertEqual(shared_dut_pool.DutState.BUSY, updated_dut['state'])

@@ -140,7 +140,6 @@ class DelayedDutReleaser:
                 if not pool_manager.update(
                     name=cros_lab_util.dut_host_name(self._dut),
                     state=shared_dut_pool.DutState.IDLE,
-                    user='',
                 ):
                     logger.info(
                         'failed to return the DUT to the shared DUT pool, try returning to the ChromeOS lab directly'
@@ -379,17 +378,29 @@ class DutManager:
                 host,
             )
         else:
+            enable_shared_dut_pool = experiment.is_in_experiment(
+                self.config.get('experiments'),
+                experiment.ID.SHARED_DUT_POOL,
+            )
             host, builder = dut_allocator.allocate_dut(
                 self.dut_allocate_spec,
                 self.config.get('chromeos_root'),
-                enable_shared_dut_pool=experiment.is_in_experiment(
-                    self.config.get('experiments'),
-                    experiment.ID.SHARED_DUT_POOL,
-                ),
+                enable_shared_dut_pool=enable_shared_dut_pool,
             )
             if not host:
                 # This should not happen.
                 raise errors.InternalError('Leased DUT invalid: %s' % host)
+
+            if enable_shared_dut_pool:
+                pool_manager = shared_dut_pool.SharedDutPoolManager()
+                if not pool_manager.update(
+                    name=host,
+                    state=shared_dut_pool.DutState.BUSY,
+                ):
+                    logger.info(
+                        'failed to lease DUT %s from the shared DUT pool', host
+                    )
+
             leased_dut = cros_lab_util.dut_name_to_address(host)
             logger.debug('Leased DUT %s with builder %s', host, builder)
         # A DUT is leased at this point successfully.
