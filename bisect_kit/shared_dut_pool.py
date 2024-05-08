@@ -444,6 +444,27 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             except Exception as e:
                 logger.warning('failed to return DUT %s to the lab: %s', d, e)
 
+    def _clean_up_stale_duts(self, dut_names: list[str]) -> list[str]:
+        """Remove duts from the shared DUT pool if it's no longer leased by us.
+
+        Args:
+          dut_names: a list of DUT names.
+        Returns:
+          A list of stale DUTs (i.e., those removed from the shared DUT pool).
+        """
+        stale_duts = []
+        for dut_name in dut_names:
+            lease_status = cros_lab_util.query_lease_status(
+                dut_name, verbose_log=False
+            )
+            if not (lease_status.is_leased and lease_status.is_leased_by_me):
+                stale_duts.append(dut_name)
+        logger.info(
+            'removing stale DUTs from the shared DUT pool: %s', stale_duts
+        )
+        self._client.delete_multi([self._default_key(d) for d in stale_duts])
+        return stale_duts
+
     def lease_for_bisect(
         self,
         bisect_id: str,
@@ -475,9 +496,22 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                 dimensions, variants, pools, state=DutState.IDLE
             )
             matched_duts = list(q.fetch())
+            matched_dut_names = [d.get('name') for d in matched_duts]
             logger.debug(
                 'leasing DUT for %s: %s matched idle duts in the shared DUT pool: %s',
                 bisect_id,
+                len(matched_dut_names),
+                matched_dut_names,
+            )
+
+            stale_duts = self._clean_up_stale_duts(matched_dut_names)
+
+            # filter out stale_duts from matched_duts.
+            matched_duts = [
+                d for d in matched_duts if d.get('name') not in stale_duts
+            ]
+            logger.debug(
+                '%s matched idle duts after removing stale duts: %s',
                 len(matched_duts),
                 [d.get('name') for d in matched_duts],
             )
