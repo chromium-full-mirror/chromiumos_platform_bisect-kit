@@ -747,7 +747,7 @@ class AsyncDutLeaser:
                     logger.warning(
                         'lease failed, will retry %d seconds later', delay
                     )
-                    asyncio.sleep(delay)
+                    await asyncio.sleep(delay)
                     continue
                 raise
 
