@@ -461,7 +461,7 @@ def allocate_dut(
 
     if enable_shared_dut_pool:
         pool_manager = shared_dut_pool.SharedDutPoolManager()
-        host, orig_owner = pool_manager.lease_for_session(
+        host, orig_owner = pool_manager.lease_for_bisect(
             spec.session, dimensions, variants, pools
         )
         logger.info(

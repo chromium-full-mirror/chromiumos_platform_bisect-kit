@@ -640,7 +640,7 @@ class TestCleanDutsByOwner(unittest.TestCase):
 
 
 class TestLeaseForSession(unittest.TestCase):
-    """Test lease_for_session()"""
+    """Test lease_for_bisect()"""
 
     def setUp(self):
         super().setUp()
@@ -659,7 +659,7 @@ class TestLeaseForSession(unittest.TestCase):
             pool_manager, '_build_query', autospec=True
         ) as mock_query_obj:
             mock_query_obj.return_value.fetch.return_value = iter([])
-            dut_name, orig_owner = pool_manager.lease_for_session(
+            dut_name, orig_owner = pool_manager.lease_for_bisect(
                 'bisect_1', [], [], []
             )
         self.assertEqual(None, dut_name)
@@ -682,7 +682,7 @@ class TestLeaseForSession(unittest.TestCase):
             pool_manager, '_build_query', autospec=True
         ) as mock_query_obj:
             mock_query_obj.return_value.fetch.return_value = iter(duts)
-            dut_name, orig_owner = pool_manager.lease_for_session(
+            dut_name, orig_owner = pool_manager.lease_for_bisect(
                 'bisect_2', [], [], []
             )
         self.assertEqual('dut_name_2', dut_name)
@@ -710,7 +710,7 @@ class TestLeaseForSession(unittest.TestCase):
             pool_manager, '_build_query', autospec=True
         ) as mock_query_obj:
             mock_query_obj.return_value.fetch.return_value = iter(duts)
-            dut_name, orig_owner = pool_manager.lease_for_session(
+            dut_name, orig_owner = pool_manager.lease_for_bisect(
                 'bisect_4', [], [], []
             )
         self.assertEqual('dut_name_1', dut_name)
