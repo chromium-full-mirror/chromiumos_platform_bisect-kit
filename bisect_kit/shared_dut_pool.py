@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import datetime
 from enum import StrEnum
 import logging
@@ -28,18 +27,6 @@ class DutState(StrEnum):
 
     BUSY = 'busy'
     IDLE = 'idle'
-
-
-@dataclasses.dataclass
-class Dut:
-    """A class represents a DUT in Datastore."""
-
-    dut_name: str
-    dimensions: dict | None
-    state: DutState | None
-    owner: str | None
-    user: str | None
-    last_update_time: datetime.datetime | None
 
 
 class SuccessorFinder:
@@ -207,7 +194,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                     'owner': owner,
                     'state': DutState.IDLE,
                     'dimensions': dimensions,
-                    'last_update_time': datetime.datetime.now(
+                    'lastUpdated': datetime.datetime.now(
                         tz=datetime.timezone.utc
                     ),
                 }
@@ -321,7 +308,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                     'dimensions': dimensions,
                     'state': state,
                     'owner': owner,
-                    'last_update_time': datetime.datetime.now(
+                    'lastUpdated': datetime.datetime.now(
                         tz=datetime.timezone.utc
                     ),
                 }.items()
@@ -372,7 +359,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                 {
                     'owner': bisect_id,
                     'state': DutState.IDLE,
-                    'last_update_time': datetime.datetime.now(
+                    'lastUpdated': datetime.datetime.now(
                         tz=datetime.timezone.utc
                     ),
                 }
@@ -512,7 +499,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                 {
                     'owner': bisect_id,
                     'state': DutState.BUSY,
-                    'last_update_time': datetime.datetime.now(
+                    'lastUpdated': datetime.datetime.now(
                         tz=datetime.timezone.utc
                     ),
                 }
