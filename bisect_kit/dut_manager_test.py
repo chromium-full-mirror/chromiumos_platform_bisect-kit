@@ -780,7 +780,7 @@ class TestDelayedDutReleaser(unittest.TestCase):
         )
         dut_releaser.start()
 
-        self.mock_dut_pool_manager.update.return_value = True
+        self.mock_dut_pool_manager.mark_dut_as_idle.return_value = True
 
         # func is the function to be called when initializing the timer, which
         # is dut_releaser.run().
@@ -788,9 +788,8 @@ class TestDelayedDutReleaser(unittest.TestCase):
         func()
 
         self.assertFalse(dut_releaser.cancel())
-        self.mock_dut_pool_manager.update.assert_called_once_with(
-            name='host',
-            state=mock.ANY,
+        self.mock_dut_pool_manager.mark_dut_as_idle.assert_called_once_with(
+            'host'
         )
         self.mock_crosfleet_release_dut.assert_not_called()
 
@@ -800,7 +799,7 @@ class TestDelayedDutReleaser(unittest.TestCase):
         )
         dut_releaser.start()
 
-        self.mock_dut_pool_manager.update.return_value = False
+        self.mock_dut_pool_manager.mark_dut_as_idle.return_value = False
 
         # func is the function to be called when initializing the timer, which
         # is dut_releaser.run().
@@ -809,8 +808,8 @@ class TestDelayedDutReleaser(unittest.TestCase):
 
         self.assertFalse(dut_releaser.cancel())
         # Returns False
-        self.mock_dut_pool_manager.update.assert_called_once_with(
-            name='host', state=mock.ANY
+        self.mock_dut_pool_manager.mark_dut_as_idle.assert_called_once_with(
+            'host'
         )
         # Returned to the ChromeOS lab instead.
         self.mock_crosfleet_release_dut.assert_called_once_with('host')

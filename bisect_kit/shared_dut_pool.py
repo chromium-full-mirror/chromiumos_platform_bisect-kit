@@ -275,49 +275,49 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         q.add_filter(filter=datastore.query.PropertyFilter('owner', '=', owner))
         return [d.get('name') for d in q.fetch()]
 
-    def update(
-        self,
-        name: str | None = None,
-        dimensions: dict | None = None,
-        state: DutState | None = None,
-        owner: str | None = None,
-    ) -> bool:
-        """Update a DUT.
-
-        If the DUT does not exist in the shared pool, returns False.
-        If a field is not given or is None, leave it intact.
-
-        Args:
-          name: The name of the DUT.
-          dimensions: A dict for all the DUT dimensions.
-          state: a DutState enum.
-          owner: the owner bisect ID.
-        """
+    def _set_dut_state(self, dut_name: str, state: DutState) -> bool:
+        """Set the dut state."""
         with self._client.transaction():
-            key = self._default_key(name)
+            key = self._default_key(dut_name)
             dut = self._client.get(key)
             if dut is None:
-                logger.warning(
-                    'DUT %s does not exist in the shared DUT pool', name
+                logger.debug(
+                    'DUT %s does not exist in the shared DUT pool. '
+                    'It is generally not harmful when the DUT has been '
+                    'cleaned up.',
+                    dut_name,
                 )
                 return False
-            to_update = {
-                k: v
-                for k, v in {
-                    'name': name,
-                    'dimensions': dimensions,
+            dut.update(
+                {
                     'state': state,
-                    'owner': owner,
                     'lastUpdated': datetime.datetime.now(
                         tz=datetime.timezone.utc
                     ),
-                }.items()
-                if v is not None
-            }
-            logger.debug('dut %s to be updated with: %s', name, to_update)
-            dut.update(to_update)
+                }
+            )
             self._client.put(dut)
-            return True
+        return True
+
+    def mark_dut_as_idle(self, dut_name: str) -> bool:
+        """mark a DUT as idle.
+
+        If the DUT does not exist in the shared pool, returns False.
+
+        Args:
+          dut_name: The name of the DUT.
+        """
+        return self._set_dut_state(dut_name, DutState.IDLE)
+
+    def mark_dut_as_busy(self, dut_name: str) -> bool:
+        """mark a DUT as busy.
+
+        If the DUT does not exist in the shared pool, returns False.
+
+        Args:
+          dut_name: The name of the DUT.
+        """
+        return self._set_dut_state(dut_name, DutState.BUSY)
 
     def transfer_owner(self, dut_name: str, bisect_id: str) -> bool:
         """Transfer the owner of a DUT to another bisect.
@@ -431,7 +431,12 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             except Exception as e:
                 logger.warning('failed to lease DUT %s from the lab: %s', d, e)
 
-        logger.info('DUTs to return to the lab: %s', duts_not_yielded)
+        logger.info(
+            'DUTs to remove from the shared DUT pool: %s', duts_not_yielded
+        )
+        self._client.delete_multi(
+            [self._default_key(d) for d in duts_not_yielded]
+        )
         for d in duts_not_yielded:
             logger.info('returning DUT %s to the lab', d)
             try:

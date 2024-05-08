@@ -137,9 +137,8 @@ class DelayedDutReleaser:
                     'returning the DUT to the shared DUT pool instead of the ChromeOS lab'
                 )
                 pool_manager = shared_dut_pool.SharedDutPoolManager()
-                if not pool_manager.update(
-                    name=cros_lab_util.dut_host_name(self._dut),
-                    state=shared_dut_pool.DutState.IDLE,
+                if not pool_manager.mark_dut_as_idle(
+                    cros_lab_util.dut_host_name(self._dut),
                 ):
                     logger.info(
                         'failed to return the DUT to the shared DUT pool, try returning to the ChromeOS lab directly'
@@ -393,10 +392,7 @@ class DutManager:
 
             if enable_shared_dut_pool:
                 pool_manager = shared_dut_pool.SharedDutPoolManager()
-                if not pool_manager.update(
-                    name=host,
-                    state=shared_dut_pool.DutState.BUSY,
-                ):
+                if not pool_manager.mark_dut_as_busy(host):
                     logger.info(
                         'failed to lease DUT %s from the shared DUT pool', host
                     )

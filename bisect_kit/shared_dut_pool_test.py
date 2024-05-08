@@ -342,6 +342,60 @@ class TestInsertDut(unittest.TestCase):
         self.assertEqual(dimensions, updated_dut['dimensions'])
 
 
+class TestMarkDutState(unittest.TestCase):
+    """Test mark_dut_as_idle() and mark_dut_as_busy()."""
+
+    def setUp(self):
+        super().setUp()
+        self._mock_client = self.enterContext(
+            mock.patch.object(
+                datastore,
+                'Client',
+                autospec=True,
+            )
+        )
+
+    def test_dut_not_exist(self):
+        self._mock_client.get.return_value = None
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        self.assertFalse(pool_manager.mark_dut_as_idle('dut_name_1'))
+        self.assertFalse(pool_manager.mark_dut_as_busy('dut_name_1'))
+
+    def test_mark_dut_as_idle(self):
+        dut = datastore.Entity()
+        dut.update(
+            {
+                'name': 'dut_name_1',
+                'owner': 'bisect_1',
+            }
+        )
+        self._mock_client.get.return_value = dut
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        self.assertTrue(pool_manager.mark_dut_as_idle('dut_name_1'))
+
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual(
+            shared_dut_pool.DutState.IDLE, updated_dut.get('state')
+        )
+
+    def test_mark_dut_as_busy(self):
+        dut = datastore.Entity()
+        dut.update(
+            {
+                'name': 'dut_name_1',
+                'owner': 'bisect_1',
+            }
+        )
+        self._mock_client.get.return_value = dut
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        self.assertTrue(pool_manager.mark_dut_as_busy('dut_name_1'))
+
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual(
+            shared_dut_pool.DutState.BUSY, updated_dut.get('state')
+        )
+
+
 class TestTransferOwner(unittest.TestCase):
     """Test transfer_owner()"""
 
@@ -531,6 +585,10 @@ class TestCleanDutsByOwner(unittest.TestCase):
                 autospec=True,
             )
         )
+        # mock the "key" method to return the raw "name"
+        self._mock_client.key.side_effect = (
+            lambda self, name, *args, **kwargs: name
+        )
         self._mock_query_by_owner = self.enterContext(
             mock.patch.object(
                 shared_dut_pool.SharedDutPoolManager,
@@ -588,6 +646,7 @@ class TestCleanDutsByOwner(unittest.TestCase):
                 ),
             ]
         )
+        self._mock_client.delete_multi.assert_called_once_with(['dut3', 'dut4'])
         self._mock_crosfleet_release_dut.assert_has_calls(
             [
                 mock.call('dut3'),
@@ -614,7 +673,7 @@ class TestCleanDutsByOwner(unittest.TestCase):
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         pool_manager.clean_up_duts_by_owner('session1')
 
-        self._mock_yield_duts.assert_called_once_with(mock.ANY, owned_duts)
+        self._mock_yield_duts.assert_called_once()
         self._mock_crosfleet_lease_dut.assert_has_calls(
             [
                 mock.call(
@@ -631,6 +690,7 @@ class TestCleanDutsByOwner(unittest.TestCase):
                 ),
             ]
         )
+        self._mock_client.delete_multi.assert_called_once_with(['dut3', 'dut4'])
         self._mock_crosfleet_release_dut.assert_has_calls(
             [
                 mock.call('dut3'),
