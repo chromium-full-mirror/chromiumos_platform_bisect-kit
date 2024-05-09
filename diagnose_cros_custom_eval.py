@@ -16,13 +16,9 @@ will cut down the search range as narrow as it can.
 from argparse import ArgumentParser
 import logging
 
-from bisect_kit import cros_util
 from bisect_kit import diagnoser_cros
-from bisect_kit import dut_allocate_spec as dut_allocate_spec_module
-from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
 from bisect_kit import util
-import experiment
 
 
 logger = logging.getLogger(__name__)
@@ -93,33 +89,8 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         self.states.load_states()
 
         try:
-            # Allocate a DUT globally only if not performing a stateless bisect.
             logger.info('experiments: %s', self.config['experiments'])
-            dut_allocate_spec = dut_allocate_spec_module.load(
-                self.config['session'],
-                self.config['sync_dut_allocate_spec_with_db'],
-            )
-            is_vm_board = cros_util.is_vm_board(
-                dut_allocate_spec.boards[0]
-                if dut_allocate_spec.boards
-                else None
-            )
-            should_auto_allocate = (
-                not experiment.is_in_experiment(
-                    self.config.get('experiments'), experiment.ID.STATELESS
-                )
-                and not is_vm_board
-            )
-            dut_manager = dut_manager_module.DutManager(
-                'Global',
-                self.states,
-                dut_allocate_spec,
-                self.config['dut'],
-                should_auto_allocate,
-                should_force_monitoring=not is_vm_board,
-            )
-            with dut_manager.provision() as dut:
-                self.do_run(dut)
+            self.do_run(self.config.get('dut'))
             logger.info('%s done', __file__)
         except Exception as e:
             logger.exception('got exception; stop')

@@ -13,6 +13,7 @@ import logging
 from bisect_kit import bisect_db
 from bisect_kit import common
 from bisect_kit import dut_allocate_spec_type
+from bisect_kit import errors
 
 
 logger = logging.getLogger(__name__)
@@ -26,16 +27,16 @@ def save(spec: DutAllocateSpec, sync_with_db=False):
     assert spec.session
     if not sync_with_db:
         session_file = _session_file_name(spec.session)
-        logger.debug('writing %s to %s', spec, session_file)
+        logger.info('writing %s to %s', spec, session_file)
         with open(session_file, 'w') as f:
             json.dump(dataclasses.asdict(spec), f, indent=4)
     else:
-        logger.debug('writing dut allocate spec back to bisect database')
+        logger.info('writing dut allocate spec back to bisect database')
         ds_client = bisect_db.Client()
         if ds_client.update_retry_device_spec(spec):
-            logger.debug('dut allocate spec written to bisect database')
+            logger.info('dut allocate spec written to bisect database')
         else:
-            logger.debug('failed to write dut allocate spec to bisect database')
+            logger.error('failed to write dut allocate spec to bisect database')
 
 
 def _session_file_name(session: str) -> str:
@@ -46,7 +47,7 @@ def _load_from_local_file(session: str) -> DutAllocateSpec:
     session_file = _session_file_name(session)
     with open(session_file) as f:
         spec = DutAllocateSpec(**json.load(f))
-    logger.debug('DutAllocateSpec loaded from %s: %s', session_file, spec)
+    logger.info('DutAllocateSpec loaded from %s: %s', session_file, spec)
     return spec
 
 
@@ -56,7 +57,19 @@ def load(session: str, sync_with_db=False) -> DutAllocateSpec | None:
         return _load_from_local_file(session)
 
     ds_client = bisect_db.Client()
-    return ds_client.load_dut_allocate_spec(session)
+    spec = None
+    try:
+        spec = ds_client.load_dut_allocate_spec(session)
+    except errors.DutAllocateSpecError as e:
+        logger.error(
+            'failed to load DutAllocateSpec from Datastore for %s: %s',
+            session,
+            e,
+        )
+    logger.info(
+        'DutAllocateSpec loaded from Datastore for %s: %s', session, spec
+    )
+    return spec
 
 
 def _str_to_list(val):

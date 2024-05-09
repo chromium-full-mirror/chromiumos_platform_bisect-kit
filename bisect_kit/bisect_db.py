@@ -144,7 +144,6 @@ class Client(gcloud.DataStoreClient):
         key = self._client.key(self._KIND_BISECT, session)
         b = self._client.get(key)
         if not b:
-            logger.error('unable to get bisect with key %s', session)
             raise errors.DutAllocateSpecError(
                 'no biesect with key %s found in database' % session
             )

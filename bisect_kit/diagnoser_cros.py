@@ -126,6 +126,8 @@ class CrosDiagnoser:
         # bisect session.
         self.noisy = config['noisy']
         self.pre_allocated_dut = dut
+        if self.pre_allocated_dut == cros_lab_util.LAB_DUT:
+            self.pre_allocated_dut = None
 
         self.cros_old: str = ''
         self.cros_new: str = ''
@@ -136,17 +138,16 @@ class CrosDiagnoser:
             self.config['session'],
             self.config['sync_dut_allocate_spec_with_db'],
         )
-        self.is_vm_board = cros_util.is_vm_board(
-            self.dut_allocate_spec.boards[0]
-            if self.dut_allocate_spec.boards
-            else None
-        )
-        self.is_stateless = (
-            experiment.is_in_experiment(
-                self.config.get('experiments'), experiment.ID.STATELESS
+        assert (
+            self.dut_allocate_spec or self.pre_allocated_dut
+        ), 'no pre-allocated dut and dut_allocate_spec can not be loaded'
+
+        self.is_vm_board = False
+        if self.dut_allocate_spec and self.dut_allocate_spec.boards:
+            self.is_vm_board = cros_util.is_vm_board(
+                self.dut_allocate_spec.boards[0]
             )
-            or self.is_vm_board
-        )
+        self.is_stateless = not self.pre_allocated_dut
         self._switch_vm_cmd: list[str] = ['./switch_cros_vm.py']
 
     def _verified_chromeos_prebuilt(self):
@@ -1626,6 +1627,20 @@ class DiagnoseCommandLineBase:
             if not opts.board:
                 opts.board = cros_util.query_dut_board(opts.dut)
 
+        if opts.sync_dut_allocate_spec_with_db:
+            if (
+                opts.dut == cros_lab_util.LAB_DUT
+                and dut_allocate_spec_module.load(opts.session, True) is None
+            ):
+                self.argument_parser.error(
+                    '--session %s is not a valid bisect ID in the database. '
+                    'If you are doing local testing, either specify --dut '
+                    'or --no-sync-dut-allocate-spec-with-db with other '
+                    '--allocate-dut-* args so the dut allocation spec can '
+                    'be generated in a local file "DutAllocateSpec".'
+                    % opts.session
+                )
+
         names = cros_util.list_board_names(opts.chromeos_root)
         if opts.board and opts.board not in names:
             util.report_similar_candidates('board name', opts.board, names)
@@ -1907,7 +1922,7 @@ class DiagnoseCommandLineBase:
         group.add_argument(
             '--sync-dut-allocate-spec-with-db',
             metavar='SYNC_DUT_ALLOCATE_SPEC_WITH_DB',
-            default=False,
+            default=True,
             action=argparse.BooleanOptionalAction,
             help=(
                 'If true, the dut allocate spec is loaded and written back to '
