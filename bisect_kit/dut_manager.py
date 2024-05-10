@@ -147,13 +147,24 @@ class DelayedDutReleaser:
                     self._has_released = True
 
             if not self._has_released:
-                cros_lab_util.crosfleet_release_dut(
-                    cros_lab_util.dut_host_name(self._dut)
-                )
+                try:
+                    cros_lab_util.crosfleet_release_dut(
+                        cros_lab_util.dut_host_name(self._dut)
+                    )
+                except Exception as e:
+                    logger.error('failed to release %s: %s', self._dut, e)
             self._has_released = True
 
         if self._callback:
             self._callback(time.time())
+
+    def wait(self):
+        """Block waiting the owned DUT to be released."""
+        if self._timer:
+            logger.info('waiting for %s to be released', self._dut)
+            self._timer.join()
+        else:
+            logger.info('no DUT to be released')
 
     def get_dut(self):
         return self._dut
@@ -708,3 +719,15 @@ class DutManager:
         self._states.save()
 
         return log_path
+
+    def wait_for_release(self):
+        """Wait until the DUT it leased to be released.
+
+        Because of the design of DelayedDutReleaser, a DUT may be waiting to
+        be released later. This method blocks until the DUT is released.
+        If there is no DUT waiting to be released, return immediately.
+        """
+        if self._dut_releaser:
+            self._dut_releaser.wait()
+        else:
+            logger.debug('no DUT releaser')
