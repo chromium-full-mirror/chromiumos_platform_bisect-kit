@@ -192,7 +192,7 @@ class Client(gcloud.DataStoreClient):
             datastore.query.PropertyFilter(
                 'Status', 'NOT_IN', self._BISECT_FINISHED_STATUS
             ),
-            datastore.query.PropertyFilter('UpdatedAt', '>=', start_date),
+            datastore.query.PropertyFilter('ReportedAt', '>=', start_date),
         ]
 
         logging.debug('querying unfinished bisects: %s', filters)
