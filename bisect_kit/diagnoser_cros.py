@@ -54,58 +54,11 @@ def run_switch_or_eval_cmd(cmd):
         )
 
 
-def release_dut_wrapper(func):
-    """A decorator to return DUTs to the lab when a bisection finishes.
-
-    It should be used to decorate a member method of class CrosDiagnoser.
-    """
-
-    def wrapper_func(self, *args, **kwargs):
-        """The wrapper function.
-
-        Args:
-          self: a CrosDiagnoser object.
-          *args: remaining args of the wrapped method.
-          *kwargs: remaining kwargs of the wrapped method.
-        """
-        enable_shared_dut_pool = experiment.is_in_experiment(
-            self.config.get('experiments'),
-            experiment.ID.SHARED_DUT_POOL,
-        )
-        if not enable_shared_dut_pool:
-            # Do nothing but run the wrapped method directly.
-            func(self, *args, **kwargs)
-            return
-
-        can_be_retried = False
-        try:
-            func(self, *args, **kwargs)
-        except Exception as e:
-            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
-                can_be_retried = True
-            raise
-        finally:
-            session = self.config.get('session')
-
-            # If the bisection can be retried, do not yield DUTs because we
-            # expect the bisection is scheduled for retry soon.
-            if can_be_retried:
-                logger.info(
-                    'bisection %s would be retried, do not yield DUTs.',
-                    session,
-                )
-            else:
-                pool_manager = shared_dut_pool.SharedDutPoolManager()
-                pool_manager.clean_up_duts_by_owner(session)
-
-    return wrapper_func
-
-
 class DutManagerRecycler:
     """A thin wrapper of DutManager to do clean up nicely."""
 
     def __init__(self):
-        self._manager = None
+        self._manager: dut_manager_module.DutManager | None = None
 
     def reset(self, manager: dut_manager_module.DutManager):
         """Wait for the owned manager to clean up, if one exists."""
@@ -166,6 +119,9 @@ class CrosDiagnoser:
         self.is_stateless = not self.pre_allocated_dut
         self._switch_vm_cmd: list[str] = ['./switch_cros_vm.py']
 
+        # Initialized in diagnose().
+        self._dut_manager = None
+
     def _verified_chromeos_prebuilt(self):
         if self.config['bypass_chromeos_prebuilt']:
             return 'assume'
@@ -182,7 +138,34 @@ class CrosDiagnoser:
             logger.info('decision: %s', text)
         self.states.add_history('decision', text=text)
 
-    @release_dut_wrapper
+    def _clean_up(self, can_be_retried: bool):
+        """Clean up when diagnose() ends.
+
+        Args:
+          can_be_retried: Whether the bisection fails due to retriable error.
+        """
+        # Release any owned DUT before cleaning up the Shared DUT pool records.
+        self._dut_manager.reset(None)
+
+        enable_shared_dut_pool = experiment.is_in_experiment(
+            self.config.get('experiments'),
+            experiment.ID.SHARED_DUT_POOL,
+        )
+        if not enable_shared_dut_pool:
+            return
+
+        session = self.config.get('session')
+        # If the bisection can be retried, do not yield DUTs because we
+        # expect the bisection to be scheduled for retry soon.
+        if can_be_retried:
+            logger.info(
+                'bisection %s would be retried, do not yield DUTs.',
+                session,
+            )
+        else:
+            pool_manager = shared_dut_pool.SharedDutPoolManager()
+            pool_manager.clean_up_duts_by_owner(session)
+
     def diagnose(
         self,
         is_autotest: bool,
@@ -195,6 +178,49 @@ class CrosDiagnoser:
         cros_localbuild_eval_cmd: list[str],
         is_custom_eval: bool = False,
     ):
+        """Diagnose entry point."""
+        self._dut_manager = DutManagerRecycler()
+
+        can_be_retried = False
+        try:
+            self._diagnose(
+                is_autotest,
+                switch_test_harness_cmd,
+                cros_prebuilt_eval_cmd,
+                android_prebuilt_eval_cmd,
+                lacros_prebuilt_eval_cmd,
+                chrome_localbuild_eval_cmd,
+                should_build_chrome_localbuild_with_tests,
+                cros_localbuild_eval_cmd,
+                is_custom_eval,
+            )
+        except Exception as e:
+            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
+                can_be_retried = True
+            raise
+        finally:
+            try:
+                self._clean_up(can_be_retried)
+            except Exception as e:
+                logger.error(
+                    'exception raised from the clean up function: %s', e
+                )
+            # Raise the original exception raised from "_diagnose()", if any.
+
+    def _diagnose(
+        self,
+        is_autotest: bool,
+        switch_test_harness_cmd: list[str] | None,
+        cros_prebuilt_eval_cmd: list[str],
+        android_prebuilt_eval_cmd: list[str],
+        lacros_prebuilt_eval_cmd: list[str],
+        chrome_localbuild_eval_cmd: list[str],
+        should_build_chrome_localbuild_with_tests: bool,
+        cros_localbuild_eval_cmd: list[str],
+        is_custom_eval: bool = False,
+    ):
+        """Diagnose internal implementation."""
+
         def init_dut_to_old_cros(
             dut: str,
         ):
@@ -253,8 +279,9 @@ class CrosDiagnoser:
         # vm_cros_version argument when calling provision() each time.
         # This case is for bisecting ChromeOS version specific domains like
         # ChromeOS prebuilt and localbuild.
-        dut_manager = DutManagerRecycler()
-        dut_manager.reset(
+
+        assert self._dut_manager, 'DutManagerRecycler not initialized'
+        self._dut_manager.reset(
             dut_manager_module.DutManager(
                 'InitLease',
                 self.states,
@@ -276,8 +303,8 @@ class CrosDiagnoser:
             # 'board' should already exist in self.config.
             # 2. For stateless bisection, a DUT would be auto-leased by the
             # following code. 'board' would be updated in
-            # dut_manager.provision().
-            with dut_manager.get().provision() as dut:
+            # DutManager.provision().
+            with self._dut_manager.get().provision() as dut:
                 # Query DUT dependent properties.
                 self.config['board_cpu_arch'] = cros_util.query_dut_cpu_arch(
                     dut, self.config.get('board', "")
@@ -316,7 +343,7 @@ class CrosDiagnoser:
                 ]
 
         # Step 1: Narrows down ChromeOS prebuilt.
-        dut_manager.reset(
+        self._dut_manager.reset(
             dut_manager_module.DutManager(
                 'PrebuiltChromeOS',
                 self.states,
@@ -326,7 +353,7 @@ class CrosDiagnoser:
             )
         )
         self.narrow_down_chromeos_prebuilt(
-            dut_manager.get(),
+            self._dut_manager.get(),
             self.config['cros_prebuilt_old'],
             self.config['cros_prebuilt_new'],
             cros_prebuilt_eval_cmd,
@@ -375,7 +402,7 @@ class CrosDiagnoser:
                 dut
             ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
-        dut_manager.reset(
+        self._dut_manager.reset(
             dut_manager_module.DutManager(
                 'OldCros',
                 self.states,
@@ -392,7 +419,7 @@ class CrosDiagnoser:
         # returns the result and skips other steps.
         try:
             if self.narrow_down_android(
-                dut_manager.get(),
+                self._dut_manager.get(),
                 android_prebuilt_eval_cmd,
                 init_once=switch_cros_repo_to_old,
             ):
@@ -412,7 +439,7 @@ class CrosDiagnoser:
         # In case of failure, run the Chrome local build step with the previous range.
         try:
             self.narrow_down_lacros_prebuilt(
-                dut_manager.get(),
+                self._dut_manager.get(),
                 lacros_prebuilt_eval_cmd,
                 init_once=switch_cros_repo_to_old,
             )
@@ -429,7 +456,7 @@ class CrosDiagnoser:
         # Step 4: Narrows down DLC prebuilt.
         try:
             if self.narrow_down_dlc_prebuilt(
-                dut_manager.get(),
+                self._dut_manager.get(),
                 self.config['old'],
                 self.config['new'],
                 cros_prebuilt_eval_cmd,
@@ -472,7 +499,7 @@ class CrosDiagnoser:
                     dut
                 ), 'Someone else reflashed the DUT. DUT locking is not respected?'
 
-        dut_manager.reset(
+        self._dut_manager.reset(
             dut_manager_module.DutManager(
                 'LocalChrome',
                 self.states,
@@ -489,7 +516,7 @@ class CrosDiagnoser:
         )
         try:
             if self.narrow_down_chrome(
-                dut_manager.get(),
+                self._dut_manager.get(),
                 chrome_localbuild_eval_cmd,
                 init_once=switch_cros_repo_to_old,
                 buildbucket_build=buildbucket_buildable
@@ -508,7 +535,7 @@ class CrosDiagnoser:
             )
 
         # Step 6: Narrowdown chromeos localbuild.
-        dut_manager.reset(
+        self._dut_manager.reset(
             dut_manager_module.DutManager(
                 'LocalChromeOS',
                 self.states,
@@ -519,15 +546,12 @@ class CrosDiagnoser:
             )
         )
         self.narrow_down_chromeos_localbuild(
-            dut_manager.get(),
+            self._dut_manager.get(),
             cros_localbuild_eval_cmd,
             buildbucket_buildable
             and not self.config['disable_buildbucket_chromeos'],
             switch_test_harness_cmd=switch_test_harness_cmd,
         )
-
-        # Reset it to None one last time to clean up.
-        dut_manager.reset(None)
 
     def narrow_down_chromeos_prebuilt(
         self,

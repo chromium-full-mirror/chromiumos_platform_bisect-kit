@@ -281,10 +281,8 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             key = self._default_key(dut_name)
             dut = self._client.get(key)
             if dut is None:
-                logger.debug(
-                    'DUT %s does not exist in the shared DUT pool. '
-                    'It is generally not harmful when the DUT has been '
-                    'cleaned up.',
+                logger.warning(
+                    'DUT %s does not exist in the shared DUT pool.',
                     dut_name,
                 )
                 return False
