@@ -603,13 +603,6 @@ class TestCleanDutsByOwner(unittest.TestCase):
                 autospec=True,
             )
         )
-        self._mock_crosfleet_lease_dut = self.enterContext(
-            mock.patch.object(
-                cros_lab_util,
-                'crosfleet_lease_dut',
-                autospec=True,
-            )
-        )
         self._mock_crosfleet_release_dut = self.enterContext(
             mock.patch.object(
                 cros_lab_util,
@@ -630,22 +623,6 @@ class TestCleanDutsByOwner(unittest.TestCase):
         pool_manager.clean_up_duts_by_owner('session1')
 
         self._mock_yield_duts.assert_called_once_with(mock.ANY, owned_duts)
-        self._mock_crosfleet_lease_dut.assert_has_calls(
-            [
-                mock.call(
-                    'dut1',
-                    'session1',
-                    # pylint: disable=protected-access
-                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
-                ),
-                mock.call(
-                    'dut2',
-                    'session1',
-                    # pylint: disable=protected-access
-                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
-                ),
-            ]
-        )
         self._mock_client.delete_multi.assert_called_once_with(['dut3', 'dut4'])
         self._mock_crosfleet_release_dut.assert_has_calls(
             [
@@ -661,10 +638,6 @@ class TestCleanDutsByOwner(unittest.TestCase):
             ['dut1', 'dut2'],
             ['dut3', 'dut4'],
         )
-        self._mock_crosfleet_lease_dut.side_effect = [
-            Exception('some exception'),
-            None,
-        ]
         self._mock_crosfleet_release_dut.side_effect = [
             None,
             errors.DutLeaseException('failed to release DUT'),
@@ -674,22 +647,6 @@ class TestCleanDutsByOwner(unittest.TestCase):
         pool_manager.clean_up_duts_by_owner('session1')
 
         self._mock_yield_duts.assert_called_once()
-        self._mock_crosfleet_lease_dut.assert_has_calls(
-            [
-                mock.call(
-                    'dut1',
-                    'session1',
-                    # pylint: disable=protected-access
-                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
-                ),
-                mock.call(
-                    'dut2',
-                    'session1',
-                    # pylint: disable=protected-access
-                    shared_dut_pool._EXTENDED_LEASE_DURATION_SECONDS,
-                ),
-            ]
-        )
         self._mock_client.delete_multi.assert_called_once_with(['dut3', 'dut4'])
         self._mock_crosfleet_release_dut.assert_has_calls(
             [

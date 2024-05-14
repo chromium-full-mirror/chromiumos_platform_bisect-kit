@@ -421,16 +421,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         logger.info('%s DUT(s) to clean up: %s', len(dut_names), dut_names)
 
         duts_yielded, duts_not_yielded = self.yield_duts(dut_names)
-        logger.info('DUTs to extend leasing time: %s', duts_yielded)
-        for d in duts_yielded:
-            logger.info('extending DUT leasing time for %s', d)
-            try:
-                cros_lab_util.crosfleet_lease_dut(
-                    d, bisect_id, _EXTENDED_LEASE_DURATION_SECONDS
-                )
-            except Exception as e:
-                logger.warning('failed to lease DUT %s from the lab: %s', d, e)
-
+        logger.info('DUTs transferred: %s', duts_yielded)
         logger.info(
             'DUTs to remove from the shared DUT pool: %s', duts_not_yielded
         )
