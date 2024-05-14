@@ -210,6 +210,13 @@ class Client(gcloud.DataStoreClient):
         specs = {}
         for b in bisects:
             bisect_id = b.get('ID')
+
+            # TODO(b/278200317): Remove it when all bisections are stateless.
+            # Do not yield DUTs to non-stateless bisections since they'll never
+            # use it.
+            if not 'stateless' in b.get('Experiments', []):
+                continue
+
             try:
                 spec = to_dut_allocate_spec(b)
             except errors.DutAllocateSpecError as e:

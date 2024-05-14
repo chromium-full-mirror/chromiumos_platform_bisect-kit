@@ -520,6 +520,8 @@ def add_dut_to_shared_pool(host: str, session: str):
     bot = bots[0]
 
     pool_manager = shared_dut_pool.SharedDutPoolManager()
+    # If |session| already owns a DUT, insert_dut() would try to find a new
+    # owner. In that case, |session| would be different from |owner|.
     owner = pool_manager.insert_dut(
         host,
         session,
@@ -530,7 +532,7 @@ def add_dut_to_shared_pool(host: str, session: str):
             'dut %s with owner %s inserted to the shared DUT pool '
             'successfully.',
             host,
-            session,
+            owner,
         )
     else:
         logger.info(
