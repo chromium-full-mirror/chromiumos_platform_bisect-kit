@@ -274,6 +274,7 @@ _PLATFORM_MAPPING = {
     'linux': 'linux',
     'win32': 'win',
     'aix6': 'aix',
+    'zos': 'zos',
 }
 
 
@@ -400,7 +401,7 @@ class Dep:
     """Represent one entry of DEPS's deps.
 
     One Dep object means one subproject inside DEPS file. It recorded what to
-    checkout (like git or cipd) content of each subproject.
+    checkout (like git, cipd or gcs) content of each subproject.
 
     Attributes:
       path: subproject path, relative to project root
@@ -408,9 +409,11 @@ class Dep:
           be applied to fields of this object (like 'url' and 'condition') and
           children projects.
       condition: whether to checkout this subproject
-      dep_type: 'git' or 'cipd'
+      dep_type: 'git', 'cipd' or 'gcs'
       url: if dep_type='git', the url of remote repo and associated branch/commit
       packages: if dep_type='cipd', cipd package version and location
+      bucket:  if dep_type='gcs', gcd bucket location
+      objects: if dep_type='gcs', gcs object info(object_name,sha256sum,size_bytes,generation,output_file)
     """
 
     def __init__(self, path, variables, entry):
@@ -419,6 +422,8 @@ class Dep:
 
         self.url = None  # only valid for dep_type='git'
         self.packages = None  # only valid for dep_type='cipd'
+        self.bucket = None  # only valid for dep_type='gcs'
+        self.objects = None  # only valid for dep_type='gcs'
 
         if isinstance(entry, str):
             self.dep_type = 'git'
@@ -429,6 +434,9 @@ class Dep:
             self.condition = entry.get('condition')
             if self.dep_type == 'git':
                 self.url = entry['url']
+            elif self.dep_type == 'gcs':
+                self.bucket = entry['bucket']
+                self.objects = entry['objects']
             else:
                 assert self.dep_type == 'cipd', (
                     'unknown dep_type:' + self.dep_type
@@ -498,6 +506,7 @@ class Dep:
             'checkout_arm64': False,
             'checkout_arm': False,
             'checkout_mips': False,
+            'checkout_mips64': False,
             'checkout_ppc': False,
             'checkout_s390': False,
             'checkout_x64': True,
@@ -536,6 +545,42 @@ class Dep:
                 [
                     '    ],',
                     '    "dep_type": "cipd",',
+                ]
+                + condition_part
+                + [
+                    '  },',
+                    '',
+                ]
+            )
+        elif self.dep_type == 'gcs':
+            s.extend(
+                [
+                    '  "%s": {' % (self.path.split(':')[0],),
+                    '    "objects": [',
+                ]
+            )
+            for obj in sorted(self.objects, key=lambda x: x['object_name']):
+                s.extend(
+                    [
+                        '      {',
+                        '        "object_name": "%s",' % obj['object_name'],
+                        '        "sha256sum": "%s",' % obj['sha256sum'],
+                        '        "size_bytes": %s,' % obj['size_bytes'],
+                        '        "generation": %s,' % obj['generation'],
+                    ]
+                )
+                if 'output_file' in obj:
+                    s.extend(
+                        [
+                            '        "output_file": "%s",' % obj['output_file'],
+                        ]
+                    )
+            s.extend(
+                [
+                    '      },',
+                    '    ],',
+                    '    "dep_type": "gcs",',
+                    '    "bucket": "%s",' % self.bucket,
                 ]
                 + condition_part
                 + [

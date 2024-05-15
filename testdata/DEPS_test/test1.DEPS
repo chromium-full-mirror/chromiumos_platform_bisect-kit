@@ -48,6 +48,34 @@ deps = {
     "dep_type": "cipd",
     "condition": 'checkout_mac',
   },
+  # Download selected models from TFHub as testdata.
+  "src/third_party/tfhub_models": {
+    "objects": [
+      {
+        "object_name": "0f037afd23a02321520951afd5c2c6078d26cbf1",
+        "sha256sum": "7130f43eb9889ff4dcd36ed2c5352053b88216e6b9186dfce08ea41b7dd142f3",
+        "size_bytes": 35504613,
+        "generation": 1691086948259727,
+      },
+    ],
+    "dep_type": "gcs",
+    "bucket": "chromium-tfhub-models",
+  },
+  # Download test data for Maps telemetry_gpu_integration_test.
+  "src/tools/perf/page_sets/maps_perf_test": {
+      "objects": [
+          {
+              "object_name": "e6bf26977c2fd80c18789d1f279d474096a7b0d1",
+              "sha256sum": "f5f7fe360ad2b9c3d9dda2612f17336c0541bac15b4e4992f2c167e059a190fa",
+              "size_bytes": 3285237,
+              "generation": 1513305740113238,
+              "output_file": "load_dataset",
+          },
+      ],
+      "dep_type": "gcs",
+      "bucket": "chromium-telemetry",
+      "condition": "non_git_source",
+  },
   # buildspec_release -> src -> src/tools/skia_goldctl/win
   "src/tools/skia_goldctl/win": {
     "packages": [

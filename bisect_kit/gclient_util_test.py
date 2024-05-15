@@ -75,7 +75,7 @@ class TestDepsParser(unittest.TestCase):
         self.assertNotIn(('src/foo', 'DEPS'), deps.recursedeps)
         self.assertIn(('src/bar', 'DEPS'), deps.recursedeps)
 
-    def test_parse_dep_type(self):
+    def test_parse_cipd_dep_type(self):
         deps_content = textwrap.dedent(
             """\
         deps = {
@@ -96,6 +96,41 @@ class TestDepsParser(unittest.TestCase):
         parser = gclient_util.DepsParser('/dummy', None)
         deps = parser.parse_single_deps(deps_content)
         # We don't support cipd yet. This test just make sure parsing is not
+        # broken.
+        self.assertEqual(len(deps.entries), 0)
+
+    def test_parse_gcs_dep_type(self):
+        deps_content = textwrap.dedent(
+            """\
+        deps = {
+          'src/foo': {
+            'objects': [
+                {
+                    'object_name': 'e9ce994346c62f8c9fd6d0cecb2b2b0b93b4c2d8',
+                    'sha256sum': '519019df16c628c6c0893df18928faeaa3150a9d8f26a787a16ce7c6b2cec2ad',
+                    'size_bytes': 601672,
+                    'generation': 1664794185950162,
+                    'output_file': 'ecommerce.json',
+                },
+                {
+                    'object_name': '756068da5e551516b23b0ba133e55c144f623d38',
+                    'sha256sum': '84ef87a8163335a95111d9709306596f96742539da0b34fbe7397f799946a168',
+                    'size_bytes': 2156935,
+                    'generation': 1664794188995509,
+                    'output_file': 'encyclopedia.json',
+                },
+            ],
+            'dep_type': 'gcs',
+            'bucket': 'dummy_bucket',
+            'condition': 'non_git_source',
+          },
+        }
+    """
+        )
+
+        parser = gclient_util.DepsParser('/dummy', None)
+        deps = parser.parse_single_deps(deps_content)
+        # We don't support gcs yet. This test just make sure parsing is not
         # broken.
         self.assertEqual(len(deps.entries), 0)
 
