@@ -542,17 +542,22 @@ def add_dut_to_shared_pool(host: str, session: str):
     )
     if owner:
         logger.info(
-            'dut %s with owner %s inserted to the shared DUT pool '
+            'dut %s with owner %s backfilled to the shared DUT pool '
             'successfully.',
             host,
             owner,
         )
     else:
         logger.info(
-            'failed to insert dut %s with owner %s to the shared DUT pool ',
+            'failed to insert dut %s with owner %s to the shared DUT pool, '
+            'try returning it back to the lab.',
             host,
             session,
         )
+        try:
+            cros_lab_util.crosfleet_release_dut(host)
+        except Exception as e:
+            logger.warning('failed to return DUT %s to the lab: %s', host, e)
 
 
 _BACKGROUND_LEASING_INTERVAL_SECONDS = 60 * 10

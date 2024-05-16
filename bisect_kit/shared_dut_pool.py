@@ -37,9 +37,23 @@ class SuccessorFinder:
     transferred to the bisect.
     """
 
-    def __init__(self):
+    def __init__(self, owner):
+        """Initializer.
+
+        Args:
+          owner: The bisection which requests to find successors for its owned DUT.
+        """
+
         bisect_db_client = bisect_db.Client()
-        self._specs = bisect_db_client.dut_alloc_spec_for_unfinished_bisects()
+        # A DUT is to be yileded by |owner|, so exclud itself from the list
+        # of candidates to yield.
+        self._specs = {
+            bisect_id: spec
+            for bisect_id, spec in (
+                bisect_db_client.dut_alloc_spec_for_unfinished_bisects().items()
+            )
+            if bisect_id != owner
+        }
 
     def match(self, dimensions: dict) -> list[str]:
         """Given a dict of dimensions, returns all matched bisects."""
@@ -165,7 +179,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                     owner,
                     list(owned_duts),
                 )
-                finder = SuccessorFinder()
+                finder = SuccessorFinder(owner)
                 matched = finder.match(dimensions)
                 if matched:
                     owner = matched[0]
@@ -317,7 +331,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         """
         return self._set_dut_state(dut_name, DutState.BUSY)
 
-    def transfer_owner(self, dut_name: str, bisect_id: str) -> bool:
+    def transfer_owner(self, dut_name: str, receiver: str) -> bool:
         """Transfer the owner of a DUT to another bisect.
 
         The transfer is not successful if the receiver biscetion has already
@@ -325,7 +339,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
 
         Args:
           dut_name: the DUT to be transferred.
-          bisect_id: the bisect ID to recieve the DUT.
+          receiver: the bisect ID to recieve the DUT.
 
         Returns:
           Success or not.
@@ -333,13 +347,13 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         with self._client.transaction():
             query_owned_duts = self._default_query()
             query_owned_duts.add_filter(
-                filter=datastore.query.PropertyFilter("owner", "=", bisect_id)
+                filter=datastore.query.PropertyFilter("owner", "=", receiver)
             )
             owned_duts = list(query_owned_duts.fetch())
             if owned_duts:
                 logger.debug(
                     'bisect %s already owns dut(s) %s',
-                    bisect_id,
+                    receiver,
                     [d.get('name') for d in owned_duts],
                 )
                 return False
@@ -355,7 +369,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
 
             dut.update(
                 {
-                    'owner': bisect_id,
+                    'owner': receiver,
                     'state': DutState.IDLE,
                     'lastUpdated': datetime.datetime.now(
                         tz=datetime.timezone.utc
@@ -363,10 +377,12 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                 }
             )
             self._client.put(dut)
-            logger.info('DUT %s transferred to %s', dut_name, bisect_id)
+            logger.info('DUT %s transferred to %s', dut_name, receiver)
         return True
 
-    def yield_duts(self, dut_names: list[str]) -> (list[str], list[str]):
+    def yield_duts(
+        self, owner: str, dut_names: list[str]
+    ) -> (list[str], list[str]):
         """Yields a list of DUTs to some other bisects.
 
         It searches for all unfinished bisects. If some other bisect
@@ -374,6 +390,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         bisect, the DUT is transferred to that bisect.
 
         Args:
+          owner: the owner bisect id.
           dut_names: list of DUT names.
         Returns:
           (list of yielded DUTs, list of not yielded DUTs)
@@ -384,7 +401,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
 
         duts = self._client.get_multi([self._default_key(d) for d in dut_names])
 
-        finder = SuccessorFinder()
+        finder = SuccessorFinder(owner)
 
         duts_yielded = []
         for dut in duts:
@@ -402,7 +419,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         ]
         return duts_yielded, duts_not_yielded
 
-    def clean_up_duts_by_owner(self, bisect_id: str):
+    def clean_up_duts_by_owner(self, owner: str):
         """Clean up DUTs owned by a bisect.
 
         Yields owned DUTs to other bisects if possible.
@@ -411,14 +428,14 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         For all DUTs not yielded, return it back to the lab.
 
         Args:
-          bisect_id: the bisect ID.
+          owner: the bisect ID.
         """
-        logger.info('Clean up DUTs held by %s', bisect_id)
+        logger.info('Clean up DUTs held by %s', owner)
 
-        dut_names = self.query_by_owner(bisect_id)
+        dut_names = self.query_by_owner(owner)
         logger.info('%s DUT(s) to clean up: %s', len(dut_names), dut_names)
 
-        duts_yielded, duts_not_yielded = self.yield_duts(dut_names)
+        duts_yielded, duts_not_yielded = self.yield_duts(owner, dut_names)
         logger.info('DUTs transferred: %s', duts_yielded)
         logger.info(
             'DUTs to remove from the shared DUT pool: %s', duts_not_yielded
@@ -456,7 +473,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
 
     def lease_for_bisect(
         self,
-        bisect_id: str,
+        requestor: str,
         dimensions: list[str],
         variants: list[str],
         pools: list[str],
@@ -471,7 +488,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         If the lease is successful, the DUT is tranferred to this bisect (if not already).
 
         Args:
-          bisect_id: the ID of the bisect.
+          requestor: the ID of the requesting bisect.
           dimensions: all DUT dimensions which needs to be satisfied.
           variants: DUT variants (e.g., board/model/sku) where any one of them would do.
           pools: a list of dimension pool where any of one of them would do. Optional.
@@ -488,7 +505,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             matched_dut_names = [d.get('name') for d in matched_duts]
             logger.debug(
                 'leasing DUT for %s: %s matched idle duts in the shared DUT pool: %s',
-                bisect_id,
+                requestor,
                 len(matched_dut_names),
                 matched_dut_names,
             )
@@ -510,13 +527,13 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             dut = None
             orig_owner = None
             for d in matched_duts:
-                if d.get('owner') == bisect_id:
+                if d.get('owner') == requestor:
                     dut = d
                     break
 
             if dut is None:
                 # matched_duts is not empty and none of them is owned by
-                # |bisect_id|.
+                # |requestor|.
                 # Returns the first one for now.
                 dut = matched_duts[0]
 
@@ -525,7 +542,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
 
             dut.update(
                 {
-                    'owner': bisect_id,
+                    'owner': requestor,
                     'state': DutState.BUSY,
                     'lastUpdated': datetime.datetime.now(
                         tz=datetime.timezone.utc

@@ -153,7 +153,7 @@ class TestSuccessorFinder(unittest.TestCase):
         }
 
     def test_matched(self):
-        finder = shared_dut_pool.SuccessorFinder()
+        finder = shared_dut_pool.SuccessorFinder('bisect_5')
         matched = finder.match(
             {
                 'label-pool': ['DUT_POOL_QUOTA'],
@@ -172,7 +172,7 @@ class TestSuccessorFinder(unittest.TestCase):
         self.assertEqual(matched, ['bisect_2', 'bisect_4'])
 
     def test_unmatched(self):
-        finder = shared_dut_pool.SuccessorFinder()
+        finder = shared_dut_pool.SuccessorFinder('bisect_5')
         matched = finder.match(
             {
                 'label-pool': ['DUT_POOL_QUOTA'],
@@ -180,6 +180,25 @@ class TestSuccessorFinder(unittest.TestCase):
             }
         )
         self.assertEqual(matched, [])
+
+    def test_exclude_itself(self):
+        finder = shared_dut_pool.SuccessorFinder('bisect_1')
+        matched = finder.match(
+            {
+                'label-pool': ['DUT_POOL_QUOTA'],
+                'label-board': ['strongbad'],
+            }
+        )
+        self.assertEqual(matched, ['bisect_3'])
+
+        matched = finder.match(
+            {
+                'label-pool': ['healthmon-satlab'],
+                'label-model': ['homestar'],
+                'label-touchscreen': ['True'],
+            }
+        )
+        self.assertEqual(matched, ['bisect_2', 'bisect_4'])
 
 
 class FakeSharedDutPoolManager(shared_dut_pool.SharedDutPoolManager):
@@ -274,9 +293,10 @@ class TestInsertDut(unittest.TestCase):
                 pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
                 skus=['quackingstick_QSIP7180_4GB'],
             ),
+            # The bisect itself, we can't yield to ourselves.
             'bisect_3': dut_allocate_spec_type.DutAllocateSpec(
                 pools=['DUT_POOL_QUOTA', 'healthmon-satlab'],
-                models=['homestar'],
+                models=['quackingstick'],
             ),
         }
         with mock.patch.object(
@@ -285,7 +305,7 @@ class TestInsertDut(unittest.TestCase):
             mock_query.return_value = owned_duts
             self.assertEqual(
                 None,
-                pool_manager.insert_dut('dut_name_4', 'bisect_4', dimensions),
+                pool_manager.insert_dut('dut_name_3', 'bisect_3', dimensions),
             )
 
         self._mock_client.put.assert_not_called()
@@ -493,7 +513,7 @@ class TestYieldsDuts(unittest.TestCase):
             dut.update(
                 {
                     'name': 'dut_name_%s' % str(i + 1),
-                    'owner': 'bisect_1',
+                    'owner': 'bisect_100',
                     'dimensions': {
                         'label-board': ['board1'],
                     },
@@ -503,20 +523,20 @@ class TestYieldsDuts(unittest.TestCase):
         self._mock_client.get_multi.return_value = duts
 
         self._mock_bisect_db_client.dut_alloc_spec_for_unfinished_bisects.return_value = {
-            'bisect_id_1': dut_allocate_spec_type.DutAllocateSpec(
+            'bisect_1': dut_allocate_spec_type.DutAllocateSpec(
                 boards=['board1']
             ),
-            'bisect_id_2': dut_allocate_spec_type.DutAllocateSpec(
+            'bisect_2': dut_allocate_spec_type.DutAllocateSpec(
                 boards=['board1', 'board2']
             ),
-            'bisect_id_3': dut_allocate_spec_type.DutAllocateSpec(
+            'bisect_3': dut_allocate_spec_type.DutAllocateSpec(
                 boards=['board3']
             ),
-            'bisect_id_4': dut_allocate_spec_type.DutAllocateSpec(
+            'bisect_4': dut_allocate_spec_type.DutAllocateSpec(
                 boards=['board4', 'board1']
             ),
-            'bisect_id_5': dut_allocate_spec_type.DutAllocateSpec(
-                boards=['board4']
+            'bisect_5': dut_allocate_spec_type.DutAllocateSpec(
+                boards=['board5']
             ),
         }
 
@@ -527,7 +547,7 @@ class TestYieldsDuts(unittest.TestCase):
             new_callable=self._gen_mock_transfer_owner,
         ):
             yielded, not_yielded = pool_manager.yield_duts(
-                [d.get('name') for d in duts]
+                'bisect_100', [d.get('name') for d in duts]
             )
         self.assertEqual(['dut_name_1', 'dut_name_2', 'dut_name_3'], yielded)
         self.assertEqual([], not_yielded)
@@ -539,7 +559,7 @@ class TestYieldsDuts(unittest.TestCase):
             dut.update(
                 {
                     'name': 'dut_name_%s' % str(i + 1),
-                    'owner': 'bisect_1',
+                    'owner': 'bisect_100',
                     'dimensions': {
                         'label-board': ['board1'],
                     },
@@ -567,10 +587,52 @@ class TestYieldsDuts(unittest.TestCase):
             new_callable=self._gen_mock_transfer_owner,
         ):
             yielded, not_yielded = pool_manager.yield_duts(
-                [d.get('name') for d in duts]
+                'bisect_100', [d.get('name') for d in duts]
             )
         self.assertEqual(['dut_name_1', 'dut_name_2'], yielded)
         self.assertEqual(['dut_name_3'], not_yielded)
+
+    def test_not_yield_to_self(self):
+        duts = []
+        for i in range(3):
+            dut = datastore.Entity()
+            dut.update(
+                {
+                    'name': 'dut_name_%s' % str(i + 1),
+                    'owner': 'bisect_1',
+                    'dimensions': {
+                        'label-board': ['board1'],
+                    },
+                }
+            )
+            duts.append(dut)
+        self._mock_client.get_multi.return_value = duts
+
+        self._mock_bisect_db_client.dut_alloc_spec_for_unfinished_bisects.return_value = {
+            'bisect_1': dut_allocate_spec_type.DutAllocateSpec(
+                boards=['board1']
+            ),
+            'bisect_2': dut_allocate_spec_type.DutAllocateSpec(
+                boards=['board2']
+            ),
+            'bisect_3': dut_allocate_spec_type.DutAllocateSpec(
+                boards=['board3']
+            ),
+        }
+
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        with mock.patch.object(
+            pool_manager,
+            'transfer_owner',
+            new_callable=self._gen_mock_transfer_owner,
+        ):
+            yielded, not_yielded = pool_manager.yield_duts(
+                'bisect_1', [d.get('name') for d in duts]
+            )
+        self.assertEqual([], yielded)
+        self.assertEqual(
+            ['dut_name_1', 'dut_name_2', 'dut_name_3'], not_yielded
+        )
 
 
 class TestCleanDutsByOwner(unittest.TestCase):
@@ -620,9 +682,11 @@ class TestCleanDutsByOwner(unittest.TestCase):
             ['dut3', 'dut4'],
         )
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
-        pool_manager.clean_up_duts_by_owner('session1')
+        pool_manager.clean_up_duts_by_owner('bisect_1')
 
-        self._mock_yield_duts.assert_called_once_with(mock.ANY, owned_duts)
+        self._mock_yield_duts.assert_called_once_with(
+            mock.ANY, 'bisect_1', owned_duts
+        )
         self._mock_client.delete_multi.assert_called_once_with(['dut3', 'dut4'])
         self._mock_crosfleet_release_dut.assert_has_calls(
             [
@@ -644,7 +708,7 @@ class TestCleanDutsByOwner(unittest.TestCase):
         ]
 
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
-        pool_manager.clean_up_duts_by_owner('session1')
+        pool_manager.clean_up_duts_by_owner('bisect_1')
 
         self._mock_yield_duts.assert_called_once()
         self._mock_client.delete_multi.assert_called_once_with(['dut3', 'dut4'])
