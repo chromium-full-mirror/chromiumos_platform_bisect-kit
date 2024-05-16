@@ -256,12 +256,20 @@ def allocate_dut(
     spec: dut_allocate_spec.DutAllocateSpec,
     chromeos_root: str,
     enable_shared_dut_pool=False,
+    lease_from_shared_dut_pool=True,
 ) -> typing.Tuple[str, str]:
     """Helper of cmd_allocate_dut.
 
     Args:
       spec: the DutAllocateSpec
       enable_shared_dut_pool: whether to enable shared DUT pool.
+      lease_from_shared_dut_pool: whether to lease from the shared DUT pool.
+        In some cases (e.g., background leasing), we may want to lease from the
+        lab directly.
+
+    Note that enable_shared_dut_pool and lease_from_shared_dut_pool differs in that
+    enable_shared_dut_pool is a transitional parameter. It can be removed after the
+    shared DUT pool is fully launched. lease_from_shared_dut_pool is mandatory.
 
     Returns:
       (host, board_to_build)
@@ -459,7 +467,12 @@ def allocate_dut(
             board_to_build = host_board
         return board_to_build
 
-    if enable_shared_dut_pool:
+    logger.debug(
+        'enable_shared_dut_pool: %s, lease_from_shared_dut_pool: %s',
+        enable_shared_dut_pool,
+        lease_from_shared_dut_pool,
+    )
+    if enable_shared_dut_pool and lease_from_shared_dut_pool:
         pool_manager = shared_dut_pool.SharedDutPoolManager()
         host, orig_owner = pool_manager.lease_for_bisect(
             spec.session, dimensions, variants, pools
@@ -564,7 +577,12 @@ def lease_dut_in_background_for_session(
             logger.info('try leasing a DUT for %s in the background', session)
             try:
                 host, _ = allocate_dut(
-                    spec, chromeos_root, enable_shared_dut_pool
+                    spec,
+                    chromeos_root,
+                    enable_shared_dut_pool=enable_shared_dut_pool,
+                    # When leasing DUT in the background, it needs a DUT from
+                    # the lab instead of the shared DUT pool.
+                    lease_from_shared_dut_pool=False,
                 )
             except errors.DutLeaseTimeout as e:
                 logger.debug(
