@@ -86,7 +86,14 @@ def _sample_available_bots(
     """
 
     def fetch_bots(dimensions):
-        logger.debug('fetch_bots: %s', dimensions)
+        logger.debug(
+            'fetch_bots: %s, is_dead: %s, quarantined, %s, is_busy: %s, limit: %s',
+            dimensions,
+            is_dead,
+            quarantined,
+            is_busy,
+            limit,
+        )
         # There might be thousand bots available, set 'limit' to reduce swarming
         # API cost. This is not uniform random, but should be good enough.
         return cros_lab_util.swarming_bots_list(
@@ -150,15 +157,8 @@ def _sample_available_bots_with_retry(
 
     fail_count = 0
     while True:
-        # Query bots that satisfy is_busy=False
         if bots := sample_func(is_busy=False):
             return bots
-        # If there is no idle bots, remove the is_busy filter and query again
-        if bots := sample_func(is_busy=None):
-            return bots
-
-        # log all the DUTs for debugging
-        sample_func(is_dead=None, quarantined=None, is_busy=None)
 
         fail_count += 1
         if fail_count >= max_attempts:

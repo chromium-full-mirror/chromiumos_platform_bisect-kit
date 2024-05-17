@@ -174,40 +174,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         self.assertCountEqual(acquired_bots, available_bots)
         mock_sleep.assert_not_called()
         mock_sample_available_bots.assert_called_once_with(
-            dimensions, variants, None, mock.ANY, None, is_busy=False
-        )
-
-    @mock.patch('time.sleep')
-    @mock.patch.object(dut_allocator, '_sample_available_bots')
-    def test_sample_available_bots_with_retry_is_busy_none(
-        self, mock_sample_available_bots, mock_sleep
-    ):
-        available_bots = [f'bot{k}' for k in range(10)]
-        mock_sample_available_bots.side_effect = [
-            [],
-            available_bots,
-        ]
-
-        dimensions = ['d1', 'd2']
-        variants = ['v1', 'v2']
-        sample_num = len(available_bots)
-        max_attempts = 3
-
-        # pylint: disable=protected-access
-        acquired_bots = dut_allocator._sample_available_bots_with_retry(
-            dimensions, variants, None, sample_num, max_attempts=max_attempts
-        )
-        self.assertCountEqual(acquired_bots, available_bots)
-        mock_sleep.assert_not_called()
-        mock_sample_available_bots.assert_has_calls(
-            [
-                mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=False
-                ),
-                mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=None
-                ),
-            ]
+            dimensions, variants, None, mock.ANY, None, is_busy=True
         )
 
     @mock.patch('time.sleep')
@@ -217,8 +184,6 @@ class TestSampleAvailableBots(unittest.TestCase):
     ):
         available_bots = [f'bot{k}' for k in range(10)]
         mock_sample_available_bots.side_effect = [
-            [],
-            [],
             [],
             available_bots,
         ]
@@ -237,23 +202,10 @@ class TestSampleAvailableBots(unittest.TestCase):
         mock_sample_available_bots.assert_has_calls(
             [
                 mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=False
+                    dimensions, variants, None, mock.ANY, None, is_busy=True
                 ),
                 mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=None
-                ),
-                mock.call(
-                    dimensions,
-                    variants,
-                    None,
-                    mock.ANY,
-                    None,
-                    is_dead=None,
-                    quarantined=None,
-                    is_busy=None,
-                ),
-                mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=False
+                    dimensions, variants, None, mock.ANY, None, is_busy=True
                 ),
             ]
         )

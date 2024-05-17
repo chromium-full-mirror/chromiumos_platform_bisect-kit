@@ -352,12 +352,17 @@ def swarming_bots_list(
     method = 'swarming.v2.Bots.ListBots'
     content = {'dimensions': dimensions, 'limit': limit}
 
+    # b/341190373: swarming requires boolean parameters to be in string
+    # forms ("TRUE" or "FALSE"). Note that it's case sensitive.
+    def bool_to_string(value: bool) -> str:
+        return str(value).upper()
+
     if is_dead is not None:
-        content['is_dead'] = is_dead
+        content['isDead'] = bool_to_string(is_dead)
     if quarantined is not None:
-        content['quarantined'] = quarantined
+        content['quarantined'] = bool_to_string(quarantined)
     if is_busy is not None:
-        content['is_busy'] = is_busy
+        content['isBusy'] = bool_to_string(is_busy)
 
     bots = []
     for bot in json.loads(swarming_grpc(method, content)).get('items', []):
