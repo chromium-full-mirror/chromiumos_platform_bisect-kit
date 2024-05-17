@@ -54,7 +54,8 @@ def to_dut_allocate_spec(
         for d in dimension_filters:
             parts = d.split(':')
             if len(parts) != 2:
-                raise errors.DutAllocateSpecError('unexpected dimension %s' % d)
+                logger.warning('unexpected dimension "%s"', d)
+                continue
             dimensions.append('%s:%s' % (parts[0].strip(), parts[1].strip()))
     spec.dimensions = dimensions
 

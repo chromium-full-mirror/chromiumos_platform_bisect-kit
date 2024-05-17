@@ -256,12 +256,25 @@ class TestToDutAllocateSpec(unittest.TestCase):
                     "label-chameleon:True",
                     "label-audio_board",
                     "label-test_usbaudio:True",
+                    "",
                 ],
             }
         )
 
-        with self.assertRaises(errors.DutAllocateSpecError):
-            bisect_db.to_dut_allocate_spec(bisect)
+        self.assertEqual(
+            dut_allocate_spec_type.DutAllocateSpec(
+                pools=['healthmon-satlab', 'DUT_POOL_QUOTA'],
+                models=['hayato'],
+                dimensions=[
+                    "label-chameleon:True",
+                    "label-test_usbaudio:True",
+                ],
+                version_hints=['12703.0.0', '12739.0.0'],
+                builder_hints=['asurada'],
+                session='00005bdd-e7fd-4a0a-be51-6f3d48547731',
+            ),
+            bisect_db.to_dut_allocate_spec(bisect),
+        )
 
     def test_bisect_misses_old_version(self):
         bisect = datastore.Entity()
