@@ -115,10 +115,24 @@ def dut_matches_spec(
     return True
 
 
-# If a DUT is transferred, extending its lease time to 8 hours.
-# We expect the bisect which needs it would be executed
-# soon.
-_EXTENDED_LEASE_DURATION_SECONDS = 60 * 60 * 8
+def filter_dimensions(dimensions: list[str], to_filter: list[str]) -> list[str]:
+    """A util function to filter out some dimensions.
+
+    Args:
+      dimensions: a list of "key:value" dimensions.
+      to_filter: a list of key to filter.
+
+    Returns:
+      A list of filtered "key:value" dimensions.
+    """
+    to_filter_set = set(to_filter)
+
+    filtered = []
+    for dimension in dimensions:
+        key, _ = dimension.split(':', 1)
+        if not key in to_filter_set:
+            filtered.append(dimension)
+    return filtered
 
 
 class SharedDutPoolManager(gcloud.DataStoreClient):
@@ -241,20 +255,29 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             # E.g., label-model:quackingstick, label-pools:DUT_POOL_QUOTA.
             return [d.split(':', 1) for d in dimensions]
 
-        and_filters = [
-            datastore.query.And(
-                [
-                    datastore.query.PropertyFilter('dimensions.' + k, '=', v)
-                    for k, v in split_dimensions(dimensions)
-                ]
-            ),
-            datastore.query.Or(
-                [
-                    datastore.query.PropertyFilter('dimensions.' + k, '=', v)
-                    for k, v in split_dimensions(variants)
-                ]
-            ),
-        ]
+        and_filters = []
+        if dimensions:
+            and_filters.append(
+                datastore.query.And(
+                    [
+                        datastore.query.PropertyFilter(
+                            'dimensions.' + k, '=', v
+                        )
+                        for k, v in split_dimensions(dimensions)
+                    ]
+                ),
+            )
+        if variants:
+            and_filters.append(
+                datastore.query.Or(
+                    [
+                        datastore.query.PropertyFilter(
+                            'dimensions.' + k, '=', v
+                        )
+                        for k, v in split_dimensions(variants)
+                    ]
+                ),
+            )
         if pools:
             and_filters.append(
                 datastore.query.Or(
@@ -471,6 +494,12 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         self._client.delete_multi([self._default_key(d) for d in stale_duts])
         return stale_duts
 
+    # Some dimensions are irrelevant when trying to find a matched DUT.
+    # In some cases, it can interfere with the match result.
+    # For example, a leased DUT could have "dut_state:needs_repair", but the
+    # dimensions passed in could want "dut_state:ready".
+    _IRRELEVANT_DIMENSIONS = ['dut_state']
+
     def lease_for_bisect(
         self,
         requestor: str,
@@ -498,9 +527,13 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
           If DUT is None, it means there is no idle DUTs which satisfies the requirement.
         """
         with self._client.transaction():
+            dimensions = filter_dimensions(
+                dimensions, self._IRRELEVANT_DIMENSIONS
+            )
             q = self._build_query(
                 dimensions, variants, pools, state=DutState.IDLE
             )
+
             matched_duts = list(q.fetch())
             matched_dut_names = [d.get('name') for d in matched_duts]
             logger.debug(

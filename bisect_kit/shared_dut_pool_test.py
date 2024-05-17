@@ -201,6 +201,45 @@ class TestSuccessorFinder(unittest.TestCase):
         self.assertEqual(matched, ['bisect_2', 'bisect_4'])
 
 
+class TestFilterDimensions(unittest.TestCase):
+    """Tests SuccessorFinder."""
+
+    def test_filtered(self):
+        dimensions = [
+            'label-touchscreen:True',
+            'dut_state:ready',
+            'label-servo:True',
+        ]
+        to_filter = ['dut_state']
+        self.assertEqual(
+            ['label-touchscreen:True', 'label-servo:True'],
+            shared_dut_pool.filter_dimensions(dimensions, to_filter),
+        )
+
+    def test_nothing_to_filter(self):
+        dimensions = [
+            'label-touchscreen:True',
+            'dut_state:ready',
+            'label-servo:True',
+        ]
+        to_filter = []
+        self.assertEqual(
+            ['label-touchscreen:True', 'dut_state:ready', 'label-servo:True'],
+            shared_dut_pool.filter_dimensions(dimensions, to_filter),
+        )
+
+    def test_all_filtered(self):
+        dimensions = [
+            'label-touchscreen:True',
+            'dut_state:ready',
+            'label-servo:True',
+        ]
+        to_filter = ['label-touchscreen', 'dut_state', 'label-servo']
+        self.assertEqual(
+            [], shared_dut_pool.filter_dimensions(dimensions, to_filter)
+        )
+
+
 class FakeSharedDutPoolManager(shared_dut_pool.SharedDutPoolManager):
     """Inherits SharedDutPoolManager to facilitate unittest."""
 
