@@ -542,7 +542,7 @@ def add_dut_to_shared_pool(host: str, session: str):
     )
     if owner:
         logger.info(
-            'dut %s with owner %s backfilled to the shared DUT pool '
+            'dut %s with owner %s inserted to the shared DUT pool '
             'successfully.',
             host,
             owner,
