@@ -513,9 +513,30 @@ def allocate_dut(
             async_dut_leaser.lease_parallelly(),
         )
         if host:
+            if not enable_shared_dut_pool:
+                return host, resolve_builder_by_host(host)
+
             # Add the leased DUT to the shared pool.
-            if enable_shared_dut_pool:
-                add_dut_to_shared_pool(host, spec.session)
+            if not add_dut_to_shared_pool(host, spec.session):
+                # In rare conditions (i.e., race condition in which when a DUT is
+                # leased here, some other bisections already leased a DUT for this
+                # bisection), we should return the DUT leased previously instead
+                # of the DUT leased here.
+                # In that case, call allocate_dut() recursively to start the
+                # process over again. A DUT should already be in the shared
+                # pool. However, in really rare cases another race condition may
+                # happen so that DUT is taken by yet another bisection. So we'll
+                # need to lease another DUT from the lab again...
+                logger.info(
+                    'a DUT should already been leased for %s, try again.',
+                    spec.session,
+                )
+                return allocate_dut(
+                    spec,
+                    chromeos_root,
+                    enable_shared_dut_pool,
+                    lease_from_shared_dut_pool,
+                )
             return host, resolve_builder_by_host(host)
         time.sleep(1)
 
@@ -525,7 +546,22 @@ def allocate_dut(
     )
 
 
-def add_dut_to_shared_pool(host: str, session: str):
+def add_dut_to_shared_pool(host: str, session: str) -> bool:
+    """Add a leased DUT to the shared DUT pool.
+
+    If |session| doesn't own a host already, insert the DUT |host| with owner |session|.
+    Otherwise, try finding a successor for |host| and insert |host| with the successor
+    as the new owner.
+    If failed to find a successor, release |host| to the lab.
+
+    Args:
+      host: the leased DUT.
+      session: the leaser bisect id.
+
+    Returns:
+      Whether |host| is inserted with owner |session|.
+      If False, it means either a successor is found or failed to find a successor.
+    """
     logger.info('putting %s into the shared DUT pool', host)
 
     bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])
@@ -558,6 +594,7 @@ def add_dut_to_shared_pool(host: str, session: str):
             cros_lab_util.crosfleet_release_dut(host)
         except Exception as e:
             logger.warning('failed to return DUT %s to the lab: %s', host, e)
+    return owner == session
 
 
 _BACKGROUND_LEASING_INTERVAL_SECONDS = 60 * 10
