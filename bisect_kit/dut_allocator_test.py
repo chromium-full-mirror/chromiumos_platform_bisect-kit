@@ -174,7 +174,7 @@ class TestSampleAvailableBots(unittest.TestCase):
         self.assertCountEqual(acquired_bots, available_bots)
         mock_sleep.assert_not_called()
         mock_sample_available_bots.assert_called_once_with(
-            dimensions, variants, None, mock.ANY, None, is_busy=True
+            dimensions, variants, None, mock.ANY, None, is_busy=False
         )
 
     @mock.patch('time.sleep')
@@ -202,10 +202,10 @@ class TestSampleAvailableBots(unittest.TestCase):
         mock_sample_available_bots.assert_has_calls(
             [
                 mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=True
+                    dimensions, variants, None, mock.ANY, None, is_busy=False
                 ),
                 mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=True
+                    dimensions, variants, None, mock.ANY, None, is_busy=False
                 ),
             ]
         )
