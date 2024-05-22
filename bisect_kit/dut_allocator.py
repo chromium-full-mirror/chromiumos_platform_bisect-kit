@@ -256,188 +256,227 @@ def allocate_dut(
     spec: dut_allocate_spec.DutAllocateSpec,
     chromeos_root: str,
     enable_shared_dut_pool=False,
-    lease_from_shared_dut_pool=True,
 ) -> typing.Tuple[str, str]:
-    """Helper of cmd_allocate_dut.
+    """A convenient function to DutAllocator.allocate_dut().
+
+    See comment in DutAllocator and DutAllocator.allocate_dut().
 
     Args:
-      spec: the DutAllocateSpec
-      enable_shared_dut_pool: whether to enable shared DUT pool.
-      lease_from_shared_dut_pool: whether to lease from the shared DUT pool.
-        In some cases (e.g., background leasing), we may want to lease from the
-        lab directly.
-
-    Note that enable_shared_dut_pool and lease_from_shared_dut_pool differs in that
-    enable_shared_dut_pool is a transitional parameter. It can be removed after the
-    shared DUT pool is fully launched. lease_from_shared_dut_pool is mandatory.
+      spec: the DutAllocateSpec.
+      chromeos_root: path to chromeos root.
 
     Returns:
-      (host, board_to_build)
-        host: leased host name
-        board_to_build: board name for building image
-
-    Raises:
-        errors.ArgumentError if the input DutAllocateSpec is invalid.
-        errors.NoDutAvailable if the DutAllocateSpec could not match any device in lab.
-        errors.DutLeaseTimeout if the DUT lease take too long.
-        errors.DutLeaseException if other exception happens.
+      (host, builder)
     """
-    if spec.dut_name:
-        # If dut_name is specified, pool is ignored.
-        spec.pools = []
+    allocator = DutAllocator(spec, chromeos_root)
+    return allocator.allocate_dut(enable_shared_dut_pool)
 
-        if cros_lab_util.is_satlab_dut(spec.dut_name):
-            cros_lab_util.write_satlab_ssh_config(spec.dut_name)
-        if not spec.builder_hints:
-            spec.builder_hints = [cros_util.query_dut_board(spec.dut_name)]
-    elif not spec.pools:
-        raise errors.ArgumentError(
-            '--pool', 'need to be specified if not --dut-name'
-        )
-    if spec.version_hints:
-        for v in spec.version_hints:
-            if cros_util.is_cros_version(
-                v
-            ) or cros_util.is_cros_snapshot_version(v):
-                continue
-            raise errors.ArgumentError(
-                '--version-hint',
-                'should be ChromeOS version numbers, separated by comma',
-            )
-    if (
-        spec.lease_duration_seconds is not None
-        and spec.lease_duration_seconds < 60
+
+class DutAllocator:
+    """A class to allocate DUT."""
+
+    def __init__(
+        self, spec: dut_allocate_spec.DutAllocateSpec, chromeos_root: str
     ):
-        raise errors.ArgumentError('--duration', 'must be at least 60 seconds')
+        """Initializer.
 
-    if spec.satlab_ip:
-        if not cros_lab_util.is_satlab_dut(spec.dut_name):
+        Args:
+          spec: the DutAllocateSpec.
+          chromeos_root: path to chromeos root.
+        """
+        self._spec = spec
+        self._chromeos_root = chromeos_root
+
+        # derived fields.
+        (
+            self._dimensions,
+            self._variants,
+            self._pools,
+            self._boards_with_prebuilt,
+        ) = self._parse_spec()
+
+    def _parse_spec(
+        self,
+    ) -> typing.Tuple[list[str], list[str], list[str], list[str]]:
+        """Parses the DutAllocateSpec and save the intermediate artifacts."""
+        # Alias for easier access.
+        spec = self._spec
+
+        if spec.dut_name:
+            # If dut_name is specified, pool is ignored.
+            spec.pools = []
+
+            if cros_lab_util.is_satlab_dut(spec.dut_name):
+                cros_lab_util.write_satlab_ssh_config(spec.dut_name)
+            if not spec.builder_hints:
+                spec.builder_hints = [cros_util.query_dut_board(spec.dut_name)]
+        elif not spec.pools:
             raise errors.ArgumentError(
-                '--satlab-ip', 'Should be only provided with a satlab dut'
+                '--pool', 'need to be specified if not --dut-name'
             )
-
-        cros_lab_util.write_satlab_ssh_config(spec.dut_name, spec.satlab_ip)
-
-    t0 = time.time()
-    dimensions = spec.dimensions[:]
-    dimensions.append('dut_state:ready')
-    dimensions = _filter_dimensions_by_lab(dimensions, raise_unknown=True)
-
-    pools = None
-    if spec.pools:
-        pools = ['label-pool:%s' % p for p in spec.pools]
-        pools = _filter_dimensions_by_lab(pools, raise_unknown=False)
-        if not pools:
-            raise errors.NoDutAvailable(
-                'all specified pools "%s" are not available in lab' % spec.pools
-            )
-
-    # Note: board, model, sku, and dut_name are mutual exclusive so at most one
-    # of them is present.
-    variants: list[str] = []
-    if spec.boards:
-        for board in spec.boards:
-            variants.append(
-                'label-board:' + _normalize_board_name(chromeos_root, board)
-            )
-        variants = _filter_dimensions_by_lab(variants)
-        if not variants:
-            raise errors.NoDutAvailable(
-                'Invalid constraints: no board=%s in the lab' % spec.boards
-            )
-
-    if spec.models:
-        for model in spec.models:
-            if model in _models_to_avoid:
-                logger.warning(
-                    'model=%s is bad (reason:%s), ignore',
-                    model,
-                    _models_to_avoid[model],
+        if spec.version_hints:
+            for v in spec.version_hints:
+                if cros_util.is_cros_version(
+                    v
+                ) or cros_util.is_cros_snapshot_version(v):
+                    continue
+                raise errors.ArgumentError(
+                    '--version-hint',
+                    'should be ChromeOS version numbers, separated by comma',
                 )
-                continue
-            variants.append('label-model:' + model)
-        if not variants:
+        if (
+            spec.lease_duration_seconds is not None
+            and spec.lease_duration_seconds < 60
+        ):
             raise errors.ArgumentError(
-                '--model', 'all specified models are not supported'
-            )
-        variants = _filter_dimensions_by_lab(variants)
-        if not variants:
-            raise errors.NoDutAvailable(
-                'Invalid constraints: no model=%s in the lab' % spec.models
+                '--duration', 'must be at least 60 seconds'
             )
 
-    if spec.skus:
-        for sku in spec.skus:
-            variants.append(
-                'label-hwid_sku:' + cros_lab_util.normalize_sku_name(sku)
-            )
-        variants = _filter_dimensions_by_lab(variants)
-        if not variants:
-            raise errors.NoDutAvailable(
-                'Invalid constraints: no sku=%s in the lab' % spec.skus
-            )
-
-    if spec.dut_name:
-        variants.append('dut_name:' + spec.dut_name)
-        variants = _filter_dimensions_by_lab(variants)
-        if not variants:
-            raise errors.NoDutAvailable(
-                'Invalid constraints: no dut_name=%s in the lab' % spec.dut_name
-            )
-
-    # Filter variants by prebuilt images.
-    boards_with_prebuilt: list[str] | None = None
-    if spec.version_hints:
-        if not spec.builder_hints:
-            spec.builder_hints = spec.boards
-        if not spec.builder_hints:
-            raise errors.ArgumentError(
-                '--builder-hint', 'must be specified along with --version-hint'
-            )
-        boards_with_prebuilt = []
-        versions = spec.version_hints
-        for builder in spec.builder_hints:
-            if not all(cros_util.has_test_image(builder, v) for v in versions):
-                logger.warning(
-                    'builder=%s does not have prebuilt test image for %s, ignore',
-                    builder,
-                    spec.version_hints,
+        if spec.satlab_ip:
+            if not cros_lab_util.is_satlab_dut(spec.dut_name):
+                raise errors.ArgumentError(
+                    '--satlab-ip', 'Should be only provided with a satlab dut'
                 )
-                continue
-            boards_with_prebuilt.append(
-                _normalize_board_name(chromeos_root, builder)
-            )
-        logger.info('boards with prebuilt: %s', boards_with_prebuilt)
-        if not boards_with_prebuilt:
-            raise errors.ArgumentError(
-                '--version-hint',
-                'given builders have no prebuilt for %s' % spec.version_hints,
-            )
-        filtered = _filter_dimensions_by_board(
-            boards_with_prebuilt, variants, None
-        )
-        if not filtered:
-            raise errors.NoDutAvailable(
-                'Devices with specified constraints (%s) have no prebuilt. '
-                'Wrong constraints or wrong version number?' % variants
-            )
-        variants = filtered
-        filtered = _filter_dimensions_by_board(
-            boards_with_prebuilt, variants, pools
-        )
-        if not filtered:
-            raise errors.NoDutAvailable(
-                'The lab has %s devices; but there are no such devices in pool=%s'
-                % (variants, spec.pools)
-            )
-        variants = filtered
 
-    def resolve_builder_by_host(host: str) -> str:
+            cros_lab_util.write_satlab_ssh_config(spec.dut_name, spec.satlab_ip)
+
+        dimensions = spec.dimensions[:]
+        dimensions.append('dut_state:ready')
+        dimensions = _filter_dimensions_by_lab(dimensions, raise_unknown=True)
+
+        pools = None
+        if spec.pools:
+            pools = ['label-pool:%s' % p for p in spec.pools]
+            pools = _filter_dimensions_by_lab(pools, raise_unknown=False)
+            if not pools:
+                raise errors.NoDutAvailable(
+                    'none of the specified pools "%s" are available in lab'
+                    % spec.pools
+                )
+
+        # Note: board, model, sku, and dut_name are mutual exclusive so at most one
+        # of them is present.
+        variants: list[str] = []
+        if spec.boards:
+            for board in spec.boards:
+                variants.append(
+                    'label-board:'
+                    + _normalize_board_name(self._chromeos_root, board)
+                )
+            variants = _filter_dimensions_by_lab(variants)
+            if not variants:
+                raise errors.NoDutAvailable(
+                    'Invalid constraints: no board=%s in the lab' % spec.boards
+                )
+
+        if spec.models:
+            for model in spec.models:
+                if model in _models_to_avoid:
+                    logger.warning(
+                        'model=%s is bad (reason:%s), ignore',
+                        model,
+                        _models_to_avoid[model],
+                    )
+                    continue
+                variants.append('label-model:' + model)
+            if not variants:
+                raise errors.ArgumentError(
+                    '--model', 'all specified models are not supported'
+                )
+            variants = _filter_dimensions_by_lab(variants)
+            if not variants:
+                raise errors.NoDutAvailable(
+                    'Invalid constraints: no model=%s in the lab' % spec.models
+                )
+
+        if spec.skus:
+            for sku in spec.skus:
+                variants.append(
+                    'label-hwid_sku:' + cros_lab_util.normalize_sku_name(sku)
+                )
+            variants = _filter_dimensions_by_lab(variants)
+            if not variants:
+                raise errors.NoDutAvailable(
+                    'Invalid constraints: no sku=%s in the lab' % spec.skus
+                )
+
+        if spec.dut_name:
+            variants.append('dut_name:' + spec.dut_name)
+            variants = _filter_dimensions_by_lab(variants)
+            if not variants:
+                raise errors.NoDutAvailable(
+                    'Invalid constraints: no dut_name=%s in the lab'
+                    % spec.dut_name
+                )
+
+        # Filter variants by prebuilt images.
+        boards_with_prebuilt: list[str] | None = None
+        if spec.version_hints:
+            if not spec.builder_hints:
+                spec.builder_hints = spec.boards
+            if not spec.builder_hints:
+                raise errors.ArgumentError(
+                    '--builder-hint',
+                    'must be specified along with --version-hint',
+                )
+            boards_with_prebuilt = []
+            versions = spec.version_hints
+            for builder in spec.builder_hints:
+                if not all(
+                    cros_util.has_test_image(builder, v) for v in versions
+                ):
+                    logger.warning(
+                        'builder=%s does not have prebuilt test image for %s, ignore',
+                        builder,
+                        spec.version_hints,
+                    )
+                    continue
+                boards_with_prebuilt.append(
+                    _normalize_board_name(self._chromeos_root, builder)
+                )
+            logger.info('boards with prebuilt: %s', boards_with_prebuilt)
+            if not boards_with_prebuilt:
+                raise errors.ArgumentError(
+                    '--version-hint',
+                    'given builders have no prebuilt for %s'
+                    % spec.version_hints,
+                )
+            filtered = _filter_dimensions_by_board(
+                boards_with_prebuilt, variants, None
+            )
+            if not filtered:
+                raise errors.NoDutAvailable(
+                    'Devices with specified constraints (%s) have no prebuilt. '
+                    'Wrong constraints or wrong version number?' % variants
+                )
+            variants = filtered
+            filtered = _filter_dimensions_by_board(
+                boards_with_prebuilt, variants, pools
+            )
+            if not filtered:
+                raise errors.NoDutAvailable(
+                    'The lab has %s devices; but there are no such devices in pool=%s'
+                    % (variants, spec.pools)
+                )
+            variants = filtered
+
+        return dimensions, variants, pools, boards_with_prebuilt
+
+    def _resolve_builder_by_host(self, host: str) -> str:
         """Resolve the builder by the leased DUT.
 
         Since the dut allocate spec may contain multiple builders and boards,
         we need to know the corresponding builder by the leased board.
+
+        Args:
+          host: DUT
+
+        Returns:
+          The builder name.
         """
+        # Alias for easier access.
+        spec = self._spec
+
         if cros_lab_util.is_satlab_dut(host):
             cros_lab_util.write_satlab_ssh_config(host)
         # Resolve what board we should build during bisection.
@@ -456,7 +495,10 @@ def allocate_dut(
 
         if spec.builder_hints:
             for builder in spec.builder_hints:
-                if _normalize_board_name(chromeos_root, builder) == host_board:
+                if (
+                    _normalize_board_name(self._chromeos_root, builder)
+                    == host_board
+                ):
                     board_to_build = builder
                     break
             else:
@@ -467,86 +509,134 @@ def allocate_dut(
             board_to_build = host_board
         return board_to_build
 
-    logger.debug(
-        'enable_shared_dut_pool: %s, lease_from_shared_dut_pool: %s',
-        enable_shared_dut_pool,
-        lease_from_shared_dut_pool,
-    )
-    if enable_shared_dut_pool and lease_from_shared_dut_pool:
+    def allocate_dut(
+        self, enable_shared_dut_pool=False
+    ) -> typing.Tuple[str, str]:
+        """Allocate a DUT.
+
+        If enable_shared_dut_pool, it tried to lease one from the shared DUT
+        pool first. If failed, try leasing one from the lab and put the leased
+        DUT into the shared DUT pool.
+        Otherwise, lease one from the lab directly.
+
+        Args:
+          enable_shared_dut_pool: whether to enable shared DUT pool.
+
+        Returns:
+          (host, builder)
+          host: leased host name
+          builder: the corresponding builder
+        """
+        # Alias for easier access.
+        spec = self._spec
+
+        logger.debug(
+            'allocate_dut(): enable_shared_dut_pool: %s', enable_shared_dut_pool
+        )
+        if not enable_shared_dut_pool:
+            return self.allocate_dut_from_lab()
+
         pool_manager = shared_dut_pool.SharedDutPoolManager()
-        host, orig_owner = pool_manager.lease_for_bisect(
-            spec.session, dimensions, variants, pools
+
+        while True:
+            host, orig_owner = pool_manager.lease_for_bisect(
+                spec.session, self._dimensions, self._variants, self._pools
+            )
+            logger.info(
+                'leased %s with original owner %s from the shared DUT pool',
+                host,
+                orig_owner,
+            )
+            if host is not None:
+                if orig_owner != spec.session:
+                    # The bisect robs the DUT owned by |orig_owner|, so lease a
+                    # DUT for |orig_owner| as a compensation in the background.
+                    lease_dut_in_background_for_session(
+                        orig_owner, self._chromeos_root
+                    )
+                return host, self._resolve_builder_by_host(host)
+
+            # If failed to lease a DUT from the shared DUT pool, lease one from
+            # the lab and add the leasead DUT to the shared pool.
+            host, _ = self.allocate_dut_from_lab()
+            add_dut_to_shared_pool(host, spec.session)
+
+            # At this point, there should already be a DUT ready to be used.
+            # Case 1: When add_dut_to_shared_pool() is called, there is no DUT
+            # owned by this bisect yet. The newly leased DUT would be owned by
+            # this bisect.
+            # Case 2: When add_dut_to_shared_pool() is called, there is already
+            # a DUT owned by this bisect (e.g., some other bisect tried to
+            # lease one for this bisect in the background). In that case, there
+            # is also a DUT owned by the bisect, just not the one leased above.
+            #
+            # In the next loop iteration, the DUT owned by this bisect should be
+            # returned. However, in rare cases a race condition may happen so
+            # the DUT is taken by another bisection. In that case, it would try
+            # to lease another DUT from the lab, and the loop continues again.
+            logger.info(
+                'a DUT should already been leased for %s, try again.',
+                spec.session,
+            )
+
+    def allocate_dut_from_lab(self) -> typing.Tuple[str, str]:
+        """Allocate a DUT from the lab.
+
+        Returns:
+          (host, builder)
+          host: leased host name
+          builder: the corresponding builder
+
+        Raises:
+            errors.ArgumentError if the input DutAllocateSpec is invalid.
+            errors.NoDutAvailable if the DutAllocateSpec could not match any device in lab.
+            errors.DutLeaseTimeout if the DUT lease take too long.
+            errors.DutLeaseException if other exception happens.
+        """
+        # Alias for easier access.
+        spec = self._spec
+
+        start_time = time.time()
+        filter_func = functools.partial(
+            _is_acceptable_bot, self._boards_with_prebuilt
         )
-        logger.info(
-            'leased %s with original owner %s from the shared DUT pool',
-            host,
-            orig_owner,
+        while True:
+            # Query every time because each iteration takes a few minutes
+            bots = _sample_available_bots_with_retry(
+                self._dimensions,
+                self._variants,
+                self._pools,
+                spec.parallel,
+                filter_func,
+            )
+
+            remaining_time = spec.time_limit_seconds - (
+                time.time() - start_time
+            )
+            if remaining_time <= 0:
+                break
+            timeout = min(120, remaining_time)
+            reason = cros_lab_util.make_lease_reason(spec.session)
+            async_dut_leaser = cros_lab_util.AsyncDutLeaser(
+                [bot['dimensions']['dut_name'][0] for bot in bots],
+                reason,
+                spec.lease_duration_seconds,
+                timeout,
+            )
+            host = asyncio.run(
+                async_dut_leaser.lease_parallelly(),
+            )
+            if host:
+                return host, self._resolve_builder_by_host(host)
+            time.sleep(1)
+
+        logger.warning('unable to lease DUT in time limit')
+        raise errors.DutLeaseTimeout(
+            'Unable to lease DUT in %s seconds' % spec.time_limit_seconds
         )
-        if host is not None:
-            if orig_owner != spec.session:
-                # The bisect robs the DUT owned by |orig_owner|, so lease a DUT
-                # for |orig_owner| as a compensation in the background.
-                lease_dut_in_background_for_session(
-                    orig_owner, chromeos_root, enable_shared_dut_pool
-                )
-            return host, resolve_builder_by_host(host)
-
-    filter_func = functools.partial(_is_acceptable_bot, boards_with_prebuilt)
-    while True:
-        # Query every time because each iteration takes a few minutes
-        bots = _sample_available_bots_with_retry(
-            dimensions, variants, pools, spec.parallel, filter_func
-        )
-
-        remaining_time = spec.time_limit_seconds - (time.time() - t0)
-        if remaining_time <= 0:
-            break
-        timeout = min(120, remaining_time)
-        reason = cros_lab_util.make_lease_reason(spec.session)
-        async_dut_leaser = cros_lab_util.AsyncDutLeaser(
-            [bot['dimensions']['dut_name'][0] for bot in bots],
-            reason,
-            spec.lease_duration_seconds,
-            timeout,
-        )
-        host = asyncio.run(
-            async_dut_leaser.lease_parallelly(),
-        )
-        if host:
-            if not enable_shared_dut_pool:
-                return host, resolve_builder_by_host(host)
-
-            # Add the leased DUT to the shared pool.
-            if not add_dut_to_shared_pool(host, spec.session):
-                # In rare conditions (i.e., race condition in which when a DUT is
-                # leased here, some other bisections already leased a DUT for this
-                # bisection), we should return the DUT leased previously instead
-                # of the DUT leased here.
-                # In that case, call allocate_dut() recursively to start the
-                # process over again. A DUT should already be in the shared
-                # pool. However, in really rare cases another race condition may
-                # happen so that DUT is taken by yet another bisection. So we'll
-                # need to lease another DUT from the lab again...
-                logger.info(
-                    'a DUT should already been leased for %s, try again.',
-                    spec.session,
-                )
-                return allocate_dut(
-                    spec,
-                    chromeos_root,
-                    enable_shared_dut_pool,
-                    lease_from_shared_dut_pool,
-                )
-            return host, resolve_builder_by_host(host)
-        time.sleep(1)
-
-    logger.warning('unable to lease DUT in time limit')
-    raise errors.DutLeaseTimeout(
-        'Unable to lease DUT in %s seconds' % spec.time_limit_seconds
-    )
 
 
-def add_dut_to_shared_pool(host: str, session: str) -> bool:
+def add_dut_to_shared_pool(host: str, session: str):
     """Add a leased DUT to the shared DUT pool.
 
     If |session| doesn't own a host already, insert the DUT |host| with owner |session|.
@@ -557,10 +647,6 @@ def add_dut_to_shared_pool(host: str, session: str) -> bool:
     Args:
       host: the leased DUT.
       session: the leaser bisect id.
-
-    Returns:
-      Whether |host| is inserted with owner |session|.
-      If False, it means either a successor is found or failed to find a successor.
     """
     logger.info('putting %s into the shared DUT pool', host)
 
@@ -594,15 +680,12 @@ def add_dut_to_shared_pool(host: str, session: str) -> bool:
             cros_lab_util.crosfleet_release_dut(host)
         except Exception as e:
             logger.warning('failed to return DUT %s to the lab: %s', host, e)
-    return owner == session
 
 
 _BACKGROUND_LEASING_INTERVAL_SECONDS = 60 * 10
 
 
-def lease_dut_in_background_for_session(
-    session: str, chromeos_root: str, enable_shared_dut_pool: bool
-):
+def lease_dut_in_background_for_session(session: str, chromeos_root: str):
     def _lease(spec: dut_allocate_spec.DutAllocateSpec):
         pool_manager = shared_dut_pool.SharedDutPoolManager()
         while True:
@@ -618,14 +701,8 @@ def lease_dut_in_background_for_session(
                 return
             logger.info('try leasing a DUT for %s in the background', session)
             try:
-                host, _ = allocate_dut(
-                    spec,
-                    chromeos_root,
-                    enable_shared_dut_pool=enable_shared_dut_pool,
-                    # When leasing DUT in the background, it needs a DUT from
-                    # the lab instead of the shared DUT pool.
-                    lease_from_shared_dut_pool=False,
-                )
+                allocator = DutAllocator(spec, chromeos_root)
+                host, _ = allocator.allocate_dut_from_lab()
             except errors.DutLeaseTimeout as e:
                 logger.debug(
                     'failed to lease a DUT for %s: %s, '
@@ -638,8 +715,11 @@ def lease_dut_in_background_for_session(
             else:
                 if host:
                     logger.info(
-                        'leased dut %s successfully in the background', host
+                        'leased dut %s successfully in the background.'
+                        'adding it to the shared DUT pool.',
+                        host,
                     )
+                    add_dut_to_shared_pool(host, session)
                     return
 
     ds_client = bisect_db.Client()
