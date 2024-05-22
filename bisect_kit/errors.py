@@ -147,6 +147,14 @@ class BisectionTemporaryError(BisectRetriableError):
     """
 
 
+class ExecutionTimeout(BisectRetriableError):
+    """Timeout expired when executing a subprocess.
+
+    This may be raised by blocking calls like Popen.wait(), check_call(),
+    check_output(), etc.
+    """
+
+
 class ExternalError(BisectionTemporaryError):
     """Errors in external dependency.
 

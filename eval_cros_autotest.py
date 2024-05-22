@@ -514,9 +514,7 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
     result = gather_test_result(opts, result_dir)
 
     # The OS version should not change.
-    assert dut_os_version == cros_util.query_dut_short_version(
-        opts.dut
-    ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+    cros_util.assert_dut_cros_version(dut_os_version, opts.dut)
 
     return result
 

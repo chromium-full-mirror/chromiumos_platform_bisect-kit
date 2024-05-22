@@ -31,14 +31,6 @@ logger = logging.getLogger(__name__)
 PathLike = os.PathLike | str
 
 
-class TimeoutExpired(Exception):
-    """Timeout expired.
-
-    This may be raised by blocking calls like Popen.wait(), check_call(),
-    check_output(), etc.
-    """
-
-
 class Popen:
     """Wrapper of subprocess.Popen. Support output logging.
 
@@ -170,7 +162,7 @@ class Popen:
                         timeout,
                     )
                     self.p.kill()
-                    raise TimeoutExpired from None
+                    raise errors.ExecutionTimeout from None
             else:
                 fd_name, line = self.queue.get(block=True)
             # line includes '\n', will be '' if EOF.
@@ -566,7 +558,7 @@ def wait_until(
         if func(*args, **kwargs):
             return
         time.sleep(period)
-    raise TimeoutExpired('wait_until failed')
+    raise errors.ExecutionTimeout('wait_until failed')
 
 
 def is_port_in_use(port: int) -> bool:

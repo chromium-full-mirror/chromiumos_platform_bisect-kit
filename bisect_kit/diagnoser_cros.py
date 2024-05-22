@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import functools
 import io
 import json
 import logging
@@ -394,14 +395,6 @@ class CrosDiagnoser:
             if switch_test_harness_cmd:
                 switch_test_harness_to_old(dut)
 
-        def bisect_prebuilt_on_old_cros_dut_leave_context_check_func(
-            dut: str,
-        ):
-            logger.info('checking cros version on dut %s', dut)
-            assert old_cros_version == cros_util.query_dut_short_version(
-                dut
-            ), 'Someone else reflashed the DUT. DUT locking is not respected?'
-
         self._dut_manager.reset(
             dut_manager_module.DutManager(
                 'OldCros',
@@ -410,7 +403,9 @@ class CrosDiagnoser:
                 self.pre_allocated_dut,
                 self.is_stateless,
                 bisect_prebuilt_on_old_cros_dut_init_func,
-                bisect_prebuilt_on_old_cros_dut_leave_context_check_func,
+                functools.partial(
+                    cros_util.assert_dut_cros_version, old_cros_version
+                ),
                 vm_cros_version=self.cros_old if self.is_vm_board else None,
             )
         )
@@ -488,16 +483,13 @@ class CrosDiagnoser:
         def bisect_local_chrome_dut_leave_context_check_func(
             dut: str,
         ):
-            logger.info('checking cros version on dut %s', dut)
             # If chrome is not deployed with cros image, do the sanity check to ensure
             # OS version.
             if (
                 not self.config['chrome_deploy_image']
                 and not self.config['enable_buildbucket_chrome']
             ):
-                assert old_cros_version == cros_util.query_dut_short_version(
-                    dut
-                ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+                cros_util.assert_dut_cros_version(old_cros_version, dut)
 
         self._dut_manager.reset(
             dut_manager_module.DutManager(

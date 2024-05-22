@@ -3517,3 +3517,27 @@ class ChromeOSVersionParser:
                 )
             version_args[k] = int(m.group(1))
         return ChromeOSVersion(**version_args)
+
+
+def assert_dut_cros_version(expected_version: str, dut: str):
+    """Asserts the CrOS version of the leased DUT.
+
+    Args:
+      dut: The DUT.
+      expected_version: the expected CrOS short version.
+
+    Raises:
+      errors.DutLeaseException
+    """
+    got_version = query_dut_short_version(dut)
+    logger.info(
+        'checking cros version on dut %s, expected version: %s, '
+        'got version: %s',
+        dut,
+        expected_version,
+        got_version,
+    )
+    if got_version != expected_version:
+        raise errors.DutLeaseException(
+            'Someone else reflashed the DUT. DUT locking is not respected?'
+        )

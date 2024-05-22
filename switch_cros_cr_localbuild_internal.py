@@ -304,9 +304,7 @@ def switch_main(args: tuple[str] | None):
 
     # Sanity check. The OS version should not change.
     if opts.dut:
-        assert dut_os_version == cros_util.query_dut_short_version(
-            opts.dut
-        ), 'Someone else reflashed the DUT. DUT locking is not respected?'
+        cros_util.assert_dut_cros_version(dut_os_version, opts.dut)
 
 
 def action() -> bisector_cli.SwitchAction:
