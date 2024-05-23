@@ -193,7 +193,7 @@ def get_last_float_spec(float_specs, timestamp):
     for spec in reversed(float_specs):
         if spec.timestamp <= timestamp:
             return spec
-    raise errors.ExternalError(
+    raise errors.BuildError(
         'Cannot predict a correct float spec before timestamp %d' % timestamp
     )
 
@@ -336,7 +336,7 @@ def get_manifest(opts):
     result.apply_manifest(snapshot)
 
     if not result.is_static_manifest():
-        raise errors.ExternalError(
+        raise errors.BuildError(
             'cannot recover project revision from snapshot and diff, '
             'there might be unnecessary project in manifest-internal, '
             'or snapshot might be incomplete.'
@@ -349,7 +349,7 @@ def search_build_image(buildbucket_id):
     properties = api.get_build(buildbucket_id).output.properties
 
     if 'artifacts' not in properties:
-        raise errors.ExternalError(
+        raise errors.BuildError(
             'artifacts not found in buildbucket_id: %s' % buildbucket_id
         )
 
@@ -503,7 +503,7 @@ def wait_for_build_completion(opts, build_id: int):
     """Wait until a build completes.
 
     Raises:
-      errors.ExternalError
+      errors.BuildError
     """
     api = buildbucket_util.BuildbucketApi()
     last_log_time = 0
@@ -518,7 +518,7 @@ def wait_for_build_completion(opts, build_id: int):
         time.sleep(60)
 
     if not api.is_success(build):
-        raise errors.ExternalError(
+        raise errors.BuildError(
             'buildbucket build fail id=%d, status=%s, summary=%r, url=%s'
             % (
                 build_id,

@@ -126,6 +126,15 @@ class BrokenDutException(DutException):
     """The DUT is broken."""
 
 
+class DatastoreTransactionConflict(BisectRetriableError):
+    """A warpper around Datastore transaction conflict exception.
+
+    Make it a subclass of BisectRetriableError so the bisection can be retried.
+    Note that it is usually raised only when an internal retry limit has been
+    exceeded.
+    """
+
+
 class TooManyTemporaryErrors(BisectRetriableError):
     """Unable to narrow bisect range further due to too many temporary errors."""
 
@@ -147,20 +156,11 @@ class BisectionTemporaryError(BisectRetriableError):
     """
 
 
-class ExecutionTimeout(BisectRetriableError):
+class ExecutionTimeout(BisectionTemporaryError):
     """Timeout expired when executing a subprocess.
 
     This may be raised by blocking calls like Popen.wait(), check_call(),
     check_output(), etc.
-    """
-
-
-class DatastoreTransactionConflict(BisectRetriableError):
-    """A warpper around Datastore transaction conflict exception.
-
-    Make it a subclass of BisectRetriableError so the bisection  can be retried.
-    Note that it is usually raised only when an internal retry limit has been
-    exceeded.
     """
 
 
@@ -280,6 +280,16 @@ class DutPreconditionNotMet(BisectException):
 
 class DutAllocateSpecError(BisectException):
     """Raised when failed to create a DutAllocateSpec from the bisect database."""
+
+    def error_type(self) -> str:
+        return ErrorType.Fatal
+
+
+class BuildError(BisectException):
+    """Errors happen in build phase which are not in general recoverable.
+
+    For example, spec errors, compile errors.
+    """
 
     def error_type(self) -> str:
         return ErrorType.Fatal
