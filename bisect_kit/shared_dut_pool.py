@@ -10,13 +10,16 @@ from __future__ import annotations
 import datetime
 from enum import StrEnum
 import logging
+import time
 import typing
 
 from bisect_kit import bisect_db
 from bisect_kit import cros_lab_util
 from bisect_kit import dut_allocate_spec_type
+from bisect_kit import errors
 from bisect_kit import gcloud
 from google.cloud import datastore
+import google.cloud.exceptions
 
 
 logger = logging.getLogger(__name__)
@@ -135,6 +138,39 @@ def filter_dimensions(dimensions: list[str], to_filter: list[str]) -> list[str]:
     return filtered
 
 
+_TRANSACTION_RETRY_LIMIT = 4
+
+_TRANSACTION_RETRY_INTERVAL_SECONDS = 3
+
+
+def retry_transaction_conflict(func):
+    """A decorator to retry Datastore transaction conflict.
+
+    https://cloud.google.com/datastore/docs/concepts/transactions#uses_for_transactions
+    """
+
+    def wrapped(*args, **kwargs):
+        retry_count = 0
+        while True:
+            try:
+                return func(*args, **kwargs)
+            except google.cloud.exceptions.Conflict as e:
+                retry_count += 1
+                if retry_count > _TRANSACTION_RETRY_LIMIT:
+                    raise errors.DatastoreTransactionConflict(
+                        'Transaction conflict retry limit %s exceeded'
+                        % _TRANSACTION_RETRY_LIMIT
+                    ) from e
+                logger.warning(
+                    'Transaction conflict, retry %s in %s seconds',
+                    retry_count,
+                    _TRANSACTION_RETRY_INTERVAL_SECONDS,
+                )
+                time.sleep(_TRANSACTION_RETRY_INTERVAL_SECONDS)
+
+    return wrapped
+
+
 class SharedDutPoolManager(gcloud.DataStoreClient):
     """Class manages the shared DUT pool."""
 
@@ -160,6 +196,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             kind=self._KIND_DUT, ancestor=self._common_parent_key()
         )
 
+    @retry_transaction_conflict
     def insert_dut(
         self,
         name: str,
@@ -312,6 +349,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         q.add_filter(filter=datastore.query.PropertyFilter('owner', '=', owner))
         return [d.get('name') for d in q.fetch()]
 
+    @retry_transaction_conflict
     def _set_dut_state(self, dut_name: str, state: DutState) -> bool:
         """Set the dut state."""
         with self._client.transaction():
@@ -354,6 +392,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         """
         return self._set_dut_state(dut_name, DutState.BUSY)
 
+    @retry_transaction_conflict
     def transfer_owner(self, dut_name: str, receiver: str) -> bool:
         """Transfer the owner of a DUT to another bisect.
 
@@ -500,6 +539,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
     # dimensions passed in could want "dut_state:ready".
     _IRRELEVANT_DIMENSIONS = ['dut_state']
 
+    @retry_transaction_conflict
     def lease_for_bisect(
         self,
         requestor: str,

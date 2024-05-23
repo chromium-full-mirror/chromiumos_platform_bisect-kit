@@ -14,6 +14,7 @@ from bisect_kit import dut_allocate_spec_type
 from bisect_kit import errors
 from bisect_kit import shared_dut_pool
 from google.cloud import datastore
+import google.cloud.exceptions
 
 
 logger = logging.getLogger(__name__)
@@ -949,3 +950,44 @@ class TestLeaseForSession(unittest.TestCase):
         self.assertEqual(None, dut_name)
         self.assertEqual(None, orig_owner)
         self._mock_client.put.assert_not_called()
+
+
+class TestRetryTransactionConflictWrapper(unittest.TestCase):
+    """Test retry_transaction_conflict()"""
+
+    def test_no_retry(self):
+        func = mock.Mock()
+        func.return_value = 'ok'
+
+        wrapped_func = shared_dut_pool.retry_transaction_conflict(func)
+
+        self.assertEqual('ok', wrapped_func())
+
+    def test_retry_within_limit(self):
+        func = mock.Mock()
+        func.side_effect = [
+            google.cloud.exceptions.Conflict(1),
+            google.cloud.exceptions.Conflict(2),
+            google.cloud.exceptions.Conflict(3),
+            google.cloud.exceptions.Conflict(4),
+            'ok',
+        ]
+
+        wrapped_func = shared_dut_pool.retry_transaction_conflict(func)
+
+        self.assertEqual('ok', wrapped_func())
+
+    def test_retry_exceeds_limit(self):
+        func = mock.Mock()
+        func.side_effect = [
+            google.cloud.exceptions.Conflict(1),
+            google.cloud.exceptions.Conflict(2),
+            google.cloud.exceptions.Conflict(3),
+            google.cloud.exceptions.Conflict(4),
+            google.cloud.exceptions.Conflict(5),
+        ]
+
+        wrapped_func = shared_dut_pool.retry_transaction_conflict(func)
+
+        with self.assertRaises(errors.DatastoreTransactionConflict):
+            wrapped_func()

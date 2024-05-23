@@ -155,6 +155,15 @@ class ExecutionTimeout(BisectRetriableError):
     """
 
 
+class DatastoreTransactionConflict(BisectRetriableError):
+    """A warpper around Datastore transaction conflict exception.
+
+    Make it a subclass of BisectRetriableError so the bisection  can be retried.
+    Note that it is usually raised only when an internal retry limit has been
+    exceeded.
+    """
+
+
 class ExternalError(BisectionTemporaryError):
     """Errors in external dependency.
 
