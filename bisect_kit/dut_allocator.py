@@ -703,8 +703,12 @@ def lease_dut_in_background_for_session(session: str, chromeos_root: str):
             try:
                 allocator = DutAllocator(spec, chromeos_root)
                 host, _ = allocator.allocate_dut_from_lab()
-            except errors.DutLeaseTimeout as e:
-                logger.debug(
+            except (
+                errors.DutLeaseTimeout,
+                errors.NoDutAvailable,
+                errors.DutLeaseException,
+            ) as e:
+                logger.info(
                     'failed to lease a DUT for %s: %s, '
                     'trying to lease later in %s seconds',
                     session,
