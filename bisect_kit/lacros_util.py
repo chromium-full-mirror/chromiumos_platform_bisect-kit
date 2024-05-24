@@ -333,28 +333,35 @@ def deploy_lacros_to_dut(
       deploy_chrome_script_path: Deploy_chrome script path
 
     Returns:
-      0 for successful deployment. Raises exception for failures.
+      0 for successful deployment. Raises ExternalError exception for failures.
     """
-    try:
-        assert os.path.exists(deploy_chrome_script_path)
+    assert os.path.exists(deploy_chrome_script_path)
 
-        lacros_deploy_command = [
-            deploy_chrome_script_path,
-            '--build-dir=%s' % lacros_build_dir,
-            '--device=%s' % dut_ip,
-            '--nostrip',
-            '--lacros',
-            '--reset-lacros',
-            '--force',
-        ]
-        logger.debug('Lacros deploy command:')
-        logger.debug(' '.join(lacros_deploy_command))
-        util.check_output(*lacros_deploy_command)
-        return 0
+    num_attempts = 2
+    for attempt in range(num_attempts):
+        if attempt > 0:
+            logger.info('lacros deploy failed. will retry 60 seconds later')
+            time.sleep(60)
+        try:
+            lacros_deploy_command = [
+                deploy_chrome_script_path,
+                '--build-dir=%s' % lacros_build_dir,
+                '--device=%s' % dut_ip,
+                '--nostrip',
+                '--lacros',
+                '--reset-lacros',
+                '--force',
+            ]
+            logger.debug('Lacros deploy command:')
+            logger.debug(' '.join(lacros_deploy_command))
+            util.check_output(*lacros_deploy_command)
+            return 0
 
-    except:
-        logger.error('Lacros deploy failed')
-        raise
+        except Exception as e:
+            if attempt < num_attempts - 1:
+                logger.debug('lacros deploy failed: %s', e)
+                continue
+            raise errors.ExternalError('lacros deploy failed') from e
 
 
 def fetch_and_deploy_lacros_prebuilt_to_dut(
