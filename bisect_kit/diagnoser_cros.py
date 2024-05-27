@@ -429,26 +429,7 @@ class CrosDiagnoser:
                 'assume the culprit is not inside Android and continue'
             )
 
-        # Step 3: Narrows down Lacros prebuilt. If the error can be reproduced,
-        # Run the Chrome local build step with the narrowed down range.
-        # In case of failure, run the Chrome local build step with the previous range.
-        try:
-            self.narrow_down_lacros_prebuilt(
-                self._dut_manager.get(),
-                lacros_prebuilt_eval_cmd,
-                init_once=switch_cros_repo_to_old,
-            )
-        except errors.DiagnoseContradiction:
-            raise
-        except Exception as e:
-            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
-                raise
-            self.make_decision(
-                'Exception in Lacros bisector before verification; '
-                'assume the culprit is not inside Lacros and continue'
-            )
-
-        # Step 4: Narrows down DLC prebuilt.
+        # Step 3: Narrows down DLC prebuilt.
         try:
             if self.narrow_down_dlc_prebuilt(
                 self._dut_manager.get(),
@@ -466,6 +447,25 @@ class CrosDiagnoser:
             self.make_decision(
                 'Exception in DLC bisector before verification; '
                 'assume the culprit is not inside DLC and continue'
+            )
+
+        # Step 4: Narrows down Lacros prebuilt. If the error can be reproduced,
+        # Run the Chrome local build step with the narrowed down range.
+        # In case of failure, run the Chrome local build step with the previous range.
+        try:
+            self.narrow_down_lacros_prebuilt(
+                self._dut_manager.get(),
+                lacros_prebuilt_eval_cmd,
+                init_once=switch_cros_repo_to_old,
+            )
+        except errors.DiagnoseContradiction:
+            raise
+        except Exception as e:
+            if self.is_stateless and isinstance(e, errors.BisectRetriableError):
+                raise
+            self.make_decision(
+                'Exception in Lacros bisector before verification; '
+                'assume the culprit is not inside Lacros and continue'
             )
 
         # Step 5: Narrows down Chrome local build. If the error can be reproduced,
@@ -525,6 +525,10 @@ class CrosDiagnoser:
                 'Exception in Chrome bisector before verification; '
                 'assume the culprit is not inside Chrome and continue'
             )
+
+        # The deployed Lacros binary from Lacros prebuilt and Chrome Local build step can interfere
+        # with later bisection steps. Please do not add any bisection steps here that do not reflash
+        # the DUT before starting. See b/330852583#comment6 for more context.
 
         # Step 6: Narrowdown chromeos localbuild.
         self._dut_manager.reset(
