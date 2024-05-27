@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import os
@@ -199,11 +200,12 @@ def get_tast_bundle_info(opts, pattern=None):
     return result
 
 
-def run_test(opts, bundle):
+def run_test(opts: argparse.Namespace, test_name: str, bundle: dict) -> str:
     """Runs an autotest test.
 
     Args:
       opts: An argparse.Namespace to hold command line arguments.
+      test_name: Name of the test
       bundle: tast's test bundle
 
     Returns:
@@ -227,7 +229,7 @@ def run_test(opts, bundle):
         flags.append('-buildbundle=' + bundle)
 
     dut, forward_host = to_forwarded_host(opts.dut)
-    cmd = tast_cmd(opts, 'run', *flags, dut, opts.test_name)
+    cmd = tast_cmd(opts, 'run', *flags, dut, test_name)
     cros_util.cros_sdk(opts.chromeos_root, *cmd, forward_host=forward_host)
 
     return results_dir_output_chroot
@@ -260,17 +262,19 @@ def parse_results_json(result_dir, test_name) -> tuple[bool, str | None]:
     return passed, reason
 
 
-def gather_test_result(opts, result_dir) -> core.StepResult:
+def gather_test_result(
+    opts: argparse.Namespace, test_name: str, result_dir: str
+) -> core.StepResult:
     error_path = os.path.join(result_dir, 'run_error.txt')
     if os.path.exists(error_path):
         with open(error_path) as f:
             message = f.read()
         raise errors.ExternalError('tast global error: %s' % message)
 
-    passed, reason = parse_results_json(result_dir, opts.test_name)
+    passed, reason = parse_results_json(result_dir, test_name)
     if opts.metric:
         chart_path = os.path.join(
-            result_dir, 'tests', opts.test_name, 'results-chart.json'
+            result_dir, 'tests', test_name, 'results-chart.json'
         )
         util.copy_file_to_log_folder(chart_path)
         try:
@@ -314,6 +318,16 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
         if not cros_lab_util.repair(opts.dut, opts.chromeos_root):
             raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
 
+    tests: list[str] = [
+        value.strip() for value in opts.test_name.split(',') if value.strip()
+    ]
+    if len(tests) == 0:
+        raise errors.ArgumentError('--test-name', 'no valid test name found.')
+    if len(tests) > 1 and opts.metric:
+        raise errors.ArgumentError(
+            '--test-name', 'multiple performance tests are not supported.'
+        )
+
     # Private bundles are not included in the OS image, make sure they are
     # available.
     if opts.with_private_bundles and not opts.tast_build:
@@ -333,26 +347,8 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
                 '--fail-to-pass',
                 '--fail-to-pass is not for benchmark test (--metric)',
             )
-    # Remove the "tast." prefix prepended by autotest.
-    opts.test_name = re.sub(r'^tast\.', '', opts.test_name)
 
     cros_util.prepare_chroot(opts.chromeos_root)
-    tast_bundle_info = get_tast_bundle_info(opts, opts.test_name)
-    if not tast_bundle_info:
-        tast_bundle_info = get_tast_bundle_info(opts)
-        util.report_similar_candidates(
-            'test name', opts.test_name, list(tast_bundle_info)
-        )
-        assert 0  # unreachable
-
-    if len(tast_bundle_info) != 1 or opts.test_name not in tast_bundle_info:
-        # For example, tast in chroot after 12205.0.0 is IPC incompatible with
-        # tast on DUT earlier than 12028.0.0 (crbug/932307)
-        raise errors.ExecutionFatalError(
-            '"tast list" returns unexpected tests; '
-            'incompatible tast on DUT and in chroot?'
-        )
-
     try:
         prepare_to_run_test(opts)
     except Exception as e:
@@ -360,17 +356,44 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
             'failed when prepare, assume it is temporary: %s' % e
         )
 
-    bundle = tast_bundle_info[opts.test_name]
-    try:
-        result_dir = run_test(opts, bundle)
-    except subprocess.CalledProcessError as e:
-        reason = 'failed to run tast; maybe build, ssh, or setup failures'
-        # TODO(njrafi): Differentiate between ssh failure and test crash
-        if opts.consider_test_crash_as_failure:
-            return util.get_test_crash_step_result(reason, opts.fail_to_pass)
-        raise errors.BisectionTemporaryError(reason) from e
+    last_test_result: core.StepResult = None
+    for test in tests:
+        # Remove the "tast." prefix prepended by autotest.
+        test = re.sub(r'^tast\.', '', test)
+        tast_bundle_info = get_tast_bundle_info(opts, test)
+        if not tast_bundle_info:
+            tast_bundle_info = get_tast_bundle_info(opts)
+            util.report_similar_candidates(
+                'test name', test, list(tast_bundle_info)
+            )
+            assert 0  # unreachable
 
-    return gather_test_result(opts, result_dir)
+        if len(tast_bundle_info) != 1 or test not in tast_bundle_info:
+            # For example, tast in chroot after 12205.0.0 is IPC incompatible with
+            # tast on DUT earlier than 12028.0.0 (crbug/932307)
+            raise errors.ExecutionFatalError(
+                '"tast list" returns unexpected tests; '
+                'incompatible tast on DUT and in chroot?'
+            )
+
+        bundle = tast_bundle_info[test]
+        try:
+            result_dir = run_test(opts, test, bundle)
+        except subprocess.CalledProcessError as e:
+            reason = (
+                f'failed to run {test}; maybe build, ssh, or setup failures'
+            )
+            # TODO(njrafi): Differentiate between ssh failure and test crash
+            if opts.consider_test_crash_as_failure:
+                return util.get_test_crash_step_result(
+                    reason, opts.fail_to_pass
+                )
+            raise errors.BisectionTemporaryError(reason) from e
+        last_test_result = gather_test_result(opts, test, result_dir)
+        if last_test_result.data['status'] in ['fatal', 'skip']:
+            break
+
+    return last_test_result
 
 
 def action() -> bisector_cli.EvalAction:

@@ -651,6 +651,19 @@ def is_valid_ip(ip: str) -> bool:
     return True
 
 
+def append_to_file(src_path, dst_path):
+    """Copies or appends a file to the destination, ensuring no overwrite.
+
+    Args:
+        src_path (str): Path to the source file.
+        dst_path (str): Path to the destination file.
+    """
+
+    with open(src_path, "rb") as fsrc, open(dst_path, "ab") as fdst:
+        shutil.copyfileobj(fsrc, fdst)
+    logger.debug('copied %s to %s', src_path, dst_path)
+
+
 def copy_file_to_log_folder(file_path: str) -> bool:
     """Copy a file to the log directory
 
@@ -690,13 +703,7 @@ def copy_file_to_log_folder(file_path: str) -> bool:
         log_path.stem + '.' + file_path.stem + file_path.suffix
     )
     destination_file_path = log_path.parents[0] / destination_file_name
-
-    try:
-        shutil.copy(file_path, destination_file_path)
-    except shutil.SameFileError:
-        logger.warning('No copies are needed since they are the same file.')
-        return False
-    logger.debug('Copied %s -> %s', file_path, destination_file_path)
+    append_to_file(file_path, destination_file_path)
     return True
 
 
