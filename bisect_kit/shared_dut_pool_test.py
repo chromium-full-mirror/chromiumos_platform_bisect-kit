@@ -805,6 +805,23 @@ class TestCleanUpStaleDuts(unittest.TestCase):
             ['dut_name_1', 'dut_name_2']
         )
 
+    def test_failed_to_query_lease_status(self):
+        self._mock_query_lease_status.side_effect = [
+            cros_lab_util.LeaseStatus(
+                dut_name='dut_name_1', is_leased=True, is_leased_by_me=False
+            ),
+            errors.DutLeaseException('failed to query'),
+            cros_lab_util.LeaseStatus(
+                dut_name='dut_name_3', is_leased=True, is_leased_by_me=True
+            ),
+        ]
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        # pylint: disable=protected-access
+        pool_manager._clean_up_stale_duts(
+            ['dut_name_1', 'dut_name_2', 'dut_name_3']
+        )
+        self._mock_client.delete_multi.assert_called_once_with(['dut_name_1'])
+
 
 class TestLeaseForSession(unittest.TestCase):
     """Test lease_for_bisect()"""

@@ -326,8 +326,8 @@ def swarming_bot_info(bot_id, verbose_log=True):
 
 def swarming_bots_list(
     dimensions,
-    is_dead=False,
-    quarantined=False,
+    is_dead=None,
+    quarantined=None,
     is_busy=None,
     limit=None,
     verbose_log=True,
@@ -345,7 +345,6 @@ def swarming_bots_list(
     Returns:
       list of bots dict
     """
-    del verbose_log
     dimensions = [dict(zip(['key', 'value'], d.split(':'))) for d in dimensions]
     if not limit:
         limit = SWARMING_PRPC_DEFAULT_LIMIT
@@ -364,6 +363,8 @@ def swarming_bots_list(
     if is_busy is not None:
         content['isBusy'] = bool_to_string(is_busy)
 
+    if verbose_log:
+        logger.debug('swarming.v2.Bots.ListBots payload: %s', content)
     bots = []
     for bot in json.loads(swarming_grpc(method, content)).get('items', []):
         bot['dimensions'] = _simplify_bot_dimensions(bot['dimensions'])
@@ -883,7 +884,7 @@ def query_lease_status(dut_name, verbose_log=True) -> LeaseStatus:
     """
     status = LeaseStatus(dut_name=dut_name)
 
-    bots = swarming_bots_list(['dut_name:' + dut_name], verbose_log=False)
+    bots = swarming_bots_list(['dut_name:' + dut_name])
     if not bots:
         raise errors.DutLeaseException('dut_name:%s not found' % dut_name)
     assert len(bots) == 1

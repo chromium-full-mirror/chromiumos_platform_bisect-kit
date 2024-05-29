@@ -522,11 +522,19 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         """
         stale_duts = []
         for dut_name in dut_names:
-            lease_status = cros_lab_util.query_lease_status(
-                dut_name, verbose_log=False
-            )
-            if not (lease_status.is_leased and lease_status.is_leased_by_me):
-                stale_duts.append(dut_name)
+            try:
+                lease_status = cros_lab_util.query_lease_status(
+                    dut_name, verbose_log=False
+                )
+            except Exception as e:
+                logger.warning(
+                    'failed to check lease status for %s: %s', dut_name, e
+                )
+            else:
+                if not (
+                    lease_status.is_leased and lease_status.is_leased_by_me
+                ):
+                    stale_duts.append(dut_name)
         logger.info(
             'removing stale DUTs from the shared DUT pool: %s', stale_duts
         )

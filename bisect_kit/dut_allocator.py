@@ -60,7 +60,7 @@ def _sample_available_bots(
     *,
     is_dead: bool | None = False,
     quarantined: bool | None = False,
-    is_busy: bool | None = None,
+    is_busy: bool | None = False,
     limit: int = 10,
 ) -> list[str]:
     """Query available bots by given constraints and randomly sample the result.
@@ -157,7 +157,7 @@ def _sample_available_bots_with_retry(
 
     fail_count = 0
     while True:
-        if bots := sample_func(is_busy=False):
+        if bots := sample_func():
             return bots
 
         fail_count += 1
@@ -180,9 +180,7 @@ def _filter_dimensions_by_board(
         # Ideally, we need only one result. Here we get more (limit=10) in order to
         # cope with incorrect metadata in swarming database (b/196499726).
         logger.debug('sample_bots: %s', constraints)
-        bots = cros_lab_util.swarming_bots_list(
-            constraints, is_busy=None, limit=10
-        )
+        bots = cros_lab_util.swarming_bots_list(constraints, limit=10)
         for bot in bots:
             board = bot['dimensions']['label-board'][0]
             if board not in boards_with_prebuilt:

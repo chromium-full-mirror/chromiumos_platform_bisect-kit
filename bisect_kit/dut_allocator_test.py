@@ -5,6 +5,7 @@
 import unittest
 from unittest import mock
 
+from bisect_kit import cros_lab_util
 from bisect_kit import dut_allocator
 from bisect_kit import errors
 
@@ -153,43 +154,62 @@ class TestSampleAvailableBots(unittest.TestCase):
             )
 
     @mock.patch('time.sleep')
-    @mock.patch.object(dut_allocator, '_sample_available_bots')
-    def test_sample_available_bots_with_retry_is_busy_false(
-        self, mock_sample_available_bots, mock_sleep
+    @mock.patch.object(cros_lab_util, 'swarming_bots_list')
+    def test_sample_available_bots_with_retry(
+        self, mock_swarming_bots_lists, mock_sleep
     ):
-        available_bots = [f'bot{k}' for k in range(10)]
-        mock_sample_available_bots.side_effect = [
-            available_bots,
+        available_bots_v1 = [f'bot{k}' for k in range(5)]
+        available_bots_v2 = [f'bot{k}' for k in range(6, 10)]
+        mock_swarming_bots_lists.side_effect = [
+            available_bots_v1,
+            available_bots_v2,
         ]
 
         dimensions = ['d1', 'd2']
         variants = ['v1', 'v2']
-        sample_num = len(available_bots)
+        sample_num = 10
         max_attempts = 3
 
         # pylint: disable=protected-access
         acquired_bots = dut_allocator._sample_available_bots_with_retry(
             dimensions, variants, None, sample_num, max_attempts=max_attempts
         )
-        self.assertCountEqual(acquired_bots, available_bots)
+        self.assertCountEqual(
+            acquired_bots, available_bots_v1 + available_bots_v2
+        )
         mock_sleep.assert_not_called()
-        mock_sample_available_bots.assert_called_once_with(
-            dimensions, variants, None, mock.ANY, None, is_busy=False
+        mock_swarming_bots_lists.assert_has_calls(
+            [
+                mock.call(
+                    ['d1', 'd2', 'v1'],
+                    is_dead=False,
+                    quarantined=False,
+                    is_busy=False,
+                    limit=mock.ANY,
+                ),
+                mock.call(
+                    ['d1', 'd2', 'v2'],
+                    is_dead=False,
+                    quarantined=False,
+                    is_busy=False,
+                    limit=mock.ANY,
+                ),
+            ]
         )
 
     @mock.patch('time.sleep')
-    @mock.patch.object(dut_allocator, '_sample_available_bots')
+    @mock.patch.object(cros_lab_util, 'swarming_bots_list')
     def test_sample_available_bots_with_retry_once(
-        self, mock_sample_available_bots, mock_sleep
+        self, mock_swarming_bots_lists, mock_sleep
     ):
         available_bots = [f'bot{k}' for k in range(10)]
-        mock_sample_available_bots.side_effect = [
+        mock_swarming_bots_lists.side_effect = [
             [],
             available_bots,
         ]
 
         dimensions = ['d1', 'd2']
-        variants = ['v1', 'v2']
+        variants = ['v1']
         sample_num = len(available_bots)
         max_attempts = 3
 
@@ -199,13 +219,21 @@ class TestSampleAvailableBots(unittest.TestCase):
         )
         self.assertCountEqual(acquired_bots, available_bots)
         mock_sleep.assert_called_once()
-        mock_sample_available_bots.assert_has_calls(
+        mock_swarming_bots_lists.assert_has_calls(
             [
                 mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=False
+                    ['d1', 'd2', 'v1'],
+                    is_dead=False,
+                    quarantined=False,
+                    is_busy=False,
+                    limit=mock.ANY,
                 ),
                 mock.call(
-                    dimensions, variants, None, mock.ANY, None, is_busy=False
+                    ['d1', 'd2', 'v1'],
+                    is_dead=False,
+                    quarantined=False,
+                    is_busy=False,
+                    limit=mock.ANY,
                 ),
             ]
         )
