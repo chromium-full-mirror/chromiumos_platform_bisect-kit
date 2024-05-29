@@ -165,8 +165,8 @@ def _sample_available_bots_with_retry(
             raise errors.NoDutAvailable(
                 'no bots satisfy constraints; all are in maintenance state?'
             )
-        # sleep 2^fail_count minutes before next try
-        time.sleep(60 * (2**fail_count))
+        # sleep one minutes before next try
+        time.sleep(60)
 
 
 def _filter_dimensions_by_board(
