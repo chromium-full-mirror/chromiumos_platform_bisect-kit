@@ -74,16 +74,12 @@ class DutManagerRecycler:
 class CrosDiagnoser:
     """Integrated bisectors API for ChromeOS regression analysis."""
 
-    def __init__(
-        self, states: core.DiagnoseStates, config: dict, dut: str | None
-    ):
+    def __init__(self, states: core.DiagnoseStates, config: dict):
         """Initializer.
 
         Args:
           states: a core.DiagnoseStates objejct.
           config: a config from a core.DiagnoseStates object.
-          dut: a pre-allocated DUT address, or the string ":lab:" to indicate
-              a DUT is to be auto-allocated.
         """
         self.states = states
         self.config = config
@@ -95,9 +91,24 @@ class CrosDiagnoser:
         # self.noisy will be updated after we gather more information from each
         # bisect session.
         self.noisy = config['noisy']
-        self.pre_allocated_dut = dut
-        if self.pre_allocated_dut == cros_lab_util.LAB_DUT:
-            self.pre_allocated_dut = None
+
+        # When BKR passes '--dut', the DUT is pre-leased only if it is a stateful
+        # bisection. So if it is a stateless bisection, ignore the DUT passed by
+        # '--dut' and let DutManager lease the specific DUT via DutAllocateSpec.
+        # Note that '--dut' is stored in self.config['dut'].
+        self.pre_allocated_dut = None
+        if not experiment.is_in_experiment(
+            self.config.get('experiments'),
+            experiment.ID.STATELESS,
+        ):
+            user_specified_dut = self.config.get('dut')
+            # ':lab:' is a legacy presnetation for auto allocation.
+            # If --dut ':lab' is passed, take it as stateless bisection.
+            if not user_specified_dut == cros_lab_util.LAB_DUT:
+                self.pre_allocated_dut = user_specified_dut
+        # self.pre_allocated_dut is always None in stateless bisection.
+        self.is_stateless = not self.pre_allocated_dut
+        logger.info('is_stateless: %s', self.is_stateless)
 
         self.cros_old: str = ''
         self.cros_new: str = ''
@@ -117,7 +128,6 @@ class CrosDiagnoser:
             self.is_vm_board = cros_util.is_vm_board(
                 self.dut_allocate_spec.boards[0]
             )
-        self.is_stateless = not self.pre_allocated_dut
         self._switch_vm_cmd: list[str] = ['./switch_cros_vm.py']
 
         # Initialized in diagnose().
@@ -1876,12 +1886,12 @@ class DiagnoseCommandLineBase:
 
     def cmd_log(self, opts):
         self.states.load_states()
-        diagnoser = CrosDiagnoser(self.states, self.config, None)
+        diagnoser = CrosDiagnoser(self.states, self.config)
         diagnoser.cmd_log(opts.json)
 
     def cmd_view(self, opts):
         self.states.load_states()
-        diagnoser = CrosDiagnoser(self.states, self.config, None)
+        diagnoser = CrosDiagnoser(self.states, self.config)
         diagnoser.cmd_view(opts.json, opts.verbose)
 
     def create_argument_parser_hook(self, parser_init):

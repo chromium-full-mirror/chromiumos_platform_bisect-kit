@@ -63,8 +63,8 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         return switch_test_harness_cmd, common_eval_cmd
 
-    def do_run(self, dut):
-        diagnoser = diagnoser_cros.CrosDiagnoser(self.states, self.config, dut)
+    def do_run(self):
+        diagnoser = diagnoser_cros.CrosDiagnoser(self.states, self.config)
 
         switch_test_harness_cmd, common_eval_cmd = self._build_cmds()
 
@@ -90,7 +90,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         try:
             logger.info('experiments: %s', self.config['experiments'])
-            self.do_run(self.config.get('dut'))
+            self.do_run()
             logger.info('%s done', __file__)
         except Exception as e:
             logger.exception('got exception; stop')
