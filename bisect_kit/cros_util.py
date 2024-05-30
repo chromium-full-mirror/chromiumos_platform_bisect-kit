@@ -1636,6 +1636,35 @@ def provision_image(
     verify_dut_version(host, board, version)
 
 
+def powerwash(
+    dut: str, force_reboot_callback: typing.Callable[[str]] | None = None
+) -> bool:
+    """Powerwash the DUT
+
+    Args:
+        dut: dut host name
+        force_reboot_callback: reboot hook for passing to reboot function
+
+    Returns:
+        True if the powerwash was successful, False otherwise
+    """
+    try:
+        # http://g3doc/company/users/timvp/ChromeOS/Debugging
+        util.ssh_cmd(
+            dut,
+            'echo',
+            '"fast safe"',
+            '>',
+            '/mnt/stateful_partition/factory_install_reset',
+        )
+        reboot(dut, force_reboot_callback=force_reboot_callback)
+    except Exception as e:
+        logger.debug('powerwashing %s failed %s', dut, e)
+        return False
+    logger.debug('powerwashing %s successful', dut)
+    return True
+
+
 def search_prebuilt_image(board, version) -> ImageInfo:
     """Searches chromeos prebuilt image.
 
@@ -1709,9 +1738,10 @@ def cros_flash(
     """
     logger.info('cros_flash %s %s', host, image_info)
 
-    # Reboot is necessary because sometimes previous 'cros flash' failed and
-    # entered a bad state.
-    reboot(host, force_reboot_callback=force_reboot_callback)
+    # Powerwash is necessary to prevent some DUTs failing the flash with no space error. b/332260805
+    # Powerwash will also reboot the DUT which is necessary because sometimes previous 'cros flash'
+    # failed and entered a bad state.
+    powerwash(host, force_reboot_callback=force_reboot_callback)
 
     # Stop service ap-update-manager to prevent rebooting during auto update.
     # The service is used in jetstream boards, but not other CrOS devices.

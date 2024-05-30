@@ -1067,7 +1067,7 @@ def dut_lease_status_monitor(dut, reason):
         logger.debug('keeper thread is terminated')
 
 
-def reboot_via_servo(dut):
+def reboot_via_servo(dut: str):
     """Reboot a DUT in the lab via servo.
 
     When this function returns, the reboot process may not finish yet. The caller
