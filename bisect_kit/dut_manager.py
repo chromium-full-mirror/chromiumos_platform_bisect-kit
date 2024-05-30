@@ -249,6 +249,9 @@ class DutManager:
         # provision() calls of a DutManager instance.
         self._is_restored_dut: bool = False
 
+        # Handle nested call of provision().
+        self._nested_counter = 0
+
         # Arguments for VM bisection.
         self._vm_cros_version: Optional[str] = vm_cros_version
         self._allocated_vm: Optional[vm_leaser.VMLeaseResult] = None
@@ -417,6 +420,7 @@ class DutManager:
         self._is_dut_initialized = False
         self._is_restored_dut = False
         self._wait_ssh_avaliable()
+        self._update_states(leased_dut)
 
     def _release_vm(self):
         """Release a VM instance, and deletes its image."""
@@ -566,6 +570,11 @@ class DutManager:
             vm_cros_version: CrOS version wants to provision. If None, VM
               bisection uses CrOS version passed in __init__.
         """
+        self._nested_counter += 1
+        yield from self._do_provision(vm_cros_version)
+        self._nested_counter -= 1
+
+    def _do_provision(self, vm_cros_version: Optional[str] = None):
         if self.is_vm:
             if self._vm_cros_version is None and vm_cros_version is None:
                 logger.warning('vm version is not defined, skip provision')
@@ -576,14 +585,17 @@ class DutManager:
                 self._vm_cros_version = vm_cros_version
         else:
             assert vm_cros_version is None
+
+        logger.debug('provision with nested counter: %s', self._nested_counter)
+        if self._nested_counter > 1:
+            yield self.dut
+            return
+
         with self:
             dut = self.dut
             if not dut:
                 yield None
                 return
-
-            if dut == self._auto_allocated_dut:
-                self._update_states(dut)
 
             self.run_init_func()
 

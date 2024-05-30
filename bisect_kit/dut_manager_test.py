@@ -382,9 +382,8 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.assertEqual(dut, 'host.cros')
             self.assertTrue(dut_manager.is_previous_dut())
 
-        self.mock_update_states.assert_called_once_with(
-            dut_manager, 'host.cros'
-        )
+        # Since the DUT is restored, _update_states() is not called again.
+        self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_called_once_with(
             'host.cros', cros_lab_util.make_lease_reason('stateless')
         )
@@ -424,6 +423,154 @@ class TestDutManagerAllocation(unittest.TestCase):
         with dut_manager.provision() as dut:
             self.assertEqual(dut, 'host2.cros')
             self.assertFalse(dut_manager.is_previous_dut())
+
+        self.mock_update_states.assert_called_once_with(
+            dut_manager, 'host2.cros'
+        )
+        self.mock_dut_lease_status_monitor.assert_called_once_with(
+            'host2.cros', cros_lab_util.make_lease_reason('stateless')
+        )
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host2.cros', mock.ANY, mock.ANY
+        )
+        self.mock_dut_releaser.start.assert_called_once()
+        self.mock_allocate_dut.assert_called_once_with(
+            dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
+            enable_shared_dut_pool=False,
+        )
+        self.mock_dut_init_func.assert_called_once_with('host2.cros')
+        self.mock_dut_leave_context_check_func.assert_called_once_with(
+            'host2.cros'
+        )
+
+    def test_nested_provision_twice_with_restored_dut(self):
+        self.mock_is_vm.return_value = False
+        dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
+            self.mock_states,
+            self.mock_dut_allocate_spec,
+            cros_lab_util.LAB_DUT,
+            True,
+            self.mock_dut_init_func,
+            self.mock_dut_leave_context_check_func,
+        )
+
+        # First lease.
+        self.mock_allocate_dut.return_value = 'host', 'board'
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host.cros')
+            with dut_manager.provision() as dut:
+                self.assertEqual(dut, 'host.cros')
+                with dut_manager.provision() as dut:
+                    self.assertEqual(dut, 'host.cros')
+
+        self.mock_update_states.assert_called_once_with(
+            dut_manager, 'host.cros'
+        )
+        self.mock_dut_lease_status_monitor.assert_called_once_with(
+            'host.cros', cros_lab_util.make_lease_reason('stateless')
+        )
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host.cros', mock.ANY, mock.ANY
+        )
+        self.mock_allocate_dut.assert_called_once_with(
+            dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
+            enable_shared_dut_pool=False,
+        )
+        self.mock_dut_init_func.assert_called_once_with('host.cros')
+        self.mock_dut_leave_context_check_func.assert_called_once_with(
+            'host.cros'
+        )
+
+        # Reset all the mocks to test the second lease.
+        self.reset_all_mocks()
+
+        # Second lease.
+        self.mock_is_vm.return_value = False
+        self.mock_dut_releaser.cancel.return_value = True
+        self.mock_dut_releaser.get_dut.return_value = 'host.cros'
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host.cros')
+            self.assertTrue(dut_manager.is_previous_dut())
+            with dut_manager.provision() as dut:
+                self.assertEqual(dut, 'host.cros')
+                self.assertTrue(dut_manager.is_previous_dut())
+                with dut_manager.provision() as dut:
+                    self.assertEqual(dut, 'host.cros')
+                    self.assertTrue(dut_manager.is_previous_dut())
+
+        self.mock_update_states.assert_not_called()
+        self.mock_dut_lease_status_monitor.assert_called_once_with(
+            'host.cros', cros_lab_util.make_lease_reason('stateless')
+        )
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host.cros', mock.ANY, mock.ANY
+        )
+        self.mock_dut_releaser.start.assert_called_once()
+        self.mock_allocate_dut.assert_not_called()
+        self.mock_dut_init_func.assert_not_called()
+        self.mock_dut_leave_context_check_func.assert_called_once_with(
+            'host.cros'
+        )
+
+    def test_nested_provision_twice_with_new_allocated_dut(self):
+        self.mock_is_vm.return_value = False
+        dut_manager = dut_manager_module.DutManager(
+            'NoPreAllocate',
+            self.mock_states,
+            self.mock_dut_allocate_spec,
+            cros_lab_util.LAB_DUT,
+            True,
+            self.mock_dut_init_func,
+            self.mock_dut_leave_context_check_func,
+        )
+
+        # First lease.
+        self.mock_allocate_dut.return_value = 'host', 'board'
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host.cros')
+            with dut_manager.provision() as dut:
+                self.assertEqual(dut, 'host.cros')
+                with dut_manager.provision() as dut:
+                    self.assertEqual(dut, 'host.cros')
+
+        self.mock_update_states.assert_called_once_with(
+            dut_manager, 'host.cros'
+        )
+        self.mock_dut_lease_status_monitor.assert_called_once_with(
+            'host.cros', cros_lab_util.make_lease_reason('stateless')
+        )
+        self.mock_delayed_dut_releaser_cls.assert_called_once_with(
+            'host.cros', mock.ANY, mock.ANY
+        )
+        self.mock_allocate_dut.assert_called_once_with(
+            dut_manager.dut_allocate_spec,
+            'PATH_TO_CHROMEOS_ROOT',
+            enable_shared_dut_pool=False,
+        )
+        self.mock_dut_init_func.assert_called_once_with('host.cros')
+        self.mock_dut_leave_context_check_func.assert_called_once_with(
+            'host.cros'
+        )
+
+        # Reset all the mocks to test the second lease.
+        self.reset_all_mocks()
+
+        # Second lease.
+        self.mock_is_vm.return_value = False
+        self.mock_dut_releaser.cancel.return_value = False
+        self.mock_allocate_dut.return_value = 'host2', 'board2'
+        with dut_manager.provision() as dut:
+            self.assertEqual(dut, 'host2.cros')
+            self.assertFalse(dut_manager.is_previous_dut())
+            with dut_manager.provision() as dut:
+                self.assertEqual(dut, 'host2.cros')
+                self.assertFalse(dut_manager.is_previous_dut())
+                with dut_manager.provision() as dut:
+                    self.assertEqual(dut, 'host2.cros')
+                    self.assertFalse(dut_manager.is_previous_dut())
 
         self.mock_update_states.assert_called_once_with(
             dut_manager, 'host2.cros'
