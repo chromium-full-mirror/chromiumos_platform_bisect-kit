@@ -598,10 +598,38 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                 d for d in matched_duts if d.get('name') not in stale_duts
             ]
             logger.debug(
-                '%s matched idle duts after removing stale duts: %s',
+                '%s matched idle DUTs after removing stale DUTs: %s',
                 len(matched_duts),
                 [d.get('name') for d in matched_duts],
             )
+
+            # In theory the DUT owned by a bisect should match the spec and idle
+            # (i.e., in |matched_dut_names|). But in some error cases the owned
+            # DUT could not be used by the owner. We should clean them up so the
+            # bisect can own a new DUT.
+            owned_duts = self.query_by_owner(requestor)
+            logger.debug('DUTs owned by %s: %s', requestor, owned_duts)
+
+            bad_owned_duts = []
+            for d in owned_duts:
+                if not d in matched_dut_names:
+                    bad_owned_duts.append(d)
+                    logger.warning(
+                        '%s can not use its own DUT %s, something wrong happened. '
+                        'Returning it to the lab',
+                        requestor,
+                        d,
+                    )
+                    try:
+                        cros_lab_util.crosfleet_release_dut(d)
+                    except Exception as e:
+                        logger.warning(
+                            'failed to return DUT %s to the lab: %s', d, e
+                        )
+            self._client.delete_multi(
+                [self._default_key(d) for d in bad_owned_duts]
+            )
+
             if not matched_duts:
                 return None, None
 

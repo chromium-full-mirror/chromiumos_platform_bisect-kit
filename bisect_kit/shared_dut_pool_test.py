@@ -852,19 +852,30 @@ class TestLeaseForSession(unittest.TestCase):
             )
         )
         self._mock_clean_up_stale_duts.return_value = []
+
+        self._mock_query_by_owner = self.enterContext(
+            mock.patch.object(
+                FakeSharedDutPoolManager,
+                'query_by_owner',
+                autospec=True,
+            )
+        )
+
+        self._mock_crosfleet_release_dut = self.enterContext(
+            mock.patch.object(
+                cros_lab_util,
+                'crosfleet_release_dut',
+                autospec=True,
+            )
+        )
+
+        # mock the "key" method to return the raw "name"
+        self._mock_client.key.side_effect = (
+            lambda self, name, *args, **kwargs: name
+        )
         self.maxDiff = None
 
-    def test_no_matched_duts(self):
-        pool_manager = FakeSharedDutPoolManager(self._mock_client)
-        self._mock_fetch.return_value = iter([])
-        dut_name, orig_owner = pool_manager.lease_for_bisect(
-            'bisect_1', [], [], []
-        )
-        self.assertEqual(None, dut_name)
-        self.assertEqual(None, orig_owner)
-        self._mock_client.put.assert_not_called()
-
-    def test_has_owned_dut(self):
+    def test_has_matched_dut_and_only_good_owned_dut(self):
         duts = []
         for i in range(3):
             dut = datastore.Entity()
@@ -877,6 +888,7 @@ class TestLeaseForSession(unittest.TestCase):
             duts.append(dut)
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         self._mock_fetch.return_value = iter(duts)
+        self._mock_query_by_owner.return_value = ['dut_name_2']
         dut_name, orig_owner = pool_manager.lease_for_bisect(
             'bisect_2', [], [], []
         )
@@ -889,7 +901,7 @@ class TestLeaseForSession(unittest.TestCase):
         self.assertEqual('bisect_2', updated_dut['owner'])
         self.assertEqual(shared_dut_pool.DutState.BUSY, updated_dut['state'])
 
-    def test_has_no_owned_dut(self):
+    def test_has_matched_dut_and_both_good_bad_owned_dut(self):
         duts = []
         for i in range(3):
             dut = datastore.Entity()
@@ -902,6 +914,83 @@ class TestLeaseForSession(unittest.TestCase):
             duts.append(dut)
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         self._mock_fetch.return_value = iter(duts)
+        self._mock_query_by_owner.return_value = [
+            'dut_name_2',
+            'dut_name_4',
+            'dut_name_5',
+        ]
+        dut_name, orig_owner = pool_manager.lease_for_bisect(
+            'bisect_2', [], [], []
+        )
+        self.assertEqual('dut_name_2', dut_name)
+        self.assertEqual('bisect_2', orig_owner)
+
+        self._mock_crosfleet_release_dut.assert_has_calls(
+            [
+                mock.call('dut_name_4'),
+                mock.call('dut_name_5'),
+            ]
+        )
+        self._mock_client.delete_multi.assert_called_once_with(
+            ['dut_name_4', 'dut_name_5']
+        )
+
+        self._mock_client.put.assert_called_once()
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual('dut_name_2', updated_dut['name'])
+        self.assertEqual('bisect_2', updated_dut['owner'])
+        self.assertEqual(shared_dut_pool.DutState.BUSY, updated_dut['state'])
+
+    def test_has_matched_dut_and_only_bad_owned_dut(self):
+        duts = []
+        for i in range(3):
+            dut = datastore.Entity()
+            dut.update(
+                {
+                    'name': 'dut_name_%s' % str(i + 1),
+                    'owner': 'bisect_%s' % str(i + 1),
+                }
+            )
+            duts.append(dut)
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        self._mock_fetch.return_value = iter(duts)
+        self._mock_query_by_owner.return_value = ['dut_name_4', 'dut_name_5']
+        dut_name, orig_owner = pool_manager.lease_for_bisect(
+            'bisect_4', [], [], []
+        )
+        self.assertEqual('dut_name_1', dut_name)
+        self.assertEqual('bisect_1', orig_owner)
+
+        self._mock_crosfleet_release_dut.assert_has_calls(
+            [
+                mock.call('dut_name_4'),
+                mock.call('dut_name_5'),
+            ]
+        )
+        self._mock_client.delete_multi.assert_called_once_with(
+            ['dut_name_4', 'dut_name_5']
+        )
+
+        self._mock_client.put.assert_called_once()
+        updated_dut = self._mock_client.put.call_args.args[0]
+        self.assertEqual('dut_name_1', updated_dut['name'])
+        self.assertEqual('bisect_4', updated_dut['owner'])
+        self.assertEqual(shared_dut_pool.DutState.BUSY, updated_dut['state'])
+
+    def test_has_matched_dut_and_no_owned_dut(self):
+        duts = []
+        for i in range(3):
+            dut = datastore.Entity()
+            dut.update(
+                {
+                    'name': 'dut_name_%s' % str(i + 1),
+                    'owner': 'bisect_%s' % str(i + 1),
+                }
+            )
+            duts.append(dut)
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        self._mock_fetch.return_value = iter(duts)
+        self._mock_query_by_owner.return_value = []
         dut_name, orig_owner = pool_manager.lease_for_bisect(
             'bisect_4', [], [], []
         )
@@ -913,6 +1002,39 @@ class TestLeaseForSession(unittest.TestCase):
         self.assertEqual('dut_name_1', updated_dut['name'])
         self.assertEqual('bisect_4', updated_dut['owner'])
         self.assertEqual(shared_dut_pool.DutState.BUSY, updated_dut['state'])
+
+    def test_no_matched_dut_and_no_owned_dut(self):
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        self._mock_fetch.return_value = iter([])
+        self._mock_query_by_owner = []
+        dut_name, orig_owner = pool_manager.lease_for_bisect(
+            'bisect_1', [], [], []
+        )
+        self.assertEqual(None, dut_name)
+        self.assertEqual(None, orig_owner)
+        self._mock_client.put.assert_not_called()
+
+    def test_no_matched_dut_and_only_bad_owned_dut(self):
+        pool_manager = FakeSharedDutPoolManager(self._mock_client)
+        self._mock_fetch.return_value = iter([])
+        self._mock_query_by_owner.return_value = ['dut_name_1', 'dut_name_2']
+        dut_name, orig_owner = pool_manager.lease_for_bisect(
+            'bisect_1', [], [], []
+        )
+        self.assertEqual(None, dut_name)
+        self.assertEqual(None, orig_owner)
+
+        self._mock_crosfleet_release_dut.assert_has_calls(
+            [
+                mock.call('dut_name_1'),
+                mock.call('dut_name_2'),
+            ]
+        )
+        self._mock_client.delete_multi.assert_called_once_with(
+            ['dut_name_1', 'dut_name_2']
+        )
+
+        self._mock_client.put.assert_not_called()
 
     def test_has_stale_duts(self):
         duts = []
@@ -927,6 +1049,7 @@ class TestLeaseForSession(unittest.TestCase):
             duts.append(dut)
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         self._mock_fetch.return_value = iter(duts)
+        self._mock_query_by_owner.return_value = []
         self._mock_clean_up_stale_duts.return_value = [
             'dut_name_1',
             'dut_name_2',
@@ -956,6 +1079,7 @@ class TestLeaseForSession(unittest.TestCase):
             duts.append(dut)
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         self._mock_fetch.return_value = iter(duts)
+        self._mock_query_by_owner.return_value = []
         self._mock_clean_up_stale_duts.return_value = [
             'dut_name_1',
             'dut_name_2',
