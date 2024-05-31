@@ -628,6 +628,13 @@ class DutManager:
         """
         logger.info('updating states by %s', dut)
 
+        if self.dut_allocate_spec.dut_name:
+            logger.info(
+                'a specific dut %s is used, no need to update the device spec.',
+                self.dut_allocate_spec.dut_name,
+            )
+            return
+
         host = cros_lab_util.dut_host_name(dut)
 
         # Query the bot id by dut name first.

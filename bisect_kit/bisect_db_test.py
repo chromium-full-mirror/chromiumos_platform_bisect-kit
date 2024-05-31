@@ -23,14 +23,14 @@ class TestToDutAllocateSpec(unittest.TestCase):
         super().setUp()
         self.maxDiff = None
 
-    def test_bisect_with_dut_name(self):
+    def test_bisect_with_dut_name_ends_with_cros(self):
         bisect = datastore.Entity()
         bisect.update(
             {
                 'ID': '00005bdd-e7fd-4a0a-be51-6f3d48547731',
                 'Builders': ['asurada'],
                 'Pools': ['healthmon-satlab', 'DUT_POOL_QUOTA'],
-                'UserDUT': 'chromeos1-dev-host9.cros',
+                'UserDUT': 'chromeos7-row6-rack4-host3.cros',
                 'Old.Version': '12703.0.0',
                 'New.Version': '12739.0.0',
             }
@@ -39,7 +39,88 @@ class TestToDutAllocateSpec(unittest.TestCase):
         self.assertEqual(
             dut_allocate_spec_type.DutAllocateSpec(
                 pools=['healthmon-satlab', 'DUT_POOL_QUOTA'],
-                dut_name='chromeos1-dev-host9',
+                dut_name='chromeos7-row6-rack4-host3',
+                dimensions=[],
+                version_hints=['12703.0.0', '12739.0.0'],
+                builder_hints=['asurada'],
+                session='00005bdd-e7fd-4a0a-be51-6f3d48547731',
+            ),
+            bisect_db.to_dut_allocate_spec(bisect),
+        )
+
+    def test_bisect_with_dut_name_not_ends_with_cros(self):
+        bisect = datastore.Entity()
+        bisect.update(
+            {
+                'ID': '00005bdd-e7fd-4a0a-be51-6f3d48547731',
+                'Builders': ['asurada'],
+                'Pools': ['healthmon-satlab', 'DUT_POOL_QUOTA'],
+                'UserDUT': 'chromeos7-row6-rack4-host3',
+                'Old.Version': '12703.0.0',
+                'New.Version': '12739.0.0',
+            }
+        )
+
+        self.assertEqual(
+            dut_allocate_spec_type.DutAllocateSpec(
+                pools=['healthmon-satlab', 'DUT_POOL_QUOTA'],
+                dut_name='chromeos7-row6-rack4-host3',
+                dimensions=[],
+                version_hints=['12703.0.0', '12739.0.0'],
+                builder_hints=['asurada'],
+                session='00005bdd-e7fd-4a0a-be51-6f3d48547731',
+            ),
+            bisect_db.to_dut_allocate_spec(bisect),
+        )
+
+    def test_bisect_with_dut_name_and_device_spec(self):
+        bisect = datastore.Entity()
+        bisect.update(
+            {
+                'ID': '00005bdd-e7fd-4a0a-be51-6f3d48547731',
+                'Builders': ['asurada'],
+                'DeviceSpecType': bisect_db.DeviceSpecType.BOARD,
+                'DeviceSpecValue': ['asurada'],
+                'Pools': ['healthmon-satlab', 'DUT_POOL_QUOTA'],
+                'UserDUT': 'chromeos7-row6-rack4-host3',
+                'Old.Version': '12703.0.0',
+                'New.Version': '12739.0.0',
+            }
+        )
+
+        self.assertEqual(
+            dut_allocate_spec_type.DutAllocateSpec(
+                pools=['healthmon-satlab', 'DUT_POOL_QUOTA'],
+                # boards not set.
+                dut_name='chromeos7-row6-rack4-host3',
+                dimensions=[],
+                version_hints=['12703.0.0', '12739.0.0'],
+                builder_hints=['asurada'],
+                session='00005bdd-e7fd-4a0a-be51-6f3d48547731',
+            ),
+            bisect_db.to_dut_allocate_spec(bisect),
+        )
+
+    def test_bisect_with_dut_name_and_retry_device_spec(self):
+        bisect = datastore.Entity()
+        bisect.update(
+            {
+                'ID': '00005bdd-e7fd-4a0a-be51-6f3d48547731',
+                'Builders': ['asurada'],
+                'RetryDeviceSpecType': bisect_db.DeviceSpecType.MODEL,
+                'RetryDeviceSpecValue': 'hayato',
+                'Pools': ['healthmon-satlab', 'DUT_POOL_QUOTA'],
+                'UserDUT': 'chromeos7-row6-rack4-host3',
+                'Old.Version': '12703.0.0',
+                'New.Version': '12739.0.0',
+            }
+        )
+
+        self.assertEqual(
+            dut_allocate_spec_type.DutAllocateSpec(
+                pools=['healthmon-satlab', 'DUT_POOL_QUOTA'],
+                # model is not set.
+                dut_name='chromeos7-row6-rack4-host3',
                 dimensions=[],
                 version_hints=['12703.0.0', '12739.0.0'],
                 builder_hints=['asurada'],
@@ -221,7 +302,7 @@ class TestToDutAllocateSpec(unittest.TestCase):
                 'Builders': ['asurada'],
                 'DeviceSpecType': bisect_db.DeviceSpecType.BOARD,
                 'DeviceSpecValue': ['asurada'],
-                'RetryDeviceSpecType': 2,
+                'RetryDeviceSpecType': bisect_db.DeviceSpecType.MODEL,
                 'RetryDeviceSpecValue': 'hayato',
                 'Pools': ['healthmon-satlab', 'DUT_POOL_QUOTA'],
                 'Old.Version': '12703.0.0',

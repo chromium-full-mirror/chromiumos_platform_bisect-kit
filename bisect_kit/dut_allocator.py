@@ -301,9 +301,6 @@ class DutAllocator:
         spec = self._spec
 
         if spec.dut_name:
-            # If dut_name is specified, pool is ignored.
-            spec.pools = []
-
             if cros_lab_util.is_satlab_dut(spec.dut_name):
                 cros_lab_util.write_satlab_ssh_config(spec.dut_name)
             if not spec.builder_hints:
@@ -343,7 +340,8 @@ class DutAllocator:
         dimensions = _filter_dimensions_by_lab(dimensions, raise_unknown=True)
 
         pools = None
-        if spec.pools:
+        # Pool is ignored if dut_name is specified.
+        if spec.pools and not spec.dut_name:
             pools = ['label-pool:%s' % p for p in spec.pools]
             pools = _filter_dimensions_by_lab(pools, raise_unknown=False)
             if not pools:

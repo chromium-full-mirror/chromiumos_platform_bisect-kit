@@ -74,24 +74,32 @@ def to_dut_allocate_spec(
 
     user_dut = b.get('UserDUT')
     if user_dut:
+        # ends with ".cros", or DUTs needs forward.
         if cros_lab_util.is_lab_dut(user_dut):
-            user_dut = cros_lab_util.dut_host_name(user_dut)
-        spec.dut_name = user_dut
+            # converts it to host name without ".cros"
+            spec.dut_name = cros_lab_util.dut_host_name(user_dut)
+        # does not ends with ".cros"
+        elif cros_lab_util.is_lab_dut(
+            cros_lab_util.dut_name_to_address(user_dut)
+        ):
+            # leave it without ".cros"
+            spec.dut_name = user_dut
 
-    retry_device_spec_type = b.get('RetryDeviceSpecType')
-    retry_device_spec_value = b.get('RetryDeviceSpecValue')
-    if retry_device_spec_type and retry_device_spec_value:
-        device_spec_type = retry_device_spec_type
-        device_spec_value = [retry_device_spec_value]
-    else:
-        device_spec_type = b.get('DeviceSpecType')
-        device_spec_value = b.get('DeviceSpecValue', [])
-    if device_spec_type == DeviceSpecType.BOARD:
-        spec.boards = device_spec_value
-    elif device_spec_type == DeviceSpecType.MODEL:
-        spec.models = device_spec_value
-    elif device_spec_type == DeviceSpecType.SKU:
-        spec.skus = device_spec_value
+    if not spec.dut_name:
+        retry_device_spec_type = b.get('RetryDeviceSpecType')
+        retry_device_spec_value = b.get('RetryDeviceSpecValue')
+        if retry_device_spec_type and retry_device_spec_value:
+            device_spec_type = retry_device_spec_type
+            device_spec_value = [retry_device_spec_value]
+        else:
+            device_spec_type = b.get('DeviceSpecType')
+            device_spec_value = b.get('DeviceSpecValue', [])
+        if device_spec_type == DeviceSpecType.BOARD:
+            spec.boards = device_spec_value
+        elif device_spec_type == DeviceSpecType.MODEL:
+            spec.models = device_spec_value
+        elif device_spec_type == DeviceSpecType.SKU:
+            spec.skus = device_spec_value
 
     if (
         not spec.boards
