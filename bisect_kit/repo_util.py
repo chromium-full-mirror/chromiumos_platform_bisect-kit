@@ -213,6 +213,17 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
     _repo_cmd(*cmd, repo_dir=repo_dir, timeout=REPO_SYNC_TIMEOUT_SECONDS)
 
 
+def cherry_pick(repo_dir: str, cl: str):
+    """Cherry pick a gerrit CL.
+
+    Args:
+      repo_dir: root directory of repo
+      cl: gerrit cl to cherry pick
+    """
+    cmd = ['repo', 'download', '-c', cl]
+    _repo_cmd(*cmd, repo_dir=repo_dir)
+
+
 def abandon(repo_dir, branch_name):
     """Repo abandon.
 

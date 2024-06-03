@@ -265,13 +265,23 @@ def clone(git_repo: str, repo_url: str, reference: str | None = None) -> None:
 
 
 def checkout_version(git_repo: str, rev: str) -> None:
-    """git checkout.
+    """git checkout a version.
 
     Args:
       git_repo: path of git repo.
       rev: git commit revision to checkout.
     """
     git(['checkout', '-q', '-f', rev], cwd=git_repo)
+
+
+def checkout_branch(git_repo: str, branch: str = 'main') -> None:
+    """git checkout a branch.
+
+    Args:
+      git_repo: path of git repo.
+      branch: git branch name
+    """
+    git(['checkout', branch], cwd=git_repo)
 
 
 def init(git_repo: str, initial_branch: str = 'main') -> None:
@@ -910,6 +920,17 @@ def reset_hard(git_repo: str) -> None:
       git_repo: path of git repo.
     """
     git_output(['reset', '--hard'], cwd=git_repo)
+
+
+def reset_hard_to_remote_branch(git_repo: str, remote_branch: str) -> None:
+    """Remove all commits added onto a local branch and sync with the remote branch.
+
+    This is simply wrapper of "git reset --hard remote_branch".
+
+    Args:
+      git_repo: path of git repo.
+    """
+    git_output(['reset', '--hard', remote_branch], cwd=git_repo)
 
 
 def clean(

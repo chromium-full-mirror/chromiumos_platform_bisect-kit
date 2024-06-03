@@ -24,6 +24,8 @@ from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import git_util
+from bisect_kit import repo_util
 from bisect_kit import util
 
 
@@ -77,6 +79,10 @@ def create_argument_parser():
         'default is using prebuilt bundle on the DUT',
     )
     parser.add_argument(
+        '--tast-patch-cl',
+        help='A gerrit CL to patch the chromiumos/platform/tast-tests repository; ',
+    )
+    parser.add_argument(
         '--with-private-bundles',
         action='store_true',
         help='Whether search tests in private bundles or not',
@@ -97,8 +103,8 @@ def create_argument_parser():
     group = parser.add_argument_group(title='Options for normal autotest tests')
     group.add_argument(
         '--test-name',
-        required=True,
         help='Test name, like "video_VideoDecodeAccelerator.h264"',
+        default='bisector.Bisect',
     )
     group.add_argument(
         '--fail-to-pass',
@@ -121,11 +127,28 @@ def create_argument_parser():
     return parser
 
 
+def add_tast_patch_cl(chromeos_root: str, tast_patch_cl: str):
+    # checkout tast binary repo to main
+    tast_binary_repo = os.path.join(chromeos_root, 'src', 'platform', 'tast')
+    git_util.checkout_branch(tast_binary_repo, 'main')
+
+    # checkout tast tests repo to main and patch the CL
+    tast_tests_repo = os.path.join(
+        chromeos_root, 'src', 'platform', 'tast-tests'
+    )
+    git_util.checkout_branch(tast_tests_repo, 'main')
+    git_util.reset_hard_to_remote_branch(tast_tests_repo, 'cros/main')
+    repo_util.cherry_pick(tast_tests_repo, tast_patch_cl)
+
+
 def prepare_to_run_test(opts):
     if opts.reboot_before_test:
         cros_util.reboot(
             opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo
         )
+
+    if opts.tast_patch_cl:
+        add_tast_patch_cl(opts.chromeos_root, opts.tast_patch_cl)
 
 
 def to_forwarded_host(host: str) -> tuple[str, str]:
@@ -137,7 +160,7 @@ def to_forwarded_host(host: str) -> tuple[str, str]:
 
 def tast_cmd(opts, cmd, *args):
     flags = []
-    if opts.prebuilt:
+    if opts.prebuilt and not opts.tast_patch_cl:
         tast_dir = os.path.join(
             cros_util.chromeos_root_inside_chroot, cros_util.prebuilt_tast_dir
         )
@@ -161,7 +184,7 @@ def tast_cmd(opts, cmd, *args):
         flags += ['-var=%s=%s' % x for x in opts.args]
 
     # TODO(zjchang): ensure the tast version for buildbucket builds is correct
-    if not opts.tast_build:
+    if not opts.tast_build and not opts.tast_patch_cl:
         flags.append('-build=false')
         if opts.with_private_bundles:
             flags.append('-downloadprivatebundles=true')
