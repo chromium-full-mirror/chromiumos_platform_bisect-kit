@@ -571,8 +571,10 @@ class DutManager:
               bisection uses CrOS version passed in __init__.
         """
         self._nested_counter += 1
-        yield from self._do_provision(vm_cros_version)
-        self._nested_counter -= 1
+        try:
+            yield from self._do_provision(vm_cros_version)
+        finally:
+            self._nested_counter -= 1
 
     def _do_provision(self, vm_cros_version: Optional[str] = None):
         if self.is_vm:
