@@ -128,11 +128,21 @@ def create_argument_parser():
 
 
 def add_tast_patch_cl(chromeos_root: str, tast_patch_cl: str):
-    # checkout tast binary repo to main
+    # checkout tast binary repo to main.
     tast_binary_repo = os.path.join(chromeos_root, 'src', 'platform', 'tast')
     git_util.checkout_branch(tast_binary_repo, 'main')
+    git_util.reset_hard_to_remote_branch(tast_binary_repo, 'cros/main')
 
-    # checkout tast tests repo to main and patch the CL
+    # checkout tast tests private repo to main.
+    tast_tests_private_repo = os.path.join(
+        chromeos_root, 'src', 'platform', 'tast-tests-private'
+    )
+    git_util.checkout_branch(tast_tests_private_repo, 'main')
+    git_util.reset_hard_to_remote_branch(
+        tast_tests_private_repo, 'cros-internal/main'
+    )
+
+    # checkout tast tests repo to main and patch the CL.
     tast_tests_repo = os.path.join(
         chromeos_root, 'src', 'platform', 'tast-tests'
     )

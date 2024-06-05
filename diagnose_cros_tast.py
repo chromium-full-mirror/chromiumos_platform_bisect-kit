@@ -57,6 +57,13 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                 '--metric',
                 self.config['metric'],
             ]
+        if self.config['tast_patch_cl']:
+            common_eval_cmd += [
+                '--tast-patch-cl',
+                self.config['tast_patch_cl'],
+            ]
+            # With tast_patch_cl switch tast harness cmd is redundent
+            switch_test_harness_cmd = None
         if self.config['fail_to_pass']:
             common_eval_cmd.append('--fail-to-pass')
         if self.config['reboot_before_test']:

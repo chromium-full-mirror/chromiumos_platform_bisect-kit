@@ -615,15 +615,12 @@ class CrosDiagnoser:
                 init_args.append('--disable-snapshot')
 
             if dut_manager.is_vm:
-                switch_cmds = [
-                    self._switch_vm_cmd,
-                    switch_test_harness_cmd,
-                ]
+                switch_cmds = [self._switch_vm_cmd]
             else:
-                switch_cmds = [
-                    switch_cmd,
-                    switch_test_harness_cmd,
-                ]
+                switch_cmds = [switch_cmd]
+
+            if switch_test_harness_cmd:
+                switch_cmds.append(switch_test_harness_cmd)
 
             bisector = wrapper.BisectorWrapper(
                 'bisect_cros_version',
@@ -797,7 +794,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
-        init_once: util.InitOnce,
+        init_once: util.InitOnce | None,
     ) -> bool:
         """Bisect with Android prebuilt and localbuild.
 
@@ -1015,7 +1012,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
-        init_once: util.InitOnce,
+        init_once: util.InitOnce | None,
     ) -> bool:
         """Bisect with Lacros Prebuilt.
 
@@ -1126,7 +1123,7 @@ class CrosDiagnoser:
         old: str,
         new: str,
         eval_cmd: list[str],
-        init_once: util.InitOnce,
+        init_once: util.InitOnce | None,
     ) -> bool:
         """Bisect ChromeOS DLC prebuilt.
 
@@ -1232,7 +1229,7 @@ class CrosDiagnoser:
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
-        init_once: util.InitOnce,
+        init_once: util.InitOnce | None,
         buildbucket_build: bool = False,
         should_build_with_tests: bool = True,
     ) -> bool:
@@ -1446,7 +1443,7 @@ class CrosDiagnoser:
         switch_cmds = [switch_cmd]
         if dut_manager.is_vm:
             switch_cmds.append(self._switch_vm_cmd)
-        if buildbucket_build:
+        if buildbucket_build and switch_test_harness_cmd:
             switch_cmds.append(switch_test_harness_cmd)
 
         bisector.init_if_necessary(
@@ -1844,6 +1841,7 @@ class DiagnoseCommandLineBase:
             "term_old": opts.term_old,
             "term_new": opts.term_new,
             "test_name": opts.test_name,
+            "tast_patch_cl": opts.tast_patch_cl,
             "fail_to_pass": opts.fail_to_pass,
             "metric": opts.metric,
             "old_value": opts.old_value,
@@ -2030,7 +2028,9 @@ class DiagnoseCommandLineBase:
         group = parser_init.add_argument_group(
             title='Options for normal autotest tests'
         )
-        group.add_argument('--test-name', help='Test name')
+        group.add_argument(
+            '--test-name', help='Test name', default='bisector.Bisect'
+        )
         group.add_argument(
             '--fail-to-pass',
             action='store_true',
@@ -2053,6 +2053,10 @@ class DiagnoseCommandLineBase:
             '--recompute-init-values',
             action='store_true',
             help='For performance test, recompute initial values',
+        )
+        group.add_argument(
+            '--tast-patch-cl',
+            help='A gerrit CL to patch the chromiumos/platform/tast-tests repository; ',
         )
 
         self.create_argument_parser_hook(parser_init)
