@@ -297,6 +297,23 @@ def bb_cancel(build_id, reason):
     util.check_call(*cmd)
 
 
+def scheduke_cancel(host_name):
+    """Cancels a scheduke lease via "crosfleet dut abandon"
+
+    (b/343902491)
+    When leasing via Scheduke, the buildbucket task id is not returned because
+    the task may not been brought up yet.
+    In the case, we can only cancel it via "crosfleet dut abandon".
+    """
+    logger.debug('canceling the lease of %s by Scheduke', host_name)
+    try:
+        crosfleet_cmd('dut abandon', host_name)
+    except Exception as e:
+        logger.warning(
+            'failed to cancel a scheduke lease for %s: %s', host_name, e
+        )
+
+
 def _simplify_bot_dimensions(dimensions_pairs):
     # Convert list to dict, so it's easier to access.
     dimensions = {}
@@ -536,14 +553,21 @@ def extract_lease_info(text):
     """
     info = {}
     # The job is wrapped as a buildbucket build.
-    m = re.search(r'.*(http\S+/builders/test_runner/dut_leaser/b(\d+))', text)
+    m = re.search(r'(http\S+/builders/test_runner/dut_leaser/b(\d+))', text)
     if m:
         info['link'] = m.group(1)
         info['buildbucket_build_id'] = m.group(2)
+
+    # In crosfleet V2, the lease is hand over to Scheduke, so no
+    # buildbucket_build_id would be returned.
+    m = re.search(r'from Scheduke', text)
+    if m:
+        info['is_by_scheduke'] = True
+
     return info
 
 
-def cancel_pending_lease(pending_lease):
+def cancel_pending_lease(pending_lease, host_name):
     assert pending_lease
     task_id = pending_lease.get('swarming_task_id')
     if task_id:
@@ -555,7 +579,18 @@ def cancel_pending_lease(pending_lease):
         logger.debug('cancel the lease build %s', build_id)
         bb_cancel(build_id, 'cancel pending lease')
 
-    assert task_id or build_id, 'lease is pending but nothing to cancel'
+    is_by_scheduke = pending_lease.get('is_by_scheduke')
+    if is_by_scheduke:
+        if not host_name:
+            logger.warning(
+                'trying to cancel a lease by Scheduke but missing host_name'
+            )
+            return
+        scheduke_cancel(host_name)
+
+    assert (
+        task_id or build_id or is_by_scheduke
+    ), 'lease is pending but nothing to cancel'
 
 
 async def create_async_crosfleet_proc(cmd: str, *args, **kwargs):
@@ -739,7 +774,7 @@ class AsyncDutLeaser:
                     pass
             if pending_lease:
                 logger.debug('cleaning up pending lease %s', dut_name)
-                cancel_pending_lease(pending_lease)
+                cancel_pending_lease(pending_lease, dut_name)
 
     async def _lease_with_retry(self, dut_name):
         tries = 0
@@ -803,7 +838,7 @@ def crosfleet_lease_dut(
             time.sleep(5)
             status = query_lease_status(dut_name)
             if is_dut_leased_by_me(status):
-                logger.info('lease: %s', pending_lease)
+                logger.info('lease for %s: %s', dut_name, pending_lease)
                 break
         else:
             raise errors.DutLeaseException(
@@ -823,7 +858,7 @@ def crosfleet_lease_dut(
         if orphan_task:
             pending_lease = extract_lease_info(''.join(stderr_lines))
             if pending_lease:
-                cancel_pending_lease(pending_lease)
+                cancel_pending_lease(pending_lease, dut_name)
 
     logger.info(
         'leased dut %s for %.1f hours',
