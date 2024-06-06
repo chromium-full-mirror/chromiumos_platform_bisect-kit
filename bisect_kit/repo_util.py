@@ -14,6 +14,7 @@ import os
 import re
 import shlex
 import subprocess
+import time
 import urllib.parse
 import xml.etree.ElementTree
 
@@ -21,6 +22,7 @@ from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import util
+import numpy
 
 
 logger = logging.getLogger(__name__)
@@ -28,9 +30,6 @@ logger = logging.getLogger(__name__)
 # Relative to repo root dir.
 REPO_META_DIR = '.repo'
 LOCAL_MANIFESTS_DIR = os.path.join(REPO_META_DIR, 'local_manifests')
-
-# If repo sync takes too long, it may hang forever.
-REPO_SYNC_TIMEOUT_SECONDS = 3 * 60 * 60
 
 
 def get_manifest_url(manifest_dir):
@@ -75,25 +74,112 @@ def _get_repo_sync_env():
     return env
 
 
-def _repo_cmd(*cmd, repo_dir, timeout=None):
+class HTTP429Exception(Exception):
+    """HTTP 429 (too many requests) error happens."""
+
+
+def _repo_cmd_random_sleep(mean: float) -> float:
+    """Get a random number in seconds to sleep before next repo command retry.
+
+    This is to prevent from an excessive amount of repo git commands
+    sent from concurrent bisections.
+    The random number is drawn from an exponential distribution at mean |mean|.
+
+    Args:
+      mean: the mean of the exponential distrubition.
+    Returns:
+      the number of seconds to sleep.
+    """
+    MAX_DELAY_SECONDS = 60 * 60
+    MIN_DELAY_SECONDS = 1
+
+    delay = numpy.random.default_rng().exponential(scale=mean, size=1)[0]
+    return max(min(delay, MAX_DELAY_SECONDS), MIN_DELAY_SECONDS)
+
+
+# If repo sync takes too long, it may hang forever.
+_REPO_SYNC_TIMEOUT_SECONDS = 3 * 60 * 60
+
+
+# The mean of initial random delay.
+# The git server has QPS limit. The default refill time is 5 seconds.
+# As a result, a minimum cool down time of 5 seconds is needed. Set it to 10 to
+# play more safe.
+_REPO_CMD_MEAN_INITIAL_DELAY_SECONDS = 10
+
+
+def _repo_cmd(*cmd, repo_dir, timeout=None, initial_delay=False):
+    """Run a repo sync command.
+
+    Args:
+      cmd: the command
+      repo_dir: the repository path
+      timeout: timeout in seconds
+      initial_delay: whether to introduce a random initial delay to avoid
+        network traffic congestion
+    """
     env = _get_repo_sync_env()
     try:
         util.check_call('update_depot_tools', cwd=repo_dir, env=env)
     except subprocess.CalledProcessError:
         logger.warning('update_depot_tools failed')
-    # repo command spawn repo_launcher subprocesses, wrap it in a subshell so
-    # the stdout can be printed for debug purpose.
-    # This can be reverted once we no longer need the log.
-    # Set binary=True because the command ever return non-UTF8 chars.
-    util.check_call(
-        'bash',
-        '-c',
-        shlex.join(cmd),
-        cwd=repo_dir,
-        env=env,
-        binary=True,
-        timeout=timeout,
-    )
+
+    def catch_http_errors(line):
+        line = line.decode('utf8', errors='ignore')
+        if re.search('error: RPC failed; HTTP 429', line):
+            raise HTTP429Exception(line)
+
+    if timeout:
+        started_time = time.time()
+
+    attempt = 0
+    delay_mean = _REPO_CMD_MEAN_INITIAL_DELAY_SECONDS
+    while True:
+        if attempt > 0 or initial_delay:
+            delay = _repo_cmd_random_sleep(delay_mean)
+            logger.debug(
+                'random delay for repo commands %s (with mean %s)',
+                delay,
+                delay_mean,
+            )
+            time.sleep(delay)
+            delay_mean *= 2
+
+        if timeout:
+            remaining_time = timeout - (time.time() - started_time)
+            logger.debug('remaining_time: %s', remaining_time)
+            if remaining_time < 0:
+                raise errors.ExecutionTimeout(
+                    'repo command %s timeout' % list(cmd)
+                )
+
+        try:
+            logger.debug('attempt %s of %s', attempt + 1, list(cmd))
+            attempt += 1
+            # repo command spawn repo_launcher subprocesses, wrap it in a subshell so
+            # the stdout/stderr can be captured.
+            # Set binary=True because the command ever return non-UTF8 chars.
+            p = util.Popen(
+                ['bash', '-c', shlex.join(cmd)],
+                cwd=repo_dir,
+                env=env,
+                binary=True,
+                stderr_callback=catch_http_errors,
+            )
+            p.wait(timeout=remaining_time if timeout else None)
+        except HTTP429Exception as e:
+            p.terminate()
+            logger.error(
+                'failed to execute repo command %s: %s. retry later.',
+                list(cmd),
+                e,
+            )
+            continue
+        # other exceptions are raised immediately.
+        if p.returncode == 0:
+            logger.debug('repo command %s completed successfully', list(cmd))
+            return
+        raise subprocess.CalledProcessError(p.returncode, cmd)
 
 
 def init(
@@ -138,7 +224,12 @@ def init(
         cmd += ['--groups', groups]
     if mirror:
         cmd.append('--mirror')
-    _repo_cmd(*cmd, repo_dir=repo_dir)
+    _repo_cmd(
+        *cmd,
+        repo_dir=repo_dir,
+        timeout=_REPO_SYNC_TIMEOUT_SECONDS,
+        initial_delay=True,
+    )
 
 
 def cleanup_repo_generated_files(repo_dir, manifest_name='default.xml'):
@@ -210,7 +301,12 @@ def sync(repo_dir, jobs=16, manifest_name=None, current_branch=None):
         cmd += ['--manifest-name', manifest_name]
     if current_branch is not None:
         cmd += ['--current-branch' if current_branch else '--no-current-branch']
-    _repo_cmd(*cmd, repo_dir=repo_dir, timeout=REPO_SYNC_TIMEOUT_SECONDS)
+    _repo_cmd(
+        *cmd,
+        repo_dir=repo_dir,
+        timeout=_REPO_SYNC_TIMEOUT_SECONDS,
+        initial_delay=True,
+    )
 
 
 def cherry_pick(repo_dir: str, cl: str):

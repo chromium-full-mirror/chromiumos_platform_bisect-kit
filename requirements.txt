@@ -8,3 +8,4 @@ psutil
 scipy
 setuptools
 sshconf==0.2.5
+numpy
