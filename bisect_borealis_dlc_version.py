@@ -164,12 +164,12 @@ class BorealisVersionDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        if self.config['dut']:
-            env['DUT'] = self.config['dut']
-        if self.config['board']:
-            env['BOARD'] = self.config['board']
-        env['CHROMEOS_ROOT'] = self.config['chromeos_root']
-        env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
+        if self.config.get('dut'):
+            env['DUT'] = self.config.get('dut')
+        if self.config.get('board'):
+            env['BOARD'] = self.config.get('board')
+        env['CHROMEOS_ROOT'] = self.config.get('chromeos_root')
+        env['CHROMEOS_MIRROR'] = self.config.get('chromeos_mirror')
         env['BOREALIS_DLC_VERSION'] = rev
 
 

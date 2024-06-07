@@ -108,16 +108,16 @@ class AndroidBuildIDDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        env['ANDROID_BRANCH'] = self.config['branch']
-        env['ANDROID_FLAVOR'] = self.config['flavor']
+        env['ANDROID_BRANCH'] = self.config.get('branch')
+        env['ANDROID_FLAVOR'] = self.config.get('flavor')
         env['ANDROID_BUILD_ID'] = rev
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:
             old, new = summary['current_range']
             url = diff_url_template.format(
-                branch=self.config['branch'],
-                flavor=self.config['flavor'],
+                branch=self.config.get('branch'),
+                flavor=self.config.get('flavor'),
                 old=old,
                 new=new,
             )

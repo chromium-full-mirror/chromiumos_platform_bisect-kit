@@ -574,8 +574,8 @@ class BisectorCommandLine:
 
     def _get_term_map(self):
         return {
-            'old': self.config['term_old'],
-            'new': self.config['term_new'],
+            'old': self.config.get('term_old'),
+            'new': self.config.get('term_new'),
         }
 
     def _format_result_counter(self, result_counter):
@@ -909,7 +909,7 @@ class BisectorCommandLine:
                     self.session, future_build_log
                 )
                 do_future_build(
-                    self.config['future_build'],
+                    self.config.get('future_build'),
                     self.domain,
                     r,
                     future_build_log_full_path,
@@ -1145,7 +1145,7 @@ class BisectorCommandLine:
     def _show_step_summary(self):
         """Show current status after each bisect step."""
         current_state = self.strategy.state
-        if self.config['recompute_init_values']:
+        if self.config.get('recompute_init_values'):
             if (
                 self.previous_strategy_state == self.strategy.INITED
                 and current_state == self.strategy.STARTED
@@ -1208,7 +1208,9 @@ class BisectorCommandLine:
             assert self.config.get('eval')
 
             self.states.add_history(
-                'start_range', old=self.config['old'], new=self.config['new']
+                'start_range',
+                old=self.config.get('old'),
+                new=self.config.get('new'),
             )
             term_map = self._get_term_map()
             prev_rev = opts.current_rev
@@ -1446,22 +1448,22 @@ class BisectorCommandLine:
         if not self.states.inited:
             return None
         term_map = {
-            'old': self.config['term_old'],
-            'new': self.config['term_new'],
+            'old': self.config.get('term_old'),
+            'new': self.config.get('term_new'),
         }
         rev_info = self.states.get_rev_info(term_map, ignore_skip=ignore_skip)
         assert rev_info
         return strategy.NoisyBinarySearch(
             rev_info,
-            self.states.rev2idx(self.config['old']),
-            self.states.rev2idx(self.config['new']),
-            old_value=self.config['old_value'],
-            new_value=self.config['new_value'],
+            self.states.rev2idx(self.config.get('old')),
+            self.states.rev2idx(self.config.get('new')),
+            old_value=self.config.get('old_value'),
+            new_value=self.config.get('new_value'),
             term_map=term_map,
-            recompute_init_values=self.config['recompute_init_values'],
-            confidence=self.config['confidence'],
-            observation=self.config['noisy'],
-            endpoint_verification=self.config['endpoint_verification'],
+            recompute_init_values=self.config.get('recompute_init_values'),
+            confidence=self.config.get('confidence'),
+            observation=self.config.get('noisy'),
+            endpoint_verification=self.config.get('endpoint_verification'),
             saved_states=self.states.strategy_states,
         )
 
@@ -1596,12 +1598,12 @@ class BisectorCommandLine:
 
     def cmd_new(self, opts):
         """Tells bisect engine the said revs have "new" behavior."""
-        logger.info('set [%s] as %s', opts.revs, self.config['term_new'])
+        logger.info('set [%s] as %s', opts.revs, self.config.get('term_new'))
         self._add_revs_status_helper(opts.revs, 'new')
 
     def cmd_old(self, opts):
         """Tells bisect engine the said revs have "old" behavior."""
-        logger.info('set [%s] as %s', opts.revs, self.config['term_old'])
+        logger.info('set [%s] as %s', opts.revs, self.config.get('term_old'))
         self._add_revs_status_helper(opts.revs, 'old')
 
     def cmd_skip(self, opts):

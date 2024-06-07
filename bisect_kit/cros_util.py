@@ -2855,16 +2855,16 @@ class ChromeOSSpecManager(codechange.SpecManager):
     def __init__(self, config: dict):
         self.config = config
         self.manifest_dir = os.path.join(
-            self.config['chromeos_root'], '.repo', 'manifests'
+            self.config.get('chromeos_root'), '.repo', 'manifests'
         )
         self.manifest_internal_dir = os.path.join(
-            self.config['chromeos_mirror'], 'manifest-internal.git'
+            self.config.get('chromeos_mirror'), 'manifest-internal.git'
         )
         self.historical_manifest_git_dir = os.path.join(
-            self.config['chromeos_mirror'], 'chromeos/manifest-versions.git'
+            self.config.get('chromeos_mirror'), 'chromeos/manifest-versions.git'
         )
         self.chromiumos_overlay_git_dir = os.path.join(
-            self.config['chromeos_mirror'],
+            self.config.get('chromeos_mirror'),
             'chromiumos/overlays/chromiumos-overlay.git',
         )
         self.historical_manifest_branch_name = 'refs/heads/main'
@@ -2893,8 +2893,12 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # generate.
         old_timestamp = None
         new_timestamp = None
-        old_path = SnapshotStore.query_snapshot_image(self.config['board'], old)
-        new_path = SnapshotStore.query_snapshot_image(self.config['board'], new)
+        old_path = SnapshotStore.query_snapshot_image(
+            self.config.get('board'), old
+        )
+        new_path = SnapshotStore.query_snapshot_image(
+            self.config.get('board'), new
+        )
         if old_path:
             old_timestamp = gs_util.stat_max_creation_time(old_path) - 86400
         if new_path:
@@ -3148,8 +3152,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # case 3: return a list of release version and append a snapshot
         #         before or at the end
         result = self.collect_release_specs(
-            version_to_full(self.config['board'], old),
-            version_to_full(self.config['board'], new),
+            version_to_full(self.config.get('board'), old),
+            version_to_full(self.config.get('board'), new),
             trim_old=is_cros_snapshot_version(old),
         )
         if is_cros_snapshot_version(old):
@@ -3169,7 +3173,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         revisions = self.lookup_snapshot_manifest_revisions(old, new)
         for timestamp, _git_rev, snapshot_id in revisions:
             snapshot_version = SnapshotStore.query_snapshot_version_by_id(
-                self.config['board'], snapshot_id
+                self.config.get('board'), snapshot_id
             )
             if snapshot_version:
                 result.append(
@@ -3315,7 +3319,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # for chromeOS version < 12931.0.0, manifests are included from incorrect
         # folder .repo instead of.repo/manifests
         if is_cros_version_lesseq(rev, '12931.0.0'):
-            repo_path = os.path.join(self.config['chromeos_root'], '.repo')
+            repo_path = os.path.join(self.config.get('chromeos_root'), '.repo')
             manifest_patch_path = os.path.join(repo_path, manifest_name)
             with open(manifest_patch_path, 'w') as f:
                 f.write(self.get_manifest(rev))
@@ -3357,11 +3361,11 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
         # manifest. 'repo sync -m' is not enough
         repo_util.init(
-            self.config['chromeos_root'],
+            self.config.get('chromeos_root'),
             'https://chrome-internal.googlesource.com/chromeos/manifest-internal',
             manifest_name=manifest_name,
             repo_url='https://chromium.googlesource.com/external/repo.git',
-            reference=self.config['chromeos_mirror'],
+            reference=self.config.get('chromeos_mirror'),
             # b/150753074: moblab is in non-default group and causes mark_as_stable
             # fail
             groups='default,moblab,platform-linux',
@@ -3370,7 +3374,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # Note, don't sync with current_branch=True for chromeos. One of its
         # build steps (inside mark_as_stable) executes "git describe" which
         # needs git tag information.
-        repo_util.sync(self.config['chromeos_root'])
+        repo_util.sync(self.config.get('chromeos_root'))
 
     def lookup_chromeos_version(
         self, version

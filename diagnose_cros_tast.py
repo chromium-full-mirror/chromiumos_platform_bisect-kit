@@ -41,37 +41,37 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             './switch_tast_prebuilt.py',
             '--rich-result',
             '--chromeos-root',
-            self.config['chromeos_root'],
+            self.config.get('chromeos_root'),
         ]
         common_eval_cmd = [
             './eval_cros_tast.py',
             '--rich-result',
             '--with-private-bundles',
             '--chromeos-root',
-            self.config['chromeos_root'],
+            self.config.get('chromeos_root'),
             '--test-name',
-            self.config['test_name'],
+            self.config.get('test_name'),
         ]
-        if self.config['metric']:
+        if self.config.get('metric'):
             common_eval_cmd += [
                 '--metric',
-                self.config['metric'],
+                self.config.get('metric'),
             ]
-        if self.config['tast_patch_cl']:
+        if self.config.get('tast_patch_cl'):
             common_eval_cmd += [
                 '--tast-patch-cl',
-                self.config['tast_patch_cl'],
+                self.config.get('tast_patch_cl'),
             ]
             # With tast_patch_cl switch tast harness cmd is redundent
             switch_test_harness_cmd = None
-        if self.config['fail_to_pass']:
+        if self.config.get('fail_to_pass'):
             common_eval_cmd.append('--fail-to-pass')
-        if self.config['reboot_before_test']:
+        if self.config.get('reboot_before_test'):
             common_eval_cmd.append('--reboot-before-test')
-        for var in self.config['extra_test_variables']:
+        for var in self.config.get('extra_test_variables'):
             common_eval_cmd.append('--args')
             common_eval_cmd.append(var)
-        if self.config['consider_test_crash_as_failure']:
+        if self.config.get('consider_test_crash_as_failure'):
             common_eval_cmd.append('--consider-test-crash-as-failure')
 
         return switch_test_harness_cmd, common_eval_cmd
@@ -88,7 +88,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             + ['lacros.DeployedBinary=/usr/local/lacros-chrome']
         )
         android_prebuilt_eval_cmd = common_eval_cmd
-        if self.config['chrome_deploy_image']:
+        if self.config.get('chrome_deploy_image'):
             chrome_localbuild_eval_cmd = common_eval_cmd + ['--tast-build']
         else:
             chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
@@ -99,10 +99,9 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             + ['lacros.DeployedBinary=/usr/local/lacros-chrome']
         )
 
-        cros_buildbucket_build = (
-            cros_util.is_buildbucket_buildable(self.config['cros_prebuilt_old'])
-            and not self.config['disable_buildbucket_chromeos']
-        )
+        cros_buildbucket_build = cros_util.is_buildbucket_buildable(
+            self.config.get('cros_prebuilt_old')
+        ) and not self.config.get('disable_buildbucket_chromeos')
         if not cros_buildbucket_build:
             cros_localbuild_eval_cmd = common_eval_cmd + ['--tast-build']
         else:
@@ -128,7 +127,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         self.states.load_states()
 
         try:
-            logger.info('experiments: %s', self.config['experiments'])
+            logger.info('experiments: %s', self.config.get('experiments'))
             self.do_run()
             logger.info('%s done', __file__)
         except Exception as e:

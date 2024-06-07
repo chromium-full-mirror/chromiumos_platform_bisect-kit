@@ -471,7 +471,7 @@ class ChromeSpecManager(codechange.SpecManager):
         Returns:
           path to the synthesized repo
         """
-        meta_dir = os.path.join(self.config['chrome_root'], 'meta-deps')
+        meta_dir = os.path.join(self.config.get('chrome_root'), 'meta-deps')
         if os.path.exists(meta_dir):
             shutil.rmtree(meta_dir)
         git_util.init(meta_dir, initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
@@ -549,9 +549,11 @@ class ChromeSpecManager(codechange.SpecManager):
         meta_dir = self.generate_meta_deps(branch)
 
         result = []
-        code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
+        code_storage = gclient_util.GclientCache(
+            self.config.get('chrome_mirror')
+        )
         parser = gclient_util.DepsParser(
-            self.config['chrome_root'], code_storage
+            self.config.get('chrome_root'), code_storage
         )
         path = os.path.join(meta_dir, 'DEPS')
 
@@ -604,9 +606,11 @@ class ChromeSpecManager(codechange.SpecManager):
         logger.info('collect_fixed_spec')
         assert is_direct_relative_version(old, new)
         result = []
-        code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
+        code_storage = gclient_util.GclientCache(
+            self.config.get('chrome_mirror')
+        )
         parser = gclient_util.DepsParser(
-            self.config['chrome_root'], code_storage
+            self.config.get('chrome_root'), code_storage
         )
         for tag in self.enumerate_ancestor(new):
             if not is_version_lesseq(old, tag):
@@ -633,13 +637,16 @@ class ChromeSpecManager(codechange.SpecManager):
 
     def parse_spec(self, spec: codechange.Spec) -> None:
         logger.debug('parse_spec %s', spec.name)
-        code_storage = gclient_util.GclientCache(self.config['chrome_mirror'])
+        code_storage = gclient_util.GclientCache(
+            self.config.get('chrome_mirror')
+        )
         assert spec.entries, 'it should already be parsed earlier'
 
         # Mirror git repos if they do not exist.
         with locking.lock_file(
             os.path.join(
-                self.config['chrome_mirror'], locking.LOCK_FILE_FOR_MIRROR_SYNC
+                self.config.get('chrome_mirror'),
+                locking.LOCK_FILE_FOR_MIRROR_SYNC,
             )
         ):
             for path_spec in spec.entries.values():
@@ -683,7 +690,8 @@ class ChromeSpecManager(codechange.SpecManager):
         assert is_chrome_version(rev)
         with locking.lock_file(
             os.path.join(
-                self.config['chrome_mirror'], locking.LOCK_FILE_FOR_MIRROR_SYNC
+                self.config.get('chrome_mirror'),
+                locking.LOCK_FILE_FOR_MIRROR_SYNC,
             )
         ):
             git_util.checkout_version(self.chrome_src, rev)
@@ -694,16 +702,16 @@ class ChromeSpecManager(codechange.SpecManager):
                 'download_remoteexec_cfg=True',
             ]
             gclient_util.config(
-                self.config['chrome_root'],
+                self.config.get('chrome_root'),
                 url='https://chromium.googlesource.com/chromium/src.git',
                 custom_var_list=custom_var_list,
-                cache_dir=self.config['chrome_mirror'],
+                cache_dir=self.config.get('chrome_mirror'),
                 managed=False,
                 target_os='chromeos',
             )
 
             gclient_util.sync(
-                self.config['chrome_root'],
+                self.config.get('chrome_root'),
                 with_branch_heads=True,
                 with_tags=True,
             )

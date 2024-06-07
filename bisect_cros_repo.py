@@ -144,10 +144,10 @@ class ChromeOSRepoDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        if self.config['board']:
-            env['BOARD'] = self.config['board']
-        env['CHROMEOS_ROOT'] = self.config['chromeos_root']
-        env['CHROMEOS_MIRROR'] = self.config['chromeos_mirror']
+        if self.config.get('board'):
+            env['BOARD'] = self.config.get('board')
+        env['CHROMEOS_ROOT'] = self.config.get('chromeos_root')
+        env['CHROMEOS_MIRROR'] = self.config.get('chromeos_mirror')
         env['CROS_VERSION'] = rev
 
     def fill_candidate_summary(self, summary):

@@ -96,34 +96,37 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             './switch_autotest_prebuilt.py',
             '--rich-result',
             '--chromeos-root',
-            self.config['chromeos_root'],
+            self.config.get('chromeos_root'),
         ]
-        if self.config['test_name'] and not self.config['cts_test']:
-            switch_test_harness_cmd += ['--test-name', self.config['test_name']]
+        if self.config.get('test_name') and not self.config.get('cts_test'):
+            switch_test_harness_cmd += [
+                '--test-name',
+                self.config.get('test_name'),
+            ]
 
         common_eval_cmd = [
             './eval_cros_autotest.py',
             '--rich-result',
             '--chromeos-root',
-            self.config['chromeos_root'],
+            self.config.get('chromeos_root'),
         ]
-        if self.config['test_name'] and not self.config['cts_test']:
-            common_eval_cmd += ['--test-name', self.config['test_name']]
-        if self.config['metric']:
+        if self.config.get('test_name') and not self.config.get('cts_test'):
+            common_eval_cmd += ['--test-name', self.config.get('test_name')]
+        if self.config.get('metric'):
             common_eval_cmd += [
                 '--metric',
-                self.config['metric'],
+                self.config.get('metric'),
             ]
-        if self.config['fail_to_pass']:
+        if self.config.get('fail_to_pass'):
             common_eval_cmd.append('--fail-to-pass')
-        if self.config['reboot_before_test']:
+        if self.config.get('reboot_before_test'):
             common_eval_cmd.append('--reboot-before-test')
-        for var in self.config['extra_test_variables']:
+        for var in self.config.get('extra_test_variables'):
             common_eval_cmd.append('--args')
             common_eval_cmd.append(var)
 
-        if self.config['test_name'].startswith('telemetry_'):
-            common_eval_cmd += ['--chrome-root', self.config['chrome_root']]
+        if self.config.get('test_name').startswith('telemetry_'):
+            common_eval_cmd += ['--chrome-root', self.config.get('chrome_root')]
 
         for arg_name in [
             'cts_revision',
@@ -136,10 +139,10 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             if self.config.get(arg_name) is not None:
                 common_eval_cmd += [
                     '--%s' % arg_name,
-                    str(self.config[arg_name]),
+                    str(self.config.get(arg_name)),
                 ]
 
-        if self.config['consider_test_crash_as_failure']:
+        if self.config.get('consider_test_crash_as_failure'):
             common_eval_cmd.append('--consider-test-crash-as-failure')
 
         return switch_test_harness_cmd, common_eval_cmd
@@ -157,12 +160,11 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         lacros_prebuilt_eval_cmd = common_eval_cmd + ['--prebuilt']
         chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
         should_build_chrome_localbuild_with_tests = bool(
-            self.config['test_name']
+            self.config.get('test_name')
         )  # not CTS/GTS
-        cros_buildbucket_build = (
-            cros_util.is_buildbucket_buildable(self.config['cros_prebuilt_old'])
-            and not self.config['disable_buildbucket_chromeos']
-        )
+        cros_buildbucket_build = cros_util.is_buildbucket_buildable(
+            self.config.get('cros_prebuilt_old')
+        ) and not self.config.get('disable_buildbucket_chromeos')
         if not cros_buildbucket_build:
             cros_localbuild_eval_cmd = common_eval_cmd[:]
         else:
@@ -188,7 +190,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         self.states.load_states()
 
         try:
-            logger.info('experiments: %s', self.config['experiments'])
+            logger.info('experiments: %s', self.config.get('experiments'))
             self.do_run()
             logger.info('%s done', __file__)
         except Exception as e:

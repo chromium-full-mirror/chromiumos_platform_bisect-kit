@@ -257,7 +257,7 @@ class AndroidSpecManager(codechange.SpecManager):
     def __init__(self, config: dict):
         self.config = config
         self.manifest_dir = os.path.join(
-            self.config['android_root'], '.repo', 'manifests'
+            self.config.get('android_root'), '.repo', 'manifests'
         )
 
     def collect_float_spec(
@@ -270,8 +270,8 @@ class AndroidSpecManager(codechange.SpecManager):
         path = 'default.xml'
 
         commits = []
-        old_timestamp = lookup_build_timestamp(self.config['flavor'], old)
-        new_timestamp = lookup_build_timestamp(self.config['flavor'], new)
+        old_timestamp = lookup_build_timestamp(self.config.get('flavor'), old)
+        new_timestamp = lookup_build_timestamp(self.config.get('flavor'), new)
         for commit in git_util.get_history(self.manifest_dir, path):
             if commit.timestamp < old_timestamp:
                 commits = []
@@ -288,21 +288,24 @@ class AndroidSpecManager(codechange.SpecManager):
     def collect_fixed_spec(self, old: str, new: str) -> list[codechange.Spec]:
         result = []
         revlist = get_build_ids_between(
-            self.config['branch'], self.config['flavor'], int(old), int(new)
+            self.config.get('branch'),
+            self.config.get('flavor'),
+            int(old),
+            int(new),
         )
         for rev in revlist:
             manifest_name = fetch_manifest(
-                self.config['android_root'], self.config['flavor'], rev
+                self.config.get('android_root'), self.config.get('flavor'), rev
             )
             path = os.path.join(self.manifest_dir, manifest_name)
-            timestamp = lookup_build_timestamp(self.config['flavor'], rev)
+            timestamp = lookup_build_timestamp(self.config.get('flavor'), rev)
             result.append(codechange.Spec.new_fixed(rev, timestamp, path))
         return result
 
     def _load_manifest_content(self, spec: codechange.Spec) -> str:
         if spec.is_fixed():
             manifest_name = fetch_manifest(
-                self.config['branch'], self.config['flavor'], spec.name
+                self.config.get('branch'), self.config.get('flavor'), spec.name
             )
             with open(os.path.join(self.manifest_dir, manifest_name)) as f:
                 content = f.read()
@@ -325,10 +328,10 @@ class AndroidSpecManager(codechange.SpecManager):
 
     def sync_disk_state(self, rev: str) -> None:
         manifest_name = fetch_manifest(
-            self.config['android_root'], self.config['flavor'], rev
+            self.config.get('android_root'), self.config.get('flavor'), rev
         )
         repo_util.sync(
-            self.config['android_root'],
+            self.config.get('android_root'),
             manifest_name=manifest_name,
             current_branch=True,
         )

@@ -178,12 +178,12 @@ class ChromeSrcDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        env['CHROME_ROOT'] = self.config['chrome_root']
-        env['CHROME_MIRROR'] = self.config['chrome_mirror']
+        env['CHROME_ROOT'] = self.config.get('chrome_root')
+        env['CHROME_MIRROR'] = self.config.get('chrome_mirror')
         env['REV'] = rev
 
-        if self.config['board']:
-            env['BOARD'] = self.config['board']
+        if self.config.get('board'):
+            env['BOARD'] = self.config.get('board')
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:

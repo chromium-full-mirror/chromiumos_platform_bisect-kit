@@ -615,7 +615,7 @@ class DutManager:
                 ):
                     logger.info('monitoring DUT lease status for %s', dut)
                     reason = cros_lab_util.make_lease_reason(
-                        self.config['session']
+                        self.config.get('session')
                     )
                     with cros_lab_util.dut_lease_status_monitor(dut, reason):
                         yield dut
@@ -721,7 +721,7 @@ class DutManager:
         self._states.save()
         dut_allocate_spec_module.save(
             self.dut_allocate_spec,
-            self.config['sync_dut_allocate_spec_with_db'],
+            self.config.get('sync_dut_allocate_spec_with_db'),
         )
 
     def dut_leases_log_path(self):
@@ -733,7 +733,7 @@ class DutManager:
             timestamp=time.strftime('%Y%m%d-%H%M%S'),
         )
         log_path = common.get_session_log_path(
-            self.config['session'], f'log/{log_file}'
+            self.config.get('session'), f'log/{log_file}'
         )
 
         statistics.dut_leases_log_path = log_path

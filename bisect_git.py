@@ -67,7 +67,7 @@ class GitDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev):
-        env['GIT_REPO'] = self.config['git_repo']
+        env['GIT_REPO'] = self.config.get('git_repo')
         env['GIT_REV'] = rev
 
     def fill_candidate_summary(self, summary):
