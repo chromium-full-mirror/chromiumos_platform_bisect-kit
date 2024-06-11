@@ -2030,9 +2030,7 @@ class DiagnoseCommandLineBase:
         group = parser_init.add_argument_group(
             title='Options for normal autotest tests'
         )
-        group.add_argument(
-            '--test-name', help='Test name', default='bisector.Bisect'
-        )
+        group.add_argument('--test-name', help='Test name')
         group.add_argument(
             '--fail-to-pass',
             action='store_true',
