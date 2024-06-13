@@ -23,6 +23,7 @@ Typical usage:
 """
 
 import argparse
+import datetime
 import glob
 import logging
 import multiprocessing
@@ -50,6 +51,34 @@ PathLike = os.PathLike | str
 MANIFEST_FOR_DELETED = 'deleted-repos.xml'
 
 logger = logging.getLogger(__name__)
+
+HOUR_IN_SECONDS = 3600
+
+
+def _should_sync(repo_dir: str, threshold_seconds=2 * HOUR_IN_SECONDS) -> bool:
+    """should_sync returns true if it is necessary to do a sync for a particular repo.
+
+    It reads the last sync time for a specific repo(e.g. chromeos/chrome/android)
+    and compares it to the current time. Returns True if the time since the last sync exceeds
+    the threshold or if the config file is not found.
+
+    Args:
+        repo_dir: the repository directory
+        threshold_seconds: Time to wait for the next sync in seconds
+
+    Returns:
+        True if a sync is required. False otherwise.
+    """
+    try:
+        last_sync_timestamp = _read_last_sync_time(repo_dir)
+        last_sync = datetime.datetime.fromtimestamp(last_sync_timestamp)
+        logger.info('last sync time for %s: %s', repo_dir, last_sync)
+        time_diff = datetime.datetime.now() - last_sync
+        return time_diff.total_seconds() > threshold_seconds
+    except Exception as e:
+        logger.info('exception raised in should_sync for %s: %s', repo_dir, e)
+        # sync anyway for exceptions
+        return True
 
 
 def _collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
@@ -312,7 +341,17 @@ def _sync_chromeos_code(path_factory):
     start_sync_time = int(time.time())
     chromeos_mirror = path_factory.get_chromeos_mirror()
 
-    logger.info('repo sync for chromeos mirror')
+    if not _should_sync(chromeos_mirror):
+        logger.info(
+            "repo sync for chromeos is skipped.  current time: %s",
+            datetime.datetime.now(),
+        )
+        return
+
+    logger.info(
+        "repo sync for chromeos mirror. current time: %s",
+        datetime.datetime.now(),
+    )
     _delete_extra_manifest(chromeos_mirror)
     # current_branch=False to ignore "sync-c=true" in the manifest file.
     repo_util.sync(chromeos_mirror, current_branch=False)
@@ -327,6 +366,12 @@ def _sync_chromeos_code(path_factory):
     logger.info('repo sync for chromeos tree')
     chromeos_tree = path_factory.get_chromeos_tree()
     repo_util.sync(chromeos_tree)
+
+    logger.info(
+        'repo sync finished. start time: %s, end_time: %s',
+        datetime.datetime.fromtimestamp(start_sync_time),
+        datetime.datetime.now(),
+    )
 
 
 def _setup_chrome_repos(path_factory, use_btrfs: bool):
