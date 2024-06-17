@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 HOUR_IN_SECONDS = 3600
 
 
-def _should_sync(repo_dir: str, threshold_seconds=2 * HOUR_IN_SECONDS) -> bool:
+def _should_sync(repo_dir: str, threshold_seconds=8 * HOUR_IN_SECONDS) -> bool:
     """should_sync returns true if it is necessary to do a sync for a particular repo.
 
     It reads the last sync time for a specific repo(e.g. chromeos/chrome/android)
