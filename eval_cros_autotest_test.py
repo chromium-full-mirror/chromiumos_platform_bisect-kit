@@ -81,7 +81,7 @@ class TestEvalCrosAutotest(unittest.TestCase):
                 'cheets_GTS.tradefed-run-test',
             )
 
-        with self.assertRaises(errors.BisectionTemporaryError):
+        with self.assertRaises(errors.ExecutionFatalError):
             eval_cros_autotest.parse_cts_results(
                 testing.get_testdata_path('cts_test_result/gts.test-not-found'),
                 'cheets_GTS.tradefed-run-test',
