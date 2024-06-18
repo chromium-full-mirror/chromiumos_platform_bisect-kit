@@ -298,20 +298,15 @@ def fetch_lacros_prebuilt(lacros_version: str, board_cpu_arch: str) -> str:
         raise
 
 
-def _get_deploy_chrome_path(
-    chrome_src: str | None = None, chromeos_root: str | None = None
-):
+def _get_deploy_chrome_path(chrome_src: str | None = None):
     """Get deploy_chrome script path
 
     Args:
       chrome_src: Chrome source root directory
-      chromeos_root: ChromeOS source root directory
 
     Returns:
       Deploy_chrome script path
     """
-    if chromeos_root:
-        return os.path.join(chromeos_root, 'chromite/bin/deploy_chrome')
     if chrome_src:
         return os.path.join(
             chrome_src, 'third_party/chromite/bin/deploy_chrome'
@@ -323,18 +318,23 @@ def _get_deploy_chrome_path(
 
 
 def deploy_lacros_to_dut(
-    lacros_build_dir: str, dut_ip: str, deploy_chrome_script_path: str
+    board: str,
+    lacros_build_dir: str,
+    dut_ip: str,
+    chrome_src: str,
 ) -> int:
     """Deploy a lacros build to a DUT
 
     Args:
+      board: the board name
       lacros_build_dir: Lacros build directory
       dut_ip: IP of the DUT
-      deploy_chrome_script_path: Deploy_chrome script path
+      chrome_src: chrome root directory
 
     Returns:
       0 for successful deployment. Raises ExternalError exception for failures.
     """
+    deploy_chrome_script_path = _get_deploy_chrome_path(chrome_src=chrome_src)
     assert os.path.exists(deploy_chrome_script_path)
 
     num_attempts = 2
@@ -347,14 +347,17 @@ def deploy_lacros_to_dut(
                 deploy_chrome_script_path,
                 '--build-dir=%s' % lacros_build_dir,
                 '--device=%s' % dut_ip,
-                '--nostrip',
                 '--lacros',
                 '--reset-lacros',
                 '--force',
+                # --board is mandotory if --nostrip is not present.
+                # --nostrip bloats the binary size so we want to avoid it.
+                # (b/343934210).
+                '--board=%s' % board,
             ]
             logger.debug('Lacros deploy command:')
             logger.debug(' '.join(lacros_deploy_command))
-            util.check_output(*lacros_deploy_command)
+            util.check_output(*lacros_deploy_command, cwd=chrome_src)
             return 0
 
         except Exception as e:
@@ -365,15 +368,20 @@ def deploy_lacros_to_dut(
 
 
 def fetch_and_deploy_lacros_prebuilt_to_dut(
-    lacros_version: str, board_cpu_arch: str, dut_ip: str, chromeos_root: str
+    board: str,
+    lacros_version: str,
+    board_cpu_arch: str,
+    dut_ip: str,
+    chrome_src: str,
 ) -> int:
     """Fetch and deploy a specific lacros prebuilt version to a DUT.
 
     Args:
+      board: the board name
       lacros_version: lacros prebuilt version to fetch
       board_cpu_arch, CPU architecture of the board
       dut_ip: IP of the DUT
-      chromeos_root: ChromeOS source root directory
+      chrome_src: Chrome source root directory
 
     Returns:
       0 for successful deployment. Raises exception for failures.
@@ -384,11 +392,11 @@ def fetch_and_deploy_lacros_prebuilt_to_dut(
             lacros_version, board_cpu_arch
         )
 
-        deploy_chrome_path = _get_deploy_chrome_path(
-            chromeos_root=chromeos_root
-        )
         deploy_lacros_to_dut(
-            lacros_prebuilt_directory, dut_ip, deploy_chrome_path
+            board,
+            lacros_prebuilt_directory,
+            dut_ip,
+            chrome_src,
         )
 
         return 0
@@ -501,15 +509,20 @@ def build(chrome_src: str, board_cpu_arch: str):
         return output_directory
 
 
-def deploy(chrome_src: str, dut_ip: str, output_directory: str | None = None):
+def deploy(
+    board: str,
+    chrome_src: str,
+    dut_ip: str,
+    output_directory: str | None = None,
+):
     """Deploy lacros
 
     Args:
+      board: the board name
       chrome_src: Chrome source root directory
       dut_ip: IP of the DUT
       output_directory: optional output directory from which to deploy binaries.
     """
     if not output_directory:
         output_directory = _get_output_directory(chrome_src)
-    deploy_chrome_script_path = _get_deploy_chrome_path(chrome_src=chrome_src)
-    deploy_lacros_to_dut(output_directory, dut_ip, deploy_chrome_script_path)
+    deploy_lacros_to_dut(board, output_directory, dut_ip, chrome_src)

@@ -297,10 +297,13 @@ def switch_main(args: tuple[str] | None):
         if lacros_cache.cache_hit():
             with lacros_cache.get() as out_dir:
                 lacros_util.deploy(
-                    opts.chrome_src, opts.dut, output_directory=out_dir
+                    opts.board,
+                    opts.chrome_src,
+                    opts.dut,
+                    output_directory=out_dir,
                 )
         else:
-            lacros_util.deploy(opts.chrome_src, opts.dut)
+            lacros_util.deploy(opts.board, opts.chrome_src, opts.dut)
 
     # Sanity check. The OS version should not change.
     if opts.dut:

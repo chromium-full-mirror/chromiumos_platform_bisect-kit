@@ -173,7 +173,7 @@ def switch_main(args: tuple[str] | None):
             )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.deploy(opts)
-        lacros_util.deploy(opts.chrome_src, opts.dut)
+        lacros_util.deploy(opts.board, opts.chrome_src, opts.dut)
 
 
 def action() -> bisector_cli.SwitchAction:

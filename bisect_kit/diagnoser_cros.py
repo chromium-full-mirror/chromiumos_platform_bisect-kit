@@ -1059,6 +1059,10 @@ class CrosDiagnoser:
             '--rich-result',
             '--chromeos-root',
             self.config.get('chromeos_root'),
+            '--chrome-root',
+            self.config.get('chrome_root'),
+            '--board',
+            self.config.get('board'),
         ]
 
         bisector = wrapper.BisectorWrapper(

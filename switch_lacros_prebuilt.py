@@ -46,6 +46,13 @@ def create_argument_parser():
         default=os.environ.get('DUT', ''),
     )
     parser.add_argument(
+        '--board',
+        type=cli.argtype_notempty,
+        metavar='BOARD',
+        default=os.environ.get('BOARD', ''),
+        help='ChromeOS board name',
+    )
+    parser.add_argument(
         '--board-cpu-arch',
         type=cli.argtype_notempty,
         metavar='BOARD_CPU_ARCH',
@@ -57,6 +64,13 @@ def create_argument_parser():
         type=cli.argtype_dir_path,
         default=os.environ.get('CHROMEOS_ROOT', ''),
         help='Root of ChromeOS source tree, like ~/chromiumOS',
+    )
+    parser.add_argument(
+        '--chrome-root',
+        metavar='CHROME_ROOT',
+        type=cli.argtype_dir_path,
+        default=os.environ.get('CHROME_ROOT', ''),
+        help='Root of Chrome source tree, like ~/chrome',
     )
     parser.add_argument(
         'version',
@@ -92,7 +106,11 @@ def switch_main(args: tuple[str] | None):
             raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
 
     lacros_util.fetch_and_deploy_lacros_prebuilt_to_dut(
-        opts.version, opts.board_cpu_arch, opts.dut, opts.chromeos_root
+        opts.board,
+        opts.version,
+        opts.board_cpu_arch,
+        opts.dut,
+        opts.chrome_root,
     )
 
     # TODO(njrafi): Check if deployed lacros version match with opts.version
