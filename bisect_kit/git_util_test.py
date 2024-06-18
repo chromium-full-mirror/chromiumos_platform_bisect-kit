@@ -120,7 +120,7 @@ class GitOperation:
           num: number of commits to create
         """
         for i in range(1, num + 1):
-            commit_time = '2017-01-%02dT00:00:00' % i
+            commit_time = '2017-01-%02dT00:00:00+08:00' % i
             self.revs.append(
                 self.add_commit(
                     commit_time,
