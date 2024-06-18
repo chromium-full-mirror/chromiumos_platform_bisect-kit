@@ -225,7 +225,7 @@ class BuildbucketApi:
                 logger.exception(
                     'Error in buildbucket post: %s', response_content
                 )
-                raise errors.ExternalError(
+                raise errors.BuildError(
                     'buildbucket api response: ' + response_content
                 ) from e
             except (ConnectionError, socket.timeout, ssl.SSLError) as e:
