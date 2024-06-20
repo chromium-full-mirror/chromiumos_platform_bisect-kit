@@ -85,6 +85,7 @@ class ArgumentParser(argparse.ArgumentParser):
         normalized = []
         preserved = False
         for arg in args:
+            arg = str(arg)
             if arg == '--':
                 preserved = True
                 normalized.append(arg)

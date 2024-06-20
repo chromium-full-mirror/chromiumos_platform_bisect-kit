@@ -477,7 +477,9 @@ class BisectStates(States):
         """Inherit from States."""
         return self.data
 
-    def get_rev_info(self, term_map=None, ignore_skip=False) -> list[RevInfo]:
+    def get_rev_info(
+        self, term_map=None, ignore_skip=False, timestamp=None
+    ) -> list[RevInfo]:
         """Gets aggregated rev info.
 
         Args:
@@ -496,6 +498,12 @@ class BisectStates(States):
                 continue
             if ignore_skip and entry.get('status') == 'skip':
                 continue
+            # When |timestamp| is given, only entries with timestamp <
+            # |timestamp| is added.
+            if timestamp is not None:
+                t = entry.get('timestamp')
+                if t is None or t >= timestamp:
+                    continue
             idx = self.rev2idx(entry['rev'])
             rev_info[idx].add_sample(**entry)
         return rev_info

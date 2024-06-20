@@ -1529,7 +1529,7 @@ class CrosDiagnoser:
         if json_output:
             print(json.dumps(result, indent=2))
 
-    def cmd_view(self, json_output=False, verbose=False):
+    def cmd_view(self, json_output=False, verbose=False, timestamp=None):
         result = []
 
         # Analyze log to determine what to show
@@ -1551,6 +1551,8 @@ class CrosDiagnoser:
             )
             try:
                 cmd = ['view']
+                if timestamp is not None:
+                    cmd.extend(['--timestamp', timestamp])
                 if verbose:
                     cmd.append('--verbose')
                 if json_output:
@@ -1896,7 +1898,7 @@ class DiagnoseCommandLineBase:
     def cmd_view(self, opts):
         self.states.load_states()
         diagnoser = CrosDiagnoser(self.states, self.config)
-        diagnoser.cmd_view(opts.json, opts.verbose)
+        diagnoser.cmd_view(opts.json, opts.verbose, opts.timestamp)
 
     def create_argument_parser_hook(self, parser_init):
         pass  # implemented by subclass if necessary
@@ -2195,6 +2197,11 @@ class DiagnoseCommandLineBase:
         parser_view.add_argument('--verbose', '-v', action='store_true')
         parser_view.add_argument(
             '--json', action='store_true', help='Machine readable output'
+        )
+        parser_view.add_argument(
+            '--timestamp',
+            type=float,
+            help='Get view at some timestamp. Only history before the timestamp is included.',
         )
         parser_view.set_defaults(func=self.cmd_view)
 

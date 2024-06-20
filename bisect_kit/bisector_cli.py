@@ -1429,7 +1429,7 @@ class BisectorCommandLine:
                         print('\t%s' % action['link'])
 
     def _strategy_factory(
-        self, ignore_skip=False
+        self, ignore_skip: bool = False, timestamp: float | None = None
     ) -> strategy.NoisyBinarySearch:
         """Create a strategy.NoisyBinarySearch instance.
 
@@ -1440,6 +1440,8 @@ class BisectorCommandLine:
             It is useful when retring a bisection since 'skip' are likely to be temporary errors.
             By ignoring the 'skip' entries, we are able to retry a bisection which was failed
             due to errors.TooManyTemporaryErrors previously.
+          timestamp: if given, only history with timestamp <= timestamp is loaded.
+            It is useful when analying bisect progress at some past time point.
 
         Returns:
           A strategy.NoisyBinarySearch instance.
@@ -1451,7 +1453,9 @@ class BisectorCommandLine:
             'old': self.config.get('term_old'),
             'new': self.config.get('term_new'),
         }
-        rev_info = self.states.get_rev_info(term_map, ignore_skip=ignore_skip)
+        rev_info = self.states.get_rev_info(
+            term_map, ignore_skip=ignore_skip, timestamp=timestamp
+        )
         assert rev_info
         return strategy.NoisyBinarySearch(
             rev_info,
@@ -1909,6 +1913,11 @@ class BisectorCommandLine:
         )
         parser_view.add_argument('--verbose', '-v', action='store_true')
         parser_view.add_argument('--json', action='store_true')
+        parser_view.add_argument(
+            '--timestamp',
+            type=float,
+            help='Get view at some timestamp. Only history before the timestamp is included.',
+        )
         parser_view.set_defaults(func=self.cmd_view)
 
         parser_log = subparsers.add_parser(
@@ -1957,7 +1966,8 @@ class BisectorCommandLine:
             # retry.
             # For other operations like cmd_view, we keep the full history.
             self.strategy = self._strategy_factory(
-                ignore_skip=opts.command == 'run'
+                ignore_skip=opts.command == 'run',
+                timestamp=opts.timestamp if opts.command == 'view' else None,
             )
 
         return opts.func(opts)
