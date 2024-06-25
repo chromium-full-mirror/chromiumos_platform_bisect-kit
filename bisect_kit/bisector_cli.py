@@ -1306,6 +1306,21 @@ class BisectorCommandLine:
         summary = {
             'rev_info': [],
         }
+        for sample in self.states.history:
+            if sample.get('event') != 'sample':
+                continue
+            if opts.timestamp is not None:
+                t = sample.get('timestamp', None)
+                if t is not None and t >= opts.timestamp:
+                    continue
+            try:
+                self.strategy.add_sample(sample['index'], **sample)
+            except (
+                errors.WrongAssumption,
+                errors.VerificationFailed,
+                errors.TooManyTemporaryErrors,
+            ):
+                pass
 
         for info in self.strategy.rev_info:
             info_dict = info.to_dict()
@@ -1429,7 +1444,9 @@ class BisectorCommandLine:
                         print('\t%s' % action['link'])
 
     def _strategy_factory(
-        self, ignore_skip: bool = False, timestamp: float | None = None
+        self,
+        ignore_skip: bool = False,
+        ignore_history=False,
     ) -> strategy.NoisyBinarySearch:
         """Create a strategy.NoisyBinarySearch instance.
 
@@ -1440,8 +1457,7 @@ class BisectorCommandLine:
             It is useful when retring a bisection since 'skip' are likely to be temporary errors.
             By ignoring the 'skip' entries, we are able to retry a bisection which was failed
             due to errors.TooManyTemporaryErrors previously.
-          timestamp: if given, only history with timestamp <= timestamp is loaded.
-            It is useful when analying bisect progress at some past time point.
+          ignore_history: Whether to ignore all history. Only get the revlist but not previous running result.
 
         Returns:
           A strategy.NoisyBinarySearch instance.
@@ -1454,7 +1470,9 @@ class BisectorCommandLine:
             'new': self.config.get('term_new'),
         }
         rev_info = self.states.get_rev_info(
-            term_map, ignore_skip=ignore_skip, timestamp=timestamp
+            term_map,
+            ignore_skip=ignore_skip,
+            ignore_history=ignore_history,
         )
         assert rev_info
         return strategy.NoisyBinarySearch(
@@ -1468,7 +1486,9 @@ class BisectorCommandLine:
             confidence=self.config.get('confidence'),
             observation=self.config.get('noisy'),
             endpoint_verification=self.config.get('endpoint_verification'),
-            saved_states=self.states.strategy_states,
+            saved_states=None
+            if ignore_history
+            else self.states.strategy_states,
         )
 
     def check_done(self, session: typing.Optional[str] = None) -> bool:
@@ -1967,7 +1987,7 @@ class BisectorCommandLine:
             # For other operations like cmd_view, we keep the full history.
             self.strategy = self._strategy_factory(
                 ignore_skip=opts.command == 'run',
-                timestamp=opts.timestamp if opts.command == 'view' else None,
+                ignore_history=opts.command == 'view',
             )
 
         return opts.func(opts)

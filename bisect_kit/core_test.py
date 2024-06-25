@@ -335,7 +335,7 @@ class TestBisectStates(unittest.TestCase):
         ):
             self.assertEqual(want.to_dict(), got.to_dict())
 
-    def test_get_rev_info_with_timestamp(self):
+    def test_get_rev_info_ignore_history(self):
         session_file_content = {
             'config': {},
             'revlist': [str(i) for i in range(5)],
@@ -345,25 +345,21 @@ class TestBisectStates(unittest.TestCase):
                     'rev': '0',
                     'event': 'sample',
                     'status': 'old',
-                    # missing timestamp.
                 },
                 {
                     'rev': '0',
                     'event': 'sample',
                     'status': 'old',
-                    'timestamp': 1718900051,
                 },
                 {
                     'rev': '4',
                     'event': 'sample',
                     'status': 'new',
-                    'timestamp': 1718900049,
                 },
                 {
                     'rev': '4',
                     'event': 'sample',
                     'status': 'new',
-                    'timestamp': 1718900050,
                 },
             ],
         }
@@ -373,12 +369,8 @@ class TestBisectStates(unittest.TestCase):
         states.load_states()
 
         expected_rev_info = [core.RevInfo(rev=str(i)) for i in range(5)]
-        expected_rev_info[0].result_counter = {}
-        expected_rev_info[4].result_counter = {
-            'new': 2,
-        }
         for want, got in zip(
-            expected_rev_info, states.get_rev_info(timestamp=1718900051)
+            expected_rev_info, states.get_rev_info(ignore_history=True)
         ):
             self.assertEqual(want.to_dict(), got.to_dict())
 

@@ -145,8 +145,7 @@ def get_default_chromeos_root() -> str:
 
 
 def get_session_log_path(
-    session_name: str | None = None,
-    file_path: PathLike = '',
+    session_name: str | None = None, file_path: PathLike = ''
 ) -> str:
     path_factory = ProjectPathFactory(session_name, DEFAULT_LOG_BASE)
     return path_factory.get_session_file(file_path)

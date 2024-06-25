@@ -421,6 +421,11 @@ class BisectStates(States):
         return self.data.get('details', {})
 
     @property
+    def history(self) -> dict[str, typing.Any]:
+        assert self.inited
+        return self.data.get('history', {})
+
+    @property
     def strategy_states(self) -> strategy_states.States | None:
         assert self.inited
         states = self.data.get('strategy_states')
@@ -478,13 +483,14 @@ class BisectStates(States):
         return self.data
 
     def get_rev_info(
-        self, term_map=None, ignore_skip=False, timestamp=None
+        self, term_map=None, ignore_skip=False, ignore_history=False
     ) -> list[RevInfo]:
         """Gets aggregated rev info.
 
         Args:
           term_map: Alternative term for states
           ignore_skip: Whether to ignore 'skip' entries.
+          ignore_history: Whether to ignore previous running result.
 
         Returns:
           list of RevInfo, which aggregated previous test samples.
@@ -493,17 +499,14 @@ class BisectStates(States):
         rev_info = []
         for rev in self.data['revlist']:
             rev_info.append(RevInfo(rev, term_map=term_map))
+        if ignore_history:
+            return rev_info
+
         for entry in self.data['history']:
             if entry.get('event', 'sample') != 'sample':
                 continue
             if ignore_skip and entry.get('status') == 'skip':
                 continue
-            # When |timestamp| is given, only entries with timestamp <
-            # |timestamp| is added.
-            if timestamp is not None:
-                t = entry.get('timestamp')
-                if t is None or t >= timestamp:
-                    continue
             idx = self.rev2idx(entry['rev'])
             rev_info[idx].add_sample(**entry)
         return rev_info
