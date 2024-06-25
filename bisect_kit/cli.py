@@ -367,6 +367,12 @@ def create_common_argument_parser() -> ArgumentParser:
     common_argument_parser.add_argument(
         '--debug', action='store_true', help='Output DEBUG log to console'
     )
+    common_argument_parser.add_argument(
+        '--log-base-dir',
+        metavar='LOG_BASE_DIR',
+        default=common.DEFAULT_LOG_BASE,
+        help='log base directory',
+    )
     return common_argument_parser
 
 

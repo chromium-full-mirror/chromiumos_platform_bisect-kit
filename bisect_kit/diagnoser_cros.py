@@ -115,22 +115,11 @@ class CrosDiagnoser:
         self.old_info: cros_util.VersionInfo = cros_util.VersionInfo()
         self.new_info: cros_util.VersionInfo = cros_util.VersionInfo()
 
-        self.dut_allocate_spec = dut_allocate_spec_module.load(
-            self.config.get('session'),
-            self.config.get('sync_dut_allocate_spec_with_db'),
-        )
-        assert (
-            self.dut_allocate_spec or self.pre_allocated_dut
-        ), 'no pre-allocated dut and dut_allocate_spec can not be loaded'
-
-        self.is_vm_board = False
-        if self.dut_allocate_spec and self.dut_allocate_spec.boards:
-            self.is_vm_board = cros_util.is_vm_board(
-                self.dut_allocate_spec.boards[0]
-            )
         self._switch_vm_cmd: list[str] = ['./switch_cros_vm.py']
 
         # Initialized in diagnose().
+        self.dut_allocate_spec = None
+        self.is_vm_board = None
         self._dut_manager = None
 
     def _verified_chromeos_prebuilt(self):
@@ -190,6 +179,19 @@ class CrosDiagnoser:
         is_custom_eval: bool = False,
     ):
         """Diagnose entry point."""
+        self.dut_allocate_spec = dut_allocate_spec_module.load(
+            self.config.get('session'),
+            self.config.get('sync_dut_allocate_spec_with_db'),
+        )
+        assert (
+            self.dut_allocate_spec or self.pre_allocated_dut
+        ), 'no pre-allocated dut and dut_allocate_spec can not be loaded'
+
+        self.is_vm_board = False
+        if self.dut_allocate_spec and self.dut_allocate_spec.boards:
+            self.is_vm_board = cros_util.is_vm_board(
+                self.dut_allocate_spec.boards[0]
+            )
         self._dut_manager = DutManagerRecycler()
 
         can_be_retried = False
@@ -1898,13 +1900,19 @@ class DiagnoseCommandLineBase:
     def cmd_view(self, opts):
         self.states.load_states()
         diagnoser = CrosDiagnoser(self.states, self.config)
-        diagnoser.cmd_view(opts.json, opts.verbose, opts.timestamp)
+        diagnoser.cmd_view(
+            opts.json,
+            opts.verbose,
+            opts.timestamp,
+        )
 
     def create_argument_parser_hook(self, parser_init):
         pass  # implemented by subclass if necessary
 
     def create_argument_parser(self):
-        parents = [cli.create_session_optional_parser()]
+        parents = [
+            cli.create_session_optional_parser(),
+        ]
         parser = cli.ArgumentParser(raise_bad_status=False)
         subparsers = parser.add_subparsers(
             dest='command', title='commands', metavar='<command>', required=True
@@ -2209,6 +2217,7 @@ class DiagnoseCommandLineBase:
 
     def main(self, args=None):
         opts = self.argument_parser.parse_args(args)
+        common.DEFAULT_LOG_BASE = opts.log_base_dir
         common.config_logging(opts)
 
         session_file = common.get_session_log_path(

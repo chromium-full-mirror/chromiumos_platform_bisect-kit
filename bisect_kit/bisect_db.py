@@ -240,3 +240,41 @@ class Client(gcloud.DataStoreClient):
 
         logging.debug('%s unfinished bisects with valid spec', len(specs))
         return specs
+
+    def query_finished_bisects(
+        self,
+        after: datetime.datetime,
+        before: datetime.datetime,
+    ) -> list[datastore.Entity]:
+        """Gets all finished bisections in [after, before)
+        Args:
+          after: the after time.
+          before: the before time.
+        Returns:
+          A list of Bisect entities.
+        """
+        q = self._client.query(kind=self._KIND_BISECT)
+        filters = [
+            datastore.query.PropertyFilter(
+                'Status', 'IN', self._BISECT_FINISHED_STATUS
+            ),
+            datastore.query.PropertyFilter('ReportedAt', '<', before),
+            datastore.query.PropertyFilter('ReportedAt', '>=', after),
+        ]
+
+        logging.debug('querying finished bisects: %s', filters)
+        q.add_filter(filter=datastore.query.And(filters))
+
+        return list(q.fetch())
+
+    def get_bisect(self, bisect_id: str) -> datastore.Entity:
+        """Get a single bisect.
+
+        Args:
+          bisect_id: bisect ID.
+        Returns:
+          The Bisect entity.
+        """
+        key = self._client.key('Bisect', bisect_id)
+        entity = self._client.get(key)
+        return entity

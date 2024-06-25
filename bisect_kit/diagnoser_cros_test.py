@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 
 from bisect_kit import diagnoser_cros
+from bisect_kit import dut_allocate_spec as dut_allocate_spec_module
 from bisect_kit import errors
 from bisect_kit import shared_dut_pool
 
@@ -72,6 +73,13 @@ class TestDiagnose(unittest.TestCase):
         )
         self._mock_dut_manager_reset = (
             self._mock_dut_manager_recycler_cls.return_value.reset
+        )
+        self._mock_load_dut_allocate_spec = self.enterContext(
+            mock.patch.object(
+                dut_allocate_spec_module,
+                'load',
+                autospec=True,
+            )
         )
         self._diagnoser = None
 
