@@ -363,7 +363,10 @@ def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
     )
     cmd = ['sh', '-ex', deploy_script] + targets
 
-    simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
+    try:
+        simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
+    except subprocess.CalledProcessError as e:
+        raise errors.ExternalError('chrome deploy failed') from e
 
 
 def _get_ancestors(target_version: str, version_list: list[str]) -> list[str]:
