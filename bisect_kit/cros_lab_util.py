@@ -945,6 +945,16 @@ def query_lease_status(dut_name, verbose_log=True) -> LeaseStatus:
     assert user
 
     request = swarming_task_request(status.task_id, verbose_log=verbose_log)
+    # b/350370209: Somehow the task id for a task is not unique.
+    # For example, calling the above API with task_id from 6a8af5c25c289110
+    # to 6a8af5c25c289119 all return a "canonical" task id of 6a8af5c25c289110.
+    # As a result, we use the "canonical" task id because it is usually
+    # expected.
+    original_task_id = status.task_id
+    status.task_id = request.get('taskId', original_task_id)
+    logger.debug(
+        'original_task_id: %s, task_id: %s', original_task_id, status.task_id
+    )
     status.leased_by = request['authenticated']
     # format change, ignore the detail information (b/179461101)
     status.is_leased_by_me = bool(status.leased_by)
