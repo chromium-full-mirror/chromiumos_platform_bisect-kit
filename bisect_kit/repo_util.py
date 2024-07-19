@@ -41,9 +41,7 @@ def get_manifest_url(manifest_dir):
     Returns:
       manifest URL.
     """
-    url = util.check_output(
-        'git', 'config', 'remote.origin.url', cwd=manifest_dir
-    )
+    url = git_util.config(manifest_dir, 'remote.origin.url')
     return url
 
 
