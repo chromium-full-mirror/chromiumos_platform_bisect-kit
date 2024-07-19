@@ -606,11 +606,11 @@ class TestDutManagerAllocation(unittest.TestCase):
 
         # First lease, exception raised at the second layer.
         self.mock_allocate_dut.return_value = 'host', 'board'
-        with self.assertRaises(Exception):
+        with self.assertRaises(DummyException):
             with dut_manager.provision() as dut:
                 self.assertEqual(dut, 'host.cros')
                 with dut_manager.provision() as dut:
-                    raise Exception('some exception')
+                    raise DummyException('some exception')
 
         self.mock_update_states.assert_called_once_with(
             dut_manager, 'host.cros'
