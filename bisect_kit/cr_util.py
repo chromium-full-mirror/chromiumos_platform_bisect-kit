@@ -58,6 +58,7 @@ CHROME_TEST_BINARIES = [
     'video_decode_accelerator_tests',
     'video_encode_accelerator_perf_tests',
     'video_encode_accelerator_tests',
+    'vulkan_overlay_adaptor_test',
     'wayland_client_integration_tests',
     'wayland_client_perftests',
     'wayland_hdr_client',
