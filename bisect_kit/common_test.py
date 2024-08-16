@@ -55,7 +55,10 @@ class TestCommon(unittest.TestCase):
 
     def test_path_factory(self):
         path_facory = common.ProjectPathFactory(
-            'dummy_session', '/dummy_work_base', '/dummy_mirror_base'
+            'dummy_session',
+            '/dummy_work_base',
+            '/dummy_mirror_base',
+            '/dummy_chrome_work_base',
         )
         self.assertEqual(path_facory.work_base, '/dummy_work_base')
         self.assertEqual(path_facory.session_name, 'dummy_session')
@@ -90,7 +93,7 @@ class TestCommon(unittest.TestCase):
         )
         self.assertEqual(
             path_facory.get_chrome_tree(),
-            '/dummy_work_base/dummy_session/chrome',
+            '/dummy_chrome_work_base/dummy_session/chrome',
         )
 
     def test_get_session_file(self):

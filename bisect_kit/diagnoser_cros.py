@@ -87,6 +87,7 @@ class CrosDiagnoser:
             self.config.get('session'),
             self.config.get('work_base'),
             self.config.get('mirror_base'),
+            self.config.get('chrome_work_base'),
         )
         # self.noisy will be updated after we gather more information from each
         # bisect session.
@@ -1635,8 +1636,22 @@ class DiagnoseCommandLineBase:
             )
 
     def check_options(self, opts):
+        if not opts.chrome_work_base:
+            if experiment.is_in_experiment(
+                opts.experiments,
+                experiment.ID.EXT4_CHROME_CHECKOUT,
+            ):
+                # Use a directory on an ext4 file system for chrome checkouts.
+                opts.chrome_work_base = common.DEFAULT_EXT4_CHROME_WORK_BASE
+            else:
+                # Use the work base directory on btrfs for chrome checkouts.
+                opts.chrome_work_base = opts.work_base
+
         path_factory = common.ProjectPathFactory(
-            opts.session, opts.work_base, opts.mirror_base
+            opts.session,
+            opts.work_base,
+            opts.mirror_base,
+            opts.chrome_work_base,
         )
         if not opts.chromeos_mirror:
             opts.chromeos_mirror = path_factory.get_chromeos_mirror()
@@ -1829,6 +1844,7 @@ class DiagnoseCommandLineBase:
             "session": opts.session,
             "mirror_base": opts.mirror_base,
             "work_base": opts.work_base,
+            "chrome_work_base": opts.chrome_work_base,
             "chromeos_root": opts.chromeos_root,
             "chromeos_mirror": opts.chromeos_mirror,
             "chrome_root": opts.chrome_root,
@@ -1943,6 +1959,12 @@ class DiagnoseCommandLineBase:
             default=os.environ.get('WORK_BASE', common.DEFAULT_WORK_BASE),
             help='Directory for bisection working directories '
             '(default: %(default)s)',
+        )
+        group.add_argument(
+            '--chrome-work-base',
+            metavar='CHROME_WORK_BASE',
+            default=os.environ.get('CHROME_WORK_BASE'),
+            help='Directory for chrome working directories',
         )
         group.add_argument(
             '--chromeos-root',

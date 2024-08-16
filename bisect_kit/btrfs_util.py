@@ -45,7 +45,7 @@ def makedirs(path: PathLike, use_btrfs: bool) -> None:
     if use_btrfs:
         _make_subvolume(path)
     else:
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
 
 
 def copy_tree(src: PathLike, dst: PathLike) -> None:

@@ -23,6 +23,10 @@ DEFAULT_TEMPLATE_NAME = 'template'
 DEFAULT_WORK_BASE = str(pathlib.Path('~/bisect-workdir').expanduser())
 DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors').expanduser())
 
+DEFAULT_EXT4_CHROME_WORK_BASE = str(
+    pathlib.Path('~/chrome-workdir').expanduser()
+)
+
 DEFAULT_LOG_BASE = 'bisect.sessions'
 DEFAULT_LOG_FILENAME = 'bisect-kit.log'
 
@@ -78,6 +82,7 @@ class ProjectPathFactory(WorkBasePathFactory):
         session_name: str | None = None,
         work_base: PathLike | None = None,
         mirror_base: PathLike | None = None,
+        chrome_work_base: PathLike | None = None,
     ):
         super().__init__(work_base=work_base)
 
@@ -89,6 +94,12 @@ class ProjectPathFactory(WorkBasePathFactory):
         if not mirror_base:
             mirror_base = DEFAULT_MIRROR_BASE
         self._mirror_base = pathlib.Path(mirror_base).absolute()
+
+        if not chrome_work_base:
+            chrome_work_base = self._work_base
+        self._chrome_workdir = (
+            pathlib.Path(chrome_work_base).absolute() / self._session_name
+        )
 
     @property
     def session_name(self) -> str:
@@ -125,8 +136,11 @@ class ProjectPathFactory(WorkBasePathFactory):
     def get_chrome_cache(self) -> str:
         return str(self._mirror_base / self.CHROME_SRC)
 
+    def get_chrome_workdir(self) -> str:
+        return str(self._chrome_workdir)
+
     def get_chrome_tree(self) -> str:
-        return str(self._session_workdir / self.CHROME_SRC)
+        return str(self._chrome_workdir / self.CHROME_SRC)
 
 
 class TemplatePathFactory(ProjectPathFactory):

@@ -44,6 +44,7 @@ from bisect_kit import git_util
 from bisect_kit import locking
 from bisect_kit import repo_util
 from bisect_kit import util
+import experiment
 
 
 PathLike = os.PathLike | str
@@ -558,7 +559,7 @@ def cmd_new(opts):
         opts.work_base, opts.mirror_base
     )
     path_factory = common.ProjectPathFactory(
-        opts.session, opts.work_base, opts.mirror_base
+        opts.session, opts.work_base, opts.mirror_base, opts.chrome_work_base
     )
     pathlib.Path(path_factory.session_workdir).mkdir(
         parents=True, exist_ok=True
@@ -585,7 +586,15 @@ def cmd_new(opts):
         logger.info(
             'prepare tree for chrome, %s', path_factory.get_chrome_tree()
         )
-        btrfs_util.copy_tree(chrome_template, path_factory.get_chrome_tree())
+        if experiment.is_in_experiment(
+            opts.experiments,
+            experiment.ID.EXT4_CHROME_CHECKOUT,
+        ):
+            _setup_chrome_repos(path_factory, use_btrfs=False)
+        else:
+            btrfs_util.copy_tree(
+                chrome_template, path_factory.get_chrome_tree()
+            )
 
     if prepare_all:
         android_branches = path_factory.iter_android_branches()
@@ -622,15 +631,32 @@ def cmd_delete(opts):
         # process first to avoid deleting the running session accidentally.
         path_factory = common.WorkBasePathFactory(work_base=opts.work_base)
         for session_name in path_factory.iter_session_names():
-            _delete_session(session_name, opts.work_base, opts.mirror_base)
+            _delete_session(
+                session_name,
+                opts.work_base,
+                opts.mirror_base,
+                opts.chrome_work_base,
+            )
     elif opts.session:
-        _delete_session(opts.session, opts.work_base, opts.mirror_base)
+        _delete_session(
+            opts.session,
+            opts.work_base,
+            opts.mirror_base,
+            opts.chrome_work_base,
+        )
 
     _clear_global_caches()
 
 
-def _delete_session(session: str, work_base: PathLike, mirror_base: PathLike):
-    path_factory = common.ProjectPathFactory(session, work_base, mirror_base)
+def _delete_session(
+    session: str,
+    work_base: PathLike,
+    mirror_base: PathLike,
+    chrome_work_base: PathLike,
+):
+    path_factory = common.ProjectPathFactory(
+        session, work_base, mirror_base, chrome_work_base
+    )
 
     chromeos_tree = path_factory.get_chromeos_tree()
     if os.path.exists(chromeos_tree):
@@ -642,12 +668,38 @@ def _delete_session(session: str, work_base: PathLike, mirror_base: PathLike):
     chrome_tree = path_factory.get_chrome_tree()
     btrfs_util.delete_tree(chrome_tree, missing_ok=True)
 
+    if work_base == chrome_work_base:
+        # Delete a chrome work dir in the DEFAULT_EXT4_CHROME_WORK_BASE
+        # directory if any. Even if we're currently running without the
+        # ext4_chrome_checkout experiment, existing sessions may have chrome
+        # checkouts in the DEFAULT_EXT4_CHROME_WORK_BASE directory.
+        btrfs_util.delete_tree(
+            common.ProjectPathFactory(
+                session,
+                work_base,
+                mirror_base,
+                common.DEFAULT_EXT4_CHROME_WORK_BASE,
+            ).get_chrome_workdir(),
+            missing_ok=True,
+        )
+    else:
+        # Delete a chrome checkout in the work_base directory if any.
+        # Even if we're currently running with the ext4_chrome_checkout experiment,
+        # existing sessions may have chrome checkouts in the work_base directory.
+        btrfs_util.delete_tree(
+            common.ProjectPathFactory(
+                session, work_base, mirror_base, work_base
+            ).get_chrome_tree(),
+            missing_ok=True,
+        )
+
     android_branches = path_factory.iter_android_branches()
     for branch in android_branches:
         android_tree = path_factory.get_android_tree(branch)
         btrfs_util.delete_tree(android_tree, missing_ok=True)
 
     btrfs_util.delete_tree(path_factory.session_workdir, missing_ok=True)
+    btrfs_util.delete_tree(path_factory.get_chrome_workdir(), missing_ok=True)
 
     for path in glob.glob(
         os.path.join(path_factory.get_chrome_cache(), '_cache_*')
@@ -760,13 +812,21 @@ def create_parser():
         help='Directory for bisection working directories'
         ' (default: %(default)s)',
     )
+    base_parser.add_argument(
+        '--chrome-work-base',
+        metavar='CHROME_WORK_BASE',
+        default=os.environ.get('CHROME_WORK_BASE'),
+        help='Directory for chrome working directories',
+    )
     parents_session_optional = [
         cli.create_session_optional_parser(),
         base_parser,
+        experiment.common_flags(),
     ]
     parents_session_required = [
         cli.create_session_required_parser(),
         base_parser,
+        experiment.common_flags(),
     ]
 
     parser = cli.ArgumentParser(
@@ -884,6 +944,18 @@ def create_parser():
 def main():
     parser = create_parser()
     opts = parser.parse_args()
+
+    if not opts.chrome_work_base:
+        if experiment.is_in_experiment(
+            opts.experiments,
+            experiment.ID.EXT4_CHROME_CHECKOUT,
+        ):
+            # Use a directory on an ext4 file system for chrome checkouts.
+            opts.chrome_work_base = common.DEFAULT_EXT4_CHROME_WORK_BASE
+        else:
+            # Use the work base directory on btrfs for chrome checkouts.
+            opts.chrome_work_base = opts.work_base
+
     common.config_logging(opts)
     return opts.func(opts)
 
