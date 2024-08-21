@@ -82,22 +82,11 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         switch_test_harness_cmd, common_eval_cmd = self._build_cmds()
 
         cros_prebuilt_eval_cmd = common_eval_cmd[:]
-        lacros_prebuilt_eval_cmd = (
-            common_eval_cmd
-            + ['--args']
-            + ['lacros.DeployedBinary=/usr/local/lacros-chrome']
-        )
         android_prebuilt_eval_cmd = common_eval_cmd
         if self.config.get('chrome_deploy_image'):
             chrome_localbuild_eval_cmd = common_eval_cmd + ['--tast-build']
         else:
             chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
-
-        chrome_localbuild_eval_cmd = (
-            chrome_localbuild_eval_cmd
-            + ['--args']
-            + ['lacros.DeployedBinary=/usr/local/lacros-chrome']
-        )
 
         cros_buildbucket_build = cros_util.is_buildbucket_buildable(
             self.config.get('cros_prebuilt_old')
@@ -112,7 +101,6 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             switch_test_harness_cmd=switch_test_harness_cmd,
             cros_prebuilt_eval_cmd=cros_prebuilt_eval_cmd,
             android_prebuilt_eval_cmd=android_prebuilt_eval_cmd,
-            lacros_prebuilt_eval_cmd=lacros_prebuilt_eval_cmd,
             chrome_localbuild_eval_cmd=chrome_localbuild_eval_cmd,
             should_build_chrome_localbuild_with_tests=True,
             cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,

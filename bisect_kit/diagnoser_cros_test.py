@@ -38,7 +38,6 @@ class TestDiagnose(unittest.TestCase):
             switch_test_harness_cmd=[],
             cros_prebuilt_eval_cmd=[],
             android_prebuilt_eval_cmd=[],
-            lacros_prebuilt_eval_cmd=[],
             chrome_localbuild_eval_cmd=[],
             should_build_chrome_localbuild_with_tests=False,
             cros_localbuild_eval_cmd=[],

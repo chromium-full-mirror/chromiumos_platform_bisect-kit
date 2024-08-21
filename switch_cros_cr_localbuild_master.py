@@ -33,7 +33,6 @@ from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
 from bisect_kit import git_util
-from bisect_kit import lacros_util
 import switch_cros_localbuild
 import switch_helper
 
@@ -159,7 +158,6 @@ def switch_main(args: tuple[str] | None):
             )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.build(opts)
-        lacros_util.build(opts.chrome_src, opts.board_cpu_arch)
 
     if not opts.no_deploy:
         # TODO(kcwu): support local patch.
@@ -173,7 +171,6 @@ def switch_main(args: tuple[str] | None):
             )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.deploy(opts)
-        lacros_util.deploy(opts.board, opts.chrome_src, opts.dut)
 
 
 def action() -> bisector_cli.SwitchAction:

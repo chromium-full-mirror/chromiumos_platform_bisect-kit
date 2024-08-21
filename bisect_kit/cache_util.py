@@ -72,7 +72,6 @@ class BuildArtifactsCache:
         """Build types the cache supports."""
 
         CHROME = 'chrome'
-        LACROS = 'lacros'
 
     _BUCKET_SUFFIX = 'builds'
 
@@ -83,11 +82,6 @@ class BuildArtifactsCache:
             'obj',
             'gen',
             'android_clang*',
-            '.reproxy_tmp',
-        ],
-        BuildType.LACROS: [
-            'obj',
-            'gen',
             '.reproxy_tmp',
         ],
     }
@@ -114,7 +108,7 @@ class BuildArtifactsCache:
 
         Args:
           self: self.
-          build_type: the type of the build artifacts (e.g., chrome, lacros).
+          build_type: the type of the build artifacts (e.g., chrome).
           variant: the variant (e.g., board or cpu architecture).
           rev: the revision.
           targets: the targets (usually binaries) to build.

@@ -35,7 +35,6 @@ from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
-from bisect_kit import lacros_util
 from bisect_kit import util
 import switch_cros_localbuild
 import switch_helper
@@ -185,7 +184,6 @@ def switch_main(args: tuple[str] | None):
     }
 
     chrome_cache = None
-    lacros_cache = None
     # If build exists in cache, shortcut it.
     if opts.deploy_method == 'chrome_deploy':
         chrome_cache = cache_util.BuildArtifactsCache(
@@ -194,17 +192,9 @@ def switch_main(args: tuple[str] | None):
             opts.rev,
             opts.target,
         )
-        lacros_cache = cache_util.BuildArtifactsCache(
-            cache_util.BuildArtifactsCache.BuildType.LACROS,
-            opts.board_cpu_arch,
-            opts.rev,
-        )
         chrome_cache_hit = chrome_cache.cache_hit()
-        lacros_cache_hit = lacros_cache.cache_hit()
-        if chrome_cache_hit and lacros_cache_hit:
-            logger.info(
-                'Both chrome and lacros are in cache, no need to sync and build.'
-            )
+        if chrome_cache_hit:
+            logger.info('Got a chrome cache hit. No need to sync and build.')
             opts.no_sync_code = True
             opts.no_build = True
 
@@ -234,8 +224,6 @@ def switch_main(args: tuple[str] | None):
             gclientfile = '.gclient-for-runhook'
             custom_var_list = [
                 'checkout_src_internal=True',
-                'cros_boards="arm-generic:amd64-generic:arm64-generic"',
-                'checkout_lacros_sdk=True',
                 'download_remoteexec_cfg=True',
             ]
             gclient_util.config(
@@ -264,13 +252,6 @@ def switch_main(args: tuple[str] | None):
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.build(opts)
 
-        if lacros_cache.cache_hit():
-            logger.info('No need to build lacros. Found %s', lacros_cache)
-        else:
-            out_dir = lacros_util.build(opts.chrome_src, opts.board_cpu_arch)
-            if out_dir:
-                lacros_cache.put(out_dir)
-
     if not opts.no_deploy:
         if opts.deploy_method == 'chrome_deploy':
             if chrome_cache.cache_hit():
@@ -293,17 +274,6 @@ def switch_main(args: tuple[str] | None):
                 )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.deploy(opts)
-
-        if lacros_cache.cache_hit():
-            with lacros_cache.get() as out_dir:
-                lacros_util.deploy(
-                    opts.board,
-                    opts.chrome_src,
-                    opts.dut,
-                    output_directory=out_dir,
-                )
-        else:
-            lacros_util.deploy(opts.board, opts.chrome_src, opts.dut)
 
     # Sanity check. The OS version should not change.
     if opts.dut:

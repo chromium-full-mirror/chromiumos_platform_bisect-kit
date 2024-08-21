@@ -376,7 +376,7 @@ def _get_ancestors(target_version: str, version_list: list[str]) -> list[str]:
 
     Args:
       target_version: The version we want to find the ancestors for
-      version_list: A list of chrome/lacros versions
+      version_list: A list of chrome versions
 
     Returns:
       A list of ancestor version of target version
@@ -396,9 +396,9 @@ def get_lca(old_version: str, new_version: str, version_list: list[str]) -> str:
     """Get the lowest common ancestor of old_version and new_version.
 
     Args:
-      old_version: Old chrome/lacros version
-      new_version: New chrome/lacros version
-      version_list: A list of chrome/lacros versions
+      old_version: Old chrome version
+      new_version: New chrome version
+      version_list: A list of chrome versions
 
     Returns:
       The lowest common ancestor of old_version and new_version
@@ -702,8 +702,6 @@ class ChromeSpecManager(codechange.SpecManager):
             git_util.checkout_version(self.chrome_src, rev)
             custom_var_list = [
                 'checkout_src_internal=True',
-                'cros_boards="arm-generic:arm64-generic:amd64-generic"',
-                'checkout_lacros_sdk=True',
                 'download_remoteexec_cfg=True',
             ]
             gclient_util.config(
