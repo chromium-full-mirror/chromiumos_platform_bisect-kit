@@ -329,7 +329,7 @@ def ssh_cmd(
     cmd.append(host)
     cmd += list(args)
 
-    max_attempts = max(max_attempts, 1)
+    max_attempts = max(max_attempts, 5)
     attempts = 0
     while True:
         attempts += 1
@@ -381,7 +381,7 @@ def scp_cmd(
         to_file,
     ]
 
-    max_attempts = max(max_attempts, 1)
+    max_attempts = max(max_attempts, 5)
     attempts = 0
     while True:
         attempts += 1
