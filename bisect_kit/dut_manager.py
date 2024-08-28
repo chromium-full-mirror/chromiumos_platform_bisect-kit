@@ -326,7 +326,7 @@ class DutManager:
             self._auto_allocated_dut,
             'cat',
             '/etc/lsb-release',
-            connect_timeout=1,
+            connect_timeout=5,
             max_attempts=30,
             retry_interval=3,
         )
