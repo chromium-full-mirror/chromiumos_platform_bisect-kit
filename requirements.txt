@@ -3,7 +3,8 @@ google-cloud-compute
 google-cloud-datastore
 googleapis_common_protos
 # b/187806838 chrome cannot find system google.protobuf, but user local's works.
-protobuf
+# b/363138301 Generated code in infra_libs doesn't work well with protobuf 5.x.x
+protobuf<5.0.0
 psutil
 scipy
 setuptools
