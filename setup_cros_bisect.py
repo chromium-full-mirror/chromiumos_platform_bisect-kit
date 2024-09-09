@@ -160,7 +160,7 @@ def _add_local_mount(chromeos_tree: str):
 def _setup_chromeos_repos(path_factory, use_btrfs: bool):
     chromeos_mirror = path_factory.get_chromeos_mirror()
     chromeos_tree = path_factory.get_chromeos_tree()
-    btrfs_util.makedirs(chromeos_mirror, use_btrfs)
+    btrfs_util.makedirs(chromeos_mirror, use_btrfs=False)
     btrfs_util.makedirs(chromeos_tree, use_btrfs)
 
     manifest_url = (
@@ -378,7 +378,7 @@ def _sync_chromeos_code(path_factory):
 def _configure_chrome_repos(path_factory, use_btrfs: bool):
     chrome_cache = path_factory.get_chrome_cache()
     chrome_tree = path_factory.get_chrome_tree()
-    btrfs_util.makedirs(chrome_cache, use_btrfs)
+    btrfs_util.makedirs(chrome_cache, use_btrfs=False)
     btrfs_util.makedirs(chrome_tree, use_btrfs)
 
     # The 'src' directory is expected to exist in many places. Create it now.

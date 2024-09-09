@@ -21,7 +21,7 @@ PathLike = os.PathLike | str
 DEFAULT_SESSION_NAME = 'default'
 DEFAULT_TEMPLATE_NAME = 'template'
 DEFAULT_WORK_BASE = str(pathlib.Path('~/bisect-workdir').expanduser())
-DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors').expanduser())
+DEFAULT_MIRROR_BASE = str(pathlib.Path('~/git-mirrors-ext4').expanduser())
 
 DEFAULT_EXT4_CHROME_WORK_BASE = str(
     pathlib.Path('~/chrome-workdir').expanduser()
