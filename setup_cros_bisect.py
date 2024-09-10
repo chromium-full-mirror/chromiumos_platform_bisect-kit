@@ -375,11 +375,15 @@ def _sync_chromeos_code(path_factory):
     )
 
 
-def _setup_chrome_repos(path_factory, use_btrfs: bool):
+def _configure_chrome_repos(path_factory, use_btrfs: bool):
     chrome_cache = path_factory.get_chrome_cache()
     chrome_tree = path_factory.get_chrome_tree()
     btrfs_util.makedirs(chrome_cache, use_btrfs)
     btrfs_util.makedirs(chrome_tree, use_btrfs)
+
+    # The 'src' directory is expected to exist in many places. Create it now.
+    chrome_src = pathlib.Path(chrome_tree) / 'src'
+    chrome_src.mkdir(exist_ok=True)
 
     spec = """
 solutions = [
@@ -398,13 +402,20 @@ cache_dir = %r
 """ % (
         chrome_cache
     )
-
     with locking.lock_file(
         os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)
     ):
         logger.info('gclient config for chrome')
         gclient_util.config(chrome_tree, spec=spec)
 
+
+def _setup_chrome_repos(path_factory, use_btrfs: bool):
+    _configure_chrome_repos(path_factory, use_btrfs)
+
+    chrome_cache = path_factory.get_chrome_cache()
+    with locking.lock_file(
+        os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)
+    ):
         is_first_sync = not os.listdir(chrome_cache)
         if is_first_sync:
             logger.info(
@@ -412,6 +423,7 @@ cache_dir = %r
             )
         else:
             logger.info('gclient sync for chrome')
+        chrome_tree = path_factory.get_chrome_tree()
         gclient_util.sync(chrome_tree, with_branch_heads=True, with_tags=True)
         _additional_chrome_mirror_sync(chrome_cache)
 
@@ -588,7 +600,7 @@ def cmd_new(opts):
             opts.experiments,
             experiment.ID.EXT4_CHROME_CHECKOUT,
         ):
-            _setup_chrome_repos(path_factory, use_btrfs=False)
+            _configure_chrome_repos(path_factory, use_btrfs=False)
         else:
             btrfs_util.copy_tree(
                 chrome_template, path_factory.get_chrome_tree()
