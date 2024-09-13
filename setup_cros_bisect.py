@@ -670,9 +670,6 @@ def _delete_session(
 
     chromeos_tree = path_factory.get_chromeos_tree()
     if os.path.exists(chromeos_tree):
-        if os.path.exists(os.path.join(chromeos_tree, 'chromite')):
-            # ignore error
-            util.call('cros_sdk', '--unmount', cwd=chromeos_tree)
         btrfs_util.delete_tree(chromeos_tree, missing_ok=True)
 
     chrome_tree = path_factory.get_chrome_tree()
