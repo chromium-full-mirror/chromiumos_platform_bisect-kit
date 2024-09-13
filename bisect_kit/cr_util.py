@@ -10,11 +10,11 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import textwrap
 import time
 import urllib.request
 
-import bisect_kit
 from bisect_kit import codechange
 from bisect_kit import errors
 from bisect_kit import gclient_util
@@ -32,7 +32,6 @@ CHROME_BINARIES_OPTIONAL = ['nacl_helper']
 # This list is created manually by inspecting
 # src/third_party/chromiumos-overlay/chromeos-base/chrome-binary-tests/
 # chrome-binary-tests-0.0.1.ebuild
-# If you change the list, deploy_chrome_helper.sh may need update as well.
 # TODO(kcwu): we can get rid of this table once we migrated to build chrome
 #             using chromeos ebuild rules.
 CHROME_TEST_BINARIES = [
@@ -365,6 +364,9 @@ def deploy_to_staging_dir(chrome_src, board, targets, out_dir, staging_dir):
         dest = os.path.join(staging_dir, target)
         # Strip the target file.
         util.check_call('eu-strip', '--strip-debug', src, '-o', dest)
+        # chmod o+x.
+        stat = os.stat(dest)
+        os.chmod(dest, stat.st_mode | 0o001)
 
 
 def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
@@ -386,20 +388,69 @@ def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
             force_nacl=True,
         )
     logger.info('deploy %s', targets)
-    env = os.environ.copy()
-    env['DUT'] = dut
-    if out_dir:
-        env['OUT_DIR'] = out_dir
 
-    deploy_script = os.path.join(
-        bisect_kit.BISECT_KIT_ROOT, 'deploy_chrome_helper.sh'
-    )
-    cmd = ['sh', '-ex', deploy_script] + targets
+    if not out_dir:
+        out_dir = os.path.join('out_%s' % board, 'Release')
 
-    try:
-        simple_chrome_shell(chrome_src, board, *cmd, internal=True, env=env)
-    except subprocess.CalledProcessError as e:
-        raise errors.ExternalError('chrome deploy failed') from e
+    # Deploy chrome if needed.
+    if set(CHROME_BINARIES).intersection(targets):
+        cmd = [
+            'deploy_chrome',
+            '--force',
+            '--build-dir',
+            out_dir,
+            '--device',
+            dut,
+        ]
+        try:
+            simple_chrome_shell(chrome_src, board, *cmd, internal=True)
+        except subprocess.CalledProcessError as e:
+            raise errors.ExternalError('chrome deploy failed') from e
+
+    # Deploy test binaries if needed.
+    test_binaries = set(CHROME_TEST_BINARIES).intersection(targets)
+    if test_binaries:
+        with tempfile.TemporaryDirectory() as staging_dir:
+            # Deploy test binaries to the staging directory.
+            deploy_to_staging_dir(
+                chrome_src, board, test_binaries, out_dir, staging_dir
+            )
+            try:
+                autotest_test_binary_path = (
+                    "/usr/local/autotest/deps/chrome_test/test_src/out/Release/"
+                )
+                tast_test_binary_path = (
+                    "/usr/local/libexec/chrome-binary-tests/"
+                )
+
+                # Copy test binaries to the autotest binary directory.
+                util.ssh_cmd(
+                    dut,
+                    'mkdir',
+                    '-p',
+                    autotest_test_binary_path,
+                )
+                # NOTE: A trailing slash (i.e. '/' at the end of the path) needs
+                # to be added to staging_dir to copy its contents instead of the
+                # directory itself (see `man rsync`).
+                util.check_call(
+                    'rsync',
+                    '-r',
+                    f'{staging_dir}/',
+                    f'{dut}:{autotest_test_binary_path}',
+                )
+                # Copy test binaries to the tast binary directory.
+                util.ssh_cmd(
+                    dut,
+                    'rsync',
+                    '-r',
+                    autotest_test_binary_path,
+                    tast_test_binary_path,
+                )
+            except subprocess.CalledProcessError as e:
+                raise errors.ExternalError(
+                    'Failed to depoy test binaries'
+                ) from e
 
 
 def _get_ancestors(target_version: str, version_list: list[str]) -> list[str]:
