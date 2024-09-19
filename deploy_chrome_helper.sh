@@ -29,9 +29,7 @@ for TARGET in $TARGETS; do
         chrome)
             # --force to skip prompt and remove rootfs verification
             # automatically
-            # Use --mount so the binary is installed under the stateful
-            # partition to avoid running out of disk space (b/343934210).
-            deploy_chrome --force --mount --build-dir=$out_dir --device=$DUT
+            deploy_chrome --force --build-dir=$out_dir --device=$DUT
             ;;
         *test\
           |*tests\
