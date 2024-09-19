@@ -336,6 +336,37 @@ def build(chrome_src, board, targets, with_tests=True):
     return os.path.join(chrome_src, out_dir)
 
 
+def deploy_to_staging_dir(chrome_src, board, targets, out_dir, staging_dir):
+    """Deploy Chrome binaries to the specified staging directory.
+
+    Args:
+      chrome_src: git repo path of chrome/src
+      board: ChromeOS board name
+      targets: ninja targets.
+      out_dir: output dir from which to deploy binaries.
+      staging_dir: staging dir to which to deploy binaries.
+    """
+    # Deploy chrome to the staging dir if needed.
+    if set(CHROME_BINARIES).intersection(targets):
+        cmd = [
+            'deploy_chrome',
+            '--force',
+            '--build-dir',
+            out_dir,
+            '--staging-dir',
+            staging_dir,
+            '--staging-only',
+        ]
+        simple_chrome_shell(chrome_src, board, *cmd, internal=True)
+    # Deploy test binaries to the staging dir if needed.
+    test_binaries = set(CHROME_TEST_BINARIES).intersection(targets)
+    for target in test_binaries:
+        src = os.path.join(out_dir, target)
+        dest = os.path.join(staging_dir, target)
+        # Strip the target file.
+        util.check_call('eu-strip', '--strip-debug', src, '-o', dest)
+
+
 def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
     """Deploy Chrome binaries.
 

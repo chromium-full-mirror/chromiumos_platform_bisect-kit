@@ -22,6 +22,7 @@ import argparse
 import logging
 import os
 import sys
+import tempfile
 
 import bisect_cr_localbuild_internal
 import bisect_kit
@@ -241,14 +242,30 @@ def switch_main(args: tuple[str] | None):
             if chrome_cache.cache_hit():
                 logger.info('No need to build chrome. Found %s', chrome_cache)
             else:
+                targets = opts.target
+                if not targets:
+                    targets = cr_util.determine_targets_to_build(
+                        opts.chrome_src,
+                        opts.board,
+                        opts.with_tests,
+                        force_nacl=True,
+                    )
                 out_dir = cr_util.build(
                     opts.chrome_src,
                     opts.board,
-                    opts.target,
+                    targets,
                     opts.with_tests,
                 )
                 if out_dir:
-                    chrome_cache.put(out_dir)
+                    with tempfile.TemporaryDirectory() as staging_dir:
+                        cr_util.deploy_to_staging_dir(
+                            opts.chrome_src,
+                            opts.board,
+                            targets,
+                            out_dir,
+                            staging_dir,
+                        )
+                        chrome_cache.put(staging_dir)
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.build(opts)
 
