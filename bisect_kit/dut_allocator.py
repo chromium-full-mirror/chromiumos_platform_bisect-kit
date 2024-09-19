@@ -611,7 +611,7 @@ class DutAllocator:
             )
             if remaining_time <= 0:
                 break
-            timeout = min(120, remaining_time)
+            timeout = min(360, remaining_time)
             reason = cros_lab_util.make_lease_reason(spec.session)
             async_dut_leaser = cros_lab_util.AsyncDutLeaser(
                 [bot['dimensions']['dut_name'][0] for bot in bots],

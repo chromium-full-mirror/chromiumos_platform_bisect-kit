@@ -22,7 +22,7 @@ class DutAllocateSpec:
     satlab_ip: str | None = None
     version_hints: list[str] = dataclasses.field(default_factory=list)
     builder_hints: list[str] = dataclasses.field(default_factory=list)
-    time_limit_seconds: int = 540
+    time_limit_seconds: int = 720
     lease_duration_seconds: float | None = None
     parallel: int = 3
     session: str | None = None
