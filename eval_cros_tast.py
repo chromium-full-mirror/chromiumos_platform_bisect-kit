@@ -161,13 +161,6 @@ def prepare_to_run_test(opts):
         add_tast_patch_cl(opts.chromeos_root, opts.tast_patch_cl)
 
 
-def to_forwarded_host(host: str) -> tuple[str, str]:
-    # Returns (dut address in chroot, dut address needs to be forwarded)
-    if cros_lab_util.is_dut_needs_forwarded(host):
-        return cros_util.FORWARDED_DUT_HOST, host
-    return host, ''
-
-
 def tast_cmd(opts, cmd, *args):
     flags = []
     if opts.prebuilt and not opts.tast_patch_cl:
@@ -203,13 +196,11 @@ def tast_cmd(opts, cmd, *args):
 
 
 def get_tast_bundle_info(opts, pattern=None):
-    dut, forward_host = to_forwarded_host(opts.dut)
-
     bundles = ['cros']
     if opts.with_private_bundles:
         bundles.append('crosint')
 
-    args = [dut]
+    args = [opts.dut]
     if pattern:
         args.append(pattern)
 
@@ -221,7 +212,6 @@ def get_tast_bundle_info(opts, pattern=None):
                 opts.chromeos_root,
                 *cmd,
                 log_stdout=False,
-                forward_host=forward_host,
             )
         except subprocess.CalledProcessError as e:
             raise errors.ExternalError(
@@ -261,9 +251,8 @@ def run_test(opts: argparse.Namespace, test_name: str, bundle: dict) -> str:
     if opts.tast_build:
         flags.append('-buildbundle=' + bundle)
 
-    dut, forward_host = to_forwarded_host(opts.dut)
-    cmd = tast_cmd(opts, 'run', *flags, dut, test_name)
-    cros_util.cros_sdk(opts.chromeos_root, *cmd, forward_host=forward_host)
+    cmd = tast_cmd(opts, 'run', *flags, opts.dut, test_name)
+    cros_util.cros_sdk(opts.chromeos_root, *cmd)
 
     return results_dir_output_chroot
 
