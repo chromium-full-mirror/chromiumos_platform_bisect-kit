@@ -114,9 +114,9 @@ class BuildArtifactsCache:
           targets: the targets (usually binaries) to build.
 
         The remote path would be like
-          gs://<project>-<build_type>-builds/<variant>/<rev>_<hash_of_targets>.tar.gz
+          gs://<project>-<build_type>-builds/<variant>/<rev>_<hash_of_targets>.tar.xz
         Example:
-          gs://crosperf-dev-chrome-builds/grunt/120.0.6064.0_2aff8a6fa2bd9d89491720ca0849b129.tar.gz
+          gs://crosperf-dev-chrome-builds/grunt/120.0.6064.0_2aff8a6fa2bd9d89491720ca0849b129.tar.xz
         """
         self._build_type = build_type
         self._variant = variant
@@ -152,7 +152,7 @@ class BuildArtifactsCache:
                 hashlib.md5('_'.join(self._targets).encode('utf8')).hexdigest(),
             )
 
-        return '%s_%s.tar.gz' % (rev, identifier)
+        return '%s_%s.tar.xz' % (rev, identifier)
 
     @property
     def _remote_path(self):
@@ -172,7 +172,8 @@ class BuildArtifactsCache:
                             self._build_type, []
                         )
                     ],
-                    '-czf',
+                    '-Ipixz',
+                    '-cf',
                     tar_file_path,
                     '.',
                     cwd=src_dir,
@@ -189,7 +190,9 @@ class BuildArtifactsCache:
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
                 gs_util.cp(self._remote_path, tmpdir)
-                util.check_call('tar', 'xf', self._tar_file_name, cwd=tmpdir)
+                util.check_call(
+                    'tar', '-Ipixz', '-xf', self._tar_file_name, cwd=tmpdir
+                )
             except Exception as e:
                 logger.exception('failed to download %s', self)
                 raise errors.BisectRetriableError(
