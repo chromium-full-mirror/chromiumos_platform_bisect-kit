@@ -141,6 +141,9 @@ class Popen:
         Returns:
           return code.
         """
+        logger.debug(
+            '[%d] running %r', self.p.pid, subprocess.list2cmdline(self.p.args)
+        )
         t0 = time.time()
         ended = 0
         while ended < 2:
@@ -176,10 +179,12 @@ class Popen:
             if self.log_stdout or fd_name == 'stderr':
                 if self.binary_mode:
                     line = line.decode('utf8', errors='replace')
-                logger.debug('[%s] %s', fd_name, line.rstrip('\n'))
+                logger.debug(
+                    '[%d][%s] %s', self.p.pid, fd_name, line.rstrip('\n')
+                )
         self.p.wait()
         self.duration = time.time() - self.start
-        logger.debug('returncode %d', self.returncode)
+        logger.debug('[%d] returncode %d', self.p.pid, self.returncode)
         return self.returncode
 
     def terminate(self) -> None:
