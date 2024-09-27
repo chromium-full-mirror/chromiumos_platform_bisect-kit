@@ -514,11 +514,16 @@ def get_RBE_environment_variables() -> dict[str, str]:
     env['RBE_use_application_default_credentials'] = 'true'
     env['RBE_use_gce_credentials'] = 'false'
     env['RBE_automatic_auth'] = 'false'
-    # (b/328578714) reclient now delegate auth to "experimental_credentials_helper".
+    # (b/328578714) reclient now delegate auth to "credentials_helper".
     # We need to overwrite its default args to make it work properly.
     env[
-        'RBE_experimental_credentials_helper_args'
+        'RBE_credentials_helper_args'
     ] = '--auth_source=gcloud --gcert_refresh_timeout=20'
+    # Set the same value to experimental_credentials_helper_args which is
+    # needed to build Chrome older than crrev.com/c/5863651
+    env['RBE_experimental_credentials_helper_args'] = env[
+        'RBE_credentials_helper_args'
+    ]
     # Autoninja does not allow external accounts on corp machines to
     # authenticate with reproxy by default. This flag is used to skip
     # that check. For more details, see b/320639792.
