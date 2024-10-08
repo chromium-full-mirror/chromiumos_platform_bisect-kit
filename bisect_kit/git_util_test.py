@@ -240,13 +240,13 @@ class TestGitOperationReadOnly(unittest.TestCase):
         # boundary case: equal timestamp
         self.assertEqual(
             git_util.get_rev_by_time(
-                self.git_repo, '2017-01-03T00:00:00', None
+                self.git_repo, '2017-01-03T00:00:00+08:00', None
             ),
             self.revs[2],
         )
 
     def test_get_history(self):
-        timestamp = 1483286400  # 2017-01-02T00:00:00
+        timestamp = 1483286400  # 2017-01-02T00:00:00+08:00
         day = 86400
 
         # Normal case.
@@ -414,13 +414,13 @@ class TestGitOperation(unittest.TestCase):
         branch_foo = 'foo'
         subprocess.check_call(['git', 'branch', branch_foo], cwd=self.git_repo)
         rev_a = self.git.add_commit(
-            '2017-02-01T00:00:00', 'commit A', 'file2', 'commit A'
+            '2017-02-01T00:00:00+08:00', 'commit A', 'file2', 'commit A'
         )
         subprocess.check_call(
             ['git', 'checkout', branch_foo], cwd=self.git_repo
         )
         rev_b = self.git.add_commit(
-            '2017-02-02T00:00:00',
+            '2017-02-02T00:00:00+08:00',
             'commit B',
             self.git.default_filename,
             'commit B',
@@ -430,7 +430,7 @@ class TestGitOperation(unittest.TestCase):
         subprocess.check_call(
             ['git', 'merge', '--no-edit', branch_foo],
             cwd=self.git_repo,
-            env={"GIT_COMMITTER_DATE": '2017-02-05T00:00:00'},
+            env={"GIT_COMMITTER_DATE": '2017-02-05T00:00:00+08:00'},
         )
 
         rev_c = subprocess.check_output(
@@ -553,7 +553,7 @@ class TestGitOperation(unittest.TestCase):
         # simple case
         self.assertEqual(
             git_util.get_rev_by_time(
-                self.git_repo, '2017-02-10T00:00:00', None
+                self.git_repo, '2017-02-10T00:00:00+08:00', None
             ),
             rev_c,
         )
@@ -561,7 +561,7 @@ class TestGitOperation(unittest.TestCase):
         # Not commit B because it is on different branch.
         self.assertEqual(
             git_util.get_rev_by_time(
-                self.git_repo, '2017-02-03T00:00:00', None
+                self.git_repo, '2017-02-03T00:00:00+08:00', None
             ),
             rev_a,
         )
