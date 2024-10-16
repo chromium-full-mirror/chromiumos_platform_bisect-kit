@@ -26,6 +26,7 @@ import typing
 
 from bisect_kit import errors
 from bisect_kit import git_util
+from bisect_kit import util
 
 
 logger = logging.getLogger(__name__)
@@ -1214,12 +1215,16 @@ class CodeManager:
 
         if not self.diff_cache_dir.exists():
             self.diff_cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_filename = self.diff_cache_dir / ('%s,%s.json' % (old, new))
+        cache_filename = self.diff_cache_dir / (
+            '%s,%s.json' % (util.escape_rev(old), util.escape_rev(new))
+        )
         with cache_filename.open('w') as fp:
             json.dump(data, fp, indent=4, sort_keys=True)
 
     def load_action_groups_between_releases(self, old, new):
-        cache_filename = self.diff_cache_dir / ('%s,%s.json' % (old, new))
+        cache_filename = self.diff_cache_dir / (
+            '%s,%s.json' % (util.escape_rev(old), util.escape_rev(new))
+        )
         if not cache_filename.exists():
             raise errors.InternalError(
                 'cached revlist not found: %s' % cache_filename

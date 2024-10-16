@@ -143,8 +143,7 @@ class BuildArtifactsCache:
 
     @property
     def _tar_file_name(self):
-        # We have rev name like '120.0.6063.0~120.0.6064.0/203'.
-        rev = self._rev.replace('/', '-')
+        rev = util.escape_rev(self._rev)
         identifier = 'default'
         if self._targets:
             # Hash of the targets is used as an identifier of the file content.
