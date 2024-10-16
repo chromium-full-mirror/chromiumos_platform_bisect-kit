@@ -598,19 +598,6 @@ class ChromeSpecManager(codechange.SpecManager):
 
         return meta_dir
 
-    def _hack_trim_libassistant(
-        self, old: str, new: str, spec: codechange.Spec
-    ) -> None:
-        del new
-        # Before 74.0.3694.0, assistant use custom hook to sync code.
-        # This is bad practice and difficult to deal. Because most of
-        # regressions are not related to assistant, we simply remove repo
-        # changes inside libassistant to make things easier (b/126633034).
-        if is_version_lesseq(old, '74.0.3694.0'):
-            for path in spec.entries.keys():
-                if path.startswith('src/chromeos/assistant/libassistant/src/'):
-                    del spec.entries[path]
-
     def collect_float_spec(
         self,
         old: str,
@@ -655,16 +642,12 @@ class ChromeSpecManager(codechange.SpecManager):
         ):
             spec = codechange.Spec.new_float('(n/a)', timestamp, path)
             spec.entries = path_specs
-            self._hack_trim_libassistant(old, new, spec)
             result.append(spec)
         return result
 
     def enumerate_ancestor(self, new: str) -> list[str]:
         result = []
         for rev in git_util.get_tags(self.chrome_src):
-            # 74.0.3696.0/DEPS is bad and rejected by gclient (crbug/929544)
-            if rev in ['74.0.3696.0']:
-                continue
             if not is_chrome_version(rev):
                 continue
             if is_version_lesseq(rev, new) and is_direct_relative_version(
@@ -687,9 +670,6 @@ class ChromeSpecManager(codechange.SpecManager):
         """
         version_list_chrome: list[str] = []
         for rev in git_util.get_tags(self.chrome_src):
-            # 74.0.3696.0/DEPS is bad and rejected by gclient (crbug/929544)
-            if rev in ['74.0.3696.0']:
-                continue
             version_list_chrome.append(rev)
 
         return get_lca(old_version, new_version, version_list_chrome)
@@ -720,7 +700,6 @@ class ChromeSpecManager(codechange.SpecManager):
             )
             assert len(path_specs_result) == 1
             spec.entries = path_specs_result[0][1]
-            self._hack_trim_libassistant(old, new, spec)
             result.append(spec)
 
         assert result[0].name == old, '%s != %s' % (result[0].name, old)
