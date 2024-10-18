@@ -1982,12 +1982,6 @@ class DiagnoseCommandLineBase:
             action='store_true',
             help='Bypass chromeos local build bisect',
         )
-        # TODO(b/359435046): Remove this.
-        group.add_argument(
-            '--bypass-lacros-prebuilt',
-            action='store_true',
-            help='Bypass lacros prebuilt image bisect (Deprecated, no effect)',
-        )
         group.add_argument(
             '--bypass-chrome-build',
             action='store_true',
