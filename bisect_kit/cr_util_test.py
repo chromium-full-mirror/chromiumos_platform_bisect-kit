@@ -6,10 +6,12 @@
 
 import os
 import tempfile
+import textwrap
 import unittest
 
 from bisect_kit import cr_util
 from bisect_kit import gclient_util
+from bisect_kit import git_util
 from bisect_kit import git_util_test
 
 
@@ -21,6 +23,13 @@ class TestCrUtil(unittest.TestCase):
 
         assert not cr_util.is_chrome_version('59.0.3065')
         assert not cr_util.is_chrome_version('59.0.3065.0.0')
+
+    def test_is_commit_position(self):
+        assert cr_util.is_commit_position('refs/heads/main@{#123456}')
+        assert cr_util.is_commit_position('refs/branch-heads/6713@{#1}')
+
+        assert not cr_util.is_commit_position('131.0.6741.0')
+        assert not cr_util.is_commit_position('131.0.6741.0~131.0.6742.0/50')
 
     def test_is_version_lesseq(self):
         assert cr_util.is_version_lesseq('75.0.3731.0', '75.0.3731.0')
@@ -117,46 +126,151 @@ class TestCrUtil(unittest.TestCase):
         self.assertTrue('RBE_automatic_auth' in env)
         self.assertEqual(env['RBE_automatic_auth'], 'false')
 
+    def _prepare_fake_chrome_repository(self, fake_chrome_src) -> list[str]:
+        git = git_util_test.GitOperation(fake_chrome_src)
+        git.init(initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
+        commits = [
+            git.add_commit(
+                '2024-01-01T10:00:00',
+                textwrap.dedent(
+                    '''\
+                Foo
+
+                Cr-Commit-Position: refs/heads/main@{#1001}
+                '''
+                ),
+                'foo',
+                'foo contents',
+            ),
+            git.add_commit(
+                '2024-01-02T10:00:00',
+                textwrap.dedent(
+                    '''\
+                Revert "Foo"
+
+                Original change's description:
+                > Foo
+                >
+                > Cr-Commit-Position: refs/heads/main@{#1001}
+
+                Cr-Commit-Position: refs/heads/main@{#1002}
+                '''
+                ),
+                'foo',
+                None,
+            ),
+            git.add_commit(
+                '2024-01-03T10:00:00',
+                textwrap.dedent(
+                    '''\
+                Bar
+
+                Cr-Commit-Position: refs/heads/main@{#1003}
+                '''
+                ),
+                'bar',
+                'bar contents',
+            ),
+        ]
+        return commits
+
     def test_query_git_rev_by_commit_position(self):
         with tempfile.TemporaryDirectory() as fake_chrome_src:
-            git = git_util_test.GitOperation(fake_chrome_src)
-            git.init(initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
-            commits = [
-                git.add_commit(
-                    '2024-01-01T10:00:00',
-                    '''Foo
-
-Cr-Commit-Position: refs/heads/main@{#1001}
-''',
-                    'foo',
-                    'foo contents',
-                ),
-                git.add_commit(
-                    '2024-01-02T10:00:00',
-                    '''Revert "Foo"
-
-Original change's description:
-> Foo
->
-> Cr-Commit-Position: refs/heads/main@{#1001}
-
-Cr-Commit-Position: refs/heads/main@{#1002}
-''',
-                    'foo',
-                    None,
-                ),
-            ]
+            commits = self._prepare_fake_chrome_repository(fake_chrome_src)
             self.assertEqual(
                 commits[0],
                 cr_util.query_git_rev_by_commit_position(
-                    fake_chrome_src, 'main', '1001'
+                    fake_chrome_src, 'refs/heads/main@{#1001}'
                 ),
             )
             self.assertEqual(
                 commits[1],
                 cr_util.query_git_rev_by_commit_position(
-                    fake_chrome_src, 'main', '1002'
+                    fake_chrome_src, 'refs/heads/main@{#1002}'
                 ),
+            )
+            self.assertEqual(
+                commits[2],
+                cr_util.query_git_rev_by_commit_position(
+                    fake_chrome_src, 'refs/heads/main@{#1003}'
+                ),
+            )
+
+    def test_get_commit_position(self):
+        with tempfile.TemporaryDirectory() as fake_chrome_src:
+            commits = self._prepare_fake_chrome_repository(fake_chrome_src)
+            self.assertEqual(
+                'refs/heads/main@{#1001}',
+                cr_util.get_commit_position(
+                    git_util.get_commit_metadata(fake_chrome_src, commits[0])
+                ),
+            )
+            self.assertEqual(
+                'refs/heads/main@{#1002}',
+                cr_util.get_commit_position(
+                    git_util.get_commit_metadata(fake_chrome_src, commits[1])
+                ),
+            )
+            self.assertEqual(
+                'refs/heads/main@{#1003}',
+                cr_util.get_commit_position(
+                    git_util.get_commit_metadata(fake_chrome_src, commits[2])
+                ),
+            )
+
+    def test_build_revlist(self):
+        with tempfile.TemporaryDirectory() as fake_chrome_src:
+            commits = self._prepare_fake_chrome_repository(fake_chrome_src)
+            revlist, details = cr_util.build_revlist(
+                fake_chrome_src,
+                'refs/heads/main@{#1001}',
+                'refs/heads/main@{#1003}',
+            )
+            self.assertListEqual(
+                revlist,
+                [
+                    'refs/heads/main@{#1001}',
+                    'refs/heads/main@{#1002}',
+                    'refs/heads/main@{#1003}',
+                ],
+            )
+            self.assertDictEqual(
+                details,
+                {
+                    'refs/heads/main@{#1001}': {
+                        'actions': [
+                            {
+                                'action_type': 'commit',
+                                'commit_summary': 'Foo',
+                                'path': 'src',
+                                'repo_url': 'https://chromium.googlesource.com/chromium/src.git',
+                                'rev': commits[0],
+                            },
+                        ]
+                    },
+                    'refs/heads/main@{#1002}': {
+                        'actions': [
+                            {
+                                'action_type': 'commit',
+                                'commit_summary': 'Revert "Foo"',
+                                'path': 'src',
+                                'repo_url': 'https://chromium.googlesource.com/chromium/src.git',
+                                'rev': commits[1],
+                            },
+                        ]
+                    },
+                    'refs/heads/main@{#1003}': {
+                        'actions': [
+                            {
+                                'action_type': 'commit',
+                                'commit_summary': 'Bar',
+                                'path': 'src',
+                                'repo_url': 'https://chromium.googlesource.com/chromium/src.git',
+                                'rev': commits[2],
+                            },
+                        ]
+                    },
+                },
             )
 
 

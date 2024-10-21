@@ -71,6 +71,11 @@ def is_chrome_version(s):
     return bool(re.match(RE_CHROME_VERSION, s))
 
 
+def is_commit_position(s):
+    """Returns whether the given string is a chrome commit position."""
+    return bool(re.match(r'^[^@]+@{#\d+}$', s))
+
+
 def _canonical_build_number(s):
     """Returns canonical build number.
 
@@ -133,15 +138,25 @@ def argtype_chrome_version(s):
     return s
 
 
-def query_git_rev_by_commit_position(chrome_src, branch, commit_position):
+def get_commit_position(metadata: git_util.CommitMeta) -> str | None:
+    if not metadata.message:
+        return None
+    for line in reversed(metadata.message.splitlines()):
+        if line.startswith('Cr-Commit-Position: '):
+            return line.split(' ', 1)[1]
+        if line == '' or line.isspace():
+            break
+    return None
+
+
+def query_git_rev_by_commit_position(chrome_src, commit_position):
     """Looks up git commit by chrome's commit position.
 
     This function cannot find early commits which is still using 'git-svn-id'.
 
     Args:
       chrome_src: git repo path of chrome/src
-      branch: branch number or 'main'
-      commit_position: chrome's commit position number
+      commit_position: chrome commit position (e.g. 'refs/heads/main@{#1364755}')
 
     Returns:
       git commit id
@@ -149,18 +164,13 @@ def query_git_rev_by_commit_position(chrome_src, branch, commit_position):
     Raises:
       ValueError: unable to find commits with given commit_position.
     """
-    if branch == 'main':
-        ref_path = 'refs/heads/main'
-    else:
-        ref_path = 'refs/branch-heads/%s' % branch
-
     rev = util.check_output(
         'git',
         'rev-list',
         '-1',
         '--all',
         '--grep',
-        '^Cr-Commit-Position: %s@{#%s}' % (ref_path, commit_position),
+        '^Cr-Commit-Position: %s' % commit_position,
         cwd=chrome_src,
     ).strip()
     if not rev:
@@ -202,7 +212,9 @@ def query_git_rev(chrome_src, rev):
     # Cr-Commit-Position
     m = re.match(r'^#(\d+)$', rev)
     if m:
-        return query_git_rev_by_commit_position(chrome_src, 'main', m.group(1))
+        return query_git_rev_by_commit_position(
+            chrome_src, 'refs/heads/main@{#%s}' % m.group(1)
+        )
 
     raise ValueError('unknown rev format: %s' % rev)
 
@@ -650,24 +662,6 @@ class ChromeSpecManager(codechange.SpecManager):
                 result.append(rev)
         return sorted(result, key=util.version_key_func)
 
-    def get_lca_chrome_localbuild(
-        self, old_version: str, new_version: str
-    ) -> str:
-        """Get the lowest common ancestor of 2 chrome localbuild version
-
-        Args:
-          old_version: Old chrome version
-          new_version: New chrome version
-
-        Returns:
-          The lowest common ancestor of 2 chrome localbuild version
-        """
-        version_list_chrome: list[str] = []
-        for rev in git_util.get_tags(self.chrome_src):
-            version_list_chrome.append(rev)
-
-        return get_lca(old_version, new_version, version_list_chrome)
-
     def collect_fixed_spec(self, old: str, new: str) -> list[codechange.Spec]:
         logger.info('collect_fixed_spec')
         assert is_direct_relative_version(old, new)
@@ -793,3 +787,88 @@ class ChromeSpecManager(codechange.SpecManager):
         """
         # TODO(kcwu): flatten recursive DEPS content
         return git_util.get_file_from_revision(self.chrome_src, rev, 'DEPS')
+
+
+def build_revlist(chrome_src: str, old: str, new: str):
+    """Build revlist.
+    Args:
+      chrome_src: chrome src directory path
+      old: chrome commit position from which the returned revlist starts
+      new: chrome commit position on which the returned revlist ends
+
+    Returns:
+      (revlist, details):
+        revlist: list of rev string
+        details: dict of rev to rev detail
+    """
+
+    old_commit_hash = query_git_rev_by_commit_position(chrome_src, old)
+    new_commit_hash = query_git_rev_by_commit_position(chrome_src, new)
+
+    revisions = [old_commit_hash] + git_util.git_output(
+        [
+            'rev-list',
+            '--reverse',
+            '--first-parent',
+            '%s..%s' % (old_commit_hash, new_commit_hash),
+        ],
+        cwd=chrome_src,
+    ).splitlines()
+    metadata = git_util.get_batch_commit_metadata(chrome_src, revisions)
+
+    revlist = []
+    details = {}
+
+    for revision in revisions:
+        commit_position = get_commit_position(metadata[revision])
+        if not commit_position:
+            logger.warning('Failed to get the commit position of %s', revision)
+            continue
+
+        revlist.append(commit_position)
+        details[commit_position] = {
+            'actions': [
+                {
+                    'action_type': 'commit',
+                    'commit_summary': git_util.CommitMeta.get_summary(
+                        git_util.get_commit_metadata(chrome_src, revision)
+                    ),
+                    'path': 'src',
+                    'repo_url': 'https://chromium.googlesource.com/chromium/src.git',
+                    'rev': revision,
+                }
+            ]
+        }
+    return (revlist, details)
+
+
+def get_lca_chrome_localbuild(
+    chrome_src, old_version: str, new_version: str
+) -> str:
+    """Get the lowest common ancestor of 2 chrome localbuild version
+
+    Args:
+      old_version: Old chrome version
+      new_version: New chrome version
+
+    Returns:
+      The lowest common ancestor of 2 chrome localbuild version
+    """
+    version_list_chrome: list[str] = []
+    for rev in git_util.get_tags(chrome_src):
+        version_list_chrome.append(rev)
+
+    return get_lca(old_version, new_version, version_list_chrome)
+
+
+def sync_to_commit_position(chrome_root, commit_position: str) -> None:
+    """Switch source tree to the given commit position.
+
+    Args:
+      chrome_root: chrome checkout root path
+      chrome_mirror: chrome cache path
+      commit_position: chrome commit position
+    """
+    chrome_src = os.path.join(chrome_root, 'src')
+    rev = query_git_rev_by_commit_position(chrome_src, commit_position)
+    gclient_util.sync(chrome_root, revision=rev)

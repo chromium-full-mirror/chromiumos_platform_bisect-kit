@@ -14,13 +14,13 @@ import os
 from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
-from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
+from bisect_kit import git_util
 
 
 logger = logging.getLogger(__name__)
@@ -131,18 +131,6 @@ class ChromeSrcDomain(core.BisectDomain):
                 % (old, new),
             )
 
-        config = {
-            "chrome_root": opts.chrome_root,
-            "old": old,
-            "new": new,
-            "board": opts.board,
-            "dut": opts.dut,
-            "chrome_mirror": opts.chrome_mirror,
-        }
-
-        spec_manager = cr_util.ChromeSpecManager(config)
-        cache = gclient_util.GclientCache(opts.chrome_mirror)
-
         # b/227415522: Sync Chrome source tree to old and new to fetch unreachable
         # commits.
         gclient_util.sync(opts.chrome_root, revision=opts.new)
@@ -150,8 +138,8 @@ class ChromeSrcDomain(core.BisectDomain):
 
         if not cr_util.is_direct_relative_version(old, new):
             logger.warning('old=%s is not parent of new=%s', old, new)
-            lowest_common_ancestor = spec_manager.get_lca_chrome_localbuild(
-                old, new
+            lowest_common_ancestor = cr_util.get_lca_chrome_localbuild(
+                chrome_src, old, new
             )
             logger.warning(
                 'Assume their lowest common ancestor, %s,'
@@ -159,19 +147,30 @@ class ChromeSrcDomain(core.BisectDomain):
                 lowest_common_ancestor,
                 old,
             )
-            config['old'] = old = lowest_common_ancestor
+            old = lowest_common_ancestor
 
-        code_manager = codechange.CodeManager(
-            opts.chrome_root,
-            spec_manager,
-            cache,
-            common.get_session_cache_dir(opts.session),
+        old_commit_position = cr_util.get_commit_position(
+            git_util.get_commit_metadata(chrome_src, old)
         )
-        revlist, details = code_manager.build_revlist(old, new)
+        new_commit_position = cr_util.get_commit_position(
+            git_util.get_commit_metadata(chrome_src, new)
+        )
+
+        revlist, details = cr_util.build_revlist(
+            chrome_src, old_commit_position, new_commit_position
+        )
         for detail in details.values():
             for action in detail.get('actions', []):
                 generate_action_link(action)
 
+        config = {
+            "chrome_root": opts.chrome_root,
+            "old": old_commit_position,
+            "new": new_commit_position,
+            "board": opts.board,
+            "dut": opts.dut,
+            "chrome_mirror": opts.chrome_mirror,
+        }
         return config, {'revlist': revlist, 'details': details}
 
     def __init__(self, config):
@@ -188,12 +187,21 @@ class ChromeSrcDomain(core.BisectDomain):
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:
             old, new = summary['current_range']
-            old_base, _, _ = codechange.parse_intra_rev(old)
-            _, new_next, _ = codechange.parse_intra_rev(new)
+            if cr_util.is_commit_position(old):
+                chrome_src = os.path.join(self.config.get('chrome_root'), 'src')
+                old_rev = cr_util.query_git_rev_by_commit_position(
+                    chrome_src, old
+                )
+                new_rev = cr_util.query_git_rev_by_commit_position(
+                    chrome_src, new
+                )
+            else:
+                old_rev, _, _ = codechange.parse_intra_rev(old)
+                _, new_rev, _ = codechange.parse_intra_rev(new)
 
             log_url = (
                 'https://chromium.googlesource.com/chromium/src/+log/%s..%s?n=10000'
-                % (old_base, new_next)
+                % (old_rev, new_rev)
             )
             summary['links'] = [
                 {

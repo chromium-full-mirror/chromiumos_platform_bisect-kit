@@ -180,40 +180,44 @@ def switch_main(args: tuple[str] | None):
 
     if not opts.no_sync_code:
         logger.info('switch source code')
-        cache = gclient_util.GclientCache(opts.chrome_mirror)
-        spec_manager = cr_util.ChromeSpecManager(config)
-        code_manager = codechange.CodeManager(
-            opts.chrome_root,
-            spec_manager,
-            cache,
-            common.get_session_cache_dir(opts.session),
-        )
-        code_manager.switch(opts.rev)
+        if cr_util.is_commit_position(opts.rev):
+            cr_util.sync_to_commit_position(opts.chrome_root, opts.rev)
+        else:
+            cache = gclient_util.GclientCache(opts.chrome_mirror)
+            spec_manager = cr_util.ChromeSpecManager(config)
+            code_manager = codechange.CodeManager(
+                opts.chrome_root,
+                spec_manager,
+                cache,
+                common.get_session_cache_dir(opts.session),
+            )
+            code_manager.switch(opts.rev)
 
     if not opts.no_build:
-        if cr_util.is_chrome_version(opts.rev):
-            # Use the default gclient file.
-            gclientfile = None
-        else:
-            # Because the DEPS file referenced in .gclient file is pointing to the DEPS
-            # snapshot, runhook may fail due to DEPS file changes in the infra versions
-            # (b/129100282). Here we create a temporary gclient file pointing to the
-            # live DEPS in the tree. Note this gclient file is used only for runhook,
-            # not for code sync.
-            gclientfile = '.gclient-for-runhook'
-            custom_var_list = [
-                'checkout_src_internal=True',
-                'download_remoteexec_cfg=True',
-            ]
-            gclient_util.config(
-                opts.chrome_root,
-                url='https://chromium.googlesource.com/chromium/src.git',
-                gclientfile=gclientfile,
-                custom_var_list=custom_var_list,
-                cache_dir=opts.chrome_mirror,
-                target_os='chromeos',
-            )
-        gclient_util.runhook(opts.chrome_root, gclientfile=gclientfile)
+        if not cr_util.is_commit_position(opts.rev):
+            if cr_util.is_chrome_version(opts.rev):
+                # Use the default gclient file.
+                gclientfile = None
+            else:
+                # Because the DEPS file referenced in .gclient file is pointing to the DEPS
+                # snapshot, runhook may fail due to DEPS file changes in the infra versions
+                # (b/129100282). Here we create a temporary gclient file pointing to the
+                # live DEPS in the tree. Note this gclient file is used only for runhook,
+                # not for code sync.
+                gclientfile = '.gclient-for-runhook'
+                custom_var_list = [
+                    'checkout_src_internal=True',
+                    'download_remoteexec_cfg=True',
+                ]
+                gclient_util.config(
+                    opts.chrome_root,
+                    url='https://chromium.googlesource.com/chromium/src.git',
+                    gclientfile=gclientfile,
+                    custom_var_list=custom_var_list,
+                    cache_dir=opts.chrome_mirror,
+                    target_os='chromeos',
+                )
+            gclient_util.runhook(opts.chrome_root, gclientfile=gclientfile)
 
         # TODO(kcwu): support local patch.
         if opts.deploy_method == 'chrome_deploy':
