@@ -161,7 +161,7 @@ def query_git_rev_by_commit_position(chrome_src, branch, commit_position):
         '-1',
         '--all',
         '--grep',
-        'Cr-Commit-Position: %s@{#%s}' % (ref_path, commit_position),
+        '^Cr-Commit-Position: %s@{#%s}' % (ref_path, commit_position),
         cwd=chrome_src,
     ).strip()
     if not rev:

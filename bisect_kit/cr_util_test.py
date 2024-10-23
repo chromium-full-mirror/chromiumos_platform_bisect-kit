@@ -5,9 +5,12 @@
 """Test cr_util module"""
 
 import os
+import tempfile
 import unittest
 
 from bisect_kit import cr_util
+from bisect_kit import gclient_util
+from bisect_kit import git_util_test
 
 
 class TestCrUtil(unittest.TestCase):
@@ -113,6 +116,48 @@ class TestCrUtil(unittest.TestCase):
 
         self.assertTrue('RBE_automatic_auth' in env)
         self.assertEqual(env['RBE_automatic_auth'], 'false')
+
+        def test_query_git_rev_by_commit_position(self):
+            with tempfile.TemporaryDirectory() as fake_chrome_src:
+                git = git_util_test.GitOperation(fake_chrome_src)
+                git.init(initial_branch=gclient_util.DEFAULT_BRANCH_NAME)
+                commits = [
+                    git.add_commit(
+                        '2024-01-01T10:00:00',
+                        '''Foo
+
+Cr-Commit-Position: refs/heads/main@{#1001}
+''',
+                        'foo',
+                        'foo contents',
+                    ),
+                    git.add_commit(
+                        '2024-01-02T10:00:00',
+                        '''Revert "Foo"
+
+Original change's description:
+> Foo
+>
+> Cr-Commit-Position: refs/heads/main@{#1001}
+
+Cr-Commit-Position: refs/heads/main@{#1002}
+''',
+                        'foo',
+                        None,
+                    ),
+                ]
+                assertEqual(
+                    commits[0],
+                    cr_util.query_git_rev_by_commit_position(
+                        fake_chrome_src, 'refs/heads/main@{#1001}'
+                    ),
+                )
+                assertEqual(
+                    commits[1],
+                    cr_util.query_git_rev_by_commit_position(
+                        fake_chrome_src, 'refs/heads/main@{#1002}'
+                    ),
+                )
 
 
 if __name__ == '__main__':
