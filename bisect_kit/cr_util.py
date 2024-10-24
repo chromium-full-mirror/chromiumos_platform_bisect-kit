@@ -41,7 +41,6 @@ CHROME_TEST_BINARIES = [
     'decode_test',
     'fake_dmserver',
     'libtest_trace_processor.so',
-    'icudtl.dat',
     'image_processor_test',
     'image_processor_perf_test',
     'jpeg_decode_accelerator_unittest',
@@ -376,17 +375,12 @@ def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
       chrome_src: git repo path of chrome/src
       board: ChromeOS board name
       dut: DUT address
-      targets: ninja targets. Default to build chrome.
+      targets: ninja targets. Default to deploy any target found in out_dir.
       with_tests: build test binaries as well if targets is not specified
       out_dir: optional output dir from which to deploy binaries.
     """
     if not targets:
-        targets = determine_targets_to_build(
-            chrome_src,
-            board,
-            with_tests=with_tests,
-            force_nacl=True,
-        )
+        targets = os.listdir(out_dir)
     logger.info('deploy %s', targets)
 
     if not out_dir:
@@ -409,7 +403,7 @@ def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
 
     # Deploy test binaries if needed.
     test_binaries = set(CHROME_TEST_BINARIES).intersection(targets)
-    if test_binaries:
+    if with_tests and test_binaries:
         with tempfile.TemporaryDirectory() as staging_dir:
             # Deploy test binaries to the staging directory.
             deploy_to_staging_dir(
