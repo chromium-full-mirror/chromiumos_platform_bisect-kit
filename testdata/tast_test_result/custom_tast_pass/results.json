@@ -1,0 +1,59 @@
+[
+    {
+      "name": "bisector.Bisect",
+      "pkg": "go.chromium.org/tast-tests/cros/local/bundles/cros/bisector",
+      "desc": "Stub test ready to be modified for bisection",
+      "contacts": [
+        "chromeos-bisector-eng@google.com",
+        "njrafi@chromium.org"
+      ],
+      "attr": [
+        "name:bisector.Bisect",
+        "bundle:cros",
+        "disabled"
+      ],
+      "data": null,
+      "fixture": "tastRootRemoteFixture",
+      "timeout": 120000000000,
+      "bundle": "cros",
+      "bugComponent": "b:497108",
+      "lacros_status": "unknown",
+      "errors": null,
+      "start": "2024-09-30T23:08:06.956549792Z",
+      "end": "2024-09-30T23:08:07.183343091Z",
+      "outDir": "/mnt/host/source/tmp/tast_results_tmp/tests/bisector.Bisect",
+      "skipReason": ""
+    },
+    {
+      "name": "bisector.Bisect",
+      "pkg": "go.chromium.org/tast-tests/cros/remote/bundles/cros/bisector",
+      "desc": "Stub test ready to be modified for bisection",
+      "contacts": [
+        "chromeos-bisector-eng@google.com",
+        "njrafi@chromium.org"
+      ],
+      "attr": [
+        "name:bisector.Bisect",
+        "bundle:cros",
+        "dep:chrome",
+        "disabled"
+      ],
+      "data": null,
+      "softwareDeps": [
+        "chrome"
+      ],
+      "serviceDeps": [
+        "tast.cros.browser.ChromeService"
+      ],
+      "fixture": "tastRootRemoteFixture",
+      "timeout": 900000000000,
+      "bundle": "cros",
+      "bugComponent": "b:497108",
+      "lacros_status": "unknown",
+      "errors": null,
+      "start": "2024-09-30T23:08:08.123148983Z",
+      "end": "2024-09-30T23:10:04.087473514Z",
+      "outDir": "/mnt/host/source/tmp/tast_results_tmp/tests/bisector.Bisect.1",
+      "skipReason": ""
+    }
+]

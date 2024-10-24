@@ -279,6 +279,9 @@ def parse_results_json(result_dir, test_name) -> tuple[bool, str | None]:
                     reason = error.get('reason')
                     if reason:
                         break
+                # In case of multiple test runs, return passed=False if any of the
+                # test failed.
+                break
     if passed is None:
         raise errors.ExternalError('no test result for "%s"?' % test_name)
     return passed, reason

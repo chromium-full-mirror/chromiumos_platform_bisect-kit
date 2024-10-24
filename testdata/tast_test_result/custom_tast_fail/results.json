@@ -1,0 +1,83 @@
+[
+    {
+      "name": "bisector.Bisect",
+      "pkg": "go.chromium.org/tast-tests/cros/local/bundles/cros/bisector",
+      "desc": "Behavior of ChromeOsLockOnIdleSuspend policy, checking the correspoding toggle button states (restriction and checked) and the lock screen after the lid is closed",
+      "contacts": [
+        "cros-lurs@google.com",
+        "antrim@google.com",
+        "emaxx@google.com"
+      ],
+      "attr": [
+        "group:golden_tier",
+        "group:hw_agnostic",
+        "name:bisector.Bisect",
+        "bundle:cros",
+        "dep:chrome"
+      ],
+      "searchFlags": [
+        {
+          "key": "cros/pci",
+          "value": "ChromeOsLockOnIdleSuspend,verified_functionality_ui"
+        },
+        {
+          "key": "cros/pci",
+          "value": "ChromeOsLockOnIdleSuspend,verified_functionality_os"
+        }
+      ],
+      "data": null,
+      "softwareDeps": [
+        "chrome"
+      ],
+      "fixture": "chromePolicyLoggedInLockscreen",
+      "timeout": 120000000000,
+      "bundle": "cros",
+      "bugComponent": "b:1277523",
+      "lacros_status": "unneeded",
+      "errors": [
+        {
+          "time": "2024-10-24T12:08:34.595464106Z",
+          "reason": "forced: Failed 2024-10-24T12:08:13.712809Z WARNING powerd: [suspend_delay_controller.cc(280)] Timed out while waiting for suspend request 66584577 readiness confirmation for 1 delay(s): 66584584 (:1.184: chrome) and 0 internal delay(s): \n",
+          "file": "/home/cros-bisect-service/chromiumos/src/platform/tast-tests/src/go.chromium.org/tast-tests/cros/local/bundles/cros/bisector/bisect.go",
+          "line": 128,
+          "stack": "forced: Failed 2024-10-24T12:08:13.712809Z WARNING powerd: [suspend_delay_controller.cc(280)] Timed out while waiting for suspend request 66584577 readiness confirmation for 1 delay(s): 66584584 (:1.184: chrome) and 0 internal delay(s): \n\n\tat go.chromium.org/tast-tests/cros/local/bundles/cros/bisector.Bisect.func1 (bisect.go:128)\n\tat go.chromium.org/tast/core/internal/testing.(*State).Run.func1 (state.go:807)\n\tat runtime.goexit (asm_amd64.s:1598)"
+        },
+        {
+          "time": "2024-10-24T12:09:04.605070818Z",
+          "reason": "Finally, a fatal error",
+          "file": "/home/cros-bisect-service/chromiumos/src/platform/tast-tests/src/go.chromium.org/tast-tests/cros/local/policyutil/fixtures/chrome.go",
+          "line": 588,
+          "stack": "Failed to create TestAPI connection\n\tat go.chromium.org/tast-tests/cros/local/policyutil/fixtures.(*policyChromeFixture).PostTest (chrome.go:588)\n\tat go.chromium.org/tast/core/internal/planner/internal/fixture.(*statefulFixture).runPostTest.func1 (internal_stack.go:563)\n\tat go.chromium.org/tast/core/internal/usercode.SafeCall.func2 (usercode.go:112)\n\tat runtime.goexit (asm_amd64.s:1598)\ncontext deadline exceeded during a poll with no set timeout; last error follows\n\tat go.chromium.org/tast/core/internal/testingutil.Poll (poll.go:90)\n\tat go.chromium.org/tast/core/testing.Poll (util.go:43)\n\tat go.chromium.org/tast-tests/cros/local/chrome/internal/cdputil.(*Conn).WaitForExpr (conn.go:280)\n\tat go.chromium.org/tast-tests/cros/local/chrome/internal/driver.(*Conn).waitForExprImpl (conn.go:216)\n\tat go.chromium.org/tast-tests/cros/local/chrome/internal/driver.(*Conn).WaitForExprWithTimeout (conn.go:199)\n\tat go.chromium.org/tast-tests/cros/local/chrome/internal/driver.(*Conn).WaitForExpr (conn.go:194)\n\tat go.chromium.org/tast-tests/cros/local/chrome/internal/driver.(*Session).testAPIConnFor (session.go:235)\n\tat go.chromium.org/tast-tests/cros/local/chrome/internal/driver.(*Session).TestAPIConn (session.go:218)\n\t...\ncdp.Runtime: Evaluate: rpcc: the connection is closing: session: detach failed for session 3FCC94E0D78FBE93D262FAC8D457F3FE: cdp.Target: DetachFromTarget: rpcc: the connection is closing: websocket: close 1006 (abnormal closure): unexpected EOF\n\tat ???"
+        }
+      ],
+      "start": "2024-10-24T12:07:42.245276768Z",
+      "end": "2024-10-24T12:09:05.011252933Z",
+      "outDir": "/mnt/host/source/tmp/tast_results_tmp/tests/bisector.Bisect",
+      "skipReason": ""
+    },
+    {
+      "name": "bisector.Bisect",
+      "pkg": "go.chromium.org/tast-tests/cros/remote/bundles/cros/bisector",
+      "desc": "Stub test ready to be modified for bisection",
+      "contacts": [
+        "chromeos-bisector-eng@google.com",
+        "njrafi@chromium.org"
+      ],
+      "attr": [
+        "name:bisector.Bisect",
+        "bundle:cros",
+        "disabled"
+      ],
+      "data": null,
+      "fixture": "tastRootRemoteFixture",
+      "timeout": 300000000000,
+      "bundle": "cros",
+      "bugComponent": "b:497108",
+      "lacros_status": "unknown",
+      "errors": null,
+      "start": "2024-10-24T12:09:05.799756895Z",
+      "end": "2024-10-24T12:09:06.520427943Z",
+      "outDir": "/mnt/host/source/tmp/tast_results_tmp/tests/bisector.Bisect.1",
+      "skipReason": ""
+    }
+]

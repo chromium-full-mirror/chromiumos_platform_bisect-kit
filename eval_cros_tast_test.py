@@ -25,8 +25,24 @@ class TestEvalCrosTast(unittest.TestCase):
 
         self.assertEqual(
             eval_cros_tast.parse_results_json(
+                testing.get_testdata_path('tast_test_result/custom_tast_pass'),
+                'bisector.Bisect',
+            ),
+            (True, None),
+        )
+
+        self.assertEqual(
+            eval_cros_tast.parse_results_json(
                 testing.get_testdata_path('tast_test_result/fail'),
                 'example.Fail',
+            ),
+            (False, 'Finally, a fatal error'),
+        )
+
+        self.assertEqual(
+            eval_cros_tast.parse_results_json(
+                testing.get_testdata_path('tast_test_result/custom_tast_fail'),
+                'bisector.Bisect',
             ),
             (False, 'Finally, a fatal error'),
         )

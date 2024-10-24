@@ -391,6 +391,10 @@ class CrosDiagnoser:
             ),
         )
 
+        if self.config.get('tast_patch_cl'):
+            # Do not switch cros repo to old for custom TAST tests.
+            switch_cros_repo_to_old = None
+
         def bisect_prebuilt_on_old_cros_dut_init_func(
             dut: str,
         ):
