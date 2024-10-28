@@ -27,11 +27,6 @@ from bisect_kit import shared_dut_pool
 logger = logging.getLogger(__name__)
 
 
-_models_to_avoid: dict[str, str] = {
-    # model: reason
-}
-
-
 def _filter_dimensions_by_lab(
     dimensions: list[str],
     raise_unknown: bool = False,
@@ -207,15 +202,6 @@ def _is_acceptable_bot(
     boards_with_prebuilt: list[str] | None,
     bot: dict,
 ) -> bool:
-    model = bot['dimensions']['label-model'][0]
-    if model in _models_to_avoid:
-        logger.warning(
-            'model=%s is bad (reason:%s), ignore',
-            model,
-            _models_to_avoid[model],
-        )
-        return False
-
     if boards_with_prebuilt is None:
         return True
 
@@ -367,13 +353,6 @@ class DutAllocator:
 
         if spec.models:
             for model in spec.models:
-                if model in _models_to_avoid:
-                    logger.warning(
-                        'model=%s is bad (reason:%s), ignore',
-                        model,
-                        _models_to_avoid[model],
-                    )
-                    continue
                 variants.append('label-model:' + model)
             if not variants:
                 raise errors.ArgumentError(
