@@ -80,6 +80,13 @@ class TestCrosLab(unittest.TestCase):
             None,
         )
 
+    def test_extract_lease_info(self):
+        info = cros_lab_util.extract_lease_info(
+            'Internal Scheduke lase ID (can be used for cancellation): 1234567'
+        )
+        self.assertIsNotNone(info)
+        self.assertEqual(info['scheduke_lease_id'], '1234567')
+
     def test_is_rootfs_verification_on(self):
         with mock.patch.object(util, 'ssh_cmd', return_value='/dev/dm-0'):
             self.assertTrue(
