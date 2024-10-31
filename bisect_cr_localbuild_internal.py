@@ -55,7 +55,9 @@ class ChromeSrcDomain(core.BisectDomain):
 
     revtype = staticmethod(
         cli.argtype_multiplexer(
-            cr_util.argtype_chrome_version, cros_util.argtype_cros_version
+            cr_util.argtype_chrome_version,
+            cros_util.argtype_cros_version,
+            git_util.argtype_git_rev,
         )
     )
     intra_revtype = staticmethod(
@@ -124,36 +126,49 @@ class ChromeSrcDomain(core.BisectDomain):
                 'start and end of chrome versions are identical',
             )
 
-        if not cr_util.is_version_lesseq(old, new):
-            raise errors.ArgumentError(
-                '--old and --new',
-                'start chrome version (%s) is newer than end version (%s)'
-                % (old, new),
-            )
-
+        old_hash = cr_util.query_git_rev(chrome_src, old)
+        new_hash = cr_util.query_git_rev(chrome_src, new)
         # b/227415522: Sync Chrome source tree to old and new to fetch unreachable
         # commits.
-        gclient_util.sync(opts.chrome_root, revision=opts.new)
-        gclient_util.sync(opts.chrome_root, revision=opts.old)
+        # This needs to be run to initialize the chrome repository to confirm
+        # opts.old is ancestor of opts.new if they are git hashes in the next step.
+        gclient_util.sync(opts.chrome_root, revision=new_hash)
+        gclient_util.sync(opts.chrome_root, revision=old_hash)
 
-        if not cr_util.is_direct_relative_version(old, new):
-            logger.warning('old=%s is not parent of new=%s', old, new)
-            lowest_common_ancestor = cr_util.get_lca_chrome_localbuild(
-                chrome_src, old, new
-            )
-            logger.warning(
-                'Assume their lowest common ancestor, %s,'
-                'still have expected old behavior as %s',
-                lowest_common_ancestor,
-                old,
-            )
-            old = lowest_common_ancestor
+        # Disable guessing LCA if any of the versions are git hash and not a
+        # chrome version.
+        if git_util.is_git_rev(opts.old) or git_util.is_git_rev(opts.new):
+            if not git_util.is_ancestor_commit(chrome_src, old_hash, new_hash):
+                raise errors.ArgumentError(
+                    '--old and --new',
+                    '--old chrome git hash (%s) is not an ancestor of the --new git hash (%s)'
+                    % (opts.old, opts.new),
+                )
+        else:
+            if not cr_util.is_version_lesseq(old, new):
+                raise errors.ArgumentError(
+                    '--old and --new',
+                    '--old chrome version (%s) is newer than --new version (%s)'
+                    % (old, new),
+                )
+            if not cr_util.is_direct_relative_version(old, new):
+                logger.warning('old=%s is not parent of new=%s', old, new)
+                lowest_common_ancestor = cr_util.get_lca_chrome_localbuild(
+                    chrome_src, old, new
+                )
+                logger.warning(
+                    'Assume their lowest common ancestor, %s,'
+                    'still have expected old behavior as %s',
+                    lowest_common_ancestor,
+                    old,
+                )
+                old = lowest_common_ancestor
 
         old_commit_position = cr_util.get_commit_position(
-            git_util.get_commit_metadata(chrome_src, old)
+            git_util.get_commit_metadata(chrome_src, old_hash)
         )
         new_commit_position = cr_util.get_commit_position(
-            git_util.get_commit_metadata(chrome_src, new)
+            git_util.get_commit_metadata(chrome_src, new_hash)
         )
 
         revlist, details = cr_util.build_revlist(

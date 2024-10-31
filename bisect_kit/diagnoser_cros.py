@@ -26,6 +26,7 @@ from bisect_kit import cros_util
 from bisect_kit import dut_allocate_spec as dut_allocate_spec_module
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
+from bisect_kit import git_util
 from bisect_kit import shared_dut_pool
 from bisect_kit import util
 from bisect_kit import wrapper
@@ -1481,9 +1482,11 @@ class DiagnoseCommandLineBase:
         return cros_version
 
     def check_chrome_version(self, argument_key: str, chrome_version: str):
-        if not cr_util.is_chrome_version(chrome_version):
+        if not cr_util.is_chrome_version(
+            chrome_version
+        ) and not git_util.is_git_rev(chrome_version):
             self.argument_parser.error(
-                '%s: %s is not a valid Chrome version'
+                '%s: %s is not a valid Chrome version nor git commit hash'
                 % (argument_key, chrome_version)
             )
 
@@ -1526,9 +1529,13 @@ class DiagnoseCommandLineBase:
             logger.info('chrome_root = %s', opts.chrome_root)
 
         if opts.bisect_chrome:
-            if not cr_util.is_version_lesseq(
-                opts.old, opts.new
-            ) or not cr_util.is_direct_relative_version(opts.old, opts.new):
+            if (
+                not git_util.is_git_rev(opts.old)
+                and not git_util.is_git_rev(opts.new)
+            ) and (
+                not cr_util.is_version_lesseq(opts.old, opts.new)
+                or not cr_util.is_direct_relative_version(opts.old, opts.new)
+            ):
                 self.argument_parser.error(
                     '%s is not ancestor of %s' % (opts.old, opts.new)
                 )
