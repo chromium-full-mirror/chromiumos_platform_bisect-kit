@@ -87,6 +87,65 @@ class TestCrosLab(unittest.TestCase):
         self.assertIsNotNone(info)
         self.assertEqual(info['scheduke_lease_id'], '1234567')
 
+    def test_extract_lease_property(self):
+        key, value = cros_lab_util.extract_lease_property(
+            'DUT_HOSTNAME=a1-b2-c3-d4'
+        )
+        self.assertEqual(key, 'DUT_HOSTNAME')
+        self.assertEqual(value, 'a1-b2-c3-d4')
+
+        key, value = cros_lab_util.extract_lease_property('BOARD=foo')
+        self.assertEqual(key, 'BOARD')
+        self.assertEqual(value, 'foo')
+
+        key, value = cros_lab_util.extract_lease_property(
+            'Not a lease property line.'
+        )
+        self.assertIsNone(key)
+        self.assertIsNone(value)
+
+    def test_enumerate_dimension_combinations(self):
+        self.assertEqual(
+            cros_lab_util.enumerate_dimension_combinations(
+                ['dut-state:ready'],
+                ['label-board:foo', 'label-board:bar'],
+                None,
+            ),
+            [
+                ['dut-state:ready', 'label-board:foo'],
+                ['dut-state:ready', 'label-board:bar'],
+            ],
+        )
+        self.assertEqual(
+            cros_lab_util.enumerate_dimension_combinations(
+                ['dut-state:ready'],
+                ['label-board:foo', 'label-board:bar'],
+                ['label-pool:DUT_POOL_QUOTA', 'label-pool:healthmon-satlab'],
+            ),
+            [
+                [
+                    'dut-state:ready',
+                    'label-board:foo',
+                    'label-pool:DUT_POOL_QUOTA',
+                ],
+                [
+                    'dut-state:ready',
+                    'label-board:bar',
+                    'label-pool:DUT_POOL_QUOTA',
+                ],
+                [
+                    'dut-state:ready',
+                    'label-board:foo',
+                    'label-pool:healthmon-satlab',
+                ],
+                [
+                    'dut-state:ready',
+                    'label-board:bar',
+                    'label-pool:healthmon-satlab',
+                ],
+            ],
+        )
+
     def test_is_rootfs_verification_on(self):
         with mock.patch.object(util, 'ssh_cmd', return_value='/dev/dm-0'):
             self.assertTrue(

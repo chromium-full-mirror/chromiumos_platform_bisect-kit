@@ -8,10 +8,7 @@
 from __future__ import annotations
 
 import asyncio
-import collections.abc
-import functools
 import logging
-import random
 import threading
 import time
 import typing
@@ -46,124 +43,6 @@ def _filter_dimensions_by_lab(
     return result
 
 
-def _sample_available_bots(
-    dimensions: list[str],
-    variants: list[str],
-    pools: list[str] | None,
-    num: int = 1,
-    filter_func: collections.abc.Callable | None = None,
-    *,
-    is_dead: bool | None = False,
-    quarantined: bool | None = False,
-    is_busy: bool | None = False,
-    limit: int = 10,
-) -> list[str]:
-    """Query available bots by given constraints and randomly sample the result.
-
-    1. Collect available bots of each variant in `variants` with
-       the specified `dimensions`.
-    2. Filter collected bots by the `filter_func`.
-    3. Randomly sample (at most) `num` bots and return.
-
-    Args:
-        dimensions: a list of dimension constraints
-        variants: a list of variant constraints
-        pools: a list of pools. None means not to consider pools.
-        num: sample (at most) `num` available bots
-        filter_func: a boolean filter function will be applied before
-            the sampling. Passing `None` means no filtering.
-
-        id_dead: see `cros_lab_util.swarming_bots_list()`
-        quarantined: see `cros_lab_util.swarming_bots_list()`
-        is_busy: see `cros_lab_util.swarming_bots_list()`
-        limit: see `cros_lab_util.swarming_bots_list()`
-    Returns: a list of available bots
-    """
-
-    def fetch_bots(dimensions):
-        logger.debug(
-            'fetch_bots: %s, is_dead: %s, quarantined, %s, is_busy: %s, limit: %s',
-            dimensions,
-            is_dead,
-            quarantined,
-            is_busy,
-            limit,
-        )
-        # There might be thousand bots available, set 'limit' to reduce swarming
-        # API cost. This is not uniform random, but should be good enough.
-        return cros_lab_util.swarming_bots_list(
-            dimensions,
-            is_dead=is_dead,
-            quarantined=quarantined,
-            is_busy=is_busy,
-            limit=limit,
-        )
-
-    bots = []
-    if not pools:
-        for variant in variants:
-            bots += fetch_bots(dimensions + [variant])
-    else:
-        for pool in pools:
-            for variant in variants:
-                bots += fetch_bots(dimensions + [variant, pool])
-
-    if filter_func:
-        bots = list(filter(filter_func, bots))
-    return random.sample(bots, min(num, len(bots)))
-
-
-def _sample_available_bots_with_retry(
-    dimensions: list[str],
-    variants: list[str],
-    pools: list[str] | None,
-    num: int,
-    filter_func: collections.abc.Callable | None = None,
-    max_attempts: int = 5,
-) -> list[str]:
-    """Query bots using the _sample_available_bots() with retries.
-
-    In each attemption, the function will try to collect non-busy bots first.
-    If there is no available bots, then try to qeury without the non-busy
-    constraint.
-
-    Args:
-        dimensions: a list of dimension constraints
-        variants: a list of variant constraints
-        pools: a list of pools. None means not to consider pools.
-        num: sample (at most) `num` available bots
-        filter_func: a boolean filter function will be applied before
-            the sampling. Passing `None` means no filtering.
-        max_attempts: Retry the query at most `max_attempts` times.
-    Returns: a list of available bots
-    """
-
-    sample_func = functools.partial(
-        _sample_available_bots,
-        dimensions,
-        variants,
-        pools,
-        num,
-        filter_func,
-    )
-
-    if max_attempts <= 0:
-        raise ValueError('max_attempts must be at least 1')
-
-    fail_count = 0
-    while True:
-        if bots := sample_func():
-            return bots
-
-        fail_count += 1
-        if fail_count >= max_attempts:
-            raise errors.NoDutAvailable(
-                'no bots satisfy constraints; all are in maintenance state?'
-            )
-        # sleep one minutes before next try
-        time.sleep(60)
-
-
 def _filter_dimensions_by_board(
     boards_with_prebuilt: list[str] | None,
     dimensions: list[str],
@@ -196,26 +75,6 @@ def _filter_dimensions_by_board(
         else:
             sample_bots(constraints, result)
     return list(result)
-
-
-def _is_acceptable_bot(
-    boards_with_prebuilt: list[str] | None,
-    bot: dict,
-) -> bool:
-    if boards_with_prebuilt is None:
-        return True
-
-    # Sometimes swarming database has inconsistent records. For example,
-    # label-model=kefka + label-board=strago are incorrect (should be
-    # label-board=kefka). It is probably human errors (strago is kefka's
-    # reference board).
-    board = bot['dimensions']['label-board'][0]
-    if board not in boards_with_prebuilt:
-        dut_name = bot['dimensions']['dut_name'][0]
-        logger.warning('%s has unexpected board=%s, ignore', dut_name, board)
-        return False
-
-    return True
 
 
 def _normalize_board_name(chromeos_root, board):
@@ -572,19 +431,7 @@ class DutAllocator:
         spec = self._spec
 
         start_time = time.time()
-        filter_func = functools.partial(
-            _is_acceptable_bot, self._boards_with_prebuilt
-        )
         while True:
-            # Query every time because each iteration takes a few minutes
-            bots = _sample_available_bots_with_retry(
-                self._dimensions,
-                self._variants,
-                self._pools,
-                spec.parallel,
-                filter_func,
-            )
-
             remaining_time = spec.time_limit_seconds - (
                 time.time() - start_time
             )
@@ -593,7 +440,10 @@ class DutAllocator:
             timeout = min(360, remaining_time)
             reason = cros_lab_util.make_lease_reason(spec.session)
             async_dut_leaser = cros_lab_util.AsyncDutLeaser(
-                [bot['dimensions']['dut_name'][0] for bot in bots],
+                self._dimensions,
+                self._variants,
+                self._pools,
+                self._boards_with_prebuilt,
                 reason,
                 spec.lease_duration_seconds,
                 timeout,

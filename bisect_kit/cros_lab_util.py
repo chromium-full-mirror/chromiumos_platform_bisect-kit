@@ -572,6 +572,14 @@ def extract_lease_info(text):
     return info
 
 
+def extract_lease_property(line):
+    """Extract a key value pair from output of crosfleet dut lease."""
+    m = re.match(r'^(\w+)=(\S+)$', line)
+    if m:
+        return m.group(1), m.group(2)
+    return None, None
+
+
 def cancel_pending_lease(pending_lease):
     assert pending_lease
     task_id = pending_lease.get('swarming_task_id')
@@ -593,6 +601,21 @@ def cancel_pending_lease(pending_lease):
     ), 'lease is pending but nothing to cancel'
 
 
+def enumerate_dimension_combinations(
+    dimensions: list[str], variants: list[str], pools: list[str] | None
+) -> list[list[str]]:
+    """Returns a list of acceptable dimension combinations for the given parameters."""
+    result = []
+    if pools:
+        for pool in pools:
+            for variant in variants:
+                result.append(dimensions + [variant, pool])
+    else:
+        for variant in variants:
+            result.append(dimensions + [variant])
+    return result
+
+
 async def create_async_crosfleet_proc(cmd: str, *args, **kwargs):
     cmd_args = ['crosfleet'] + cmd.split(' ')
     service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
@@ -611,9 +634,19 @@ class AsyncDutLeaser:
     """A class to lease lab DUTs asynchronously."""
 
     def __init__(
-        self, hosts, reason, lease_duration_seconds=None, timeout=None
+        self,
+        dimensions,
+        variants,
+        pools,
+        boards_with_prebuilt,
+        reason,
+        lease_duration_seconds=None,
+        timeout=None,
     ):
-        self._hosts: list[str] = hosts
+        self._dimensions: list[str] = dimensions
+        self._variants: list[str] = variants
+        self._pools: list[str] | None = pools
+        self._boards_with_prebuilt: list[str] | None = boards_with_prebuilt
         self._reason: str = reason
         self._lease_duration_seconds: int = (
             lease_duration_seconds or LEASE_DURATION_SECONDS
@@ -628,10 +661,17 @@ class AsyncDutLeaser:
 
     async def lease_parallelly(self):
         tasks = []
-        for host in self._hosts:
-            tasks.append(asyncio.create_task(self._lease_with_retry(host)))
+        for dimensions in enumerate_dimension_combinations(
+            self._dimensions, self._variants, self._pools
+        ):
+            tasks.append(
+                asyncio.create_task(self._lease_with_retry(dimensions))
+            )
         logger.info(
-            'trying to lease %d DUTs: %s', len(self._hosts), self._hosts
+            'trying to lease DUTs: dimensions=%s, variants=%s, pools=%s',
+            self._dimensions,
+            self._variants,
+            self._pools,
         )
         # b/296872055: The returned value of asyncio.wait are sets, so if
         # multiple coroutines are completed at the same time, we don't know
@@ -644,9 +684,10 @@ class AsyncDutLeaser:
         if not self._leased_dut_name:
             # Timeout happens.
             logger.info(
-                'timeout, failed to lease %d DUTs: %s',
-                len(self._hosts),
-                self._hosts,
+                'timeout, failed to lease DUTs: : dimensions=%s, variants=%s, pools=%s',
+                self._dimensions,
+                self._variants,
+                self._pools,
             )
             return None
         logger.info('leased %s', self._leased_dut_name)
@@ -654,15 +695,16 @@ class AsyncDutLeaser:
         # finishing.
         return self._leased_dut_name
 
-    async def _lease(self, dut_name):
+    async def _lease(self, dimensions):
         args = [
             '-minutes',
             '%d' % (self._lease_duration_seconds // 60),
             '-reason',
             self._reason,
-            '-host',
-            dut_name_to_address(dut_name),
         ]
+        for dimension in dimensions:
+            args.append('-dim')
+            args.append(dimension)
         proc = await create_async_crosfleet_proc(
             'dut lease',
             *args,
@@ -672,23 +714,28 @@ class AsyncDutLeaser:
 
         pending_lease = None
         try:
+            lease_properties = {}
             while True:
                 line = await proc.stdout.readline()
                 if not line:
                     break
                 line = line.decode('utf8')
-                logger.debug('lease(%s): %s', dut_name, line)
+                logger.debug('lease(%s): %s', dimensions, line)
                 if not pending_lease:
                     pending_lease = extract_lease_info(line)
                 if 'INFRA_FAILURE' in line:
                     pending_lease = None
                     return None
 
+                key, value = extract_lease_property(line)
+                if key:
+                    lease_properties[key] = value
+
             await proc.wait()
             if proc.returncode != 0:
                 logger.warning(
                     'lease(%s): crosfleet command failed: %s',
-                    dut_name,
+                    dimensions,
                     proc.returncode,
                 )
                 raise errors.ExternalError(
@@ -700,8 +747,29 @@ class AsyncDutLeaser:
                     'not found lease info; crosfleet output format changed?'
                 )
 
+            dut_name = lease_properties.get('DUT_HOSTNAME')
+            board_name = lease_properties.get('BOARD')
+            if not dut_name or not board_name:
+                logger.error(
+                    'lease(%s): unexpected lease property format: %s',
+                    dimensions,
+                    lease_properties,
+                )
+                return None
+
             if is_satlab_dut(dut_name):
                 write_satlab_ssh_config(dut_name)
+
+            if (
+                self._boards_with_prebuilt
+                and board_name not in self._boards_with_prebuilt
+            ):
+                logger.warning(
+                    'lease(%s): the leased DUT has no prebuilt image; '
+                    'return it and lease another one later',
+                    dut_name,
+                )
+                return None
 
             if not cros_util.is_good_dut(dut_name_to_address(dut_name)):
                 logger.warning(
@@ -746,11 +814,11 @@ class AsyncDutLeaser:
 
                 return dut_name
         except asyncio.CancelledError:
-            logger.debug('lease(%s): got CancelledError', dut_name)
+            logger.debug('lease(%s): got CancelledError', dimensions)
             raise
         except errors.DutLeaseException:
             logger.exception(
-                'lease(%s): lease task state is unexpected. discard', dut_name
+                'lease(%s): lease task state is unexpected. discard', dimensions
             )
             return None
         finally:
@@ -763,7 +831,7 @@ class AsyncDutLeaser:
                 try:
                     logger.debug(
                         'killing unfinished proc which is trying to lease %s',
-                        dut_name,
+                        dimensions,
                     )
                     proc.kill()
                     await proc.wait()
@@ -773,15 +841,15 @@ class AsyncDutLeaser:
                     # race.
                     pass
             if pending_lease:
-                logger.debug('cleaning up pending lease %s', dut_name)
+                logger.debug('cleaning up pending lease %s', dimensions)
                 cancel_pending_lease(pending_lease)
 
-    async def _lease_with_retry(self, dut_name):
+    async def _lease_with_retry(self, dimensions):
         tries = 0
         while True:
             try:
                 tries += 1
-                return await self._lease(dut_name)
+                return await self._lease(dimensions)
             except errors.ExternalError:
                 if tries < 3:
                     delay = 60
