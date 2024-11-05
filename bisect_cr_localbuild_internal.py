@@ -191,10 +191,10 @@ class ChromeSrcDomain(core.BisectDomain):
     def __init__(self, config):
         self.config = config
 
-    def setenv(self, env, rev):
+    def setenv(self, env, rev, rev_details=None):
         env['CHROME_ROOT'] = self.config.get('chrome_root')
         env['CHROME_MIRROR'] = self.config.get('chrome_mirror')
-        env['REV'] = rev
+        env['REV'] = cr_util.get_chrome_commit_hash(rev_details)
 
         if self.config.get('board'):
             env['BOARD'] = self.config.get('board')

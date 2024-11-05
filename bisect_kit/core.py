@@ -617,12 +617,13 @@ class BisectDomain:
               details (dict): detail information for each rev
         """
 
-    def setenv(self, env, rev):
+    def setenv(self, env, rev, rev_details=None):
         """Sets environment variables needed by switchers and evaluators.
 
         Args:
           env: The dict to hold environment variables.
           rev: Current bisecting version.
+          rev_details: Details of the current version.
         """
 
     def fill_candidate_summary(self, summary):

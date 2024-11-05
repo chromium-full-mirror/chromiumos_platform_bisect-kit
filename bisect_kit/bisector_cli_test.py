@@ -47,7 +47,7 @@ class DummyDomain(core.BisectDomain):
     def __init__(self, config):
         self.config = config
 
-    def setenv(self, env, rev):
+    def setenv(self, env, rev, rev_details=None):
         env['ANS'] = str(self.config.get('ans'))
         env['OLD_P'] = str(self.config.get('old_p'))
         env['NEW_P'] = str(self.config.get('new_p'))
@@ -193,14 +193,16 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(result.get('inited'), True)
         self.assertEqual(result.get('verified'), False)
 
-    def do_evaluate(self, _cmd, _domain, rev, _log_file, capture_values=False):
+    def do_evaluate(
+        self, _cmd, _domain, rev, _rev_details, _log_file, capture_values=False
+    ):
         del capture_values  # unused
         if int(rev) < 42:
             return core.StepResult('old')
         return core.StepResult('new')
 
     def do_noisy_evaluate(
-        self, _cmd, _domain, rev, _log_file, capture_values=False
+        self, _cmd, _domain, rev, _rev_details, _log_file, capture_values=False
     ):
         del capture_values
         ans = self.random_list.get_random_num()
@@ -657,10 +659,10 @@ class TestSwitchAndEval(unittest.TestCase):
             ),
         )
         self.mock_do_switch.assert_called_once_with(
-            ['switch_cmd'], bisector.domain, '3', mock.ANY
+            ['switch_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
         )
         self.mock_do_evaluate.assert_called_once_with(
-            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
+            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY, mock.ANY
         )
 
     def test_preset_dut_switch_with_dut_eval_with_dut(self):
@@ -702,9 +704,15 @@ class TestSwitchAndEval(unittest.TestCase):
             bisector.domain,
             '3',
             mock.ANY,
+            mock.ANY,
         )
         self.mock_do_evaluate.assert_called_once_with(
-            ['eval_cmd', 'preset_dut'], bisector.domain, '3', mock.ANY, mock.ANY
+            ['eval_cmd', 'preset_dut'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+            mock.ANY,
+            mock.ANY,
         )
 
     def test_preset_dut_multiple_switch_eval_with_dut(self):
@@ -755,11 +763,13 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_build_deploy_cmd', '--no-deploy'],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
                 mock.call(
@@ -772,11 +782,13 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_with_dut_cmd', '--dut', 'preset_dut'],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
             ]
@@ -785,6 +797,7 @@ class TestSwitchAndEval(unittest.TestCase):
             ['eval_cmd', 'preset_dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -837,11 +850,13 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_build_deploy_cmd', '--no-deploy'],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
                 mock.call(
@@ -854,11 +869,13 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_with_dut_cmd', '--dut', 'preset_dut'],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
             ]
@@ -867,6 +884,7 @@ class TestSwitchAndEval(unittest.TestCase):
             ['eval_cmd'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -906,12 +924,13 @@ class TestSwitchAndEval(unittest.TestCase):
             ),
         )
         self.mock_do_switch.assert_called_once_with(
-            ['switch_cmd'], bisector.domain, '3', mock.ANY
+            ['switch_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
         )
         self.mock_do_evaluate.assert_called_once_with(
             ['eval_cmd', 'preset_dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -960,11 +979,13 @@ class TestSwitchAndEval(unittest.TestCase):
             bisector.domain,
             '3',
             mock.ANY,
+            mock.ANY,
         )
         self.mock_do_evaluate.assert_called_once_with(
             ['eval_cmd', 'preset_dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -1009,11 +1030,13 @@ class TestSwitchAndEval(unittest.TestCase):
             bisector.domain,
             '3',
             mock.ANY,
+            mock.ANY,
         )
         self.mock_do_evaluate.assert_called_once_with(
             ['eval_cmd', 'dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -1067,11 +1090,13 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_build_deploy_cmd', '--no-deploy'],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
                 mock.call(
@@ -1084,11 +1109,13 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_with_dut_cmd', '--dut', 'dut'],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
             ]
@@ -1097,6 +1124,7 @@ class TestSwitchAndEval(unittest.TestCase):
             ['eval_cmd', 'dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -1146,12 +1174,17 @@ class TestSwitchAndEval(unittest.TestCase):
         self.mock_do_switch.assert_has_calls(
             [
                 mock.call(
-                    ['switch_without_dut_cmd'], bisector.domain, '3', mock.ANY
+                    ['switch_without_dut_cmd'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_build_deploy_cmd', '--no-deploy'],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
                 mock.call(
@@ -1164,17 +1197,19 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_with_dut_cmd', '--dut', 'dut'],
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
             ]
         )
         self.mock_do_evaluate.assert_called_once_with(
-            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
+            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY, mock.ANY
         )
 
     def test_dut_manager_switch_without_dut_eval_with_dut(self):
@@ -1213,12 +1248,13 @@ class TestSwitchAndEval(unittest.TestCase):
             ),
         )
         self.mock_do_switch.assert_called_once_with(
-            ['switch_cmd'], bisector.domain, '3', mock.ANY
+            ['switch_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
         )
         self.mock_do_evaluate.assert_called_once_with(
             ['eval_cmd', 'dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -1270,11 +1306,13 @@ class TestSwitchAndEval(unittest.TestCase):
             bisector.domain,
             '3',
             mock.ANY,
+            mock.ANY,
         )
         self.mock_do_evaluate.assert_called_once_with(
             ['eval_cmd', 'dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -1326,7 +1364,11 @@ class TestSwitchAndEval(unittest.TestCase):
         self.mock_do_switch.assert_has_calls(
             [
                 mock.call(
-                    ['switch_without_dut_cmd'], bisector.domain, '3', mock.ANY
+                    ['switch_without_dut_cmd'],
+                    bisector.domain,
+                    '3',
+                    mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     [
@@ -1338,11 +1380,13 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     ['switch_with_dut_cmd', '--dut', 'dut'],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
             ]
@@ -1351,6 +1395,7 @@ class TestSwitchAndEval(unittest.TestCase):
             ['eval_cmd', 'dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
             mock.ANY,
         )
@@ -1375,7 +1420,7 @@ class TestSwitchAndEval(unittest.TestCase):
             self.run_test(bisector)
 
         self.mock_do_switch.assert_called_once_with(
-            ['switch_cmd'], bisector.domain, '3', mock.ANY
+            ['switch_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
         )
 
     def test_no_dut_anager_switch_with_dut_eval_without_dut(self):
@@ -1439,7 +1484,7 @@ class TestSwitchAndEval(unittest.TestCase):
             ),
         )
         self.mock_do_switch.assert_called_once_with(
-            ['switch_cmd'], bisector.domain, '3', mock.ANY
+            ['switch_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
         )
 
     def test_dut_manager_switch_failed(self):
@@ -1479,6 +1524,7 @@ class TestSwitchAndEval(unittest.TestCase):
             ['switch_cmd', '--dut', 'dut'],
             bisector.domain,
             '3',
+            mock.ANY,
             mock.ANY,
         )
 
@@ -1527,6 +1573,7 @@ class TestSwitchAndEval(unittest.TestCase):
                     bisector.domain,
                     '3',
                     mock.ANY,
+                    mock.ANY,
                 ),
                 mock.call(
                     [
@@ -1537,6 +1584,7 @@ class TestSwitchAndEval(unittest.TestCase):
                     ],
                     bisector.domain,
                     '3',
+                    mock.ANY,
                     mock.ANY,
                 ),
             ]

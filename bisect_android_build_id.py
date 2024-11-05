@@ -107,7 +107,7 @@ class AndroidBuildIDDomain(core.BisectDomain):
     def __init__(self, config):
         self.config = config
 
-    def setenv(self, env, rev):
+    def setenv(self, env, rev, rev_details=None):
         env['ANDROID_BRANCH'] = self.config.get('branch')
         env['ANDROID_FLAVOR'] = self.config.get('flavor')
         env['ANDROID_BUILD_ID'] = rev

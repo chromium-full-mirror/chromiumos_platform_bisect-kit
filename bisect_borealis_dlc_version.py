@@ -163,7 +163,7 @@ class BorealisVersionDomain(core.BisectDomain):
     def __init__(self, config):
         self.config = config
 
-    def setenv(self, env, rev):
+    def setenv(self, env, rev, rev_details=None):
         if self.config.get('dut'):
             env['DUT'] = self.config.get('dut')
         if self.config.get('board'):

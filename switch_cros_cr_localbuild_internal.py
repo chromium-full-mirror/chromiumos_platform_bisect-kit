@@ -28,12 +28,13 @@ import bisect_cr_localbuild_internal
 from bisect_kit import bisector_cli
 from bisect_kit import cache_util
 from bisect_kit import cli
-from bisect_kit import codechange
 from bisect_kit import common
 from bisect_kit import cr_util
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import gclient_util
+from bisect_kit import git_util
 import switch_cros_localbuild
 import switch_helper
 
@@ -55,13 +56,10 @@ def create_argument_parser():
     parser.add_argument(
         'rev',
         nargs='?',
-        type=cli.argtype_notempty,
+        type=git_util.argtype_git_rev,
         metavar='REV',
         default=os.environ.get('REV', ''),
-        help='ChromeOS version, Chrome version, or Chrome local build intra '
-        'version (in format "%s"). For ChromeOS version, the corresponding '
-        'Chrome version will be determined by ChromeOS build.'
-        % codechange.make_intra_rev('X', 'Y', 3),
+        help='Chrome src git hash.',
     )
     parser.add_argument(
         '--board',
@@ -175,7 +173,7 @@ def switch_main(args: tuple[str] | None):
 
     if not opts.no_sync_code:
         logger.info('switch source code')
-        cr_util.sync_to_commit_position(opts.chrome_root, opts.rev)
+        gclient_util.sync(opts.chrome_root, revision=opts.rev)
 
     if not opts.no_build:
         # TODO(kcwu): support local patch.

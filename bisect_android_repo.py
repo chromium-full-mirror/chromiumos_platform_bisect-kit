@@ -171,7 +171,7 @@ class AndroidRepoDomain(core.BisectDomain):
     def __init__(self, config):
         self.config = config
 
-    def setenv(self, env, rev=None):
+    def setenv(self, env, rev=None, rev_details=None):
         env['ANDROID_ROOT'] = self.config.get('android_root')
         env['ANDROID_FLAVOR'] = self.config.get('flavor')
         env['ANDROID_BRANCH'] = self.config.get('branch')

@@ -15,7 +15,6 @@ import time
 import urllib.request
 
 from bisect_kit import errors
-from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import locking
 from bisect_kit import util
@@ -589,6 +588,18 @@ def build_revlist(chrome_src: str, old: str, new: str):
     return (revlist, details)
 
 
+def get_chrome_commit_hash(details) -> str:
+    """Gets the chrome commit hash from details dictionary
+
+    Args:
+      details: details dict returned by `build_revlist()`
+
+    Returns:
+      chrome git commit hash
+    """
+    return details['actions'][0]['rev']
+
+
 def get_lca_chrome_localbuild(
     chrome_src, old_version: str, new_version: str
 ) -> str:
@@ -606,16 +617,3 @@ def get_lca_chrome_localbuild(
         version_list_chrome.append(rev)
 
     return get_lca(old_version, new_version, version_list_chrome)
-
-
-def sync_to_commit_position(chrome_root, commit_position: str) -> None:
-    """Switch source tree to the given commit position.
-
-    Args:
-      chrome_root: chrome checkout root path
-      chrome_mirror: chrome cache path
-      commit_position: chrome commit position
-    """
-    chrome_src = os.path.join(chrome_root, 'src')
-    rev = query_git_rev_by_commit_position(chrome_src, commit_position)
-    gclient_util.sync(chrome_root, revision=rev)

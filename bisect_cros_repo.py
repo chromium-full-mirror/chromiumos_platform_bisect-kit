@@ -143,7 +143,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
     def __init__(self, config):
         self.config = config
 
-    def setenv(self, env, rev):
+    def setenv(self, env, rev, rev_details=None):
         if self.config.get('board'):
             env['BOARD'] = self.config.get('board')
         env['CHROMEOS_ROOT'] = self.config.get('chromeos_root')
