@@ -103,7 +103,7 @@ def sync(
       gclient_dir: root directory of gclient project
       with_branch_heads: whether to clone git `branch_heads` refspecs
       with_tags: whether to clone git tags
-      revision: the revision name, e.g. src@100.0.4857.0 or 100.0.4857.0
+      revision: the revision name, e.g. src@100.0.4857.0 or 100.0.4857.0 or git hash
       jobs: how many workers running in parallel
     """
     # Work around gclient issue crbug/943430
