@@ -171,7 +171,9 @@ def switch_main(args: tuple[str] | None):
             opts.no_sync_code = True
             opts.no_build = True
 
-    if not opts.no_sync_code:
+    # If chrome_src is not a git root, force sync code to have a chrome
+    # checkout even if no_sync_code is set.
+    if not opts.no_sync_code or not git_util.is_git_root(opts.chrome_src):
         logger.info('switch source code')
         gclient_util.sync(opts.chrome_root, revision=opts.rev)
 
