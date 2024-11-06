@@ -202,18 +202,9 @@ class ChromeSrcDomain(core.BisectDomain):
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:
             old, new = summary['current_range']
-            if cr_util.is_commit_position(old):
-                chrome_src = os.path.join(self.config.get('chrome_root'), 'src')
-                old_rev = cr_util.query_git_rev_by_commit_position(
-                    chrome_src, old
-                )
-                new_rev = cr_util.query_git_rev_by_commit_position(
-                    chrome_src, new
-                )
-            else:
-                old_rev, _, _ = codechange.parse_intra_rev(old)
-                _, new_rev, _ = codechange.parse_intra_rev(new)
-
+            chrome_src = os.path.join(self.config.get('chrome_root'), 'src')
+            old_rev = cr_util.query_git_rev_by_commit_position(chrome_src, old)
+            new_rev = cr_util.query_git_rev_by_commit_position(chrome_src, new)
             log_url = (
                 'https://chromium.googlesource.com/chromium/src/+log/%s..%s?n=10000'
                 % (old_rev, new_rev)
