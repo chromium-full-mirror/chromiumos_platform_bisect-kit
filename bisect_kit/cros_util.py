@@ -1232,12 +1232,6 @@ def _find_files_from_image_archive(
         ):
             version_prefixes.append('R%d-%d.' % (old_milestone, major))
 
-    # Performance tips: "gsutil ls" is much faster with ** if the tree is
-    # relative small and flat. For example,
-    #   $ gsutil ls 'gs://chromeos-image-archive/eve-release/R90-*/image.zip'
-    # takes 35.8 seconds.
-    #   $ gsutil ls 'gs://chromeos-image-archive/eve-release/R90-**/image.zip'
-    # takes 3.7 seconds.
     with multiprocessing.Pool() as pool:
         async_results = []
         for bucket in buckets:
@@ -1247,7 +1241,7 @@ def _find_files_from_image_archive(
                         gs_archive_path.format(
                             board=board,
                             bucket=bucket,
-                            version=version_prefix + '**',
+                            version=version_prefix + '*',
                         )
                         + '/'
                         + filename
