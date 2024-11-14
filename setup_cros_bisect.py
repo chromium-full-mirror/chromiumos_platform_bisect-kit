@@ -516,6 +516,16 @@ def cmd_init(opts):
         _setup_android_repos(path_factory, branch, opts.btrfs)
 
 
+def cmd_update(opts):
+    try:
+        repo_util.sync(opts.chromiumos_checkout_path, current_branch=True)
+    except subprocess.CalledProcessError:
+        # Sync may fail due to network or server issues.
+        logger.exception('repo sync failed, will retry one minute later')
+        time.sleep(60)
+        repo_util.sync(opts.chromiumos_checkout_path, current_branch=True)
+
+
 def do_sync_template(opts):
     template_factory = common.TemplatePathFactory(
         opts.work_base, opts.mirror_base
@@ -869,6 +879,20 @@ def create_parser():
         help='create btrfs subvolume for source tree',
     )
     parser_init.set_defaults(func=cmd_init)
+
+    parser_update = subparsers.add_parser(
+        'update',
+        help='Updates bisect-kit itself and all other projects',
+        description='Sync all projects in the repo',
+        parents=parents_session_optional,
+    )
+    parser_update.add_argument(
+        '--chromiumos-checkout-path',
+        metavar='CHROMIUMOS_CHECKOUT_PATH',
+        help='ChromiumOS checkout path to-be-updated.',
+        required=True,
+    )
+    parser_update.set_defaults(func=cmd_update)
 
     parser_sync = subparsers.add_parser(
         'sync',
