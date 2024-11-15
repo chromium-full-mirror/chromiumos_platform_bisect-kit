@@ -824,6 +824,22 @@ def is_dut(host):
         return False
 
 
+def has_python(
+    host: str, max_attempts: int = DEFAULT_CHECK_GOOD_DUT_ATTEMPTS
+) -> bool:
+    """Returns whether python is present on the DUT."""
+    # b/378126412: Temporary workaround to address the bad symlink
+    # /usr/bin/python in some CrOS builds. It can be reverted to checking
+    # 'python' only after R133-16095.0.0
+    for python in ['python', 'python3.8', 'python3.11']:
+        try:
+            util.ssh_cmd(host, python, '-c', '1', max_attempts=max_attempts)
+            return True
+        except (subprocess.CalledProcessError, errors.SshConnectionError) as e:
+            logger.warning('python checking failed: %s', e)
+    return False
+
+
 def is_good_dut(
     host: str, max_attempts: int = DEFAULT_CHECK_GOOD_DUT_ATTEMPTS
 ) -> bool:
@@ -840,8 +856,9 @@ def is_good_dut(
         return False
 
     # Sometimes python is broken after 'cros flash'.
+    if not has_python(host, max_attempts):
+        return False
     try:
-        util.ssh_cmd(host, 'python', '-c', '1', max_attempts=max_attempts)
         return query_dut_test_runner_availability(
             host, max_attempts=max_attempts
         )
