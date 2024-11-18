@@ -1644,6 +1644,9 @@ def provision_image(
         force_reboot_callback=force_reboot_callback,
     ):
         raise errors.InternalError('unsupported image: ' + str(image_info))
+    workaround_b378126412(
+        host, version, force_reboot_callback=force_reboot_callback
+    )
     verify_dut_version(host, board, version)
 
 
@@ -2635,6 +2638,37 @@ def workaround_b183567529(
                 'patching/b183567529/test_cbi_script.sh',
             )
             util.check_output(patch_script, host)
+            reboot(host, force_reboot_callback)
+            break
+
+
+def workaround_b378126412(host, version, force_reboot_callback=None):
+    """Workaround for python path failure.
+
+    The python path was broken in the build range after cros flash.
+    A simple reboot resolved it somehow.
+    """
+    broken_range = [
+        ('16083.0.0', '16089.0.0'),
+    ]
+
+    if is_cros_short_version(version):
+        short_version = version
+    else:
+        _, short_version = version_split(version)
+    for old, new in broken_range:
+        if (
+            util.is_version_lesseq(old, short_version)
+            and util.is_version_lesseq(short_version, new)
+            and (
+                util.is_direct_relative_version(old, short_version)
+                and util.is_direct_relative_version(short_version, new)
+            )
+        ):
+            logger.info(
+                'CrOS version %s: reboot so the python path is set correctly (b/378126412).',
+                version,
+            )
             reboot(host, force_reboot_callback)
             break
 
