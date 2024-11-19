@@ -1250,7 +1250,7 @@ def _find_files_from_image_archive(
             version_prefixes.append('R%d-%d.' % (old_milestone, major))
 
     with multiprocessing.Pool() as pool:
-        async_results = []
+        async_requests = []
         for bucket in buckets:
             for version_prefix in version_prefixes:
                 for filename in filenames:
@@ -1263,15 +1263,23 @@ def _find_files_from_image_archive(
                         + '/'
                         + filename
                     )
-                    async_results.append(
-                        pool.apply_async(
-                            gs_util.ls, [gs_path], {"ignore_errors": True}
-                        )
+                    async_requests.append(
+                        {
+                            'path': gs_path,
+                            'result': pool.apply_async(
+                                gs_util.ls, [gs_path], {"ignore_errors": True}
+                            ),
+                        }
                     )
 
         result = []
-        for async_result in async_results:
-            for gs_path in async_result.get():
+        for async_request in async_requests:
+            logging.info(
+                'waiting for the result of gsutil ls %s', async_request['path']
+            )
+            lines = async_request['result'].get()
+            logging.info('result: %s', lines)
+            for gs_path in lines:
                 m = re.search(r'(R\d+-\d+\.\d+\.\d+(-\d+)?)', gs_path)
                 if not m:
                     continue
