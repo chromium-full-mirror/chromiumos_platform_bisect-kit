@@ -1274,11 +1274,19 @@ def _find_files_from_image_archive(
 
         result = []
         for async_request in async_requests:
-            logging.info(
+            logger.debug(
                 'waiting for the result of gsutil ls %s', async_request['path']
             )
-            lines = async_request['result'].get()
-            logging.info('result: %s', lines)
+            # timeout=3600 because `gsutil ls` shouldn't take more than 1 hour.
+            try:
+                lines = async_request['result'].get(timeout=3600)
+            except multiprocessing.TimeoutError as e:
+                raise errors.ExecutionTimeout(
+                    'timed out getting the list of available prebuilts for %s'
+                    % async_request['path']
+                ) from e
+
+            logger.debug('result: %s', lines)
             for gs_path in lines:
                 m = re.search(r'(R\d+-\d+\.\d+\.\d+(-\d+)?)', gs_path)
                 if not m:
@@ -1365,6 +1373,7 @@ def list_prebuilt_from_image_archive(
             old,
             new,
         )
+    logger.debug('Found prebuilt image files: %s', files)
 
     result = {}
     for version, gs_path in files:
@@ -1405,11 +1414,14 @@ def list_chromeos_prebuilt_versions(
     if is_cros_short_version(new):
         new = version_to_full(board, new, spec_manager=spec_manager)
 
+    prebuilt_images = list_prebuilt_from_image_archive(
+        board, old, new, use_snapshot=use_snapshot
+    )
+    logger.debug('prebuilt_images: %s', prebuilt_images)
+
     versions = []
     details: dict[str, typing.Any] = {}
-    for version, image_info in list_prebuilt_from_image_archive(
-        board, old, new, use_snapshot=use_snapshot
-    ):
+    for version, image_info in prebuilt_images:
         if is_cros_snapshot_version(version) and is_bad_snapshot_to_ignore(
             version
         ):
