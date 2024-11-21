@@ -2662,6 +2662,8 @@ def workaround_b183567529(
             break
 
 
+# TODO(b/378126412): Remove this function after CrOS version '16083.0.0' to
+# '16089.0.0' are no longer active.
 def workaround_b378126412(host, version, force_reboot_callback=None):
     """Workaround for python path failure.
 
@@ -2672,12 +2674,16 @@ def workaround_b378126412(host, version, force_reboot_callback=None):
         ('16083.0.0', '16089.0.0'),
     ]
 
-    if is_cros_short_version(version):
-        short_version = version
+    if version:
+        if is_cros_short_version(version):
+            short_version = version
+        else:
+            _, short_version = version_split(version)
     else:
-        _, short_version = version_split(version)
+        short_version = None
+
     for old, new in broken_range:
-        if (
+        if short_version is None or (
             util.is_version_lesseq(old, short_version)
             and util.is_version_lesseq(short_version, new)
             and (
