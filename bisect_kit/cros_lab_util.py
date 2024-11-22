@@ -691,8 +691,8 @@ class AsyncDutLeaser:
             )
             return None
         logger.info('leased %s', self._leased_dut_name)
-        # Unfinished lease tasks will be cancelled when asyncio.run is
-        # finishing.
+        for task in tasks:
+            task.cancel('Already leased a DUT.')
         return self._leased_dut_name
 
     async def _lease(self, dimensions):
