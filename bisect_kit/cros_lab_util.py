@@ -681,6 +681,10 @@ class AsyncDutLeaser:
         await asyncio.wait(
             tasks, timeout=self._timeout, return_when=asyncio.FIRST_COMPLETED
         )
+        # Cancel ongoing tasks. Unlike asyncio.wait_for(), asyncio.wait()
+        # doesn't cancel tasks when a timeout occurs.
+        for task in tasks:
+            task.cancel('Already leased a DUT.')
         if not self._leased_dut_name:
             # Timeout happens.
             logger.info(
@@ -691,8 +695,6 @@ class AsyncDutLeaser:
             )
             return None
         logger.info('leased %s', self._leased_dut_name)
-        for task in tasks:
-            task.cancel('Already leased a DUT.')
         return self._leased_dut_name
 
     async def _lease(self, dimensions):
