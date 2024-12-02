@@ -25,8 +25,11 @@ cros format *.py bisect_kit/*.py bisect_kit/*/*.py --check
 # We manually list all python files in the base folder because pylint only
 # support iterating python files over a valid package (a folder containing
 # __init__.py).
+#
+# --disable too-many-positional-arguments because our code contains a lot of
+# existing functions with many arguments.
 PYTHONPATH="$(pwd):$(pwd)/third_party" \
-pylint *.py bisect_kit
+pylint --disable too-many-positional-arguments *.py bisect_kit
 
 # Run test cases with pytest.
 pytest -v
