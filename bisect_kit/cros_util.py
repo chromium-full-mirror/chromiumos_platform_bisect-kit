@@ -634,7 +634,7 @@ def query_dut_cpu_arch(
 
     Raise:
       errors.SshConnectionError: cannot connect to host.
-      errors.ExternalError: failed to run 'file /sbin/init' on the given DUT.
+      errors.ExternalError: failed to run 'hexdump /sbin/init' on the given DUT.
     """
     # Some boards(e.g. jacuzzi,kukui) have moved to 64 bit userspace, however some experimental
     # builder variantions of them(e.g. jacuzzi64, kukui64) are moved to 32 bit temporarily.
@@ -647,23 +647,31 @@ def query_dut_cpu_arch(
         return 'arm'
 
     try:
+        # The 18th and 19th bytes of an ELF file indicates the target
+        # architecture.
+        # See https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
         output = util.ssh_cmd(
-            host, 'file', '/sbin/init', max_attempts=max_attempts
+            host,
+            'hexdump',
+            '-e',
+            '\'"%x"\'',  # Print the bytes as a hexadecimal number.
+            '-s',
+            '18',  # Skip 18 bytes.
+            '-n',
+            '2',  # Dump 2 bytes.
+            '/sbin/init',
+            max_attempts=max_attempts,
         ).strip()
 
-        arm64_match = re.search(r"ARM aarch64", output)
-        arm32_match = re.search(r"ARM,", output)  # Ensure it's not aarch64
-        x86_64_match = re.search(r"x86-64", output)
-
-        if arm64_match:
+        if output == 'b7':
             return "arm64"
-        if arm32_match:
+        if output == '28':
             return "arm"
-        if x86_64_match:
+        if output == '3e':
             return "x86_64"
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError(
-            'unable to get DUT architecture by "file /sbin/init"'
+            'unable to get DUT architecture by "hexdump /sbin/init"'
         ) from e
     logger.debug(
         "query_dut_cpu_arch failed to match the architecture with any of the arm, arm64, or x86_64."

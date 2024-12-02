@@ -1104,19 +1104,13 @@ class TestCrosUtil(unittest.TestCase):
             cros_util.query_dut_cpu_arch('kukui_dut', 'kukui64'), 'arm'
         )
 
-        mock_ssh_cmd.side_effect = [
-            '/sbin/init: ELF 32-bit LSB pie executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 3.2.0, BuildID[xxHash]=d2e2abeee457e477, stripped'
-        ]
+        mock_ssh_cmd.side_effect = ['28']
         self.assertEqual(cros_util.query_dut_cpu_arch('arm32_dut'), 'arm')
 
-        mock_ssh_cmd.side_effect = [
-            '/sbin/init: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.7.0, BuildID[xxHash]=eda6b35bdcd5907c, stripped'
-        ]
+        mock_ssh_cmd.side_effect = ['b7']
         self.assertEqual(cros_util.query_dut_cpu_arch('arm64_dut'), 'arm64')
 
-        mock_ssh_cmd.side_effect = [
-            '/sbin/init: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[xxHash]=9e6ae0d456eb48d8, stripped'
-        ]
+        mock_ssh_cmd.side_effect = ['3e']
         self.assertEqual(cros_util.query_dut_cpu_arch('x86_64_dut'), 'x86_64')
 
 
