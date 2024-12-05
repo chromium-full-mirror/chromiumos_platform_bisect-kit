@@ -90,6 +90,7 @@ class DelayedDutReleaser:
     def __init__(
         self,
         dut,
+        dut_is_broken: bool = False,
         enable_shared_dut_pool: bool = False,
         callback: typing.Callable[[float], None] | None = None,
     ):
@@ -101,6 +102,7 @@ class DelayedDutReleaser:
             callback: a callback to call when the DUT is released. It accepts an argument as the DUT release timestamp.
         """
         self._dut = dut
+        self._dut_is_broken = dut_is_broken
         self._enable_shared_dut_pool = enable_shared_dut_pool
         self._callback = callback
 
@@ -133,18 +135,23 @@ class DelayedDutReleaser:
                 return
             logger.info('releasing DUT %s', self._dut)
             if self._enable_shared_dut_pool:
-                logger.info(
-                    'returning the DUT to the shared DUT pool instead of the ChromeOS lab'
-                )
-                pool_manager = shared_dut_pool.SharedDutPoolManager()
-                if not pool_manager.mark_dut_as_idle(
-                    cros_lab_util.dut_host_name(self._dut),
-                ):
+                if self._dut_is_broken:
                     logger.info(
-                        'failed to return the DUT to the shared DUT pool, try returning to the ChromeOS lab directly'
+                        'not returning the DUT to the shared DUT pool as it is broken'
                     )
                 else:
-                    self._has_released = True
+                    logger.info(
+                        'returning the DUT to the shared DUT pool instead of the ChromeOS lab'
+                    )
+                    pool_manager = shared_dut_pool.SharedDutPoolManager()
+                    if not pool_manager.mark_dut_as_idle(
+                        cros_lab_util.dut_host_name(self._dut),
+                    ):
+                        logger.info(
+                            'failed to return the DUT to the shared DUT pool, try returning to the ChromeOS lab directly'
+                        )
+                    else:
+                        self._has_released = True
 
             if not self._has_released:
                 try:
@@ -486,6 +493,7 @@ class DutManager:
 
         error = None
         dut = self.dut
+        dut_is_broken = isinstance(ex_value, errors.BrokenDutException)
         if dut and self._dut_leave_context_check_func:
             logger.info(
                 'calling dut leave context check function for dut %s', dut
@@ -496,7 +504,7 @@ class DutManager:
                 error = e
 
         if self._auto_allocated_dut and not self.is_vm:
-            self._schedule_release_dut()
+            self._schedule_release_dut(dut_is_broken)
             self._auto_allocated_dut = None
         if self.is_vm:
             self._release_vm()
@@ -504,7 +512,7 @@ class DutManager:
         if error:
             raise error
 
-    def _schedule_release_dut(self):
+    def _schedule_release_dut(self, dut_is_broken: bool):
         """Schedules to release the DUT auto leased by this instance earlier."""
 
         def add_dut_lease_record(start_timestamp: float, end_timestamp: float):
@@ -528,6 +536,7 @@ class DutManager:
 
         self._dut_releaser = DelayedDutReleaser(
             self._auto_allocated_dut,
+            dut_is_broken,
             experiment.is_in_experiment(
                 self.config.get('experiments'),
                 experiment.ID.SHARED_DUT_POOL,
