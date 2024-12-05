@@ -1818,7 +1818,7 @@ def cros_flash(
         args.append('--disable-rootfs-verification')
 
     try:
-        cros_sdk(chromeos_root, 'cros', 'flash', *args)
+        util.check_output('cros', 'flash', *args, cwd=chromeos_root)
         wait_kernel_ready(host)
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError('cros flash failed') from e
