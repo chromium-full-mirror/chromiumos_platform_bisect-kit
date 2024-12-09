@@ -797,7 +797,7 @@ def _check_chrome_build_deps(
     path_factoroy: common.ProjectPathFactory, should_fix: bool
 ):
     chrome_tree = pathlib.Path(path_factoroy.get_chrome_tree())
-    cmds = ['src/build/install-build-deps.sh', '--no-prompt', '--android']
+    cmds = ['src/build/install-build-deps.sh', '--no-prompt']
     if should_fix:
         util.check_output(*cmds, cwd=chrome_tree)
         return True
