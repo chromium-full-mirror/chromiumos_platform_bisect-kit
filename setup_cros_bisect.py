@@ -26,7 +26,6 @@ import argparse
 import datetime
 import glob
 import logging
-import multiprocessing
 import os
 import pathlib
 import subprocess
@@ -294,50 +293,6 @@ def _generate_extra_manifest_for_deleted_repo(repo_dir, only_branch=None):
     return len(removed)
 
 
-def _additional_chrome_mirror_sync(chrome_cache):
-    # Why additional sync is necessary:
-    #   1. `gclient sync` take cares only for the state of the DEPS files on the
-    #      current working directory (main branch). If a repo has been removed
-    #      from the main branch, gclient no longer fetch anything for the said
-    #      repo. We need this additional sync to fetch
-    #        a. history between the last sync and the removal time.
-    #        b. history on other branches
-    #   2. If the DEPS file refers a git repo with a static commit hash and the
-    #      repo already contains the said commit on the local disk, gclient will
-    #      skip to update the git mirror. We need this additional sync to fetch
-    #      history on other branches. (b/206567489)
-    #
-    # However, there are still corner cases. If a repo was added and removed
-    # after our last sync, we have no simple methods to detect them. They will
-    # be synced during DEPS file processing because the necessary information
-    # requires full DEPS parsing. (crbug.com/902238)
-    #
-    # One wasteful problem of this additional sync operation is, we keep sync
-    # repos even if they are removed for a long time. This should be acceptable
-    # because the cost to sync a repo with zero changes should be negligible.
-    logger.info('additional sync for chrome mirror')
-    with multiprocessing.Pool() as pool:
-        results = []
-        for git_repo_name in os.listdir(chrome_cache):
-            # another gclient is running or leftover of previous run; skip
-            if git_repo_name.startswith('_cache_tmp'):
-                continue
-            git_repo = os.path.join(chrome_cache, git_repo_name)
-            if not git_util.is_git_bare_dir(git_repo):
-                continue
-            results.append(
-                pool.apply_async(
-                    git_util.fetch,
-                    (git_repo,),
-                    {"retry_prune_if_conflict": True},
-                )
-            )
-        for r in results:
-            # git_util.fetch doesn't return values. Here we call get() in order to
-            # propagate exceptions if any.
-            r.get()
-
-
 def _sync_chromeos_code(path_factory):
     start_sync_time = int(time.time())
     chromeos_mirror = path_factory.get_chromeos_mirror()
@@ -425,7 +380,6 @@ def _setup_chrome_repos(path_factory, use_btrfs: bool):
             logger.info('gclient sync for chrome')
         chrome_tree = path_factory.get_chrome_tree()
         gclient_util.sync(chrome_tree, with_branch_heads=True, with_tags=True)
-        _additional_chrome_mirror_sync(chrome_cache)
 
 
 def _sync_chrome_code(path_factory, use_btrfs: bool):
