@@ -257,9 +257,11 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
     # Add the environment variables for reproxy
     env.update(get_RBE_environment_variables())
 
+    timeout = kwargs.get('timeout')
+
     cmd = prefix + ['--'] + list(args)
 
-    return util.check_output(*cmd, cwd=chrome_src, env=env)
+    return util.check_output(*cmd, cwd=chrome_src, env=env, timeout=timeout)
 
 
 def determine_targets_to_build(
@@ -330,15 +332,22 @@ def build(chrome_src, board, targets, with_tests=True):
     out_dir = os.path.join('out_%s' % board, 'Release')
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
         cmd = ['autoninja', '-C', out_dir] + targets
+        # Chrome build shouldn't take more than 3 hours. Set timeout to abort
+        # the process in case it gets deadlocked. b/369498616
+        timeout = 3 * 60 * 60
         try:
-            simple_chrome_shell(chrome_src, board, *cmd, internal=True)
+            simple_chrome_shell(
+                chrome_src, board, *cmd, internal=True, timeout=timeout
+            )
         except subprocess.CalledProcessError:
             logger.warning('build failed, delete out directory and retry again')
             # Some compiler processes are still terminating. Short delay is
             # necessary.
             time.sleep(10)
             shutil.rmtree(os.path.join(chrome_src, out_dir))
-            simple_chrome_shell(chrome_src, board, *cmd, internal=True)
+            simple_chrome_shell(
+                chrome_src, board, *cmd, internal=True, timeout=timeout
+            )
 
     return os.path.join(chrome_src, out_dir)
 
