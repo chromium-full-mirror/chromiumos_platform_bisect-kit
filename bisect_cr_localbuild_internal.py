@@ -26,6 +26,25 @@ from bisect_kit import git_util
 logger = logging.getLogger(__name__)
 
 
+def workaround_b378019087(chrome_src: str):
+    """Workaround for b/378019087"""
+    chromite_path = os.path.join(chrome_src, 'third_party/chromite')
+    if (
+        git_util.is_git_root(chromite_path)
+        and git_util.is_ancestor_commit(
+            chromite_path, '217ba94e17971b5de16f384ce955a147ea347a28', 'HEAD'
+        )
+        and not git_util.is_ancestor_commit(
+            chromite_path, 'd9ade857400136815e6b4403ff9ce2e301779437', 'HEAD'
+        )
+    ):
+        # Checkout a known good revision of chromite.
+        git_util.checkout_version(
+            chromite_path,
+            'a251e44dc0010c09918189bb51376c27bfd2e93d',
+        )
+
+
 def guess_chrome_version(opts, rev):
     if cros_util.is_cros_version(rev):
         assert opts.board, 'need to specify BOARD for cros version'
@@ -132,6 +151,7 @@ class ChromeSrcDomain(core.BisectDomain):
         # opts.old is ancestor of opts.new if they are git hashes in the next step.
         gclient_util.sync(opts.chrome_root, revision=new)
         gclient_util.sync(opts.chrome_root, revision=old)
+        workaround_b378019087(chrome_src)
         old_hash = cr_util.query_git_rev(chrome_src, old)
         new_hash = cr_util.query_git_rev(chrome_src, new)
 

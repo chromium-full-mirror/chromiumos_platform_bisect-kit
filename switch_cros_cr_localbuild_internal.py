@@ -176,6 +176,7 @@ def switch_main(args: tuple[str] | None):
     if not opts.no_sync_code or not git_util.is_git_root(opts.chrome_src):
         logger.info('switch source code')
         gclient_util.sync(opts.chrome_root, revision=opts.rev)
+        bisect_cr_localbuild_internal.workaround_b378019087(opts.chrome_src)
 
     if not opts.no_build:
         # TODO(kcwu): support local patch.
