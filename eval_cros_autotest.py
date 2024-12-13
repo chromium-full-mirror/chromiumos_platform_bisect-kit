@@ -353,7 +353,7 @@ def parse_cts_results(result_dir, test_name) -> tuple[bool, str | None]:
     assert summary is not None
     logger.info('summary: %s', summary.attrib)
     if summary.get('pass') == summary.get('failed') == '0':
-        raise errors.ExecutionFatalError('no tests found')
+        return False, 'No result found in the summary'
 
     # Returns the reason of the first failure.
     for test in root.iter('Test'):

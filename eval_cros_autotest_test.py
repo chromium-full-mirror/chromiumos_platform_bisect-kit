@@ -81,11 +81,13 @@ class TestEvalCrosAutotest(unittest.TestCase):
                 'cheets_GTS.tradefed-run-test',
             )
 
-        with self.assertRaises(errors.ExecutionFatalError):
+        self.assertEqual(
             eval_cros_autotest.parse_cts_results(
                 testing.get_testdata_path('cts_test_result/gts.test-not-found'),
                 'cheets_GTS.tradefed-run-test',
-            )
+            ),
+            (False, 'No result found in the summary'),
+        )
 
 
 if __name__ == '__main__':
