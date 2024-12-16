@@ -271,16 +271,21 @@ def determine_targets_to_build(
     force_nacl: bool = False,
 ):
     out_dir = os.path.join('out_%s' % board, 'Release')
-    available_targets = simple_chrome_shell(
-        chrome_src,
-        board,
-        'buildtools/linux64/gn',
-        'ls',
-        '--type=executable',
-        '--as=output',
-        out_dir,
-        internal=True,
-    ).splitlines()
+    try:
+        available_targets = simple_chrome_shell(
+            chrome_src,
+            board,
+            'buildtools/linux64/gn',
+            'ls',
+            '--type=executable',
+            '--as=output',
+            out_dir,
+            internal=True,
+        ).splitlines()
+    except subprocess.CalledProcessError as e:
+        raise errors.BuildError(
+            'failed to determine chrome targets to build'
+        ) from e
 
     mandatory = CHROME_BINARIES
     optional = list(CHROME_BINARIES_OPTIONAL)
@@ -345,9 +350,12 @@ def build(chrome_src, board, targets, with_tests=True):
             # necessary.
             time.sleep(10)
             shutil.rmtree(os.path.join(chrome_src, out_dir))
-            simple_chrome_shell(
-                chrome_src, board, *cmd, internal=True, timeout=timeout
-            )
+            try:
+                simple_chrome_shell(
+                    chrome_src, board, *cmd, internal=True, timeout=timeout
+                )
+            except subprocess.CalledProcessError as e:
+                raise errors.BuildError('failed to build chrome') from e
 
     return os.path.join(chrome_src, out_dir)
 

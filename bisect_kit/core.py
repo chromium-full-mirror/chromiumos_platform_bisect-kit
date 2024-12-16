@@ -33,6 +33,7 @@ class StepResult:
         reason: str | None = None,
         values: list[float] | None = None,
         exception: str | None = None,
+        times: int | None = None,
     ):
         self.data: dict[str, typing.Any] = {'status': status}
         if values:
@@ -41,6 +42,8 @@ class StepResult:
             self.data['reason'] = reason
         if exception:
             self.data['exception'] = exception
+        if times:
+            self.data['times'] = times
 
 
 class RevInfo:

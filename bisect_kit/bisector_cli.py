@@ -423,6 +423,17 @@ def step_main_wrapper(
         result = core.StepResult(
             'skip', reason=str(e), exception=exception_name
         )
+    except errors.BuildError as e:
+        # BuildError means the current revision cannot be tested. Skip it
+        # forever.
+        exception_name = e.__class__.__name__
+        logging.exception(str(e))
+        result = core.StepResult(
+            'skip',
+            reason=str(e),
+            exception=exception_name,
+            times=strategy.SKIP_FOREVER,
+        )
     except Exception as e:
         exception_name = e.__class__.__name__
         logging.exception('unhandled exception')
@@ -801,6 +812,8 @@ class BisectorCommandLine:
                 sample['reason'] = result.data['reason']
             if 'exception' in result.data:
                 sample['exception'] = result.data['exception']
+            if 'times' in result.data:
+                sample['times'] = result.data['times']
         if status in ('skip', 'fatal'):
             logger.debug('eval failed => %s', status)
             return False
@@ -882,6 +895,8 @@ class BisectorCommandLine:
                 sample['reason'] = result.data['reason']
             if 'exception' in result.data:
                 sample['exception'] = result.data['exception']
+            if 'times' in result.data:
+                sample['times'] = result.data['times']
         if status in ('skip', 'fatal'):
             logger.debug('switch (%s) failed => %s', action, status)
             return False
