@@ -357,11 +357,22 @@ cache_dir = %r
 """ % (
         chrome_cache
     )
-    with locking.lock_file(
-        os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)
-    ):
-        logger.info('gclient config for chrome')
-        gclient_util.config(chrome_tree, spec=spec)
+
+    n_retries = 0
+    while True:
+        try:
+            with locking.lock_file(
+                os.path.join(chrome_cache, locking.LOCK_FILE_FOR_MIRROR_SYNC)
+            ):
+                logger.info('gclient config for chrome')
+                gclient_util.config(chrome_tree, spec=spec)
+                break
+        except subprocess.CalledProcessError as e:
+            n_retries += 1
+            logger.error('gclient config failed (%d): %s', n_retries, e)
+            if n_retries == 3:
+                raise
+            time.sleep(60)
 
 
 def _setup_chrome_repos(path_factory, use_btrfs: bool):
