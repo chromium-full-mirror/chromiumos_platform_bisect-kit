@@ -165,7 +165,7 @@ def _setup_chromeos_repos(path_factory, use_btrfs: bool):
     manifest_url = (
         'https://chrome-internal.googlesource.com/chromeos/manifest-internal'
     )
-    repo_url = 'https://chromium.googlesource.com/external/repo.git'
+    repo_url = 'https://gerrit.googlesource.com/git-repo'
 
     if os.path.exists(os.path.join(chromeos_mirror, '.repo', 'manifests')):
         logger.warning(

@@ -3443,7 +3443,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             self.config.get('chromeos_root'),
             'https://chrome-internal.googlesource.com/chromeos/manifest-internal',
             manifest_name=manifest_name,
-            repo_url='https://chromium.googlesource.com/external/repo.git',
+            repo_url='https://gerrit.googlesource.com/git-repo',
             reference=self.config.get('chromeos_mirror'),
             # b/150753074: moblab is in non-default group and causes mark_as_stable
             # fail
