@@ -219,6 +219,21 @@ class TestNoisyBinarySearch(unittest.TestCase):
         bsearch.add_sample(98, 'new')
         self.assertGreater(bsearch.get_prob()[98], 0)
 
+    def test_skip_forever(self):
+        bsearch = strategy.NoisyBinarySearch(
+            self.rev_info,
+        )
+        bsearch.add_sample(0, 'old')
+        bsearch.add_sample(99, 'new')
+        bsearch.add_sample(40, 'skip', times=strategy.SKIP_FOREVER)
+        # Skip too many times, the probability is set to 0.
+        self.assertEqual(bsearch.get_prob()[40], 0)
+
+        # For each revision between skip-forever revisions, the probablity is
+        # also set to 0.
+        bsearch.add_sample(50, 'skip', times=strategy.SKIP_FOREVER)
+        self.assertEqual(bsearch.get_prob()[40:51], [0] * 11)
+
     def test_get_range_with_skip(self):
         bsearch = strategy.NoisyBinarySearch(
             self.rev_info,

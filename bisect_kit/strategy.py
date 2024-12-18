@@ -705,6 +705,23 @@ class NoisyBinarySearch:
                 # Allow retry, but the more 'skip', the lower weighting.
                 weighting[i] *= 0.1 ** info['skip']
 
+        # Skip-forever revisions are broken. Assume that revisions between them
+        # are also broken and avoid evaluating them.
+        i_last_skip_forever = None
+        for i, info in enumerate(rev_info):
+            if info['new'] or info['old']:
+                i_last_skip_forever = None
+                continue
+
+            if not info['skip']:
+                continue
+
+            if info['skip'] >= SKIP_FOREVER:
+                if i_last_skip_forever is not None:
+                    for j in range(i_last_skip_forever, i + 1):
+                        weighting[j] = 0
+                i_last_skip_forever = i
+
         # Adjust weighting of neighbors.
         # Following formula is chosen arbitrarily. The main idea is "impact" is
         # correlated to the distance until reaching non-skip version.
