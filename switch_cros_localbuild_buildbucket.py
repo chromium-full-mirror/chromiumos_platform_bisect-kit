@@ -518,6 +518,19 @@ def wait_for_build_completion(opts, build_id: int):
         time.sleep(60)
 
     if not api.is_success(build):
+        if build.status == buildbucket_util.Status.Value('INFRA_FAILURE'):
+            # Infra failure is a temporary error.
+            raise errors.ExternalError(
+                'buildbucket infra failure id=%d, status=%s, summary=%r, url=%s'
+                % (
+                    build_id,
+                    buildbucket_util.Status.Name(build.status),
+                    build.summary_markdown,
+                    buildbucket_util.get_luci_link(
+                        opts.board, build_id, bucket=opts.bucket
+                    ),
+                )
+            )
         raise errors.BuildError(
             'buildbucket build fail id=%d, status=%s, summary=%r, url=%s'
             % (
