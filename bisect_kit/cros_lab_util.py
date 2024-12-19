@@ -1256,11 +1256,10 @@ def repair(dut: str, chromeos_root: str = ''):
 
     try:
         logger.debug('Reset using servo for repair')
-        boot_id = cros_util.query_dut_boot_id(dut)
         # Perform a normal reboot to avoid servod command failure
         cros_util.reboot(dut)
         reboot_via_servo(dut)
-        cros_util.wait_reboot_done(dut, boot_id)
+        cros_util.wait_reboot_done(dut)
     except (errors.SshConnectionError, subprocess.CalledProcessError) as e:
         logger.error('reboot via servo failed %s', e)
         return False

@@ -968,22 +968,41 @@ def reboot(host, force_reboot_callback=None):
     try:
         boot_id = query_dut_boot_id(host)
 
-        try:
-            util.ssh_cmd(host, 'reboot', connect_timeout=20)
-        except errors.SshConnectionError:
-            # Depends on timing, ssh may return failure due to broken pipe, which is
-            # working as intended. Ignore such kind of errors.
-            pass
-
-        wait_reboot_done(host, boot_id)
-    except (errors.SshConnectionError, errors.ExternalError):
+        max_attempts = 3
+        for _ in range(0, max_attempts):
+            try:
+                util.ssh_cmd(host, 'reboot', connect_timeout=20)
+            except errors.SshConnectionError as e:
+                # Depends on timing, ssh may return failure due to broken pipe, which is
+                # working as intended. Ignore such kind of errors.
+                logger.info(
+                    'Ignoring SshConnectionError while rebooting the DUT: %s', e
+                )
+            if wait_reboot_done(host) == boot_id:
+                logger.info(
+                    'rebooted but the boot id (%s) has not changed.',
+                    boot_id,
+                )
+            else:
+                # Reboot succeeded.
+                return
+        raise errors.ExternalError(
+            'Boot ID has not changed after reboot: %s' % boot_id
+        )
+    # We need to catch errors.SshConnectionError here because
+    # query_dut_boot_id() may raise it even though it is already caught in the
+    # for loop above.
+    except (errors.SshConnectionError, errors.ExternalError) as e:
         if force_reboot_callback and force_reboot_callback(host):
-            wait_reboot_done(host, boot_id)
+            if wait_reboot_done(host) == boot_id:
+                raise errors.ExternalError(
+                    'Boot ID has not changed after force reboot: %s' % boot_id
+                ) from e
             return
         raise
 
 
-def wait_reboot_done(host, boot_id):
+def wait_reboot_done(host) -> str:
     # For dev-mode test image, the reboot time is roughly at least 16 seconds
     # (dev screen short delay) or more (long delay).
     time.sleep(15)
@@ -991,13 +1010,12 @@ def wait_reboot_done(host, boot_id):
         # During boot, DUT does not response and thus ssh may hang a while. So
         # set a connect timeout. 3 seconds are enough and 2 are not. It's okay to
         # set tight limit because it's inside retry loop.
-        assert boot_id != query_dut_boot_id(
+        return query_dut_boot_id(
             host,
             connect_timeout=5,
             max_attempts=60,
             retry_interval=1,
-        ), 'rebooted but boot id intact?'
-        return
+        )
     except errors.SshConnectionError as e:
         raise errors.ExternalError('reboot failed?') from e
 

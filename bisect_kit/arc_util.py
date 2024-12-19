@@ -41,8 +41,6 @@ def search_push_to_device_script_path(android_root):
 
 def _push_to_device(dut, push_script, args, android_root=None, flavor=None):
     """Helper function to run push_to_device.py"""
-    boot_id = cros_util.query_dut_boot_id(dut)
-
     assert push_script
     cmd = [push_script] + args
     stderr_lines = []
@@ -66,7 +64,7 @@ def _push_to_device(dut, push_script, args, android_root=None, flavor=None):
         or '*** Rebooting device. ***' in stderr
         or 'root:Rebooting device...' in stderr
     ):
-        cros_util.wait_reboot_done(dut, boot_id)
+        cros_util.wait_reboot_done(dut)
 
 
 def push_prebuilt_to_device(dut, flavor, build_id):
