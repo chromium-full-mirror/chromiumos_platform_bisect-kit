@@ -431,6 +431,7 @@ class DutAllocator:
         spec = self._spec
 
         start_time = time.time()
+        dut_availability_info = None
         while True:
             remaining_time = spec.time_limit_seconds - (
                 time.time() - start_time
@@ -453,11 +454,16 @@ class DutAllocator:
             )
             if host:
                 return host, self._resolve_builder_by_host(host)
+            dut_availability_info = async_dut_leaser.dut_availability_info
             time.sleep(1)
 
-        logger.warning('unable to lease DUT in time limit')
+        logger.warning(
+            'unable to lease DUT in time limit: %s',
+            dut_availability_info,
+        )
         raise errors.DutLeaseTimeout(
-            'Unable to lease DUT in %s seconds' % spec.time_limit_seconds
+            'Unable to lease DUT in %s seconds: %s'
+            % (spec.time_limit_seconds, dut_availability_info)
         )
 
 

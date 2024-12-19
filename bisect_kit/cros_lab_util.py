@@ -659,6 +659,13 @@ class AsyncDutLeaser:
         # This variable is guarded by self._lock
         self._leased_dut_name: str | None = None
 
+        # Dict from DUT dimensions to human readable DUT availability info.
+        self._dut_availability_info: dict[str, str] = {}
+
+    @property
+    def dut_availability_info(self) -> dict[str, str]:
+        return self._dut_availability_info
+
     async def lease_parallelly(self):
         tasks = []
         for dimensions in enumerate_dimension_combinations(
@@ -723,6 +730,13 @@ class AsyncDutLeaser:
                     break
                 line = line.decode('utf8')
                 logger.debug('lease(%s): %s', dimensions, line)
+
+                if re.search(r'\bFound \d+ DUT\(s\)', line):
+                    async with self._lock:
+                        self._dut_availability_info[
+                            str(dimensions)
+                        ] = line.strip()
+
                 if not pending_lease:
                     pending_lease = extract_lease_info(line)
                 if 'INFRA_FAILURE' in line:
