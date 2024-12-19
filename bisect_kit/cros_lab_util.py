@@ -861,20 +861,16 @@ class AsyncDutLeaser:
                 cancel_pending_lease(pending_lease)
 
     async def _lease_with_retry(self, dimensions):
-        tries = 0
+        # Retry until we hit the timeout set in lease_parallelly().
         while True:
             try:
-                tries += 1
                 return await self._lease(dimensions)
             except errors.ExternalError:
-                if tries < 3:
-                    delay = 60
-                    logger.warning(
-                        'lease failed, will retry %d seconds later', delay
-                    )
-                    await asyncio.sleep(delay)
-                    continue
-                raise
+                delay = 120
+                logger.warning(
+                    'lease failed, will retry %d seconds later', delay
+                )
+                await asyncio.sleep(delay)
 
 
 def make_lease_reason(session):
