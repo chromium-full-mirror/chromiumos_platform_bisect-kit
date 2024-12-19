@@ -13,6 +13,7 @@ import shutil
 import socket
 import ssl
 import tempfile
+import time
 import typing
 
 from bisect_kit import codechange
@@ -216,6 +217,20 @@ class BuildbucketApi:
                 )
                 response = conn.getresponse()
                 response_content = response.read()
+                if response.status == 500:
+                    # Retry when HTTP status 500 (server error).
+                    if response_content:
+                        response_content = response_content.decode('utf-8')
+                    if max_retries <= 0:
+                        raise errors.ExternalError(
+                            'buildbucket api server error: ' + response_content
+                        )
+                    logger.warning(
+                        'retry buildbucket api due to server error: %s',
+                        response_content,
+                    )
+                    time.sleep(30)
+                    continue
                 result = return_class()
                 result.ParseFromString(response_content)
                 return result
