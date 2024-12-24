@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.parse
 
 from bisect_kit import codechange
@@ -96,6 +97,8 @@ def sync(
     with_tags: bool = False,
     revision: str = None,
     jobs: int = 8,
+    max_attempts: int = 3,
+    retry_interval: int = 60,
 ):
     """Simply wrapper of `gclient sync`.
 
@@ -136,7 +139,23 @@ def sync(
         old_projects = {}
 
     with git_util.PatchGitConfig() as new_env:
-        util.check_call(*cmd, cwd=gclient_dir, env=new_env)
+        attempts = 0
+        while True:
+            attempts += 1
+            try:
+                util.check_call(*cmd, cwd=gclient_dir, env=new_env)
+                break
+            except subprocess.CalledProcessError as e:
+                if attempts >= max_attempts:
+                    raise errors.ExternalError(
+                        'gclient sync failed: %s' % cmd
+                    ) from e
+                logger.warning(
+                    'gclient sync failed, will retry %d seconds later: %s',
+                    retry_interval,
+                    e,
+                )
+                time.sleep(retry_interval)
 
     # Remove dead .git folder after sync.
     # Ideally, this should be handled by gclient but sometimes gclient didn't
