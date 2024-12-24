@@ -1053,6 +1053,13 @@ def _notify_error_from_lease_keeper(exception, error_queue):
     os.kill(os.getpid(), signal.SIGINT)
 
 
+def _cancel_lease_and_raise_exception(dut_name, error_message):
+    logger.error(error_message)
+    logger.error('cancel our recent lease task')
+    crosfleet_release_dut(dut_name)
+    raise errors.DutLeaseException(error_message)
+
+
 def lease_keeper(dut_name, reason, quit_event, error_queue):
     """Monitors and maintains skylab lease status.
 
@@ -1118,24 +1125,29 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
 
             # leased, but need to verify in case of race condition
             tasks = swarming_bot_tasks(lease_status.bot_id, limit=5)
-            assert len(tasks) >= 2
-            assert tasks[0]['taskId'] == this_lease.task_id
+            if len(tasks) < 2:
+                _cancel_lease_and_raise_exception(
+                    dut_name, 'Less lease tasks than expected: %s' % tasks
+                )
+
+            if tasks[0]['taskId'] != this_lease.task_id:
+                _cancel_lease_and_raise_exception(
+                    dut_name,
+                    'The first lease task ID is different from %s: %s'
+                    % (this_lease.task_id, tasks),
+                )
+
             for i, task in enumerate(tasks[1:], 1):
                 if task['taskId'] == lease_status.task_id:
                     if i > 1:
-                        logger.error('detected race condition')
-                        logger.error('cancel our recent lease task')
-                        crosfleet_release_dut(dut_name)
-                        raise errors.DutLeaseException(
-                            'there are other tasks between our two leases; race condition?'
+                        _cancel_lease_and_raise_exception(
+                            dut_name,
+                            'there are other tasks between our two leases; race condition?',
                         )
                     break
             else:
-                logger.error('not found previous lease task in task list')
-                logger.error('cancel our recent lease task')
-                crosfleet_release_dut(dut_name)
-                raise errors.DutLeaseException(
-                    'not found previous lease task in task list'
+                _cancel_lease_and_raise_exception(
+                    dut_name, 'not found previous lease task in task list'
                 )
     except (
         errors.DutLeaseException,
