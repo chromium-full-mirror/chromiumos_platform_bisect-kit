@@ -37,6 +37,7 @@ import typing
 from bisect_kit import common
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import scheduke_util
 from bisect_kit import util
 import sshconf
 
@@ -75,8 +76,7 @@ class LeaseStatus:
             fields are not available.
         leased_by: User id leases the dut.
         is_leased_by_me: Whether is leased by current account.
-        lease_duration_seconds: Lease duration in seconds.
-        start_time: Lease start timestamp. (seconds since unix epoch time)
+        end_time: Timestamp at which this lease ends. (seconds since unix epoch time)
     """
 
     dut_name: str
@@ -86,8 +86,7 @@ class LeaseStatus:
     is_leased: bool = False
     leased_by: typing.Optional[str] = None
     is_leased_by_me: typing.Optional[bool] = None
-    lease_duration_seconds: typing.Optional[int] = None
-    start_time: typing.Optional[int] = None
+    end_time: typing.Optional[int] = None
 
 
 def normalize_sku_name(sku):
@@ -798,13 +797,13 @@ class AsyncDutLeaser:
             # wait the state propagated
             for _ in range(10):
                 await asyncio.sleep(5)
-                status = query_lease_status(dut_name, verbose_log=False)
+                status = query_lease_status(dut_name)
                 if is_dut_leased_by_me(status):
                     logger.info('lease: %s', pending_lease)
                     break
             else:
                 raise errors.DutLeaseException(
-                    'lease verification failed: %s' % dataclasses.asdict(status)
+                    'lease verification failed: %s' % dut_name
                 )
 
             # (b/290040570)
@@ -987,63 +986,28 @@ def parse_timestamp_from_swarming(timestamp):
     return calendar.timegm(time.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ'))
 
 
-def query_lease_status(dut_name, verbose_log=True) -> LeaseStatus:
+def query_lease_status(dut_name) -> LeaseStatus:
     """Query DUT lease status.
 
     Args:
       dut_name: DUT name
-      verbose_log: log more if True
 
     Returns:
       The lease status of DUT.
     """
     status = LeaseStatus(dut_name=dut_name)
 
-    bots = swarming_bots_list(['dut_name:' + dut_name])
-    if not bots:
-        raise errors.DutLeaseException('dut_name:%s not found' % dut_name)
-    assert len(bots) == 1
-    bot = bots[0]
-    status.bot_id = bot['botId']
-    status.task_name = bot.get('taskName')
-    status.task_id = bot.get('taskId') or None  # convert empty string to None
-    status.is_leased = (
-        status.task_name == 'lease task'
-        or status.task_name
-        and 'dut_leaser' in status.task_name
+    task_states = scheduke_util.get_task_states(
+        users=[scheduke_util.get_active_gcloud_user()], device_names=[dut_name]
     )
-    if not status.is_leased:
-        return status
-
-    service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
-    if service_account_json:
-        with open(service_account_json) as f:
-            service_account_data = json.load(f)
-        user = service_account_data['client_email']
+    if task_states.tasks:
+        status.is_leased = True
+        status.is_leased_by_me = True
+        status.task_id = task_states.tasks[0].task_state_id
+        status.end_time = task_states.tasks[0].end_time / 1000000
     else:
-        user = os.environ['USER']
-    assert user
-
-    request = swarming_task_request(status.task_id, verbose_log=verbose_log)
-    # b/350370209: Somehow the task id for a task is not unique.
-    # For example, calling the above API with task_id from 6a8af5c25c289110
-    # to 6a8af5c25c289119 all return a "canonical" task id of 6a8af5c25c289110.
-    # As a result, we use the "canonical" task id because it is usually
-    # expected.
-    original_task_id = status.task_id
-    status.task_id = request.get('taskId', original_task_id)
-    logger.debug(
-        'original_task_id: %s, task_id: %s', original_task_id, status.task_id
-    )
-    status.leased_by = request['authenticated']
-    # format change, ignore the detail information (b/179461101)
-    status.is_leased_by_me = bool(status.leased_by)
-    status.lease_duration_seconds = int(
-        request['properties']['executionTimeoutSecs']
-    )
-
-    result = swarming_task_result(status.task_id, verbose_log=verbose_log)
-    status.start_time = parse_timestamp_from_swarming(result['startedTs'])
+        status.is_leased = False
+        status.is_leased_by_me = False
     return status
 
 
@@ -1075,10 +1039,13 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
       error_queue: a queue.Queue object, for passing exception to main thread.
     """
 
+    # TODO(b/394220130) Remove `reason` or use it for easier debugging.
+    del reason
+
     try:
         previous_status = {}
         while True:
-            lease_status = query_lease_status(dut_name, verbose_log=False)
+            lease_status = query_lease_status(dut_name)
             if not (lease_status.is_leased and lease_status.is_leased_by_me):
                 if previous_status and previous_status.task_id:
                     task_url = (
@@ -1095,12 +1062,9 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
                 )
             previous_status = lease_status
 
-            expire_time = (
-                lease_status.start_time + lease_status.lease_duration_seconds
-            )
             # We need buffer time (like querying lease status, network latency, etc.)
             # before actual lease request, 100 must be enough.
-            to_lease_again = expire_time - 100
+            to_lease_again = lease_status.end_time - 100
 
             now = time.time()
             if to_lease_again > now:
@@ -1116,39 +1080,14 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
                     return
                 continue
 
-            logger.info("Previous lease is near expiration, let's lease again")
-            this_lease = crosfleet_lease_dut(dut_name, reason)
-            if not this_lease:
-                raise errors.DutLeaseException(
-                    'Lease is expired and unable to extend the lease'
-                )
+            # TODO(b/394220130): Implement a mechanism to handle lease expiration more gracefully.
+            logger.info(
+                "Previous lease is near expiration, but currently we don't have a way to extend the current lease"
+            )
+            raise errors.DutLeaseException(
+                'Lease is expired and unable to extend the lease'
+            )
 
-            # leased, but need to verify in case of race condition
-            tasks = swarming_bot_tasks(lease_status.bot_id, limit=5)
-            if len(tasks) < 2:
-                _cancel_lease_and_raise_exception(
-                    dut_name, 'Less lease tasks than expected: %s' % tasks
-                )
-
-            if tasks[0]['taskId'] != this_lease.task_id:
-                _cancel_lease_and_raise_exception(
-                    dut_name,
-                    'The first lease task ID is different from %s: %s'
-                    % (this_lease.task_id, tasks),
-                )
-
-            for i, task in enumerate(tasks[1:], 1):
-                if task['taskId'] == lease_status.task_id:
-                    if i > 1:
-                        _cancel_lease_and_raise_exception(
-                            dut_name,
-                            'there are other tasks between our two leases; race condition?',
-                        )
-                    break
-            else:
-                _cancel_lease_and_raise_exception(
-                    dut_name, 'not found previous lease task in task list'
-                )
     except (
         errors.DutLeaseException,
         errors.ExternalError,

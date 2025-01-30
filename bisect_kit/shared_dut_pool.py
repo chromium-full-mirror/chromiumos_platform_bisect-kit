@@ -523,9 +523,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         stale_duts = []
         for dut_name in dut_names:
             try:
-                lease_status = cros_lab_util.query_lease_status(
-                    dut_name, verbose_log=False
-                )
+                lease_status = cros_lab_util.query_lease_status(dut_name)
             except Exception as e:
                 logger.warning(
                     'failed to check lease status for %s: %s', dut_name, e
