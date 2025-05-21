@@ -216,7 +216,13 @@ def run_test(opts) -> str:
     Returns:
       path of test result (outside chroot)
     """
-    if is_cts(opts) and cros_lab_util.is_dut_needs_forwarded(opts.dut):
+    # Enable port forwarding for CTS tests because ADB doesn't support SSH's
+    # ProxyJump. Sometimes users want to run a group of CTS tests by specifying
+    # opts.test_name only, instead of running a single test case by specifying
+    # opts.cts_test. b/417324492
+    if (
+        is_cts(opts) or re.match(r'cheets_\wTS_\w+\.', opts.test_name)
+    ) and cros_lab_util.is_dut_needs_forwarded(opts.dut):
         dut, forward_host = (
             '%s:%d'
             % (cros_util.FORWARDED_DUT_HOST, cros_util.FORWARDED_DUT_PORT),
