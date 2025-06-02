@@ -300,9 +300,9 @@ class CrosDiagnoser:
                 self.dut_allocate_spec,
                 self.pre_allocated_dut,
                 self.is_stateless,
-                vm_cros_version=self.config.get('old')
-                if self.is_vm_board
-                else None,
+                vm_cros_version=(
+                    self.config.get('old') if self.is_vm_board else None
+                ),
             )
         )
         if not self.config.get('board') or not self.config.get(
@@ -1734,6 +1734,9 @@ class DiagnoseCommandLineBase:
             "term_new": opts.term_new,
             "test_name": opts.test_name,
             "tast_patch_cl": opts.tast_patch_cl,
+            "tast_revision": opts.tast_revision,
+            "tast_private_revision": opts.tast_private_revision,
+            "tast_runtime_revision": opts.tast_runtime_revision,
             "fail_to_pass": opts.fail_to_pass,
             "metric": opts.metric,
             "old_value": opts.old_value,
@@ -1957,7 +1960,23 @@ class DiagnoseCommandLineBase:
         )
         group.add_argument(
             '--tast-patch-cl',
-            help='A gerrit CL to patch the chromiumos/platform/tast-tests repository; ',
+            help='A gerrit CL to patch the chromiumos/platform/tast-tests '
+            'repository',
+        )
+        group.add_argument(
+            '--tast-revision',
+            help='A git revision of chromiumos/platform/tast-tests repository '
+            'to be specified',
+        )
+        group.add_argument(
+            '--tast-private-revision',
+            help='A git revision of chromeos/platform/tast-tests-private '
+            'repository to be specified',
+        )
+        group.add_argument(
+            '--tast-runtime-revision',
+            help='A git revision of chromiumos/platform/tast repository to be '
+            'specified',
         )
 
         self.create_argument_parser_hook(parser_init)

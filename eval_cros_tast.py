@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import Optional
 
 from bisect_kit import bisector_cli
 from bisect_kit import catapult_util
@@ -83,6 +84,21 @@ def create_argument_parser():
         help='A gerrit CL to patch the chromiumos/platform/tast-tests repository; ',
     )
     parser.add_argument(
+        '--tast-revision',
+        help='A git revision of chromiumos/platform/tast-tests repository '
+        'to be specified',
+    )
+    parser.add_argument(
+        '--tast-private-revision',
+        help='A git revision of chromeos/platform/tast-tests-private '
+        'repository to be specified',
+    )
+    parser.add_argument(
+        '--tast-runtime-revision',
+        help='A git revision of chromiumos/platform/tast repository to be '
+        'specified',
+    )
+    parser.add_argument(
         '--with-private-bundles',
         action='store_true',
         help='Whether search tests in private bundles or not',
@@ -127,28 +143,66 @@ def create_argument_parser():
     return parser
 
 
-def add_tast_patch_cl(chromeos_root: str, tast_patch_cl: str):
-    # checkout tast binary repo to main.
-    tast_binary_repo = os.path.join(chromeos_root, 'src', 'platform', 'tast')
-    git_util.checkout_branch(tast_binary_repo, 'main')
-    git_util.reset_hard_to_remote_branch(tast_binary_repo, 'cros/main')
+def add_tast_patch_cl(
+    chromeos_root: str,
+    tast_patch_cl: Optional[str],
+    tast_revision: Optional[str],
+    tast_private_revision: Optional[str],
+    tast_runtime_revision: Optional[str],
+):
+    # Use 'main' branch code as the base if the patch CL is specified.
+    # It's compatible as the previous behavior.
+    if tast_patch_cl:
+        if not tast_runtime_revision:
+            tast_runtime_revision = 'main'
+        if not tast_private_revision:
+            tast_private_revision = 'main'
+        if not tast_revision:
+            tast_revision = 'main'
 
-    # checkout tast tests private repo to main.
-    tast_tests_private_repo = os.path.join(
-        chromeos_root, 'src', 'platform', 'tast-tests-private'
-    )
-    git_util.checkout_branch(tast_tests_private_repo, 'main')
-    git_util.reset_hard_to_remote_branch(
-        tast_tests_private_repo, 'cros-internal/main'
-    )
+    # checkout tast runtime repo to main or the specified revision.
+    if tast_runtime_revision:
+        tast_runtime_repo = os.path.join(
+            chromeos_root, 'src', 'platform', 'tast'
+        )
+        if tast_runtime_revision == 'main':
+            git_util.checkout_branch(tast_runtime_repo, 'main')
+            git_util.reset_hard_to_remote_branch(tast_runtime_repo, 'cros/main')
+        else:
+            git_util.checkout_version(tast_runtime_repo, tast_runtime_revision)
+            git_util.reset_hard(tast_runtime_repo)
 
-    # checkout tast tests repo to main and patch the CL.
-    tast_tests_repo = os.path.join(
-        chromeos_root, 'src', 'platform', 'tast-tests'
-    )
-    git_util.checkout_branch(tast_tests_repo, 'main')
-    git_util.reset_hard_to_remote_branch(tast_tests_repo, 'cros/main')
-    repo_util.cherry_pick(tast_tests_repo, tast_patch_cl)
+    # checkout tast tests private repo to main or the specified revision.
+    if tast_private_revision:
+        tast_tests_private_repo = os.path.join(
+            chromeos_root, 'src', 'platform', 'tast-tests-private'
+        )
+        if tast_private_revision == 'main':
+            git_util.checkout_branch(tast_tests_private_repo, 'main')
+            git_util.reset_hard_to_remote_branch(
+                tast_tests_private_repo, 'cros-internal/main'
+            )
+        else:
+            git_util.checkout_version(
+                tast_tests_private_repo, tast_private_revision
+            )
+            git_util.reset_hard(tast_tests_private_repo)
+
+    # checkout tast tests repo to main or the specified revision.
+    if tast_revision:
+        tast_tests_repo = os.path.join(
+            chromeos_root, 'src', 'platform', 'tast-tests'
+        )
+        if tast_revision == 'main':
+            git_util.checkout_branch(tast_tests_repo, 'main')
+            git_util.reset_hard_to_remote_branch(tast_tests_repo, 'cros/main')
+        else:
+            git_util.checkout_version(tast_tests_repo, tast_revision)
+            git_util.reset_hard(tast_tests_repo)
+
+    # Patch the CL to the tast tests repo.
+    if tast_patch_cl:
+        repo_util.cherry_pick(tast_tests_repo, tast_patch_cl)
 
 
 def prepare_to_run_test(opts):
@@ -157,13 +211,30 @@ def prepare_to_run_test(opts):
             opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo
         )
 
-    if opts.tast_patch_cl:
-        add_tast_patch_cl(opts.chromeos_root, opts.tast_patch_cl)
+    if (
+        opts.tast_patch_cl
+        or opts.tast_revision
+        or opts.tast_private_revision
+        or opts.tast_runtime_revision
+    ):
+        add_tast_patch_cl(
+            opts.chromeos_root,
+            opts.tast_patch_cl,
+            opts.tast_revision,
+            opts.tast_private_revision,
+            opts.tast_runtime_revision,
+        )
 
 
 def tast_cmd(opts, cmd, *args):
     flags = []
-    if opts.prebuilt and not opts.tast_patch_cl:
+    use_custom_tast_test = (
+        opts.tast_patch_cl
+        or opts.tast_revision
+        or opts.tast_private_revision
+        or opts.tast_runtime_revision
+    )
+    if opts.prebuilt and not use_custom_tast_test:
         tast_dir = os.path.join(
             cros_util.chromeos_root_inside_chroot, cros_util.prebuilt_tast_dir
         )
@@ -187,7 +258,7 @@ def tast_cmd(opts, cmd, *args):
         flags += ['-var=%s=%s' % x for x in opts.args]
 
     # TODO(zjchang): ensure the tast version for buildbucket builds is correct
-    if not opts.tast_build and not opts.tast_patch_cl:
+    if not opts.tast_build and not use_custom_tast_test:
         flags.append('-build=false')
         if opts.with_private_bundles:
             flags.append('-downloadprivatebundles=true')

@@ -62,7 +62,25 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                 '--tast-patch-cl',
                 self.config.get('tast_patch_cl'),
             ]
-            # With tast_patch_cl switch tast harness cmd is redundent
+            # With tast_patch_cl switch tast harness cmd is redundant
+            switch_test_harness_cmd = None
+        if self.config.get('tast_revision'):
+            common_eval_cmd += [
+                '--tast-revision',
+                self.config.get('tast_revision'),
+            ]
+            switch_test_harness_cmd = None
+        if self.config.get('tast_private_revision'):
+            common_eval_cmd += [
+                '--tast-private-revision',
+                self.config.get('tast_private_revision'),
+            ]
+            switch_test_harness_cmd = None
+        if self.config.get('tast_runtime_revision'):
+            common_eval_cmd += [
+                '--tast-runtime-revision',
+                self.config.get('tast_runtime_revision'),
+            ]
             switch_test_harness_cmd = None
         if self.config.get('fail_to_pass'):
             common_eval_cmd.append('--fail-to-pass')
