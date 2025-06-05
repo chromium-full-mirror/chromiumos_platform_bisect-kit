@@ -81,10 +81,10 @@ class TestAddTastPatchCl(unittest.TestCase):
         mock_cherry_pick,
     ):
         """Test when only tast_patch_cl is provided."""
-        tast_patch_cl = 'crrev.com/c/12345'
+        tast_patch_cls = ['crrev.com/c/12345', 'crrev.com/c/67890']
         eval_cros_tast.add_tast_patch_cl(
             self.CHROMEOS_ROOT,
-            tast_patch_cl=tast_patch_cl,
+            tast_patch_cls=tast_patch_cls,
             tast_revision=None,
             tast_private_revision=None,
             tast_runtime_revision=None,
@@ -104,8 +104,11 @@ class TestAddTastPatchCl(unittest.TestCase):
         mock_reset_hard_to_remote_branch.assert_any_call(
             self.TAST_TESTS_REPO, 'cros/main'
         )
-        mock_cherry_pick.assert_called_once_with(
-            self.TAST_TESTS_REPO, tast_patch_cl
+        mock_cherry_pick.assert_any_call(
+            self.TAST_TESTS_REPO, tast_patch_cls[0]
+        )
+        mock_cherry_pick.assert_any_call(
+            self.TAST_TESTS_REPO, tast_patch_cls[1]
         )
         mock_checkout_version.assert_not_called()
         mock_reset_hard.assert_not_called()
@@ -131,7 +134,7 @@ class TestAddTastPatchCl(unittest.TestCase):
 
         eval_cros_tast.add_tast_patch_cl(
             self.CHROMEOS_ROOT,
-            tast_patch_cl=tast_patch_cl,
+            tast_patch_cls=[tast_patch_cl],
             tast_revision=tast_revision,
             tast_private_revision=tast_private_revision,
             tast_runtime_revision=tast_runtime_revision,
@@ -175,7 +178,7 @@ class TestAddTastPatchCl(unittest.TestCase):
 
         eval_cros_tast.add_tast_patch_cl(
             self.CHROMEOS_ROOT,
-            tast_patch_cl=None,
+            tast_patch_cls=list(),
             tast_revision=tast_revision,
             tast_private_revision=tast_private_revision,
             tast_runtime_revision=tast_runtime_revision,
@@ -213,7 +216,7 @@ class TestAddTastPatchCl(unittest.TestCase):
         """Test when all revision arguments are explicitly 'main'."""
         eval_cros_tast.add_tast_patch_cl(
             self.CHROMEOS_ROOT,
-            tast_patch_cl=None,
+            tast_patch_cls=list(),
             tast_revision='main',
             tast_private_revision='main',
             tast_runtime_revision='main',
@@ -249,7 +252,7 @@ class TestAddTastPatchCl(unittest.TestCase):
     ):
         """Test when no arguments are provided."""
         eval_cros_tast.add_tast_patch_cl(
-            self.CHROMEOS_ROOT, None, None, None, None
+            self.CHROMEOS_ROOT, list(), None, None, None
         )
         mock_checkout_version.assert_not_called()
         mock_reset_hard.assert_not_called()

@@ -81,6 +81,7 @@ def create_argument_parser():
     )
     parser.add_argument(
         '--tast-patch-cl',
+        action='append',
         help='A gerrit CL to patch the chromiumos/platform/tast-tests repository; ',
     )
     parser.add_argument(
@@ -145,14 +146,14 @@ def create_argument_parser():
 
 def add_tast_patch_cl(
     chromeos_root: str,
-    tast_patch_cl: Optional[str],
+    tast_patch_cls: List[str],
     tast_revision: Optional[str],
     tast_private_revision: Optional[str],
     tast_runtime_revision: Optional[str],
 ):
     # Use 'main' branch code as the base if the patch CL is specified.
     # It's compatible as the previous behavior.
-    if tast_patch_cl:
+    if tast_patch_cls:
         if not tast_runtime_revision:
             tast_runtime_revision = 'main'
         if not tast_private_revision:
@@ -201,8 +202,8 @@ def add_tast_patch_cl(
             git_util.reset_hard(tast_tests_repo)
 
     # Patch the CL to the tast tests repo.
-    if tast_patch_cl:
-        repo_util.cherry_pick(tast_tests_repo, tast_patch_cl)
+    for patch_cl in tast_patch_cls:
+        repo_util.cherry_pick(tast_tests_repo, patch_cl)
 
 
 def prepare_to_run_test(opts):
@@ -212,14 +213,14 @@ def prepare_to_run_test(opts):
         )
 
     if (
-        opts.tast_patch_cl
+        opts.tast_patch_cls
         or opts.tast_revision
         or opts.tast_private_revision
         or opts.tast_runtime_revision
     ):
         add_tast_patch_cl(
             opts.chromeos_root,
-            opts.tast_patch_cl,
+            opts.tast_patch_cls,
             opts.tast_revision,
             opts.tast_private_revision,
             opts.tast_runtime_revision,

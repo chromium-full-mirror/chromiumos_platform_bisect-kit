@@ -57,12 +57,10 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
                 '--metric',
                 self.config.get('metric'),
             ]
-        if self.config.get('tast_patch_cl'):
-            common_eval_cmd += [
-                '--tast-patch-cl',
-                self.config.get('tast_patch_cl'),
-            ]
-            # With tast_patch_cl switch tast harness cmd is redundant
+        if self.config.get('tast_patch_cls'):
+            for patch_cl in self.config.get('tast_patch_cls'):
+                common_eval_cmd += ['--tast-patch-cl', patch_cl]
+            # With tast_patch_cls switch tast harness cmd is redundant
             switch_test_harness_cmd = None
         if self.config.get('tast_revision'):
             common_eval_cmd += [

@@ -392,7 +392,7 @@ class CrosDiagnoser:
             ),
         )
 
-        if self.config.get('tast_patch_cl'):
+        if self.config.get('tast_patch_cls'):
             # Do not switch cros repo to old for custom TAST tests.
             switch_cros_repo_to_old = None
 
@@ -1733,7 +1733,7 @@ class DiagnoseCommandLineBase:
             "term_old": opts.term_old,
             "term_new": opts.term_new,
             "test_name": opts.test_name,
-            "tast_patch_cl": opts.tast_patch_cl,
+            "tast_patch_cls": opts.tast_patch_cl,
             "tast_revision": opts.tast_revision,
             "tast_private_revision": opts.tast_private_revision,
             "tast_runtime_revision": opts.tast_runtime_revision,
@@ -1960,8 +1960,9 @@ class DiagnoseCommandLineBase:
         )
         group.add_argument(
             '--tast-patch-cl',
+            action='append',
             help='A gerrit CL to patch the chromiumos/platform/tast-tests '
-            'repository',
+            'repository. This can be passed multiple times.',
         )
         group.add_argument(
             '--tast-revision',
