@@ -295,6 +295,20 @@ class BuildError(BisectException):
         return ErrorType.Fatal
 
 
+class PatchFetchError(BisectException):
+    """Raised when failed to fetch the given patch to to be applied to the code."""
+
+    def error_type(self) -> str:
+        return ErrorType.Fatal
+
+
+class PatchApplyError(BisectException):
+    """Raised when failed to apply the given patch to the code."""
+
+    def error_type(self) -> str:
+        return ErrorType.Fatal
+
+
 def reconstruct_from_string(
     cls_name: str, error_msg: str
 ) -> BisectException | None:

@@ -341,6 +341,16 @@ def commit_file(
     git(['commit', '-q', '-m', message, path], cwd=git_repo, env=env)
 
 
+def cherry_pick(git_repo: str, rev: str) -> None:
+    """Git cherry-pick.
+
+    Args:
+      git_repo: path of git repo.
+      rev: git commit revision to cherry-pick.
+    """
+    git(['cherry-pick', rev], cwd=git_repo)
+
+
 def config(git_repo: str, *args, **kwargs) -> str:
     """Wrapper of 'git config'.
 

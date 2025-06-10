@@ -492,9 +492,15 @@ class CrosDiagnoser:
                 vm_cros_version=self.cros_old if self.is_vm_board else None,
             )
         )
-        buildbucket_buildable = cros_util.is_buildbucket_buildable(
-            self.config.get('cros_prebuilt_old')
-        )
+        chromium_patch_cls = self.config.get('chromium_patch_cls')
+        if not chromium_patch_cls:
+            buildbucket_buildable = cros_util.is_buildbucket_buildable(
+                self.config.get('cros_prebuilt_old')
+            )
+        else:
+            # Currently only local build supports custom patches to chromium
+            buildbucket_buildable = False
+
         try:
             if self.narrow_down_chrome(
                 self._dut_manager.get(),
@@ -503,6 +509,7 @@ class CrosDiagnoser:
                 buildbucket_build=buildbucket_buildable
                 and self.config.get('enable_buildbucket_chrome'),
                 should_build_with_tests=should_build_chrome_localbuild_with_tests,
+                chromium_patch_cls=chromium_patch_cls,
             ):
                 return
         except errors.DiagnoseContradiction:
@@ -1101,6 +1108,7 @@ class CrosDiagnoser:
         init_once: util.InitOnce | None,
         buildbucket_build: bool = False,
         should_build_with_tests: bool = True,
+        chromium_patch_cls: Optional[list[str]] = None,
     ) -> bool:
         """Bisect with Chrome localbuild.
 
@@ -1162,6 +1170,10 @@ class CrosDiagnoser:
                 switch_cmd.append('--disable-rootfs-verification')
             else:
                 switch_cmd.append('--no-disable-rootfs-verification')
+
+            # Currently only local build supports custom patches to chromium.
+            # This assertion must be true here since the condition should have been checked.
+            assert len(chromium_patch_cls) == 0
         else:
             switch_cmd = [
                 './switch_cros_cr_localbuild_internal.py',
@@ -1183,6 +1195,10 @@ class CrosDiagnoser:
                     switch_cmd.append('--disable-rootfs-verification')
                 else:
                     switch_cmd.append('--no-disable-rootfs-verification')
+
+            if chromium_patch_cls:
+                for cl in chromium_patch_cls:
+                    switch_cmd += ['--chromium-patch-cl', cl]
 
         bisector = wrapper.BisectorWrapper(
             'bisect_cr_localbuild_internal',
@@ -1728,6 +1744,7 @@ class DiagnoseCommandLineBase:
             "cros_prebuilt_new": cros_prebuilt_new,
             "chrome_localbuild_old": chrome_localbuild_old,
             "chrome_localbuild_new": chrome_localbuild_new,
+            "chromium_patch_cls": opts.chromium_patch_cl,
             "android_prebuilt_old": android_prebuilt_old,
             "android_prebuilt_new": android_prebuilt_new,
             "term_old": opts.term_old,
@@ -1873,6 +1890,11 @@ class DiagnoseCommandLineBase:
             type=cli.argtype_dir_path,
             default=os.environ.get('CHROME_MIRROR'),
             help="chrome's gclient cache dir",
+        )
+        group.add_argument(
+            '--chromium-patch-cl',
+            action='append',
+            help='A gerrit CL to patch the chromium/src repository',
         )
 
         group = parser_init.add_argument_group(title='DUT allocation options')

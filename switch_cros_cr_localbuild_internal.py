@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -34,12 +35,15 @@ from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
 from bisect_kit import gclient_util
+from bisect_kit import gerrit_util
 from bisect_kit import git_util
 import switch_cros_localbuild
 import switch_helper
 
 
 logger = logging.getLogger(__name__)
+
+GERRIT_CHROMIUM_PROJECT = "chromium/src"
 
 
 def create_argument_parser():
@@ -88,6 +92,11 @@ def create_argument_parser():
         default=os.environ.get('CHROME_MIRROR', ''),
         help='gclient cache dir',
     )
+    parser.add_argument(
+        '--chromium-patch-cl',
+        action='append',
+        help='A gerrit CL to patch the chromium/src repository',
+    )
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -125,6 +134,39 @@ def create_argument_parser():
     )
     switch_cros_localbuild.add_build_and_deploy_arguments(group)
     return parser
+
+
+def patch_cls(chrome_src: str, chromium_patch_cls: list[str]):
+    base_commit_hash = git_util.get_commit_hash(chrome_src, 'HEAD')
+
+    applied_cls = []
+    for cl in chromium_patch_cls:
+        cl_info = gerrit_util.get_gerrit_cl_info(cl)
+        if not cl_info:
+            raise errors.PatchFetchError(
+                'Failed to download the chromium CL (%s).' % cl
+            )
+
+        if cl_info["project"] != GERRIT_CHROMIUM_PROJECT:
+            continue
+
+        revision_info = cl_info["revisions"].get(
+            cl_info["current_revision"], {}
+        )
+        gerrit_repo_url = revision_info["fetch"]["http"]["url"]
+        gerrit_revision_ref = revision_info["fetch"]["http"]["ref"]
+
+        git_util.fetch(chrome_src, gerrit_repo_url, gerrit_revision_ref)
+
+        try:
+            git_util.cherry_pick(chrome_src, "FETCH_HEAD")
+        except subprocess.CalledProcessError:
+            error_message = 'Failed to apply the chromium CL (%s)' % cl
+            if applied_cls:
+                error_message += ' after %s' % '.'.join(applied_cls)
+            error_message += ' on %s.' % base_commit_hash
+
+            raise errors.PatchApplyError(error_message)
 
 
 def switch_main(args: tuple[str] | None):
@@ -177,6 +219,9 @@ def switch_main(args: tuple[str] | None):
         logger.info('switch source code')
         gclient_util.sync(opts.chrome_root, revision=opts.rev)
         bisect_cr_localbuild_internal.workaround_b378019087(opts.chrome_src)
+
+    if opts.chromium_patch_cl:
+        patch_cls(opts.chrome_src, opts.chromium_patch_cl)
 
     if not opts.no_build:
         # TODO(kcwu): support local patch.

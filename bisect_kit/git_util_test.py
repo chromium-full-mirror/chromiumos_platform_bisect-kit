@@ -486,6 +486,45 @@ class TestGitOperation(unittest.TestCase):
         with open(full_path) as f:
             self.assertEqual(f.read(), 'commit 2')
 
+    def test_cherry_pick(self):
+        # Create a base commit
+        base_commit_msg = 'Base commit'
+        base_content = 'Initial content'
+        self.git.add_commit(
+            '2023-01-01T00:00:00',
+            base_commit_msg,
+            self.git.default_filename,
+            base_content,
+        )
+
+        # Create a new branch and a commit to pick
+        subprocess.check_call(
+            ['git', 'checkout', '-b', 'feature_branch'], cwd=self.git_repo
+        )
+        commit_to_pick_msg = 'Feature commit'
+        commit_to_pick_content = 'Feature content added'
+        commit_to_pick_hash = self.git.add_commit(
+            '2023-01-02T00:00:00',
+            commit_to_pick_msg,
+            'feature_file.txt',
+            commit_to_pick_content,
+        )
+
+        # Switch back to main and cherry-pick
+        subprocess.check_call(['git', 'checkout', 'main'], cwd=self.git_repo)
+        git_util.cherry_pick(self.git_repo, commit_to_pick_hash)
+
+        # Verify the cherry-pick
+        self.assertEqual(
+            git_util.get_file_from_revision(
+                self.git_repo, 'HEAD', 'feature_file.txt'
+            ),
+            commit_to_pick_content,
+        )
+        self.assertIn(
+            commit_to_pick_msg, git_util.get_commit_log(self.git_repo, 'HEAD')
+        )
+
     def test_get_file_from_revision(self):
         path = 'foo'
         time = 1500000000
