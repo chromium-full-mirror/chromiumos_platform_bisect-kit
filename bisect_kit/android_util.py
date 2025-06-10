@@ -15,6 +15,7 @@ Terminology used in this module:
 import json
 import logging
 import os
+import shutil
 import tempfile
 import urllib.request
 
@@ -24,6 +25,7 @@ from bisect_kit import git_util
 from bisect_kit import plugin_util
 from bisect_kit import repo_util
 from bisect_kit import util
+import google.auth.transport.requests
 import google.oauth2.service_account
 import googleapiclient
 import googleapiclient.discovery
@@ -356,12 +358,8 @@ class AndroidInternalApi:
                 'must defined when using Android Api'
             )
         self.credentials = self.get_credentials()
-        self.service = googleapiclient.discovery.build(
-            'androidbuildinternal',
-            'v3',
-            credentials=self.credentials,
-            cache_discovery=False,
-            static_discovery=False,
+        self.session = google.auth.transport.requests.AuthorizedSession(
+            self.credentials
         )
 
     def get_credentials(self):
@@ -376,8 +374,8 @@ class AndroidInternalApi:
         )
         return credentials
 
-    def get_artifact_info(self, build_id, target, name, attempt_id=0):
-        """Get Android build artifact info.
+    def get_artifact_url(self, build_id, target, name, attempt_id=0):
+        """Get Android build artifact URL.
 
         Args:
           build_id: Android build ID.
@@ -386,31 +384,30 @@ class AndroidInternalApi:
           attempt_id: A build attempt. Defaults to 0.
 
         Returns:
-          Artifact info.
+          Artifact download URL.
 
         Raises:
           errors.ExternalError
         """
         try:
-            artifact = (
-                self.service.buildartifact()
-                .get(
-                    buildId=build_id,
-                    target=target,
-                    attemptId=attempt_id,
-                    resourceId=name,
+            resp = self.session.get(
+                (
+                    'https://androidbuild-pa.googleapis.com/v4/builds/'
+                    f'{build_id}/{target}/attempts/{attempt_id}/artifacts/{name}/url'
                 )
-                .execute(num_retries=self._retries)
             )
+            resp.raise_for_status()
+            artifact = resp.json()
         except (googleapiclient.errors.HttpError, httplib2.HttpLib2Error) as e:
             raise errors.ExternalError('Android API error: ' + str(e))
 
-        if artifact is None:
-            raise errors.ExternalError(
-                'Invalid artifact %s/%s/%s/%s'
-                % (build_id, target, attempt_id, name)
-            )
-        return artifact
+        if artifact and 'signedUrl' in artifact:
+            return artifact['signedUrl']
+
+        raise errors.ExternalError(
+            'Invalid artifact %s/%s/%s/%s'
+            % (build_id, target, attempt_id, name)
+        )
 
     def download_artifact(
         self, build_id, target, name, output_file, attempt_id=0
@@ -427,27 +424,13 @@ class AndroidInternalApi:
         Raises:
           errors.ExternalError
         """
-        artifact = self.get_artifact_info(
+        url = self.get_artifact_url(
             build_id, target, name, attempt_id=attempt_id
-        )
-        chunksize = min(int(artifact['size']), self._default_chunk_size)
-
-        download_request = self.service.buildartifact().get_media(
-            buildId=build_id,
-            target=target,
-            attemptId=attempt_id,
-            resourceId=name,
         )
 
         try:
-            with open(output_file, mode='wb') as f:
-                downloader = googleapiclient.http.MediaIoBaseDownload(
-                    f, download_request, chunksize=chunksize
-                )
-                done = False
-                while not done:
-                    _status, done = downloader.next_chunk(
-                        num_retries=self._retries
-                    )
-        except (googleapiclient.errors.HttpError, httplib2.HttpLib2Error) as e:
-            raise errors.ExternalError('Android API error: ' + str(e))
+            with urllib.request.urlopen(url) as resp:
+                with open(output_file, mode='wb') as f:
+                    shutil.copyfileobj(resp, f, length=self._default_chunk_size)
+        except Exception as e:
+            raise errors.ExternalError('Download artifact error: ' + str(e))
