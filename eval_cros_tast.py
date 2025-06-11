@@ -213,14 +213,14 @@ def prepare_to_run_test(opts):
         )
 
     if (
-        opts.tast_patch_cls
+        opts.tast_patch_cl
         or opts.tast_revision
         or opts.tast_private_revision
         or opts.tast_runtime_revision
     ):
         add_tast_patch_cl(
             opts.chromeos_root,
-            opts.tast_patch_cls,
+            opts.tast_patch_cl,
             opts.tast_revision,
             opts.tast_private_revision,
             opts.tast_runtime_revision,
