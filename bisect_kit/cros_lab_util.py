@@ -732,9 +732,9 @@ class AsyncDutLeaser:
 
                 if re.search(r'\bFound \d+ DUT\(s\)', line):
                     async with self._lock:
-                        self._dut_availability_info[
-                            str(dimensions)
-                        ] = line.strip()
+                        self._dut_availability_info[str(dimensions)] = (
+                            line.strip()
+                        )
 
                 if not pending_lease:
                     pending_lease = extract_lease_info(line)

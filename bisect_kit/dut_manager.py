@@ -199,8 +199,9 @@ class DutManager:
         pre_allocated_dut: str | None,
         should_auto_allocate: bool,
         dut_init_func: typing.Callable[[DutManager], None] | None = None,
-        dut_leave_context_check_func: typing.Callable[[DutManager], None]
-        | None = None,
+        dut_leave_context_check_func: (
+            typing.Callable[[DutManager], None] | None
+        ) = None,
         should_force_monitoring: bool = False,
         vm_cros_version: Optional[str] = None,
         is_cros_localbuild_vm: bool = False,
@@ -228,17 +229,17 @@ class DutManager:
         """
         self._name: str = name
         self._states: core.DiagnoseStates | None = states
-        self._dut_allocate_spec: dut_allocate_spec_module.DutAllocateSpec | None = (
-            dut_allocate_spec
-        )
+        self._dut_allocate_spec: (
+            dut_allocate_spec_module.DutAllocateSpec | None
+        ) = dut_allocate_spec
         self._should_auto_allocate: bool = should_auto_allocate
         self._pre_allocated_dut: str | None = None
         if pre_allocated_dut != cros_lab_util.LAB_DUT:
             self._pre_allocated_dut = pre_allocated_dut
         self._dut_init_func: typing.Callable[[str], None] | None = dut_init_func
-        self._dut_leave_context_check_func: typing.Callable[
-            [str], None
-        ] | None = dut_leave_context_check_func
+        self._dut_leave_context_check_func: (
+            typing.Callable[[str], None] | None
+        ) = dut_leave_context_check_func
         self._should_force_monitoring: bool = should_force_monitoring
 
         # DUT allocated by this DutManager, if any.

@@ -131,9 +131,11 @@ def stat_max_creation_time(*args, **kwargs) -> int:
       errors.ExternalError: creation time is not found
     """
     timestamps = [
-        x['create_time_seconds']
-        if 'create_time_seconds' in x
-        else x.get('Creation time')
+        (
+            x['create_time_seconds']
+            if 'create_time_seconds' in x
+            else x.get('Creation time')
+        )
         for x in stat(*args, **kwargs).values()
     ]
     if None in timestamps:

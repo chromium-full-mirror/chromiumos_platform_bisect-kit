@@ -237,7 +237,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.mock_states,
             self.mock_dut_allocate_spec,
             'pre_allocated_dut',
-            True
+            True,
             # dut_init_func and dut_leave_context_check_func are missing.
         )
         with dut_manager.provision() as dut:
@@ -840,7 +840,7 @@ class TestDutManagerAllocation(unittest.TestCase):
                 None,
                 True,
                 should_force_monitoring=False,
-                vm_cros_version='invalid_version'
+                vm_cros_version='invalid_version',
                 # dut_init_func and dut_leave_context_check_func are missing.
             )
 
@@ -855,7 +855,7 @@ class TestDutManagerAllocation(unittest.TestCase):
                 None,
                 True,
                 should_force_monitoring=False,
-                vm_cros_version='R102-19999.0.0-12345'
+                vm_cros_version='R102-19999.0.0-12345',
                 # dut_init_func and dut_leave_context_check_func are missing.
             )
 
@@ -917,7 +917,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             None,
             True,
             should_force_monitoring=False,
-            vm_cros_version='R102-19999.0.0-12345'
+            vm_cros_version='R102-19999.0.0-12345',
             # dut_init_func and dut_leave_context_check_func are missing.
         )
         self.mock_allocate_vm_dut.assert_not_called()

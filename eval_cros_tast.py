@@ -146,7 +146,7 @@ def create_argument_parser():
 
 def add_tast_patch_cl(
     chromeos_root: str,
-    tast_patch_cls: List[str],
+    tast_patch_cls: list[str],
     tast_revision: Optional[str],
     tast_private_revision: Optional[str],
     tast_runtime_revision: Optional[str],

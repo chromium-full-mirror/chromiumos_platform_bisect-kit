@@ -1515,9 +1515,9 @@ class BisectorCommandLine:
             confidence=self.config.get('confidence'),
             observation=self.config.get('noisy'),
             endpoint_verification=self.config.get('endpoint_verification'),
-            saved_states=None
-            if ignore_history
-            else self.states.strategy_states,
+            saved_states=(
+                None if ignore_history else self.states.strategy_states
+            ),
         )
 
     def check_done(self, session: typing.Optional[str] = None) -> bool:

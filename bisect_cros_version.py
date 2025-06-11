@@ -43,9 +43,11 @@ def get_revlist(board, old, new, use_snapshot=False):
     )
     logger.info('full_versions: %s', full_versions)
     short_versions = [
-        v
-        if cros_util.is_cros_snapshot_version(v)
-        else cros_util.version_to_short(v)
+        (
+            v
+            if cros_util.is_cros_snapshot_version(v)
+            else cros_util.version_to_short(v)
+        )
         for v in full_versions
     ]
     logger.info('short_versions: %s', short_versions)

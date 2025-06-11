@@ -209,7 +209,9 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
         """
 
         def __init__(self, states_instance):
-            # Partially initialize, enough for self.config to work via states.
+            super().__init__()
+
+            # Override default None, instead of initializing it in DiagnoseCommandLineBase.main().
             self.states = states_instance
 
         def _build_cmds(self):
@@ -256,19 +258,23 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
                 cros_localbuild_eval_cmd=cros_localbuild_eval_cmd,
             )
 
+        # Defining the mock method for suppressing a pylint error
+        def cmd_run(self, opts):
+            raise NotImplementedError
+
     @mock.patch('bisect_kit.diagnoser_cros.cros_util.is_buildbucket_buildable')
     @mock.patch('bisect_kit.diagnoser_cros.CrosDiagnoser')
     def test_diagnoser_command_line(
         self, MockCrosDiagnoser, mock_is_buildbucket_buildable
     ):
         """Tests that --tast-patch-cl correctly modifies eval commands."""
-        mock_states = mock.Mock(spec=core.DiagnoseStates)
         test_config = {
             'chromeos_root': '/path/to/chromeos',
             'test_name': 'tast.awesome.test',
             'tast_patch_cls': ['12345', '67890'],
         }
-        mock_states.config = test_config
+        mock_states = mock.Mock(spec=core.DiagnoseStates, config=test_config)
+        # mock_states.config = test_config
 
         cli_runner = self.MockableDiagnoseTastLogicCli(mock_states)
         mock_diagnoser_instance = MockCrosDiagnoser.return_value

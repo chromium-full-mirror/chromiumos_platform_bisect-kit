@@ -178,7 +178,7 @@ class TestAddTastPatchCl(unittest.TestCase):
 
         eval_cros_tast.add_tast_patch_cl(
             self.CHROMEOS_ROOT,
-            tast_patch_cls=list(),
+            tast_patch_cls=[],
             tast_revision=tast_revision,
             tast_private_revision=tast_private_revision,
             tast_runtime_revision=tast_runtime_revision,
@@ -216,7 +216,7 @@ class TestAddTastPatchCl(unittest.TestCase):
         """Test when all revision arguments are explicitly 'main'."""
         eval_cros_tast.add_tast_patch_cl(
             self.CHROMEOS_ROOT,
-            tast_patch_cls=list(),
+            tast_patch_cls=[],
             tast_revision='main',
             tast_private_revision='main',
             tast_runtime_revision='main',
@@ -252,7 +252,7 @@ class TestAddTastPatchCl(unittest.TestCase):
     ):
         """Test when no arguments are provided."""
         eval_cros_tast.add_tast_patch_cl(
-            self.CHROMEOS_ROOT, list(), None, None, None
+            self.CHROMEOS_ROOT, [], None, None, None
         )
         mock_checkout_version.assert_not_called()
         mock_reset_hard.assert_not_called()
