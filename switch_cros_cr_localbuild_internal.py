@@ -235,7 +235,6 @@ def switch_main(args: tuple[str] | None):
                         opts.chrome_src,
                         opts.board,
                         opts.with_tests,
-                        force_nacl=True,
                     )
                 out_dir = cr_util.build(
                     opts.chrome_src,

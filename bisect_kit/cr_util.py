@@ -268,7 +268,6 @@ def determine_targets_to_build(
     chrome_src: str,
     board: str,
     with_tests: bool = True,
-    force_nacl: bool = False,
 ):
     out_dir = os.path.join('out_%s' % board, 'Release')
     try:
@@ -303,11 +302,12 @@ def determine_targets_to_build(
         if (
             binary == 'nacl_helper'
             and binary not in available_targets
-            and force_nacl
+            and 'nacl_helper_arm32/nacl_helper' in available_targets
         ):
             result.append(binary)
             logger.warning(
-                'nacl_helper not found in gn ls, force adding it in targets list'
+                '"nacl_helper" not found but "nacl_helper_arm32/nacl_helper" '
+                'in gn ls, force adding "nacl_helper" to targets list'
             )
             continue
         if binary not in available_targets:
@@ -330,7 +330,7 @@ def build(chrome_src, board, targets, with_tests=True):
     """
     if not targets:
         targets = determine_targets_to_build(
-            chrome_src, board, with_tests=with_tests, force_nacl=True
+            chrome_src, board, with_tests=with_tests
         )
 
     logger.info('build %s', targets)
