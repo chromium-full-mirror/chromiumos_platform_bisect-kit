@@ -86,6 +86,8 @@ disable = [
     "too-many-instance-attributes",
     "too-many-lines",
     "too-many-locals",
+    # our code contains a lot of existing functions with many arguments.
+    "too-many-positional-arguments",
     "too-many-public-methods",
     "too-many-return-statements",
     "too-many-statements",
