@@ -160,13 +160,13 @@ def patch_cls(chrome_src: str, chromium_patch_cls: list[str]):
 
         try:
             git_util.cherry_pick(chrome_src, "FETCH_HEAD")
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as exc:
             error_message = 'Failed to apply the chromium CL (%s)' % cl
             if applied_cls:
                 error_message += ' after %s' % '.'.join(applied_cls)
             error_message += ' on %s.' % base_commit_hash
 
-            raise errors.PatchApplyError(error_message)
+            raise errors.PatchApplyError(error_message) from exc
 
 
 def switch_main(args: tuple[str] | None):

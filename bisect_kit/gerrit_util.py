@@ -40,15 +40,17 @@ def get_gerrit_cl_info(change_id: str) -> dict | None:
         with urllib.request.urlopen(req, timeout=30) as response:
             if not (200 <= response.status and response.status < 300):
                 logger.error(
-                    f"HTTP error occurred: {response.status} {response.reason}"
+                    "HTTP error occurred: %d %s",
+                    response.status,
+                    response.reason,
                 )
                 try:
                     error_content = response.read().decode(
                         'utf-8', errors='ignore'
                     )
-                    logger.error(f"Response content: {error_content}")
+                    logger.error("Response content: %s", error_content)
                 except Exception as e:
-                    logger.error(f"Could not read error response body: {e}")
+                    logger.error("Could not read error response body: %s", e)
                 return None
 
             content_bytes = response.read()
@@ -61,27 +63,29 @@ def get_gerrit_cl_info(change_id: str) -> dict | None:
             return cl_info
 
     except urllib.error.HTTPError as http_err:
-        logger.error(f"HTTP error occurred: {http_err.code} {http_err.reason}")
+        logger.error(
+            "HTTP error occurred: %d %s", http_err.code, http_err.reason
+        )
         try:
             error_content = http_err.read().decode('utf-8', errors='ignore')
-            logger.error(f"Response content: {error_content}")
+            logger.error("Response content: %s", error_content)
         except Exception as e:
-            logger.error(f"Could not read error response body: {e}")
+            logger.error("Could not read error response body: %s", e)
     except urllib.error.URLError as url_err:
         if isinstance(url_err.reason, socket.timeout):
-            logger.error(f"Timeout Error: {url_err.reason}")
+            logger.error("Timeout Error: %s", url_err.reason)
         else:
             logger.error(
-                f"URL Error (e.g., connection issue): {url_err.reason}"
+                "URL Error (e.g., connection issue): %s", url_err.reason
             )
     except socket.timeout:
         logger.error("Timeout Error: The request timed out.")
     except json.JSONDecodeError as json_err:
-        logger.error(f"Error decoding JSON response: {json_err}")
+        logger.error("Error decoding JSON response: %s", json_err)
         # content_str must be defined at the timing of json parse.
-        logger.error(f"Response content that failed to parse: {content_str}")
+        logger.error("Response content that failed to parse: %s", content_str)
     except Exception as e:
-        logger.exception(f"An unexpected error occurred: {e}")
+        logger.exception("An unexpected error occurred: %s", e)
 
     return None
 
@@ -99,17 +103,15 @@ def main():
 
     cl_data = get_gerrit_cl_info(cl_number)
 
-    if cl_data:
-        print(json.dumps(cl_data, indent=4))
-        return 0
-    else:
+    if not cl_data:
         sys.stderr.write(
             "Failed to retrieve CL information.",
         )
         return 1
 
+    print(json.dumps(cl_data, indent=4))
+    return 0
+
 
 if __name__ == "__main__":
-    import sys
-
     sys.exit(main())

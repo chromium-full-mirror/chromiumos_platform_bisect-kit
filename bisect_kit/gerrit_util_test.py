@@ -8,7 +8,6 @@
 import io
 import json
 import logging
-import socket
 import unittest
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -19,6 +18,7 @@ from bisect_kit import gerrit_util
 
 
 class TestGerritUtil(unittest.TestCase):
+    """Tests for gerrit_util.py."""
 
     def setUp(self):
         self.logger_to_test = logging.getLogger(gerrit_util.__name__)

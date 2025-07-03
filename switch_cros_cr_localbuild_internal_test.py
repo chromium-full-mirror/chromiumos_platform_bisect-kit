@@ -15,6 +15,10 @@ import switch_cros_cr_localbuild_internal
 
 
 class TestPatchCls(unittest.TestCase):
+    """
+    Tests for the patch_cls function in
+    switch_cros_cr_localbuild_internal.py.
+    """
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()

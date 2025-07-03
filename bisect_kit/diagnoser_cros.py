@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import sys
+from typing import Optional
 
 from bisect_kit import android_util
 from bisect_kit import bisector_cli
