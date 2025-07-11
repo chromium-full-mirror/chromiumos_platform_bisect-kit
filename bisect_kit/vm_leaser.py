@@ -28,10 +28,12 @@ logger = logging.getLogger(__name__)
 VMLEASER_DEFAULT_PROJECT = 'google.com:crosperf-dev'
 VMLEASER_DEFAULT_NETWORK = 'global/networks/default'
 VMLEASER_DEFAULT_MACHINE_TYPE = 'n2-standard-4'
-VMLEASER_DEFAULT_DISK_SIZE = 20
 VMLEASER_DEFAULT_REGION = 'us-central1-a'
 VMLEASER_PROD_SERVER = 'vmleaser.api.cr.dev:443'
 VM_DEFAULT_IMAGE_CLOUD_PROJECT = 'chromeos-gce-tests'
+
+# 22 GB (betty-arc-t image size as of July 2025) + 5GB (buffer).
+VMLEASER_DEFAULT_DISK_SIZE = 27
 
 MAX_RETRIES = 25
 RETRY_PERIOD_SECONDS = 15
