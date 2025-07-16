@@ -356,11 +356,20 @@ class DutManager:
 
         Raises:
             subprocess.CalledProcessError: If path not exists.
+            errors.ExecutionFatalError: If an image for given board and version
+                not exists.
         """
         if not self._is_cros_localbuild_vm:
-            return cros_util.search_image(
+            images = cros_util.search_image(
                 self.dut_allocate_spec.boards[0], self._vm_cros_version
-            )[cros_util.ImageType.VM_IMAGE]
+            )
+
+            if cros_util.ImageType.VM_IMAGE not in images:
+                raise errors.ExecutionFatalError(
+                    'No VM image for %s (%s) found'
+                    % (self.dut_allocate_spec.boards[0], self._vm_cros_version)
+                )
+            return images[cros_util.ImageType.VM_IMAGE]
 
         # TODO(zjchang): Currently it's not possible for build script to pass
         # gs path to dut_manager. We should have a way to communicate between
