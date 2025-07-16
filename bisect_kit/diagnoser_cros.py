@@ -301,9 +301,7 @@ class CrosDiagnoser:
                 self.dut_allocate_spec,
                 self.pre_allocated_dut,
                 self.is_stateless,
-                vm_cros_version=(
-                    self.config.get('old') if self.is_vm_board else None
-                ),
+                vm_cros_version=self.cros_old if self.is_vm_board else None,
             )
         )
         if not self.config.get('board') or not self.config.get(
@@ -341,7 +339,7 @@ class CrosDiagnoser:
         if not is_custom_eval and not is_autotest:
             # So far only the `release` images support the `--prebuilt` option
             if cros_util.has_release_prebuilt(
-                self.config.get('board'), self.config.get('old')
+                self.config.get('board'), self.cros_old
             ):
                 cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + ['--prebuilt']
             else:

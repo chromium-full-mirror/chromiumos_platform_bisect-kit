@@ -268,10 +268,17 @@ class DutManager:
             assert not should_force_monitoring
             # Currently only allow one board input for VM bisection.
             assert len(self.dut_allocate_spec.boards) == 1
-            assert (
-                self._vm_cros_version is None
-                or cros_util.is_cros_or_snapshot_version(self._vm_cros_version)
-            )
+
+            if (
+                self._vm_cros_version is not None
+                and not cros_util.is_cros_or_snapshot_version(
+                    self._vm_cros_version
+                )
+            ):
+                raise errors.ArgumentError(
+                    '--base-cros-version',
+                    'No CrOS image of "%s" found' % self._vm_cros_version,
+                )
         else:
             assert self._vm_cros_version is None
             assert not self._is_cros_localbuild_vm
