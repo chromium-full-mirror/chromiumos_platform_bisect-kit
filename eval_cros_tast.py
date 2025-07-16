@@ -212,15 +212,18 @@ def prepare_to_run_test(opts):
             opts.dut, force_reboot_callback=cros_lab_util.reboot_via_servo
         )
 
+    # opts.tast_patch_cl can be None.
+    tast_patch_cls = opts.tast_patch_cl or []
+
     if (
-        opts.tast_patch_cl
+        tast_patch_cls
         or opts.tast_revision
         or opts.tast_private_revision
         or opts.tast_runtime_revision
     ):
         add_tast_patch_cl(
             opts.chromeos_root,
-            opts.tast_patch_cl,
+            tast_patch_cls,
             opts.tast_revision,
             opts.tast_private_revision,
             opts.tast_runtime_revision,
