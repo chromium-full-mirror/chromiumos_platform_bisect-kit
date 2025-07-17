@@ -216,12 +216,13 @@ def switch_main(args: tuple[str] | None):
     # If chrome_src is not a git root, force sync code to have a chrome
     # checkout even if no_sync_code is set.
     if not opts.no_sync_code or not git_util.is_git_root(opts.chrome_src):
-        logger.info('switch source code')
+        logger.info('switch source code to %s', opts.rev)
         gclient_util.sync(opts.chrome_root, revision=opts.rev)
         bisect_cr_localbuild_internal.workaround_b378019087(opts.chrome_src)
 
-    if opts.chromium_patch_cl:
-        patch_cls(opts.chrome_src, opts.chromium_patch_cl)
+        if opts.chromium_patch_cl:
+            logger.info('patching the custom CLs: %s', opts.chromium_patch_cl)
+            patch_cls(opts.chrome_src, opts.chromium_patch_cl)
 
     if not opts.no_build:
         # TODO(kcwu): support local patch.

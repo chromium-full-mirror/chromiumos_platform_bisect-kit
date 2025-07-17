@@ -3,12 +3,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import os
 import subprocess
 import tempfile
 import unittest
 from unittest import mock
 
+# import bisect_cr_localbuild_internal
 from bisect_kit import errors
+from bisect_kit import gclient_util
 from bisect_kit import gerrit_util
 from bisect_kit import git_util
 import switch_cros_cr_localbuild_internal
@@ -169,6 +172,149 @@ class TestPatchCls(unittest.TestCase):
         mock_cherry_pick.assert_called_once_with(
             self.chrome_src_path, "FETCH_HEAD"
         )
+
+
+class TestSwitchMain(unittest.TestCase):
+    """
+    Tests for the switch_main function in
+    switch_cros_cr_localbuild_internal.py.
+    """
+
+    def setUp(self):
+        self.CHROME_REVISION = '123456abcdef'
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.chrome_root = os.path.join(self.temp_dir.name, 'chrome')
+        self.chrome_src = os.path.join(self.chrome_root, 'src')
+        self.chrome_mirror = os.path.join(self.temp_dir.name, 'chrome_mirror')
+        os.makedirs(self.chrome_src)
+        os.makedirs(self.chrome_mirror)
+        git_util.init(self.chrome_src)
+        git_util.commit_file(self.chrome_src, "TESTFILE", "MESSAGE", "CONTENT")
+
+        self.common_args = [
+            # revision
+            self.CHROME_REVISION,
+            '--target',
+            'eve',
+            '--board',
+            'eve',
+            '--board-cpu-arch',
+            'amd64',
+            '--chrome-root',
+            self.chrome_root,
+            '--chrome-mirror',
+            self.chrome_mirror,
+        ]
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    @mock.patch(
+        'switch_cros_cr_localbuild_internal.cache_util.BuildArtifactsCache'
+    )
+    @mock.patch.object(switch_cros_cr_localbuild_internal, 'patch_cls')
+    @mock.patch.object(gclient_util, 'sync')
+    def test_sync_called(
+        self,
+        mock_sync,
+        mock_patch_cls,
+        mock_build_artifacts_cache,
+    ):
+        """Tests that sync is called when sync is enabled."""
+        args = self.common_args + [
+            '--sync-code-only',
+        ]
+
+        # Simulate the cache doesn't hit.
+        mock_build_artifacts_cache.return_value.cache_hit.return_value = False
+
+        switch_cros_cr_localbuild_internal.switch_main(args)
+
+        mock_sync.assert_called_once()
+        mock_patch_cls.assert_not_called()
+
+    @mock.patch(
+        'switch_cros_cr_localbuild_internal.cache_util.BuildArtifactsCache'
+    )
+    @mock.patch.object(switch_cros_cr_localbuild_internal, 'patch_cls')
+    @mock.patch.object(gclient_util, 'sync')
+    def test_sync_not_called(
+        self,
+        mock_sync,
+        mock_patch_cls,
+        mock_build_artifacts_cache,
+    ):
+        """Tests that sync and patch_cls are not called when sync is disabled."""
+        CL_NUMBER = "12345"
+        args = self.common_args + [
+            '--chromium-patch-cl',
+            CL_NUMBER,
+            '--no-sync-code',
+            '--no-deploy',
+            '--no-build',
+            '--allow-no-ops',
+        ]
+        # Simulate the cache doesn't hit.
+        mock_build_artifacts_cache.return_value.cache_hit.return_value = False
+
+        switch_cros_cr_localbuild_internal.switch_main(args)
+
+        mock_sync.assert_not_called()
+        mock_patch_cls.assert_not_called()
+
+    @mock.patch(
+        'switch_cros_cr_localbuild_internal.cache_util.BuildArtifactsCache'
+    )
+    @mock.patch.object(switch_cros_cr_localbuild_internal, 'patch_cls')
+    @mock.patch.object(gclient_util, 'sync')
+    def test_sync_not_called_with_cache(
+        self,
+        mock_sync,
+        mock_patch_cls,
+        mock_build_artifacts_cache,
+    ):
+        """Tests that sync and patch_cls are not called when the code is cached."""
+        CL_NUMBER = "12345"
+        args = self.common_args + [
+            '--chromium-patch-cl',
+            CL_NUMBER,
+            '--sync-code-only',
+        ]
+
+        # Simulate the cache hits.
+        mock_build_artifacts_cache.return_value.cache_hit.return_value = True
+
+        switch_cros_cr_localbuild_internal.switch_main(args)
+
+        mock_sync.assert_not_called()
+        mock_patch_cls.assert_not_called()
+
+    @mock.patch(
+        'switch_cros_cr_localbuild_internal.cache_util.BuildArtifactsCache'
+    )
+    @mock.patch.object(switch_cros_cr_localbuild_internal, 'patch_cls')
+    @mock.patch.object(gclient_util, 'sync')
+    def test_patch_cl_called(
+        self,
+        mock_sync,
+        mock_patch_cls,
+        mock_build_artifacts_cache,
+    ):
+        """Tests that patch_cls is called when --chromium-patch-cl is provided."""
+        CL_NUMBER = "12345"
+        args = self.common_args + [
+            '--chromium-patch-cl',
+            CL_NUMBER,
+            '--sync-code-only',
+        ]
+
+        # Simulate the cache doesn't hit.
+        mock_build_artifacts_cache.return_value.cache_hit.return_value = False
+
+        switch_cros_cr_localbuild_internal.switch_main(args)
+
+        mock_sync.assert_called_once()
+        mock_patch_cls.assert_called_once_with(self.chrome_src, [CL_NUMBER])
 
 
 if __name__ == '__main__':

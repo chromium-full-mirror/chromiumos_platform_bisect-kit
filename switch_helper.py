@@ -77,6 +77,12 @@ def common_local_build_flags() -> cli.ArgumentParser:
         default=os.environ.get('DEPLOY_ONLY') == 'true',
         help='deploy only. Shorthand for --no-sync-code and --no-build',
     )
+    # Allow no operation without raising an exception. It's for testing.
+    shortcut_group.add_argument(
+        '--allow-no-ops',
+        action='store_true',
+        help=argparse.SUPPRESS,
+    )
     return parser
 
 
@@ -127,7 +133,12 @@ def post_init_local_build_flags(opts: argparse.Namespace):
     # Cleanup the namespace since this flag is only a shortahnd.
     delattr(opts, 'deploy_only')
 
-    if opts.no_sync_code and opts.no_build and opts.no_deploy:
+    if (
+        opts.no_sync_code
+        and opts.no_build
+        and opts.no_deploy
+        and not opts.allow_no_ops
+    ):
         raise errors.ArgumentError(
             '--no-sync-code, --no-build, --no-deploy',
             'All three of them are True, nothing to do?',
