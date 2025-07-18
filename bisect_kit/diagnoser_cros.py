@@ -113,8 +113,15 @@ class CrosDiagnoser:
         self.is_stateless = not self.pre_allocated_dut
         logger.info('is_stateless: %s', self.is_stateless)
 
-        self.cros_old: str = ''
-        self.cros_new: str = ''
+        if self.config.get('bisect_chrome') or self.config.get(
+            'bisect_android'
+        ):
+            assert self.config.get('base_cros_version')
+            self.cros_old = self.cros_new = self.config.get('base_cros_version')
+        else:
+            self.cros_old = self.config.get('cros_prebuilt_old')
+            self.cros_new = self.config.get('cros_prebuilt_new')
+
         self.old_info: cros_util.VersionInfo = cros_util.VersionInfo()
         self.new_info: cros_util.VersionInfo = cros_util.VersionInfo()
 
@@ -561,20 +568,16 @@ class CrosDiagnoser:
             self.make_decision(
                 'The ChromeOS prebuilt bisection is bypassed since --bisect-chrome is on'
             )
-            self.cros_old = self.cros_new = self.config.get('base_cros_version')
         elif self.config.get('bisect_android'):
             self.make_decision(
                 'The ChromeOS prebuilt bisection is bypassed since --bisect-android is on'
             )
-            self.cros_old = self.cros_new = self.config.get('base_cros_version')
         elif self.config.get('bypass_chromeos_prebuilt'):
             self.make_decision(
                 'The bisection with ChromeOS prebuilt image is bypassed; '
                 'assume that old ChromeOS has old behavior and '
                 'new ChromeOS has new behavior'
             )
-            self.cros_old = old
-            self.cros_new = new
         else:
             self.states.add_history(
                 'bisect',
