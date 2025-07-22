@@ -245,10 +245,7 @@ class TestSwitchMain(unittest.TestCase):
         mock_build_artifacts_cache,
     ):
         """Tests that sync and patch_cls are not called when sync is disabled."""
-        CL_NUMBER = "12345"
         args = self.common_args + [
-            '--chromium-patch-cl',
-            CL_NUMBER,
             '--no-sync-code',
             '--no-deploy',
             '--no-build',
@@ -274,10 +271,7 @@ class TestSwitchMain(unittest.TestCase):
         mock_build_artifacts_cache,
     ):
         """Tests that sync and patch_cls are not called when the code is cached."""
-        CL_NUMBER = "12345"
         args = self.common_args + [
-            '--chromium-patch-cl',
-            CL_NUMBER,
             '--sync-code-only',
         ]
 
@@ -308,8 +302,8 @@ class TestSwitchMain(unittest.TestCase):
             '--sync-code-only',
         ]
 
-        # Simulate the cache doesn't hit.
-        mock_build_artifacts_cache.return_value.cache_hit.return_value = False
+        # Cache should not be used with a custom chromium CL.
+        mock_build_artifacts_cache.assert_not_called()
 
         switch_cros_cr_localbuild_internal.switch_main(args)
 

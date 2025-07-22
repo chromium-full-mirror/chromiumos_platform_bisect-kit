@@ -199,14 +199,16 @@ def switch_main(args: tuple[str] | None):
     )
 
     chrome_cache = None
-    # If build exists in cache, shortcut it.
-    if opts.deploy_method == 'chrome_deploy':
+    # On chrome_deploy mode, if no custom patch is specified, enable the
+    # caching of the chrome binaries.
+    if opts.deploy_method == 'chrome_deploy' and not opts.chromium_patch_cl:
         chrome_cache = cache_util.BuildArtifactsCache(
             cache_util.BuildArtifactsCache.BuildType.CHROME,
             opts.board,
             opts.rev,
             opts.target,
         )
+
         chrome_cache_hit = chrome_cache.cache_hit()
         if chrome_cache_hit:
             logger.info('Got a chrome cache hit. No need to sync and build.')
@@ -225,9 +227,8 @@ def switch_main(args: tuple[str] | None):
             patch_cls(opts.chrome_src, opts.chromium_patch_cl)
 
     if not opts.no_build:
-        # TODO(kcwu): support local patch.
         if opts.deploy_method == 'chrome_deploy':
-            if chrome_cache.cache_hit():
+            if chrome_cache and chrome_cache.cache_hit():
                 logger.info('No need to build chrome. Found %s', chrome_cache)
             else:
                 targets = opts.target
@@ -243,7 +244,9 @@ def switch_main(args: tuple[str] | None):
                     targets,
                     opts.with_tests,
                 )
-                if out_dir:
+
+                # Upload the binaries to the cache.
+                if out_dir and chrome_cache:
                     with tempfile.TemporaryDirectory() as staging_dir:
                         cr_util.deploy_to_staging_dir(
                             opts.chrome_src,
@@ -258,7 +261,7 @@ def switch_main(args: tuple[str] | None):
 
     if not opts.no_deploy:
         if opts.deploy_method == 'chrome_deploy':
-            if chrome_cache.cache_hit():
+            if chrome_cache and chrome_cache.cache_hit():
                 with chrome_cache.get() as out_dir:
                     cr_util.deploy(
                         opts.chrome_src,
