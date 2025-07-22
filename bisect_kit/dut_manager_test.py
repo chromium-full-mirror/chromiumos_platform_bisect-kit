@@ -825,14 +825,14 @@ class TestDutManagerAllocation(unittest.TestCase):
             should_force_monitoring=False,
             # dut_init_func and dut_leave_context_check_func are missing.
         )
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(errors.ArgumentError):
             with dut_manager.provision(vm_cros_version='invalid_version'):
                 pass
 
     def test_init_invalid_vm_cros_version(self):
         # The init version format is invalid.
         self.mock_is_vm.return_value = True
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(errors.ArgumentError):
             _dut_manager = dut_manager_module.DutManager(
                 'VM',
                 self.mock_states,

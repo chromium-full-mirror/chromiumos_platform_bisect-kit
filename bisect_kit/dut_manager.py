@@ -609,7 +609,12 @@ class DutManager:
                 yield None
                 return
             if vm_cros_version:
-                assert cros_util.is_cros_or_snapshot_version(vm_cros_version)
+                if not cros_util.is_cros_or_snapshot_version(vm_cros_version):
+                    raise errors.ArgumentError(
+                        '--base-cros-version',
+                        'No CrOS VM image of "%s" found' % vm_cros_version,
+                    )
+
                 self._vm_cros_version = vm_cros_version
         else:
             assert vm_cros_version is None
