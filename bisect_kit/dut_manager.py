@@ -266,8 +266,14 @@ class DutManager:
         self._is_cros_localbuild_vm = is_cros_localbuild_vm
         if self.is_vm:
             assert not should_force_monitoring
+
             # Currently only allow one board input for VM bisection.
-            assert len(self.dut_allocate_spec.boards) == 1
+            if len(self.dut_allocate_spec.boards) != 1:
+                raise errors.ArgumentError(
+                    '--base-cros-version',
+                    'Multiple boards (%s) including VM specified. Please specify only one board for VM.'
+                    % ", ".join(self.dut_allocate_spec.boards),
+                )
 
             if (
                 self._vm_cros_version is not None
@@ -293,9 +299,13 @@ class DutManager:
 
     @property
     def is_vm(self):
+        """Check if it should initiate the VM bisection, instead of the real-DUT bisection."""
         if not self.dut_allocate_spec or not self.dut_allocate_spec.boards:
             return False
-        return cros_util.is_vm_board(self.dut_allocate_spec.boards[0])
+        return any(
+            cros_util.is_vm_board(board)
+            for board in self.dut_allocate_spec.boards
+        )
 
     def is_previous_dut(self):
         logger.info(
