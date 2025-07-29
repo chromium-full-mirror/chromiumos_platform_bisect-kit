@@ -141,6 +141,8 @@ def lease_vm(
             'gce_disk_size': VMLEASER_DEFAULT_DISK_SIZE,
         },
     }
+    logger.info('Leasing a VM: %s', json.dumps(content))
+
     response = json.loads(grpc(VMLEASER_PROD_SERVER, method, content))
     assert response['leaseId']
     assert response['vm']['address']['host']
