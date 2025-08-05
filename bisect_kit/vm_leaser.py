@@ -145,8 +145,24 @@ def lease_vm(
 
     response = json.loads(grpc(VMLEASER_PROD_SERVER, method, content))
     assert response['leaseId']
+    lease_id = response['leaseId']
+
+    for _ in range(0, MAX_RETRIES):
+        if 'host' in response['vm']['address']:
+            break
+
+        logger.info(
+            'Imcomplete result on leasing a VMs. Retrying in %d sec',
+            RETRY_PERIOD_SECONDS,
+        )
+        time.sleep(RETRY_PERIOD_SECONDS)
+
+        response = json.loads(grpc(VMLEASER_PROD_SERVER, method, content))
+        assert response['leaseId'] == lease_id
+
     assert response['vm']['address']['host']
     assert response['vm']['gceRegion']
+
     result = VMLeaseResult(
         lease_id=response['leaseId'],
         private_host=response['vm']['address']['host'],
@@ -157,6 +173,7 @@ def lease_vm(
         gce_image_name=inserted_image,
     )
     result.public_host = get_vm_public_ip(result)
+    logger.info('Leased a VM: %s in %s.', result.public_host, result.gce_region)
     return result
 
 
