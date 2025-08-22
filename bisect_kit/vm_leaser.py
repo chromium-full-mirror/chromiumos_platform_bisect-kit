@@ -32,9 +32,6 @@ VMLEASER_DEFAULT_REGION = 'us-central1-a'
 VMLEASER_PROD_SERVER = 'vmleaser.api.cr.dev:443'
 VM_DEFAULT_IMAGE_CLOUD_PROJECT = 'chromeos-gce-tests'
 
-# 22 GB (betty-arc-t image size as of July 2025) + 5GB (buffer).
-VMLEASER_DEFAULT_DISK_SIZE = 27
-
 MAX_RETRIES = 25
 RETRY_PERIOD_SECONDS = 15
 
@@ -50,6 +47,24 @@ class VMLeaseResult:
     gce_region: str
     gce_image_project: str
     gce_image_name: str
+
+
+def _get_disk_size(board: str) -> int:
+    """Return the VM disk size to create in GiB per the given board.
+
+    These values are as of 2025-08-22 to run all the tast tests,
+    from https://chromium.googlesource.com/infra/infra/+/11f04943f680b0710fa2fa2a8b7d3e4ec63368eb/go/src/infra/cros/cmd/cros_test_runner/internal/executors/cros_vm_provision_executor.go#354
+    """
+
+    if "betty" in board:
+        # 47GiB is more than 50GB, which is required by bruschetta tests.
+        return 47
+    if "reven-vmtest" in board:
+        return 20
+    if "amd64-generic" in board:
+        return 26
+
+    return 13
 
 
 def get_default_credential() -> service_account.Credentials:
@@ -138,7 +153,7 @@ def lease_vm(
             'gce_region': VMLEASER_DEFAULT_REGION,
             'gce_network': VMLEASER_DEFAULT_NETWORK,
             'gce_machine_type': VMLEASER_DEFAULT_MACHINE_TYPE,
-            'gce_disk_size': VMLEASER_DEFAULT_DISK_SIZE,
+            'gce_disk_size': _get_disk_size(board),
         },
     }
     logger.info('Leasing a VM: %s', json.dumps(content))
@@ -152,7 +167,7 @@ def lease_vm(
             break
 
         logger.info(
-            'Imcomplete result on leasing a VMs. Retrying in %d sec',
+            'Incomplete result on leasing a VMs. Retrying in %d sec',
             RETRY_PERIOD_SECONDS,
         )
         time.sleep(RETRY_PERIOD_SECONDS)
