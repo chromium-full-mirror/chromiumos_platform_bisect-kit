@@ -232,6 +232,8 @@ def call(*args, timeout: float | None = None, **kwargs) -> int:
     return p.wait(timeout=timeout)
 
 
+# Suppressing the`deprecated warning, because AnyStr is deprecated on Python 3.13+
+# pylint: disable=deprecated-attribute
 def _check_output(
     *args,
     timeout: float | None = None,
