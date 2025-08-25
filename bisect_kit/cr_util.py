@@ -14,6 +14,7 @@ import tempfile
 import time
 import urllib.request
 
+from bisect_kit import chromite_util
 from bisect_kit import errors
 from bisect_kit import git_util
 from bisect_kit import locking
@@ -260,7 +261,9 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
 
     cmd = prefix + ['--'] + list(args)
 
-    return util.check_output(*cmd, cwd=chrome_src, env=env, timeout=timeout)
+    return chromite_util.check_output(
+        *cmd, cwd=chrome_src, env=env, timeout=timeout
+    )
 
 
 def determine_targets_to_build(

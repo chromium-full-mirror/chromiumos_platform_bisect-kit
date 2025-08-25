@@ -37,6 +37,7 @@ import urllib.parse
 
 import bisect_kit
 from bisect_kit import buildbucket_util
+from bisect_kit import chromite_util
 from bisect_kit import codechange
 from bisect_kit import core
 from bisect_kit import errors
@@ -1146,7 +1147,7 @@ def list_board_names(chromeos_root):
     cros_list_overlays = os.path.join(
         chromeos_root, 'chromite/bin/cros_list_overlays'
     )
-    overlays = util.check_output(cros_list_overlays).splitlines()
+    overlays = chromite_util.check_output(cros_list_overlays).splitlines()
     result = set()
     for overlay in overlays:
         conf_file = os.path.join(overlay, 'metadata', 'layout.conf')
@@ -1836,7 +1837,7 @@ def cros_flash(
         args.append('--disable-rootfs-verification')
 
     try:
-        util.check_output('cros', 'flash', *args, cwd=chromeos_root)
+        chromite_util.check_output('cros', 'flash', *args, cwd=chromeos_root)
         wait_kernel_ready(host)
     except subprocess.CalledProcessError as e:
         raise errors.ExternalError('cros flash failed') from e
@@ -2200,7 +2201,7 @@ def cros_sdk(
     # the command we are interested.
     cmd = prefix + ['true']
     try:
-        util.check_call(*cmd, cwd=chromeos_root)
+        chromite_util.check_call(*cmd, cwd=chromeos_root)
     except subprocess.CalledProcessError:
         logger.exception('cros_sdk init/update failed')
         raise
@@ -2210,7 +2211,7 @@ def cros_sdk(
     cmd = prefix + list(args)
     if forward_host:
         with util.forward_ssh(forward_host, FORWARDED_DUT_PORT):
-            return util.check_output(
+            return chromite_util.check_output(
                 *cmd,
                 cwd=chromeos_root,
                 log_stdout=log_stdout,
@@ -2218,7 +2219,7 @@ def cros_sdk(
                 stderr_callback=stderr_callback,
             )
     else:
-        return util.check_output(
+        return chromite_util.check_output(
             *cmd,
             cwd=chromeos_root,
             log_stdout=log_stdout,
