@@ -154,7 +154,9 @@ def switch_main(args: tuple[str] | None):
                 opts.chrome_src,
                 opts.board,
                 opts.target,
-                opts.with_tests,
+                # TODO(b/441146529): Implement public board bisection support.
+                is_public_build=False,
+                with_tests=opts.with_tests,
             )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.build(opts)
@@ -167,7 +169,9 @@ def switch_main(args: tuple[str] | None):
                 opts.board,
                 opts.dut,
                 opts.target,
-                opts.with_tests,
+                # TODO(b/441146529): Implement public board bisection support.
+                is_public_build=False,
+                with_tests=opts.with_tests,
             )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.deploy(opts)

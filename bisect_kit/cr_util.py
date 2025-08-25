@@ -216,22 +216,34 @@ def query_git_rev(chrome_src, rev):
     raise ValueError('unknown rev format: %s' % rev)
 
 
-def simple_chrome_shell(chrome_src, board, *args, **kwargs):
-    """Run commands inside chrome-sdk shell.
+def _simple_chrome_shell(
+    chrome_src: str,
+    board: str,
+    command: list[str],
+    is_public_build: bool = False,
+    env: dict[str, str] | None = None,
+    timeout: int | None = None,
+) -> str:
+    """Runs a command inside the chrome-sdk shell.
+
+    This is a wrapper around `cros chrome-sdk`.
 
     Args:
-      chrome_src: git repo path of chrome/src
-      board: ChromeOS board name
-      *args: command to run
-      **kwargs:
-        env: (dict) environment variables for the command
+      chrome_src: Git repo path of chrome/src.
+      board: ChromeOS board name.
+      command: Command to run inside the shell.
+      is_public_build: Whether this is a public build.
+      env: Environment variables for the command.
+      timeout: Timeout in seconds for the command.
     """
     prefix = [
         'cros',
         'chrome-sdk',
         '--board=%s' % board,
     ]
-    if kwargs.get('internal'):
+    if is_public_build:
+        prefix.append('--use-external-config')
+    else:
         prefix.append('--internal')
 
     prefix.append('--use-remoteexec')
@@ -246,7 +258,7 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
             ) and util.is_version_lesseq(lkgm_version, '14309.0.0'):
                 prefix += ['--version', '14284.0.0']
 
-    env = kwargs.get('env', os.environ).copy()
+    env = (env if env is not None else os.environ).copy()
 
     # This work around http://crbug.com/658104, which depot_tool can't find GN
     # path correctly.
@@ -257,9 +269,7 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
     # Add the environment variables for reproxy
     env.update(get_RBE_environment_variables())
 
-    timeout = kwargs.get('timeout')
-
-    cmd = prefix + ['--'] + list(args)
+    cmd = prefix + ['--'] + list(command)
 
     return chromite_util.check_output(
         *cmd, cwd=chrome_src, env=env, timeout=timeout
@@ -269,19 +279,23 @@ def simple_chrome_shell(chrome_src, board, *args, **kwargs):
 def determine_targets_to_build(
     chrome_src: str,
     board: str,
+    is_public_build: bool,
     with_tests: bool = True,
 ):
+    logger.info('is_public_build %s', is_public_build)
     out_dir = os.path.join('out_%s' % board, 'Release')
     try:
-        available_targets = simple_chrome_shell(
+        available_targets = _simple_chrome_shell(
             chrome_src,
             board,
-            'buildtools/linux64/gn',
-            'ls',
-            '--type=executable',
-            '--as=output',
-            out_dir,
-            internal=True,
+            command=[
+                'buildtools/linux64/gn',
+                'ls',
+                '--type=executable',
+                '--as=output',
+                out_dir,
+            ],
+            is_public_build=is_public_build,
         ).splitlines()
     except subprocess.CalledProcessError as e:
         raise errors.BuildError(
@@ -318,21 +332,31 @@ def determine_targets_to_build(
     return result
 
 
-def build(chrome_src, board, targets, with_tests=True):
+def build(
+    chrome_src: str,
+    board: str,
+    targets: list[str],
+    is_public_build: bool,
+    with_tests: bool = True,
+) -> str:
     """Build Chrome binaries.
 
     Args:
-      chrome_src: git repo path of chrome/src
-      board: ChromeOS board name
-      targets: ninja targets. Default to build chrome.
-      with_tests: build test binaries as well if targets is not specified
+      chrome_src: git repo path of chrome/src.
+      board: ChromeOS board name.
+      targets: ninja targets. If empty, targets are determined automatically.
+      is_public_build: Whether this is a public build.
+      with_tests: Build test binaries as well if targets is not specified.
 
     Returns:
       The output directory of the build.
     """
     if not targets:
         targets = determine_targets_to_build(
-            chrome_src, board, with_tests=with_tests
+            chrome_src,
+            board,
+            is_public_build=is_public_build,
+            with_tests=with_tests,
         )
 
     logger.info('build %s', targets)
@@ -343,8 +367,12 @@ def build(chrome_src, board, targets, with_tests=True):
         # the process in case it gets deadlocked. b/369498616
         timeout = 3 * 60 * 60
         try:
-            simple_chrome_shell(
-                chrome_src, board, *cmd, internal=True, timeout=timeout
+            _simple_chrome_shell(
+                chrome_src,
+                board,
+                command=cmd,
+                is_public_build=is_public_build,
+                timeout=timeout,
             )
         except subprocess.CalledProcessError:
             logger.warning('build failed, delete out directory and retry again')
@@ -353,8 +381,12 @@ def build(chrome_src, board, targets, with_tests=True):
             time.sleep(10)
             shutil.rmtree(os.path.join(chrome_src, out_dir))
             try:
-                simple_chrome_shell(
-                    chrome_src, board, *cmd, internal=True, timeout=timeout
+                _simple_chrome_shell(
+                    chrome_src,
+                    board,
+                    command=cmd,
+                    is_public_build=is_public_build,
+                    timeout=timeout,
                 )
             except subprocess.CalledProcessError as e:
                 raise errors.BuildError('failed to build chrome') from e
@@ -362,7 +394,14 @@ def build(chrome_src, board, targets, with_tests=True):
     return os.path.join(chrome_src, out_dir)
 
 
-def deploy_to_staging_dir(chrome_src, board, targets, out_dir, staging_dir):
+def deploy_to_staging_dir(
+    chrome_src: str,
+    board: str,
+    targets: list[str],
+    is_public_build: bool,
+    out_dir: str,
+    staging_dir: str,
+) -> None:
     """Deploy Chrome binaries to the specified staging directory.
 
     Args:
@@ -383,7 +422,9 @@ def deploy_to_staging_dir(chrome_src, board, targets, out_dir, staging_dir):
             staging_dir,
             '--staging-only',
         ]
-        simple_chrome_shell(chrome_src, board, *cmd, internal=True)
+        _simple_chrome_shell(
+            chrome_src, board, command=cmd, is_public_build=is_public_build
+        )
     # Deploy test binaries to the staging dir if needed.
     test_binaries = set(CHROME_TEST_BINARIES).intersection(targets)
     for target in test_binaries:
@@ -396,16 +437,25 @@ def deploy_to_staging_dir(chrome_src, board, targets, out_dir, staging_dir):
         os.chmod(dest, stat.st_mode | 0o001)
 
 
-def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
+def deploy(
+    chrome_src: str,
+    board: str,
+    dut: str,
+    targets: list[str],
+    is_public_build: bool,
+    with_tests: bool = True,
+    out_dir: str | None = None,
+) -> None:
     """Deploy Chrome binaries.
 
     Args:
-      chrome_src: git repo path of chrome/src
-      board: ChromeOS board name
-      dut: DUT address
-      targets: ninja targets. Default to deploy any target found in out_dir.
-      with_tests: build test binaries as well if targets is not specified
-      out_dir: optional output dir from which to deploy binaries.
+      chrome_src: git repo path of chrome/src.
+      board: ChromeOS board name.
+      dut: DUT address.
+      targets: ninja targets. If empty, deploys any target found in out_dir.
+      is_public_build: Whether this is a public build.
+      with_tests: Deploy test binaries as well.
+      out_dir: Optional output dir from which to deploy binaries.
     """
     if not targets:
         targets = os.listdir(out_dir)
@@ -425,7 +475,9 @@ def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
             dut,
         ]
         try:
-            simple_chrome_shell(chrome_src, board, *cmd, internal=True)
+            _simple_chrome_shell(
+                chrome_src, board, command=cmd, is_public_build=is_public_build
+            )
         except subprocess.CalledProcessError as e:
             raise errors.ExternalError('chrome deploy failed') from e
 
@@ -435,7 +487,12 @@ def deploy(chrome_src, board, dut, targets, with_tests=True, out_dir=None):
         with tempfile.TemporaryDirectory() as staging_dir:
             # Deploy test binaries to the staging directory.
             deploy_to_staging_dir(
-                chrome_src, board, test_binaries, out_dir, staging_dir
+                chrome_src,
+                board,
+                test_binaries,
+                is_public_build=is_public_build,
+                out_dir=out_dir,
+                staging_dir=staging_dir,
             )
             try:
                 autotest_test_binary_path = (

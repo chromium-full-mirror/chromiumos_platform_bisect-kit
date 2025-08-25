@@ -8,6 +8,7 @@ import os
 import tempfile
 import textwrap
 import unittest
+from unittest import mock
 
 from bisect_kit import cr_util
 from bisect_kit import gclient_util
@@ -272,6 +273,52 @@ class TestCrUtil(unittest.TestCase):
                     },
                 },
             )
+
+
+class SimpleChromeShellTest(unittest.TestCase):
+    """Test simple_chrome_shell function."""
+
+    @mock.patch('bisect_kit.util.check_output')
+    def test_simple_chrome_shell_internal(self, mock_check_output):
+        # pylint: disable=protected-access
+        cr_util._simple_chrome_shell(
+            '/path/to/chrome',
+            'board_name',
+            command=['build', 'chrome'],
+            is_public_build=False,
+        )
+        mock_check_output.assert_called_once()
+        call_args, _ = mock_check_output.call_args
+        self.assertIn('--internal', call_args)
+        self.assertNotIn('--use-external-config', call_args)
+
+    @mock.patch('bisect_kit.util.check_output')
+    def test_simple_chrome_shell_public(self, mock_check_output):
+        # pylint: disable=protected-access
+        cr_util._simple_chrome_shell(
+            '/path/to/chrome',
+            'board_name',
+            command=['build', 'chrome'],
+            is_public_build=True,
+        )
+        mock_check_output.assert_called_once()
+        call_args, _ = mock_check_output.call_args
+        self.assertNotIn('--internal', call_args)
+        self.assertIn('--use-external-config', call_args)
+
+    @mock.patch('bisect_kit.util.check_output')
+    def test_simple_chrome_shell_kwargs_internal(self, mock_check_output):
+        # pylint: disable=protected-access
+        cr_util._simple_chrome_shell(
+            '/path/to/chrome',
+            'board_name',
+            command=['build', 'chrome'],
+            is_public_build=False,
+        )
+        mock_check_output.assert_called_once()
+        call_args, _ = mock_check_output.call_args
+        self.assertIn('--internal', call_args)
+        self.assertNotIn('--use-external-config', call_args)
 
 
 if __name__ == '__main__':
