@@ -76,7 +76,12 @@ def create_argument_parser():
 def switch(opts, board, version, dut):
     logger.info('Unpack autotest packages for %s %s', board, version)
     if cros_util.is_cros_version(version):
-        gs_build_path = cros_util.query_prebuilt_gs_path(board, version)
+        gs_build_path = cros_util.query_prebuilt_gs_path(
+            board,
+            version,
+            # TODO(b/441146529): Implement public board bisection support.
+            is_public_build=False,
+        )
     else:
         gs_path = cros_util.query_dut_lsb_release(dut).get(
             'CHROMEOS_RELEASE_BUILDER_PATH'

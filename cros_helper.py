@@ -26,7 +26,12 @@ logger = logging.getLogger(__name__)
 
 def cmd_version_info(opts):
     info = dataclasses.asdict(
-        cros_util.query_version_info(opts.board, opts.version)
+        cros_util.query_version_info(
+            opts.board,
+            opts.versio,
+            # TODO(b/441146529): Implement public board bisection support.
+            is_public_build=False,
+        )
     )
     if opts.name:
         if opts.name not in info:

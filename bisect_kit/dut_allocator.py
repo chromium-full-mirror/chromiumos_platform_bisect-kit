@@ -257,7 +257,13 @@ class DutAllocator:
             versions = spec.version_hints
             for builder in spec.builder_hints:
                 if not all(
-                    cros_util.has_test_image(builder, v) for v in versions
+                    cros_util.has_test_image(
+                        builder,
+                        v,
+                        # TODO(b/441146529): Implement public board bisection support.
+                        is_public_build=False,
+                    )
+                    for v in versions
                 ):
                     logger.warning(
                         'builder=%s does not have prebuilt test image for %s, ignore',

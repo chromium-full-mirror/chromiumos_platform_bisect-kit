@@ -69,6 +69,22 @@ def _fake_version_to_full(_board, version, spec_manager=None):
     return 'R63-' + version
 
 
+def _fake_gs_util_ls_for_public_build(*args, **kwargs):
+    archive_base = 'gs://chromiumos-image-archive/foo-public/'
+    gs_files = [
+        archive_base + 'R100-10000.0.0/chromiumos_test_image.tar.xz',
+        archive_base + 'R100-10001.0.0/chromiumos_test_image.tar.xz',
+    ]
+    assert len(args) == 1
+    result = []
+    for gs_path in gs_files:
+        if fnmatch.fnmatchcase(gs_path, args[0]):
+            result.append(gs_path)
+        elif fnmatch.fnmatchcase(gs_path, args[0] + '*/'):
+            result.append(gs_path)
+    return result
+
+
 class TestCrosUtil(unittest.TestCase):
     """Test cros_util functions."""
 
@@ -303,31 +319,43 @@ class TestCrosUtil(unittest.TestCase):
             return []
 
         with mock.patch.object(gs_util, 'ls', fake_gs_util_ls):
-            gs_path = cros_util.query_prebuilt_gs_path('samus', 'R64-10123.0.0')
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'samus', 'R64-10123.0.0', is_public_build=False
+            )
             self.assertEqual(
                 gs_path,
                 'gs://chromeos-image-archive/samus-release/R64-10123.0.0',
             )
-            gs_path = cros_util.query_prebuilt_gs_path('samus', '10123.0.0')
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'samus', '10123.0.0', is_public_build=False
+            )
             self.assertEqual(
                 gs_path,
                 'gs://chromeos-image-archive/samus-release/R64-10123.0.0',
             )
 
-            gs_path = cros_util.query_prebuilt_gs_path('samus', 'R64-10123.5.0')
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'samus', 'R64-10123.5.0', is_public_build=False
+            )
             self.assertEqual(
                 gs_path,
                 'gs://chromeos-image-archive/samus-factory/R64-10123.5.0',
             )
-            gs_path = cros_util.query_prebuilt_gs_path('samus', '10123.5.0')
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'samus', '10123.5.0', is_public_build=False
+            )
             self.assertEqual(
                 gs_path,
                 'gs://chromeos-image-archive/samus-factory/R64-10123.5.0',
             )
 
-            gs_path = cros_util.query_prebuilt_gs_path('foo', 'R64-10123.5.0')
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'foo', 'R64-10123.5.0', is_public_build=False
+            )
             self.assertEqual(gs_path, '')
-            gs_path = cros_util.query_prebuilt_gs_path('samus', '10123.6.0')
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'samus', '10123.6.0', is_public_build=False
+            )
             self.assertEqual(gs_path, '')
 
     def test_has_release_prebuilt(self):
@@ -350,20 +378,30 @@ class TestCrosUtil(unittest.TestCase):
 
         with mock.patch.object(gs_util, 'ls', fake_gs_util_ls):
             self.assertTrue(
-                cros_util.has_release_prebuilt('samus', 'R64-10123.0.0')
+                cros_util.has_release_prebuilt(
+                    'samus', 'R64-10123.0.0', is_public_build=False
+                )
             )
             self.assertTrue(
-                cros_util.has_release_prebuilt('samus', '10123.0.0')
+                cros_util.has_release_prebuilt(
+                    'samus', '10123.0.0', is_public_build=False
+                )
             )
 
             self.assertFalse(
-                cros_util.has_release_prebuilt('samus', 'R65-10123.0.0')
+                cros_util.has_release_prebuilt(
+                    'samus', 'R65-10123.0.0', is_public_build=False
+                )
             )
             self.assertFalse(
-                cros_util.has_release_prebuilt('samus', 'R64-10123.5.0')
+                cros_util.has_release_prebuilt(
+                    'samus', 'R64-10123.5.0', is_public_build=False
+                )
             )
             self.assertFalse(
-                cros_util.has_release_prebuilt('samus', '10123.5.0')
+                cros_util.has_release_prebuilt(
+                    'samus', '10123.5.0', is_public_build=False
+                )
             )
 
     def test_query_milestone_by_version(self):
@@ -462,7 +500,9 @@ class TestCrosUtil(unittest.TestCase):
             'fetch_buildbucket_version_info',
             return_value=cros_util.VersionInfo(),
         ):
-            info = cros_util.query_version_info('caroline', 'R89-13664.0.0')
+            info = cros_util.query_version_info(
+                'caroline', 'R89-13664.0.0', is_public_build=False
+            )
             self.assertEqual(
                 cros_util.VersionInfo(
                     buildbucket_id=8860981718532549296,
@@ -503,7 +543,9 @@ class TestCrosUtil(unittest.TestCase):
             'fetch_buildbucket_version_info',
             return_value=cros_util.VersionInfo(),
         ):
-            info = cros_util.query_version_info('stronbad', 'R115-15452.0.0')
+            info = cros_util.query_version_info(
+                'stronbad', 'R115-15452.0.0', is_public_build=False
+            )
             self.assertEqual(
                 cros_util.VersionInfo(
                     buildbucket_id=8781974877551968897,
@@ -528,7 +570,7 @@ class TestCrosUtil(unittest.TestCase):
         # Both ends are in gs://chromeos-image-archive
         self.assertEqual(
             cros_util.list_chromeos_prebuilt_versions(
-                'foo', '9998.0.0', '10001.0.0'
+                'foo', '9998.0.0', '10001.0.0', is_public_build=False
             ),
             (
                 [
@@ -574,7 +616,11 @@ class TestCrosUtil(unittest.TestCase):
         # snapshot 1: release ~ release
         self.assertEqual(
             cros_util.list_chromeos_prebuilt_versions(
-                'foo', 'R63-9995.0.0', 'R63-9997.0.0', use_snapshot=True
+                'foo',
+                'R63-9995.0.0',
+                'R63-9997.0.0',
+                is_public_build=False,
+                use_snapshot=True,
             ),
             (
                 [
@@ -607,7 +653,11 @@ class TestCrosUtil(unittest.TestCase):
 
         self.assertEqual(
             cros_util.list_chromeos_prebuilt_versions(
-                'foo', 'R63-9996.0.0', 'R63-9998.0.0', use_snapshot=True
+                'foo',
+                'R63-9996.0.0',
+                'R63-9998.0.0',
+                is_public_build=False,
+                use_snapshot=True,
             )[0],
             [
                 'R63-9996.0.0-30103',
@@ -620,21 +670,33 @@ class TestCrosUtil(unittest.TestCase):
         # snapshot 2: release ~ snapshot or snapshot ~ release
         self.assertEqual(
             cros_util.list_chromeos_prebuilt_versions(
-                'foo', 'R63-9995.0.0-30100', 'R63-9997.0.0', use_snapshot=True
+                'foo',
+                'R63-9995.0.0-30100',
+                'R63-9997.0.0',
+                is_public_build=False,
+                use_snapshot=True,
             )[0],
             ['R63-9996.0.0-30103', 'R63-9997.0.0'],
         )
 
         self.assertEqual(
             cros_util.list_chromeos_prebuilt_versions(
-                'foo', 'R63-9995.0.0-30103', 'R63-9997.0.0', use_snapshot=True
+                'foo',
+                'R63-9995.0.0-30103',
+                'R63-9997.0.0',
+                is_public_build=False,
+                use_snapshot=True,
             )[0],
             ['R63-9996.0.0-30103', 'R63-9997.0.0'],
         )
 
         self.assertEqual(
             cros_util.list_chromeos_prebuilt_versions(
-                'foo', 'R63-9995.0.0', 'R63-9997.0.0-30104', use_snapshot=True
+                'foo',
+                'R63-9995.0.0',
+                'R63-9997.0.0-30104',
+                is_public_build=False,
+                use_snapshot=True,
             )[0],
             [
                 'R63-9995.0.0',
@@ -647,7 +709,11 @@ class TestCrosUtil(unittest.TestCase):
         # snapshot 3: branch case
         self.assertEqual(
             cros_util.list_chromeos_prebuilt_versions(
-                'foo', 'R63-9998.0.0', 'R63-9999.1.0', use_snapshot=True
+                'foo',
+                'R63-9998.0.0',
+                'R63-9999.1.0',
+                is_public_build=False,
+                use_snapshot=True,
             )[0],
             [
                 'R63-9998.0.0',
@@ -660,7 +726,11 @@ class TestCrosUtil(unittest.TestCase):
 
         self.assertEqual(
             cros_util.list_chromeos_prebuilt_versions(
-                'foo', 'R63-9998.0.0', 'R63-10000.0.0', use_snapshot=True
+                'foo',
+                'R63-9998.0.0',
+                'R63-10000.0.0',
+                is_public_build=False,
+                use_snapshot=True,
             )[0],
             [
                 'R63-9998.0.0',
@@ -677,17 +747,43 @@ class TestCrosUtil(unittest.TestCase):
         )
         self.assertDictEqual(
             info,
-            {'board': 'foo', 'bucket': 'release', 'version': 'R63-10001.0.0'},
+            {
+                'gcp_bucket': 'chromeos-image-archive',
+                'board': 'foo',
+                'bucket': 'release',
+                'version': 'R63-10001.0.0',
+            },
         )
         info = cros_util.extract_info_from_prebuilt_gs_path(
             'gs://chromeos-image-archive/bar-factory/R71-10082.30.0/chromiumos_test_image.tar.xz'
         )
         self.assertDictEqual(
             info,
-            {'board': 'bar', 'bucket': 'factory', 'version': 'R71-10082.30.0'},
+            {
+                'gcp_bucket': 'chromeos-image-archive',
+                'board': 'bar',
+                'bucket': 'factory',
+                'version': 'R71-10082.30.0',
+            },
         )
         info = cros_util.extract_info_from_prebuilt_gs_path(
             'gs://chromeos-image-archive/bar-factory/R71-10082.30.0'
+        )
+        self.assertDictEqual(info, {})
+        info = cros_util.extract_info_from_prebuilt_gs_path(
+            'gs://chromiumos-image-archive/hoge-public/R141-12345.30.0/chromiumos_test_image.tar.xz'
+        )
+        self.assertDictEqual(
+            info,
+            {
+                'gcp_bucket': 'chromiumos-image-archive',
+                'board': 'hoge',
+                'bucket': 'public',
+                'version': 'R141-12345.30.0',
+            },
+        )
+        info = cros_util.extract_info_from_prebuilt_gs_path(
+            'gs://chromeos-image-archive/hoge-public/R141-12345.30.0'
         )
         self.assertDictEqual(info, {})
 
@@ -1103,6 +1199,73 @@ class TestCrosUtil(unittest.TestCase):
 
         mock_ssh_cmd.side_effect = ['3e']
         self.assertEqual(cros_util.query_dut_cpu_arch('x86_64_dut'), 'x86_64')
+
+    def test_query_prebuilt_gs_path_public(self):
+        def fake_gs_util_ls(*args, **kwargs):
+            logger.debug('fake_gs_util_ls %r %r', args, kwargs)
+            if args in [
+                (
+                    '-d',
+                    'gs://chromiumos-image-archive/samus-public/R100-12345.0.0',
+                ),
+                (
+                    '-d',
+                    'gs://chromiumos-image-archive/samus-public/R*-12345.0.0',
+                ),
+            ]:
+                return [
+                    'gs://chromiumos-image-archive/samus-public/R100-12345.0.0/'
+                ]
+            return []
+
+        with mock.patch.object(gs_util, 'ls', fake_gs_util_ls):
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'samus', 'R100-12345.0.0', is_public_build=True
+            )
+            self.assertEqual(
+                gs_path,
+                'gs://chromiumos-image-archive/samus-public/R100-12345.0.0',
+            )
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'samus', '12345.0.0', is_public_build=True
+            )
+            self.assertEqual(
+                gs_path,
+                'gs://chromiumos-image-archive/samus-public/R100-12345.0.0',
+            )
+            gs_path = cros_util.query_prebuilt_gs_path(
+                'foo', 'R100-12345.0.0', is_public_build=True
+            )
+            self.assertEqual(gs_path, '')
+
+    def test_has_release_prebuilt_public(self):
+        def fake_gs_util_ls(*args, **kwargs):
+            return []
+
+        with mock.patch.object(gs_util, 'ls', fake_gs_util_ls):
+            self.assertFalse(
+                cros_util.has_release_prebuilt(
+                    'samus', 'R100-12345.0.0', is_public_build=True
+                )
+            )
+
+    @mock.patch(
+        'bisect_kit.cros_util.version_to_full',
+        lambda _, v, **kwargs: f'R100-{v}',
+    )
+    def test_list_chromeos_prebuilt_versions_public(self):
+        with mock.patch(
+            'bisect_kit.gs_util.ls', _fake_gs_util_ls_for_public_build
+        ):
+            (
+                versions,
+                details,
+            ) = cros_util.list_chromeos_prebuilt_versions(
+                'foo', '10000.0.0', '10001.0.0', is_public_build=True
+            )
+            self.assertEqual(versions, ['R100-10000.0.0', 'R100-10001.0.0'])
+            self.assertIn('R100-10000.0.0', details)
+            self.assertIn('R100-10001.0.0', details)
 
 
 if __name__ == '__main__':

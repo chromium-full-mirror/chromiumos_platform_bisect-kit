@@ -81,7 +81,12 @@ def switch(opts):
         if states.load_states():
             cros_util.SnapshotStore.init_with_state(states)
     # TODO(kcwu): clear cache of cros flash
-    image_info = cros_util.search_image(opts.board, opts.version)
+    image_info = cros_util.search_image(
+        opts.board,
+        opts.version,
+        # TODO(b/441146529): Implement public board bisection support.
+        is_public_build=False,
+    )
     if not image_info:
         raise errors.ExecutionFatalError(
             'no images available for %s %s' % (opts.board, opts.version)
@@ -92,6 +97,8 @@ def switch(opts):
         opts.dut,
         opts.board,
         image_info,
+        # TODO(b/441146529): Implement public board bisection support.
+        is_public_build=False,
         version=opts.version,
         clobber_stateful=opts.clobber_stateful,
         disable_rootfs_verification=opts.disable_rootfs_verification,

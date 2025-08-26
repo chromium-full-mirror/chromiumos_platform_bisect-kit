@@ -371,7 +371,10 @@ class DutManager:
         """
         if not self._is_cros_localbuild_vm:
             images = cros_util.search_image(
-                self.dut_allocate_spec.boards[0], self._vm_cros_version
+                self.dut_allocate_spec.boards[0],
+                self._vm_cros_version,
+                # TODO(b/441146529): Implement public board bisection support.
+                is_public_build=False,
             )
 
             if cros_util.ImageType.VM_IMAGE not in images:

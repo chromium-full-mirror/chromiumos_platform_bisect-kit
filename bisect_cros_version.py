@@ -39,7 +39,12 @@ def get_revlist(board, old, new, use_snapshot=False):
     logger.info('get_revlist %s %s %s', board, old, new)
     logger.info('use_snapshot: %s', use_snapshot)
     full_versions, details = cros_util.list_chromeos_prebuilt_versions(
-        board, old, new, use_snapshot=use_snapshot
+        board,
+        old,
+        new,
+        use_snapshot=use_snapshot,
+        # TODO(b/441146529): Implement public board bisection support.
+        is_public_build=False,
     )
     logger.info('full_versions: %s', full_versions)
     short_versions = [
@@ -115,11 +120,21 @@ class ChromeOSVersionDomain(core.BisectDomain):
             assert cros_util.is_dut(opts.dut)
         if not opts.board:
             opts.board = cros_util.query_dut_board(opts.dut)
-        if not cros_util.has_test_image(opts.board, opts.old):
+        if not cros_util.has_test_image(
+            opts.board,
+            opts.old,
+            # TODO(b/441146529): Implement public board bisection support.
+            is_public_build=False,
+        ):
             raise errors.ArgumentError(
                 '--old', '%s has no image for %s' % (opts.board, opts.old)
             )
-        if not cros_util.has_test_image(opts.board, opts.new):
+        if not cros_util.has_test_image(
+            opts.board,
+            opts.new,
+            # TODO(b/441146529): Implement public board bisection support.
+            is_public_build=False,
+        ):
             raise errors.ArgumentError(
                 '--new', '%s has no image for %s' % (opts.board, opts.new)
             )

@@ -1301,7 +1301,12 @@ def reflash_dut(
         cros_full_version = cros_util.version_to_full(
             dut_board, cros_short_version
         )
-        image_info = cros_util.search_image(dut_board, cros_short_version)
+        image_info = cros_util.search_image(
+            dut_board,
+            cros_short_version,
+            # TODO(b/441146529): Implement public board bisection support.
+            is_public_build=False,
+        )
     except (subprocess.CalledProcessError, errors.SshConnectionError):
         logger.exception('Failed to get DUT information')
         return False
@@ -1312,7 +1317,9 @@ def reflash_dut(
             dut,
             dut_board,
             image_info,
-            cros_full_version,
+            # TODO(b/441146529): Implement public board bisection support.
+            is_public_build=False,
+            version=cros_full_version,
             disable_rootfs_verification=disable_rootfs_verification,
         )
     except errors.ExternalError:

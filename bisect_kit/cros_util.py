@@ -61,11 +61,14 @@ PATTERN_CROS_SHORT_VERSION = re.compile(rf'^{RE_CROS_SHORT_VERSION}$')
 PATTERN_CROS_FULL_VERSION = re.compile(rf'^{RE_CROS_FULL_VERSION}$')
 PATTERN_CROS_SNAPSHOT_VERSION = re.compile(rf'^{RE_CROS_SNAPSHOT_VERSION}$')
 
-gs_archive_base = 'gs://chromeos-image-archive/'
-gs_archive_path = 'gs://chromeos-image-archive/{board}-{bucket}/{version}'
-release_bucket = 'release'
-factory_bucket = 'factory'
-prebuilt_image_buckets = [release_bucket, factory_bucket]
+GCP_BUCKET_INTERNAL = 'chromeos-image-archive'
+GCP_BUCKET_PUBLIC = 'chromiumos-image-archive'
+GS_ARCHIVE_BASE = 'gs://{gcp_bucket}/'
+GS_ARCHIVE_PATH = 'gs://{gcp_bucket}/{board}-{bucket}/{version}'
+RELEASE_BUCKET = 'release'
+FACTORY_BUCKET = 'factory'
+PREBUILT_IMAGE_BUCKETS_INTERNAL = [RELEASE_BUCKET, FACTORY_BUCKET]
+PREBUILT_IMAGE_BUCKETS_PUBLIC = ['public']
 
 # only fetches manifest from gs when milestone >= 92
 gs_manifest_cutoff_milestone = 92
@@ -348,7 +351,7 @@ class SnapshotStore:
 
     @classmethod
     def query_snapshot_version_by_id(
-        cls, board: str, snapshot_id: str
+        cls, board: str, snapshot_id: str, is_public_build: bool
     ) -> str | None:
         """Given a snapshot id, return its corresponding snapshot version."""
         for snapshot_version in cls.images:
@@ -368,7 +371,12 @@ class SnapshotStore:
             snapshot_buckets,
         )
         for bucket in snapshot_buckets:
-            gs_path = gs_archive_path.format(
+            gs_path = GS_ARCHIVE_PATH.format(
+                gcp_bucket=(
+                    GCP_BUCKET_PUBLIC
+                    if is_public_build
+                    else GCP_BUCKET_INTERNAL
+                ),
                 board=board,
                 bucket=bucket,
                 snapshot_id=snapshot_id,
@@ -1038,14 +1046,16 @@ def should_fetch_release_manifest_from_gs(version: str) -> bool:
 def _iter_valid_prebuilt_gs_path(
     board: str,
     version: str,
+    is_public_build: bool,
     buckets: list[str] | None = None,
 ) -> typing.Iterator[str]:
-    """Iterate the valid paths of prebuilt images on `gs_archive_path`.
+    """Iterate the valid paths of prebuilt images on `GS_ARCHIVE_PATH`.
 
     Args:
       board: The board name of the ChromeOS prebuilt image.
       version: The version of the ChromeOS prebuilt image. Both long version and
         short version are acceptable.
+      is_public_build: whether to iterate public image archive.
       buckets: A list of bucket name to search. The default value is
         `prebuilt_image_buckets`.
 
@@ -1056,12 +1066,21 @@ def _iter_valid_prebuilt_gs_path(
       `"gs://chromeos-image-archive/samus-release/R64-10123.0.0"`
     """
     if buckets is None:
-        buckets = prebuilt_image_buckets
+        buckets = (
+            PREBUILT_IMAGE_BUCKETS_PUBLIC
+            if is_public_build
+            else PREBUILT_IMAGE_BUCKETS_INTERNAL
+        )
     if is_cros_short_version(version):
         version = f'R*-{version}'
     for bucket in buckets:
-        path = gs_archive_path.format(
-            board=board, bucket=bucket, version=version
+        path = GS_ARCHIVE_PATH.format(
+            gcp_bucket=(
+                GCP_BUCKET_PUBLIC if is_public_build else GCP_BUCKET_INTERNAL
+            ),
+            board=board,
+            bucket=bucket,
+            version=version,
         )
         for gs_path in gs_util.ls('-d', path, ignore_errors=True):
             yield gs_path.rstrip('/')
@@ -1070,9 +1089,10 @@ def _iter_valid_prebuilt_gs_path(
 def query_prebuilt_gs_path(
     board: str,
     version: str,
+    is_public_build: bool,
     buckets: list[str] | None = None,
 ) -> str:
-    """Query the first valid path of prebuilt image on `gs_archive_path`.
+    """Query the first valid path of prebuilt image on `GS_ARCHIVE_PATH`.
 
     Args:
       board: The board name of the ChromeOS prebuilt image.
@@ -1086,13 +1106,21 @@ def query_prebuilt_gs_path(
       `buckets`.  An empty string `''` if there is no valid prebuilt path.
     """
     if buckets is None:
-        buckets = prebuilt_image_buckets
-    for archive_path in _iter_valid_prebuilt_gs_path(board, version, buckets):
+        buckets = (
+            PREBUILT_IMAGE_BUCKETS_PUBLIC
+            if is_public_build
+            else PREBUILT_IMAGE_BUCKETS_INTERNAL
+        )
+    for archive_path in _iter_valid_prebuilt_gs_path(
+        board, version, is_public_build, buckets
+    ):
         return archive_path
     return ''
 
 
-def has_release_prebuilt(board: str, version: str) -> bool:
+def has_release_prebuilt(
+    board: str, version: str, is_public_build: bool
+) -> bool:
     """Determine if the prebuilt image exist in the release bucket.
 
     Args:
@@ -1103,7 +1131,11 @@ def has_release_prebuilt(board: str, version: str) -> bool:
     Returns:
       True for there exists a prebuilt in the release bucket. False otherwise.
     """
-    return bool(query_prebuilt_gs_path(board, version, [release_bucket]))
+    return bool(
+        query_prebuilt_gs_path(
+            board, version, is_public_build, [RELEASE_BUCKET]
+        )
+    )
 
 
 def query_milestone_by_version(
@@ -1126,7 +1158,15 @@ def query_milestone_by_version(
         info = spec_manager.lookup_chromeos_version(short_version)
         if info:
             return info.chrome_branch
-    for archive_path in _iter_valid_prebuilt_gs_path(board, short_version):
+
+    # Use the internal builds to look up the milestone.
+    for archive_path in _iter_valid_prebuilt_gs_path(
+        board,
+        short_version,
+        # Use the internal builds to look up the chrome version, since both
+        # builds should have the same chrome version.
+        is_public_build=False,
+    ):
         if m := re.search(r'/R(?P<milestone>\d+)-', archive_path):
             return m.group('milestone')
 
@@ -1231,7 +1271,12 @@ def version_to_full(
 
 
 def _find_files_from_image_archive(
-    board: str, buckets: list[str], filenames: list[str], old: str, new: str
+    board: str,
+    buckets: list[str],
+    filenames: list[str],
+    old: str,
+    new: str,
+    is_public_build: bool,
 ) -> list[tuple[str, str]]:
     assert is_cros_full_version(old) or is_cros_snapshot_version(old)
     assert is_cros_full_version(new) or is_cros_snapshot_version(new)
@@ -1264,7 +1309,12 @@ def _find_files_from_image_archive(
             for version_prefix in version_prefixes:
                 for filename in filenames:
                     gs_path = (
-                        gs_archive_path.format(
+                        GS_ARCHIVE_PATH.format(
+                            gcp_bucket=(
+                                GCP_BUCKET_PUBLIC
+                                if is_public_build
+                                else GCP_BUCKET_INTERNAL
+                            ),
                             board=board,
                             bucket=bucket,
                             version=version_prefix + '*',
@@ -1335,8 +1385,8 @@ def is_bad_snapshot_to_ignore(version):
     return False
 
 
-def list_prebuilt_from_image_archive(
-    board: str, old: str, new: str, use_snapshot: bool
+def _list_prebuilt_from_image_archive(
+    board: str, old: str, new: str, is_public_build: bool, use_snapshot: bool
 ) -> list[tuple[str, ImageInfo]]:
     """Lists ChromeOS prebuilt image available from gs://chromeos-image-archive.
 
@@ -1367,12 +1417,18 @@ def list_prebuilt_from_image_archive(
             sample_partition_filename,
         ]
 
+    prebuilt_image_buckets = (
+        PREBUILT_IMAGE_BUCKETS_PUBLIC
+        if is_public_build
+        else PREBUILT_IMAGE_BUCKETS_INTERNAL
+    )
     files = _find_files_from_image_archive(
         board,
         prebuilt_image_buckets,
         files_to_find,
         old,
         new,
+        is_public_build=is_public_build,
     )
     if use_snapshot:
         files += _find_files_from_image_archive(
@@ -1381,6 +1437,7 @@ def list_prebuilt_from_image_archive(
             files_to_find_snapshot,
             old,
             new,
+            is_public_build=is_public_build,
         )
     logger.debug('Found prebuilt image files: %s', files)
 
@@ -1399,6 +1456,7 @@ def list_chromeos_prebuilt_versions(
     board: str,
     old: str,
     new: str,
+    is_public_build: bool,
     use_snapshot: bool = False,
     spec_manager: typing.Optional[ChromeOSSpecManager] = None,
 ) -> tuple[list[str], dict[str, typing.Any]]:
@@ -1423,8 +1481,12 @@ def list_chromeos_prebuilt_versions(
     if is_cros_short_version(new):
         new = version_to_full(board, new, spec_manager=spec_manager)
 
-    prebuilt_images = list_prebuilt_from_image_archive(
-        board, old, new, use_snapshot=use_snapshot
+    prebuilt_images = _list_prebuilt_from_image_archive(
+        board,
+        old,
+        new,
+        is_public_build=is_public_build,
+        use_snapshot=use_snapshot,
     )
     logger.debug('prebuilt_images: %s', prebuilt_images)
 
@@ -1445,8 +1507,11 @@ def list_chromeos_prebuilt_versions(
     return versions, details
 
 
-def prepare_image_for_quick_provision(image_info):
+def _prepare_image_for_quick_provision(image_info, is_public_build):
     path = image_info.get(ImageType.PARTITION_IMAGE)
+    gs_archive_base = GS_ARCHIVE_BASE.format(
+        gcp_bucket=GCP_BUCKET_PUBLIC if is_public_build else GCP_BUCKET_INTERNAL
+    )
     if path and path.startswith(gs_archive_base):
         return urllib.parse.urlparse(path).path[1:]
 
@@ -1474,9 +1539,13 @@ def extract_info_from_prebuilt_gs_path(gs_path) -> dict:
       the given prebuilt path is invalid.
     """
     # TODO(acewu): Pre-compile all the regex patterns
+    gcp_bucket_pattern = '|'.join([GCP_BUCKET_PUBLIC, GCP_BUCKET_INTERNAL])
+    prebuilt_image_buckets = (
+        PREBUILT_IMAGE_BUCKETS_INTERNAL + PREBUILT_IMAGE_BUCKETS_PUBLIC
+    )
     bucket_pattern = '|'.join(prebuilt_image_buckets)
     gs_path_pattern = (
-        gs_archive_base
+        rf'gs://(?P<gcp_bucket>{gcp_bucket_pattern})/'
         + rf'(?P<board>[^/]+?)-(?P<bucket>{bucket_pattern})/(?P<version>[^/]+)/'
     )
     if m := re.search(gs_path_pattern, gs_path):
@@ -1484,7 +1553,9 @@ def extract_info_from_prebuilt_gs_path(gs_path) -> dict:
     return {}
 
 
-def prepare_image_for_cros_flash(chromeos_root, image_info):
+def prepare_image_for_cros_flash(
+    chromeos_root, image_info, is_public_build: bool
+):
     """Prepares image path for 'cros flash'.
 
     Returns:
@@ -1492,6 +1563,10 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
       chromeos_root.
     """
     path = image_info.get(ImageType.DISK_IMAGE)
+    gs_archive_base = GS_ARCHIVE_BASE.format(
+        gcp_bucket=GCP_BUCKET_PUBLIC if is_public_build else GCP_BUCKET_INTERNAL
+    )
+
     if path:
         # local path
         if '://' not in path:
@@ -1499,10 +1574,10 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
 
         info = extract_info_from_prebuilt_gs_path(path)
 
-        if info.get('bucket') == release_bucket:
+        if info.get('bucket') == RELEASE_BUCKET:
             return f'xbuddy://remote/{info["board"]}/{info["version"]}/test'
 
-        if info.get('bucket') == factory_bucket:
+        if info.get('bucket') == FACTORY_BUCKET:
             cache_path = _cache_path_for_download(
                 chromeos_root, f'{path}.{test_image_filename}'
             )
@@ -1566,10 +1641,10 @@ def prepare_image_for_cros_flash(chromeos_root, image_info):
     return None
 
 
-def quick_provision(chromeos_root, host, image_info):
+def _quick_provision(chromeos_root, host, image_info, is_public_build: bool):
     # TODO(kimjae): Transition to using TLS ProvisionDut for F20.
     logger.debug('quick_provision %s %s', host, image_info)
-    build = prepare_image_for_quick_provision(image_info)
+    build = _prepare_image_for_quick_provision(image_info, is_public_build)
     if not build:
         return False
 
@@ -1646,6 +1721,7 @@ def provision_image(
     host,
     board,
     image_info,
+    is_public_build,
     version=None,
     clobber_stateful=False,
     disable_rootfs_verification=False,
@@ -1664,10 +1740,11 @@ def provision_image(
         logger.warning('quick-provision failed; fallback to cros flash: %s', e)
     """
 
-    if not cros_flash(
+    if not _cros_flash(
         chromeos_root,
         host,
         image_info,
+        is_public_build=is_public_build,
         clobber_stateful=clobber_stateful,
         disable_rootfs_verification=disable_rootfs_verification,
         force_reboot_callback=force_reboot_callback,
@@ -1708,7 +1785,7 @@ def powerwash(
     return True
 
 
-def search_prebuilt_image(board, version) -> ImageInfo:
+def _search_prebuilt_image(board, version, is_public_build: bool) -> ImageInfo:
     """Searches chromeos prebuilt image.
 
     Args:
@@ -1722,7 +1799,9 @@ def search_prebuilt_image(board, version) -> ImageInfo:
     assert is_cros_version(version)
 
     image_info = ImageInfo()
-    for gs_path in _iter_valid_prebuilt_gs_path(board, version):
+    for gs_path in _iter_valid_prebuilt_gs_path(
+        board, version, is_public_build
+    ):
         if is_vm_board(board):
             vm_image_gs_path = f'{gs_path}/{vm_image_filename}'
             if gs_util.ls(vm_image_gs_path, ignore_errors=True):
@@ -1740,20 +1819,21 @@ def search_prebuilt_image(board, version) -> ImageInfo:
     return image_info
 
 
-def search_image(board, version) -> ImageInfo:
+def search_image(board, version, is_public_build: bool) -> ImageInfo:
     if is_cros_snapshot_version(version):
         return SnapshotStore.search_snapshot_image(board, version)
-    return search_prebuilt_image(board, version)
+    return _search_prebuilt_image(board, version, is_public_build)
 
 
-def has_test_image(board, version) -> bool:
-    return bool(search_image(board, version))
+def has_test_image(board, version, is_public_build: bool) -> bool:
+    return bool(search_image(board, version, is_public_build=is_public_build))
 
 
-def cros_flash(
+def _cros_flash(
     chromeos_root,
     host,
     image_info,
+    is_public_build,
     clobber_stateful=False,
     disable_rootfs_verification=True,
     force_reboot_callback=None,
@@ -1799,7 +1879,9 @@ def cros_flash(
         except subprocess.CalledProcessError:
             pass  # not started; do nothing
 
-    image_path = prepare_image_for_cros_flash(chromeos_root, image_info)
+    image_path = prepare_image_for_cros_flash(
+        chromeos_root, image_info, is_public_build=is_public_build
+    )
     if not image_path:
         return False
 
@@ -1831,6 +1913,7 @@ def provision_image_with_retry(
     host,
     board,
     image_info,
+    is_public_build,
     version=None,
     clobber_stateful=False,
     disable_rootfs_verification=False,
@@ -1850,6 +1933,7 @@ def provision_image_with_retry(
                 host,
                 board,
                 image_info,
+                is_public_build=is_public_build,
                 version=version,
                 clobber_stateful=clobber_stateful,
                 disable_rootfs_verification=disable_rootfs_verification,
@@ -1931,7 +2015,9 @@ def cros_deploy(chromeos_root: str, dut: str, package: str) -> str:
     return cros_sdk(chromeos_root, 'cros', 'deploy', '--debug', dut, package)
 
 
-def fetch_metadata_version_info(board: str, cros_version: str) -> VersionInfo:
+def _fetch_metadata_version_info(
+    board: str, cros_version: str, is_public_build: bool
+) -> VersionInfo:
     """Query version info of given version of ChromeOS from metadata
 
     Args:
@@ -1956,7 +2042,9 @@ def fetch_metadata_version_info(board: str, cros_version: str) -> VersionInfo:
     # Let's try both.
     metadata_filenames = ['metadata.json', 'partial-metadata.json']
     info = VersionInfo()
-    for gs_path in _iter_valid_prebuilt_gs_path(board, cros_version):
+    for gs_path in _iter_valid_prebuilt_gs_path(
+        board, cros_version, is_public_build
+    ):
         for metadata_filename in metadata_filenames:
             metadata_str = gs_util.cat(
                 f'{gs_path}/{metadata_filename}', ignore_errors=True
@@ -2040,7 +2128,9 @@ def fetch_buildbucket_version_info(
     return info
 
 
-def query_version_info(board: str, cros_version: str) -> VersionInfo:
+def query_version_info(
+    board: str, cros_version: str, is_public_build: bool
+) -> VersionInfo:
     """Query subcomponents version info of given version of ChromeOS
 
     Args:
@@ -2059,7 +2149,9 @@ def query_version_info(board: str, cros_version: str) -> VersionInfo:
     """
     if is_cros_short_version(cros_version):
         cros_version = version_to_full(board, cros_version)
-    info = fetch_metadata_version_info(board, cros_version)
+    info = _fetch_metadata_version_info(
+        board, cros_version, is_public_build=is_public_build
+    )
     buildbucket_id = (
         info.buildbucket_id
         or SnapshotStore.query_snapshot_buildbucket_id(board, cros_version)
@@ -2090,15 +2182,34 @@ def query_chrome_version(board, cros_version) -> str | None:
     Returns:
       Chrome version number
     """
-    return query_version_info(board, cros_version).cr_version
+
+    return query_version_info(
+        board,
+        cros_version,
+        # Use the internal builds to look up the chrome version, since both
+        # builds should have the same chrome version.
+        is_public_build=False,
+    ).cr_version
 
 
 def query_android_build_id(board, cros_version) -> str | None:
-    return query_version_info(board, cros_version).android_build_id
+    return query_version_info(
+        board,
+        cros_version,
+        # Use the internal builds to look up the Android build, since only the
+        # internal builds contain Android.
+        is_public_build=False,
+    ).android_build_id
 
 
 def query_android_branch(board, cros_version) -> str | None:
-    return query_version_info(board, cros_version).android_branch
+    return query_version_info(
+        board,
+        cros_version,
+        # Use the internal builds to look up the Android branch, since only the
+        # internal builds contain Android.
+        is_public_build=False,
+    ).android_branch
 
 
 def is_inside_chroot():
@@ -2947,6 +3058,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             self.config.get('chromeos_mirror'),
             'chromiumos/overlays/chromiumos-overlay.git',
         )
+        self.is_public_build = self.config.get('is_public_build', False)
         self.historical_manifest_branch_name = 'refs/heads/main'
         if not os.path.exists(self.historical_manifest_git_dir):
             raise errors.InternalError(
@@ -3253,7 +3365,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
         revisions = self.lookup_snapshot_manifest_revisions(old, new)
         for timestamp, _git_rev, snapshot_id in revisions:
             snapshot_version = SnapshotStore.query_snapshot_version_by_id(
-                self.config.get('board'), snapshot_id
+                self.config.get('board'),
+                snapshot_id,
+                is_public_build=self.config.get('is_public_build'),
             )
             if snapshot_version:
                 result.append(

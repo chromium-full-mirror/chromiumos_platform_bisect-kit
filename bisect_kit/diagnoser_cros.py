@@ -346,7 +346,10 @@ class CrosDiagnoser:
         if not is_custom_eval and not is_autotest:
             # So far only the `release` images support the `--prebuilt` option
             if cros_util.has_release_prebuilt(
-                self.config.get('board'), self.cros_old
+                self.config.get('board'),
+                self.cros_old,
+                # TODO(b/441146529): Implement public board bisection support.
+                is_public_build=False,
             ):
                 cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + ['--prebuilt']
             else:
@@ -649,7 +652,10 @@ class CrosDiagnoser:
             )
         elif self.config.get('bisect_android'):
             base_cros_info = cros_util.query_version_info(
-                self.config.get('board'), self.config.get('base_cros_version')
+                self.config.get('board'),
+                self.config.get('base_cros_version'),
+                # TODO(b/441146529): Implement public board bisection support.
+                is_public_build=False,
             )
             self.old_info = cros_util.VersionInfo(
                 android_build_id=self.config.get('android_prebuilt_old'),
@@ -663,10 +669,16 @@ class CrosDiagnoser:
             )
         else:
             self.old_info = cros_util.query_version_info(
-                self.config.get('board'), self.cros_old
+                self.config.get('board'),
+                self.cros_old,
+                # TODO(b/441146529): Implement public board bisection support.
+                is_public_build=False,
             )
             self.new_info = cros_util.query_version_info(
-                self.config.get('board'), self.cros_new
+                self.config.get('board'),
+                self.cros_new,
+                # TODO(b/441146529): Implement public board bisection support.
+                is_public_build=False,
             )
 
         logger.info(
@@ -1492,7 +1504,11 @@ class DiagnoseCommandLineBase:
         if not board:
             return cros_version
 
-        if not cros_util.has_test_image(board, cros_version):
+        if not cros_util.has_test_image(
+            board,
+            cros_version,
+            is_public_build=False,
+        ):
             self.argument_parser.error(
                 '%s: %s has no image for %s'
                 % (argument_key, board, cros_version)

@@ -241,6 +241,8 @@ def deploy(opts):
         opts.dut,
         opts.board,
         image_info,
+        # TODO(b/441146529): Implement public board bisection support.
+        is_public_build=False,
         clobber_stateful=opts.clobber_stateful,
         disable_rootfs_verification=opts.disable_rootfs_verification,
         repair_callback=cros_lab_util.repair,
