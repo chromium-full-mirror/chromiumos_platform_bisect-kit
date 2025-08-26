@@ -400,15 +400,6 @@ class TestCrosUtil(unittest.TestCase):
             cros_util, 'query_milestone_by_version', return_value='64'
         ):
             self.assertEqual(
-                cros_util.recognize_version('samus', 'R64-10123.0.0'),
-                ('64', '10123.0.0'),
-            )
-            self.assertEqual(
-                cros_util.recognize_version('samus', '10123.0.0'),
-                ('64', '10123.0.0'),
-            )
-
-            self.assertEqual(
                 cros_util.version_to_short('R64-10123.0.0'), '10123.0.0'
             )
             self.assertEqual(

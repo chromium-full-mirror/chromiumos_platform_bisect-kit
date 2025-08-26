@@ -1172,24 +1172,6 @@ def list_board_names(chromeos_root):
     return list(result)
 
 
-def recognize_version(board, version):
-    """Recognize ChromeOS version.
-
-    Args:
-      board: ChromeOS board name
-      version: ChromeOS version number in short or full format
-
-    Returns:
-      (milestone, version in short format)
-    """
-    if is_cros_short_version(version):
-        milestone = query_milestone_by_version(board, version)
-        short_version = version
-    else:
-        milestone, short_version = version_split(version)
-    return milestone, short_version
-
-
 def extract_major_version(version: str) -> str:
     """Converts a version to its major version.
 
