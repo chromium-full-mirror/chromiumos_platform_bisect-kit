@@ -72,6 +72,11 @@ def create_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
+        '--public-build',
+        action='store_true',
+        help='Use public build artifacts instead of internal ones.',
+    )
+    parser.add_argument(
         '--chrome-root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
@@ -154,8 +159,7 @@ def switch_main(args: tuple[str] | None):
                 opts.chrome_src,
                 opts.board,
                 opts.target,
-                # TODO(b/441146529): Implement public board bisection support.
-                is_public_build=False,
+                is_public_build=opts.public_build,
                 with_tests=opts.with_tests,
             )
         elif opts.deploy_method == 'image':
@@ -169,8 +173,7 @@ def switch_main(args: tuple[str] | None):
                 opts.board,
                 opts.dut,
                 opts.target,
-                # TODO(b/441146529): Implement public board bisection support.
-                is_public_build=False,
+                is_public_build=opts.public_build,
                 with_tests=opts.with_tests,
             )
         elif opts.deploy_method == 'image':

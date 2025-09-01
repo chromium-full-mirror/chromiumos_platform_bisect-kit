@@ -30,7 +30,9 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 AUTOTEST_SERVER_TARBALL = 'autotest_server_package.tar.bz2'
-GS_BUILDBUCKET_BUILD_PATH = 'gs://chromeos-image-archive/{path}'
+GS_GCP_BUCKET_INTERNAL = 'chromeos-image-archive'
+GS_GCP_BUCKET_PUBLIC = 'chromiumos-image-archive'
+GS_BUILDBUCKET_BUILD_PATH = 'gs://{gcp_bucket}/{path}'
 
 
 def create_argument_parser():
@@ -69,6 +71,11 @@ def create_argument_parser():
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
     )
+    parser.add_argument(
+        '--public-build',
+        action='store_true',
+        help='Use public build artifacts instead of internal ones.',
+    )
 
     return parser
 
@@ -77,16 +84,20 @@ def switch(opts, board, version, dut):
     logger.info('Unpack autotest packages for %s %s', board, version)
     if cros_util.is_cros_version(version):
         gs_build_path = cros_util.query_prebuilt_gs_path(
-            board,
-            version,
-            # TODO(b/441146529): Implement public board bisection support.
-            is_public_build=False,
+            board, version, is_public_build=opts.public_build
         )
     else:
         gs_path = cros_util.query_dut_lsb_release(dut).get(
             'CHROMEOS_RELEASE_BUILDER_PATH'
         )
-        gs_build_path = GS_BUILDBUCKET_BUILD_PATH.format(path=gs_path)
+        gs_build_path = GS_BUILDBUCKET_BUILD_PATH.format(
+            gcp_bucket=(
+                GS_GCP_BUCKET_PUBLIC
+                if opts.public_build
+                else GS_GCP_BUCKET_INTERNAL
+            ),
+            path=gs_path,
+        )
     autotest_server_path = f'{gs_build_path}/{AUTOTEST_SERVER_TARBALL}'
 
     logger.info('autotest_server_path %s', autotest_server_path)

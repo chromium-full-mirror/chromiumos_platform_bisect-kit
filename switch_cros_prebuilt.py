@@ -53,6 +53,11 @@ def create_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
+        '--public-build',
+        action='store_true',
+        help='Use public build artifacts instead of internal ones.',
+    )
+    parser.add_argument(
         '--clobber-stateful',
         action='store_true',
         help='Clobber stateful partition when performing update',
@@ -82,10 +87,7 @@ def switch(opts):
             cros_util.SnapshotStore.init_with_state(states)
     # TODO(kcwu): clear cache of cros flash
     image_info = cros_util.search_image(
-        opts.board,
-        opts.version,
-        # TODO(b/441146529): Implement public board bisection support.
-        is_public_build=False,
+        opts.board, opts.version, is_public_build=opts.public_build
     )
     if not image_info:
         raise errors.ExecutionFatalError(
@@ -97,8 +99,7 @@ def switch(opts):
         opts.dut,
         opts.board,
         image_info,
-        # TODO(b/441146529): Implement public board bisection support.
-        is_public_build=False,
+        is_public_build=opts.public_build,
         version=opts.version,
         clobber_stateful=opts.clobber_stateful,
         disable_rootfs_verification=opts.disable_rootfs_verification,

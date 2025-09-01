@@ -97,6 +97,11 @@ def create_argument_parser():
         action='append',
         help='A gerrit CL to patch the chromium/src repository',
     )
+    parser.add_argument(
+        '--public-build',
+        action='store_true',
+        help='Use public build artifacts instead of internal ones.',
+    )
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -237,16 +242,14 @@ def switch_main(args: tuple[str] | None):
                         opts.chrome_src,
                         opts.board,
                         with_tests=opts.with_tests,
-                        # TODO(b/441146529): Implement public board bisection support.
-                        is_public_build=False,
+                        is_public_build=opts.public_build,
                     )
                 out_dir = cr_util.build(
                     opts.chrome_src,
                     opts.board,
                     targets,
                     with_tests=opts.with_tests,
-                    # TODO(b/441146529): Implement public board bisection support.
-                    is_public_build=False,
+                    is_public_build=opts.public_build,
                 )
 
                 # Upload the binaries to the cache.
@@ -256,7 +259,7 @@ def switch_main(args: tuple[str] | None):
                             opts.chrome_src,
                             opts.board,
                             targets,
-                            is_public_build=False,
+                            is_public_build=opts.public_build,
                             out_dir=out_dir,
                             staging_dir=staging_dir,
                         )
@@ -273,8 +276,7 @@ def switch_main(args: tuple[str] | None):
                         opts.board,
                         opts.dut,
                         opts.target,
-                        # TODO(b/441146529): Implement public board bisection support.
-                        is_public_build=False,
+                        is_public_build=opts.public_build,
                         with_tests=opts.with_tests,
                         out_dir=out_dir,
                     )
@@ -283,9 +285,8 @@ def switch_main(args: tuple[str] | None):
                     opts.chrome_src,
                     opts.board,
                     opts.dut,
-                    # TODO(b/441146529): Implement public board bisection support.
-                    is_public_build=False,
                     targets=opts.target,
+                    is_public_build=opts.public_build,
                     with_tests=opts.with_tests,
                 )
         elif opts.deploy_method == 'image':

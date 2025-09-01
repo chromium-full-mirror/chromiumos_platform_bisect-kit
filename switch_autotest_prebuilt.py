@@ -33,11 +33,13 @@ logger = logging.getLogger(__name__)
 
 AUTOTEST_CLIENT_TARBALL = 'autotest_packages.tar'
 AUTOTEST_SERVER_TARBALL = 'autotest_server_package.tar.bz2'
-GS_BUILD_PATH = 'gs://chromeos-image-archive/{board}-release/{full_version}'
+GS_GCP_BUCKET_INTERNAL = 'chromeos-image-archive'
+GS_GCP_BUCKET_PUBLIC = 'chromiumos-image-archive'
+GS_BUILD_PATH = 'gs://{gcp_bucket}/{board}-release/{full_version}'
 GS_AUTOTEST_CLIENT_PATH = GS_BUILD_PATH + '/' + AUTOTEST_CLIENT_TARBALL
 GS_AUTOTEST_SERVER_PATH = GS_BUILD_PATH + '/' + AUTOTEST_SERVER_TARBALL
 
-GS_BUILDBUCKET_BUILD_PATH = 'gs://chromeos-image-archive/{path}'
+GS_BUILDBUCKET_BUILD_PATH = 'gs://{gcp_bucket}/{path}'
 GS_BUILDBUCKET_BUILD_AUTOTEST_CLIENT_PATH = (
     GS_BUILDBUCKET_BUILD_PATH + '/' + AUTOTEST_CLIENT_TARBALL
 )
@@ -71,6 +73,11 @@ def create_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
+        '--public-build',
+        action='store_true',
+        help='Use public build artifacts instead of internal ones.',
+    )
+    parser.add_argument(
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
@@ -90,25 +97,47 @@ def create_argument_parser():
     return parser
 
 
-def switch(autotest_dir, board, version, test_name, dut):
+def _switch(autotest_dir, board, version, test_name, dut, is_public_build):
     logger.info('Unpack autotest packages for %s %s', board, version)
     if cros_util.is_cros_version(version):
         full_version = cros_util.version_to_full(board, version)
         autotest_client_path = GS_AUTOTEST_CLIENT_PATH.format(
-            board=board, full_version=full_version
+            gcp_bucket=(
+                GS_GCP_BUCKET_PUBLIC
+                if is_public_build
+                else GS_GCP_BUCKET_INTERNAL
+            ),
+            board=board,
+            full_version=full_version,
         )
         autotest_server_path = GS_AUTOTEST_SERVER_PATH.format(
-            board=board, full_version=full_version
+            gcp_bucket=(
+                GS_GCP_BUCKET_PUBLIC
+                if is_public_build
+                else GS_GCP_BUCKET_INTERNAL
+            ),
+            board=board,
+            full_version=full_version,
         )
     else:
         gs_path = cros_util.query_dut_lsb_release(dut).get(
             'CHROMEOS_RELEASE_BUILDER_PATH'
         )
         autotest_client_path = GS_BUILDBUCKET_BUILD_AUTOTEST_CLIENT_PATH.format(
-            path=gs_path
+            gcp_bucket=(
+                GS_GCP_BUCKET_PUBLIC
+                if is_public_build
+                else GS_GCP_BUCKET_INTERNAL
+            ),
+            path=gs_path,
         )
         autotest_server_path = GS_BUILDBUCKET_BUILD_AUTOTEST_SERVER_PATH.format(
-            path=gs_path
+            gcp_bucket=(
+                GS_GCP_BUCKET_PUBLIC
+                if is_public_build
+                else GS_GCP_BUCKET_INTERNAL
+            ),
+            path=gs_path,
         )
 
     logger.info('autotest_client_path %s', autotest_client_path)
@@ -179,7 +208,14 @@ def switch_main(args: tuple[str] | None):
 
     if opts.test_name:
         opts.test_name = cros_util.normalize_test_name(opts.test_name)
-    switch(autotest_dir, opts.board, opts.version, opts.test_name, opts.dut)
+    _switch(
+        autotest_dir,
+        opts.board,
+        opts.version,
+        opts.test_name,
+        opts.dut,
+        opts.is_public_build,
+    )
 
     # Verify test control file exists.
     if opts.test_name:
