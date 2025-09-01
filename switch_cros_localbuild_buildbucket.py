@@ -64,6 +64,11 @@ def create_common_argument_parser():
         help='ChromeOS board name',
     )
     parser.add_argument(
+        '--public-build',
+        action='store_true',
+        help='Use public build artifacts instead of internal ones.',
+    )
+    parser.add_argument(
         '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
@@ -243,12 +248,19 @@ def get_chrome_buildspec_by_time(opts, timestamp, old_rev, new_rev):
     return parser.flatten(result, deps_path)
 
 
-def get_chromeos_spec_manager(opts):
-    config = {
+def get_config_for_chromeos_spec_manager(opts):
+    return {
         "board": opts.board,
         "chromeos_root": opts.chromeos_root,
         "chromeos_mirror": opts.chromeos_mirror,
+        # TODO(b/441146529): Currently cros localbuild doesn't support a public
+        # build.
+        "is_public_build": False,
     }
+
+
+def get_chromeos_spec_manager(opts):
+    config = get_config_for_chromeos_spec_manager(opts)
     return cros_util.ChromeOSSpecManager(config)
 
 
@@ -396,7 +408,8 @@ def search_closest_snapshot_image(opts) -> typing.Optional[str]:
         opts.board,
         new_rev,
         search_end_version,
-        # TODO(b/441146529): Implement public board bisection support.
+        # TODO(b/441146529): Currently cros localbuild doesn't support a public
+        # build.
         is_public_build=False,
         use_snapshot=True,
         spec_manager=get_chromeos_spec_manager(opts),
@@ -548,12 +561,8 @@ def wait_for_build_completion(opts, build_id: int):
 
 def build_revlist(opts):
     old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
-    config = {
-        "board": opts.board,
-        "chromeos_root": opts.chromeos_root,
-        "chromeos_mirror": opts.chromeos_mirror,
-    }
-    spec_manager = cros_util.ChromeOSSpecManager(config)
+    config = get_config_for_chromeos_spec_manager(opts)
+    spec_manager = get_chromeos_spec_manager(opts)
     cache = repo_util.RepoMirror(opts.chromeos_mirror)
     code_manager = codechange.CodeManager(
         config['chromeos_root'],
@@ -606,7 +615,8 @@ def switch(opts) -> core.StepResult:
         opts.dut,
         opts.board,
         image_info,
-        # TODO(b/441146529): Implement public board bisection support.
+        # TODO(b/441146529): Currently cros localbuild doesn't support a public
+        # build.
         is_public_build=False,
         clobber_stateful=opts.clobber_stateful,
         disable_rootfs_verification=opts.disable_rootfs_verification,

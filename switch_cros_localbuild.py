@@ -80,6 +80,13 @@ def create_argument_parser():
         default=os.environ.get('BOARD', ''),
         help='ChromeOS board name',
     )
+    # Adds --public-build flag for compatibility with other switch scripts, but it's not
+    # supported yet on this script.
+    parser.add_argument(
+        '--public-build',
+        action='store_true',
+        help='Use public build artifacts instead of internal ones.',
+    )
     parser.add_argument(
         '--chromeos-root',
         type=cli.argtype_dir_path,
@@ -241,7 +248,8 @@ def deploy(opts):
         opts.dut,
         opts.board,
         image_info,
-        # TODO(b/441146529): Implement public board bisection support.
+        # TODO(b/441146529): Currently cros localbuild doesn't support a public
+        # build.
         is_public_build=False,
         clobber_stateful=opts.clobber_stateful,
         disable_rootfs_verification=opts.disable_rootfs_verification,
@@ -260,6 +268,9 @@ def switch(opts):
             "board": opts.board,
             "chromeos_root": opts.chromeos_root,
             "chromeos_mirror": opts.chromeos_mirror,
+            # TODO(b/441146529): Currently cros localbuild doesn't support a
+            # public build.
+            "is_public_build": False,
         }
         spec_manager = cros_util.ChromeOSSpecManager(config)
         cache = repo_util.RepoMirror(opts.chromeos_mirror)
