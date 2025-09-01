@@ -339,17 +339,21 @@ class CrosDiagnoser:
 
         # Fix commands which depend on "board".
         if switch_test_harness_cmd:
-            switch_test_harness_cmd = switch_test_harness_cmd + [
-                '--board',
-                self.config.get('board'),
-            ]
+            switch_test_harness_cmd.extend(
+                [
+                    '--board',
+                    self.config.get('board'),
+                ]
+            )
+            if self.config.get('is_public_build'):
+                switch_test_harness_cmd.append('--public-build')
+
         if not is_custom_eval and not is_autotest:
             # So far only the `release` images support the `--prebuilt` option
             if cros_util.has_release_prebuilt(
                 self.config.get('board'),
                 self.cros_old,
-                # TODO(b/441146529): Implement public board bisection support.
-                is_public_build=False,
+                is_public_build=self.config.get('is_public_build'),
             ):
                 cros_prebuilt_eval_cmd = cros_prebuilt_eval_cmd + ['--prebuilt']
             else:
@@ -502,21 +506,25 @@ class CrosDiagnoser:
             )
         )
         chromium_patch_cls = self.config.get('chromium_patch_cls')
-        if not chromium_patch_cls:
-            buildbucket_buildable = cros_util.is_buildbucket_buildable(
+        buildbucket_buildable = (
+            cros_util.is_buildbucket_buildable(
                 self.config.get('cros_prebuilt_old')
             )
-        else:
             # Currently only local build supports custom patches to chromium
-            buildbucket_buildable = False
+            and not chromium_patch_cls
+            # Currently a public build can't be built by the build bucket server.
+            and not self.config.get('is_public_build')
+        )
 
         try:
-            if self.narrow_down_chrome(
+            if self._narrow_down_chrome(
                 self._dut_manager.get(),
                 chrome_localbuild_eval_cmd,
                 init_once=switch_cros_repo_to_old,
-                buildbucket_build=buildbucket_buildable
-                and self.config.get('enable_buildbucket_chrome'),
+                buildbucket_build=(
+                    buildbucket_buildable
+                    and self.config.get('enable_buildbucket_chrome')
+                ),
                 should_build_with_tests=should_build_chrome_localbuild_with_tests,
                 chromium_patch_cls=chromium_patch_cls,
             ):
@@ -601,6 +609,10 @@ class CrosDiagnoser:
             if self.config.get('disable_snapshot'):
                 init_args.append('--disable-snapshot')
 
+            if self.config.get('is_public_build'):
+                switch_cmd.append('--public-build')
+                init_args.append('--public-build')
+
             if dut_manager.is_vm:
                 switch_cmds = [self._switch_vm_cmd]
             else:
@@ -654,8 +666,7 @@ class CrosDiagnoser:
             base_cros_info = cros_util.query_version_info(
                 self.config.get('board'),
                 self.config.get('base_cros_version'),
-                # TODO(b/441146529): Implement public board bisection support.
-                is_public_build=False,
+                is_public_build=self.config.get('is_public_build'),
             )
             self.old_info = cros_util.VersionInfo(
                 android_build_id=self.config.get('android_prebuilt_old'),
@@ -671,14 +682,12 @@ class CrosDiagnoser:
             self.old_info = cros_util.query_version_info(
                 self.config.get('board'),
                 self.cros_old,
-                # TODO(b/441146529): Implement public board bisection support.
-                is_public_build=False,
+                is_public_build=self.config.get('is_public_build'),
             )
             self.new_info = cros_util.query_version_info(
                 self.config.get('board'),
                 self.cros_new,
-                # TODO(b/441146529): Implement public board bisection support.
-                is_public_build=False,
+                is_public_build=self.config.get('is_public_build'),
             )
 
         logger.info(
@@ -727,6 +736,9 @@ class CrosDiagnoser:
             cmd.append('--disable-rootfs-verification')
         else:
             cmd.append('--no-disable-rootfs-verification')
+        if self.config.get('is_public_build'):
+            cmd.append('--public-build')
+
         run_switch_or_eval_cmd(cmd)
 
     def _need_android_bisect(
@@ -805,6 +817,13 @@ class CrosDiagnoser:
           True: culprit is inside Android
           False: culprit is not inside Android or unable to bisect
         """
+
+        if self.config.get('is_public_build'):
+            self.make_decision(
+                'Skipping Android bisection, since the public builds contain no ARC.'
+            )
+            return False
+
         verified = False
         if not self._need_android_bisect(self.old_info, self.new_info):
             return verified
@@ -1046,6 +1065,12 @@ class CrosDiagnoser:
             )
             return False
 
+        if self.config.get('is_public_build'):
+            self.make_decision(
+                'Skipping DLC bisection, since it is not implemented for public builds yet.'
+            )
+            return False
+
         logger.info('bisect dlc prebuilt')
         self.states.add_history(
             'bisect',
@@ -1115,7 +1140,7 @@ class CrosDiagnoser:
             return False
         return True
 
-    def narrow_down_chrome(
+    def _narrow_down_chrome(
         self,
         dut_manager: dut_manager_module.DutManager,
         eval_cmd: list[str],
@@ -1214,6 +1239,17 @@ class CrosDiagnoser:
                 for cl in chromium_patch_cls:
                     switch_cmd += ['--chromium-patch-cl', cl]
 
+        init_args = [
+            '--chrome-root',
+            self.config.get('chrome_root'),
+            '--chrome-mirror',
+            self.config.get('chrome_mirror'),
+        ]
+
+        if self.config.get('is_public_build'):
+            switch_cmd.append('--public-build')
+            init_args.append('--public-build')
+
         bisector = wrapper.BisectorWrapper(
             'bisect_cr_localbuild_internal',
             self.config.get('session'),
@@ -1224,12 +1260,7 @@ class CrosDiagnoser:
             bisector.init_if_necessary(
                 self.old_info.cr_version,
                 self.new_info.cr_version,
-                init_args=[
-                    '--chrome-root',
-                    self.config.get('chrome_root'),
-                    '--chrome-mirror',
-                    self.config.get('chrome_mirror'),
-                ],
+                init_args=init_args,
                 switch_cmds=[switch_cmd],
                 eval_cmd=eval_cmd,
                 old_value=self.config.get('old_value'),
@@ -1291,6 +1322,12 @@ class CrosDiagnoser:
         if self.config.get('bypass_chromeos_build'):
             self.make_decision(
                 'The bisection with ChromeOS local build is bypassed'
+            )
+            return
+
+        if self.config.get('is_public_build'):
+            self.make_decision(
+                'Skipping CrOS localbuild bisection, since it is not implemented for public builds yet.'
             )
             return
 
@@ -1507,7 +1544,7 @@ class DiagnoseCommandLineBase:
         if not cros_util.has_test_image(
             board,
             cros_version,
-            is_public_build=False,
+            is_public_build=self.config.get('is_public_build'),
         ):
             self.argument_parser.error(
                 '%s: %s has no image for %s'
@@ -1755,6 +1792,7 @@ class DiagnoseCommandLineBase:
             "board": opts.board,
             "old": opts.old,  # TODO(zjchang): Remove ambiguous term old and new
             "new": opts.new,
+            "is_public_build": opts.public_build,
             "bisect_chrome": opts.bisect_chrome,
             "bisect_android": opts.bisect_android,
             "base_cros_version": opts.base_cros_version,
@@ -1951,6 +1989,11 @@ class DiagnoseCommandLineBase:
             metavar='BOARD',
             default=os.environ.get('BOARD'),
             help='ChromeOS board name; auto detected if DUT is not auto allocated',
+        )
+        group.add_argument(
+            '--public-build',
+            action='store_true',
+            help='Use public build artifacts instead of internal ones.',
         )
         group.add_argument(
             '--old',

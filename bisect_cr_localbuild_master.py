@@ -147,6 +147,11 @@ class ChromeSrcMasterDomain(core.BisectDomain):
             default=os.environ.get('BOARD'),
             help='For ChromeOS, board name',
         )
+        parser.add_argument(
+            '--public-build',
+            action='store_true',
+            help='Use public build artifacts instead of internal ones.',
+        )
 
     @staticmethod
     def init(opts):
@@ -187,6 +192,7 @@ class ChromeSrcMasterDomain(core.BisectDomain):
             "new": new,
             "board": opts.board,
             "dut": opts.dut,
+            "is_public_build": opts.public_build,
         }
 
         details = {}

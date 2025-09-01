@@ -35,16 +35,16 @@ from bisect_kit import errors
 logger = logging.getLogger(__name__)
 
 
-def get_revlist(board, old, new, use_snapshot=False):
+def _get_revlist(board, old, new, is_public_build, use_snapshot=False):
     logger.info('get_revlist %s %s %s', board, old, new)
+    logger.info('is_public_build: %s', is_public_build)
     logger.info('use_snapshot: %s', use_snapshot)
     full_versions, details = cros_util.list_chromeos_prebuilt_versions(
         board,
         old,
         new,
         use_snapshot=use_snapshot,
-        # TODO(b/441146529): Implement public board bisection support.
-        is_public_build=False,
+        is_public_build=is_public_build,
     )
     logger.info('full_versions: %s', full_versions)
     short_versions = [
@@ -98,6 +98,11 @@ class ChromeOSVersionDomain(core.BisectDomain):
             'to be specified',
         )
         parser.add_argument(
+            '--public-build',
+            action='store_true',
+            help='Use public build artifacts instead of internal ones.',
+        )
+        parser.add_argument(
             '--disable-snapshot',
             action='store_true',
             help='Disable snapshot for bisect chromeos prebuilt',
@@ -121,31 +126,36 @@ class ChromeOSVersionDomain(core.BisectDomain):
         if not opts.board:
             opts.board = cros_util.query_dut_board(opts.dut)
         if not cros_util.has_test_image(
-            opts.board,
-            opts.old,
-            # TODO(b/441146529): Implement public board bisection support.
-            is_public_build=False,
+            opts.board, opts.old, is_public_build=opts.public_build
         ):
             raise errors.ArgumentError(
-                '--old', '%s has no image for %s' % (opts.board, opts.old)
+                '--old',
+                '%s has no image for %s (is_public_build: %s)'
+                % (opts.board, opts.old, opts.public_build),
             )
         if not cros_util.has_test_image(
-            opts.board,
-            opts.new,
-            # TODO(b/441146529): Implement public board bisection support.
-            is_public_build=False,
+            opts.board, opts.new, is_public_build=opts.public_build
         ):
             raise errors.ArgumentError(
-                '--new', '%s has no image for %s' % (opts.board, opts.new)
+                '--new',
+                '%s has no image for %s (is_public_build: %s)'
+                % (opts.board, opts.new, opts.public_build),
             )
 
-        old, new, revlist, details = get_revlist(
+        old, new, revlist, details = _get_revlist(
             opts.board,
             opts.old,
             opts.new,
+            is_public_build=opts.public_build,
             use_snapshot=not opts.disable_snapshot,
         )
-        config = {"dut": opts.dut, "board": opts.board, "old": old, "new": new}
+        config = {
+            "dut": opts.dut,
+            "board": opts.board,
+            "old": old,
+            "new": new,
+            "is_public_build": opts.public_build,
+        }
 
         for i in range(1, len(revlist)):
             link = cros_util.get_crosland_link(revlist[i - 1], revlist[i])
