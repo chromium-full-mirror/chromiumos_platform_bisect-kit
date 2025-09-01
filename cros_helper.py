@@ -27,10 +27,7 @@ logger = logging.getLogger(__name__)
 def cmd_version_info(opts):
     info = dataclasses.asdict(
         cros_util.query_version_info(
-            opts.board,
-            opts.versio,
-            # TODO(b/441146529): Implement public board bisection support.
-            is_public_build=False,
+            opts.board, opts.version, is_public_build=opts.public_build
         )
     )
     if opts.name:
@@ -236,6 +233,11 @@ def main():
     )
     parser_version_info.add_argument(
         'board', help='ChromeOS board name, like "samus".'
+    )
+    parser_version_info.add_argument(
+        '--public-build',
+        action='store_true',
+        help='Use public build artifacts instead of internal ones.',
     )
     parser_version_info.add_argument(
         'version',
