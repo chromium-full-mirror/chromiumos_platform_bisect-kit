@@ -258,10 +258,7 @@ class DutAllocator:
             for builder in spec.builder_hints:
                 if not all(
                     cros_util.has_test_image(
-                        builder,
-                        v,
-                        # TODO(b/441146529): Implement public board bisection support.
-                        is_public_build=False,
+                        builder, v, is_public_build=spec.public
                     )
                     for v in versions
                 ):

@@ -72,6 +72,8 @@ def to_dut_allocate_spec(
             raise errors.DutAllocateSpecError('Missing New.Version')
         spec.version_hints = [old_version, new_version]
 
+    spec.public = b.get('PublicBuild', False)
+
     user_dut = b.get('UserDUT')
     if user_dut:
         # ends with ".cros", or DUTs needs forward.

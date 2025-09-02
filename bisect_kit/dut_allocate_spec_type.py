@@ -26,3 +26,4 @@ class DutAllocateSpec:
     lease_duration_seconds: float | None = None
     parallel: int = 3
     session: str | None = None
+    public: bool = dataclasses.field(default=False)

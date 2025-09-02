@@ -122,4 +122,5 @@ def parse_from_dut_allocate_command_line_args(
         lease_duration_seconds=opts.allocate_dut_duration,
         parallel=opts.allocate_dut_parallel,
         session=opts.session,
+        public=opts.public_build,
     )
