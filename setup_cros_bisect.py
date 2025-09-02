@@ -330,11 +330,7 @@ def _sync_chromeos_code(path_factory):
     )
 
 
-def _configure_chrome_repos(
-    path_factory: common.WorkBasePathFactory,
-    use_btrfs: bool,
-    is_public_build: bool,
-) -> None:
+def _configure_chrome_repos(path_factory, use_btrfs: bool):
     chrome_cache = path_factory.get_chrome_cache()
     chrome_tree = path_factory.get_chrome_tree()
     btrfs_util.makedirs(chrome_cache, use_btrfs=False)
@@ -351,7 +347,7 @@ solutions = [
     "custom_deps" : {
     },
     "custom_vars": {
-      'checkout_src_internal': %s,
+      'checkout_src_internal': True,
       'download_remoteexec_cfg': True,
     },
   },
@@ -359,8 +355,7 @@ solutions = [
 target_os = ['chromeos']
 cache_dir = %r
 """ % (
-        "False" if is_public_build else "True",
-        chrome_cache,
+        chrome_cache
     )
 
     n_retries = 0
@@ -380,12 +375,8 @@ cache_dir = %r
             time.sleep(60)
 
 
-def _setup_chrome_repos(
-    path_factory: common.WorkBasePathFactory,
-    use_btrfs: bool,
-    is_public_build: bool,
-) -> None:
-    _configure_chrome_repos(path_factory, use_btrfs, is_public_build)
+def _setup_chrome_repos(path_factory, use_btrfs: bool):
+    _configure_chrome_repos(path_factory, use_btrfs)
 
     chrome_cache = path_factory.get_chrome_cache()
     with locking.lock_file(
@@ -402,13 +393,9 @@ def _setup_chrome_repos(
         gclient_util.sync(chrome_tree, with_branch_heads=True, with_tags=True)
 
 
-def _sync_chrome_code(
-    path_factory: common.WorkBasePathFactory,
-    use_btrfs: bool,
-    is_public_build: bool,
-) -> None:
+def _sync_chrome_code(path_factory, use_btrfs: bool):
     # The sync step is identical to the initial gclient config step.
-    _setup_chrome_repos(path_factory, use_btrfs, is_public_build)
+    _setup_chrome_repos(path_factory, use_btrfs)
 
 
 def _setup_android_repos(path_factory, branch, use_btrfs: bool):
@@ -489,9 +476,7 @@ def cmd_init(opts):
     if opts.chromeos:
         _setup_chromeos_repos(path_factory, opts.btrfs)
     if opts.chrome:
-        _setup_chrome_repos(
-            path_factory, opts.btrfs, is_public_build=opts.public_build
-        )
+        _setup_chrome_repos(path_factory, opts.btrfs)
     for branch in opts.android:
         _setup_android_repos(path_factory, branch, opts.btrfs)
 
@@ -534,11 +519,7 @@ def do_sync_template(opts):
         use_btrfs = btrfs_util.is_btrfs_subvolume(
             template_factory.get_chrome_tree()
         )
-        # Sync fetches the internal code (assuimng the public code is a subset
-        # of the public).
-        _sync_chrome_code(
-            template_factory, use_btrfs, is_public_build=opts.public_build
-        )
+        _sync_chrome_code(template_factory, use_btrfs)
 
     if sync_all:
         android_branches = template_factory.iter_android_branches()
@@ -594,15 +575,10 @@ def cmd_new(opts):
             opts.experiments,
             experiment.ID.EXT4_CHROME_CHECKOUT,
         ):
-            _configure_chrome_repos(
-                path_factory, use_btrfs=False, is_public_build=opts.public_build
-            )
+            _configure_chrome_repos(path_factory, use_btrfs=False)
         else:
             btrfs_util.copy_tree(
                 chrome_template, path_factory.get_chrome_tree()
-            )
-            _configure_chrome_repos(
-                path_factory, use_btrfs=True, is_public_build=opts.public_build
             )
 
     if prepare_all:
@@ -778,9 +754,7 @@ def _check_chrome_tree(
     if not should_fix:
         return False
     btrfs_util.delete_tree(chrome_tree, missing_ok=True)
-    # Fix fetches the internal code (assuming the public code is a subset of
-    # the internal).
-    _setup_chrome_repos(path_factory, use_btrfs=True, is_public_build=False)
+    _setup_chrome_repos(path_factory, use_btrfs=True)
     return True
 
 
@@ -916,11 +890,6 @@ def create_parser():
     )
     parser_new.add_argument(
         '--chrome', action='store_true', help='create chrome checkout'
-    )
-    parser_new.add_argument(
-        '--public-build',
-        action='store_true',
-        help='Use public build artifacts instead of internal ones.',
     )
     parser_new.add_argument(
         '--chromeos', action='store_true', help='create chromeos checkout'
