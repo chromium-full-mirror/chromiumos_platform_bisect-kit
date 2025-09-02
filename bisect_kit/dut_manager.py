@@ -373,14 +373,17 @@ class DutManager:
             images = cros_util.search_image(
                 self.dut_allocate_spec.boards[0],
                 self._vm_cros_version,
-                # TODO(b/441146529): Implement public board bisection support.
-                is_public_build=False,
+                is_public_build=self.config.get('is_public_build', False),
             )
 
             if cros_util.ImageType.VM_IMAGE not in images:
                 raise errors.ExecutionFatalError(
-                    'No VM image for %s (%s) found'
-                    % (self.dut_allocate_spec.boards[0], self._vm_cros_version)
+                    'No VM image for %s (%s, is_public_build: %s) found'
+                    % (
+                        self.dut_allocate_spec.boards[0],
+                        self._vm_cros_version,
+                        self.config.get('is_public_build', False),
+                    )
                 )
             return images[cros_util.ImageType.VM_IMAGE]
 
