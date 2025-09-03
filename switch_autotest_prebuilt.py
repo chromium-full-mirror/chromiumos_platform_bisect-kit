@@ -214,7 +214,7 @@ def switch_main(args: tuple[str] | None):
         opts.version,
         opts.test_name,
         opts.dut,
-        opts.is_public_build,
+        opts.public_build,
     )
 
     # Verify test control file exists.
