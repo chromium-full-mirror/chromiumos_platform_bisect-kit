@@ -91,7 +91,7 @@ def _get_required_python_version(
     """
     # The first commits in the chromite repo supporting python 3.12 and 3.13.
     MIN_REV_FOR_3_12 = 'f220bbd3d92693db4a51c2d5e5d0575f231127e2'
-    MIN_REV_FOR_3_13 = 'e384797423d713cd3e07ac7223fadc0189dc9551'
+    MIN_REV_FOR_3_13 = '822b9e35d8052a39b83c08cf44748defce0e3e2d'
 
     if not chromite_dir or not git_util.is_git_root(chromite_dir):
         return None
