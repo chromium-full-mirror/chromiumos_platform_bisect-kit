@@ -8,7 +8,11 @@ import base64
 import json
 import logging
 import os
+import re
+from typing import Optional
 
+from bisect_kit import cr_util
+from bisect_kit import git_util
 from google import genai
 from google.api_core import retry
 import google.auth.transport.requests
@@ -50,8 +54,42 @@ FUNCTIONS = [
         ),
     },
     {
+        "name": "get_revision_detail",
+        "description": (
+            "Get all details, like commit messages, code diffs for a specific "
+            "revision."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "rev_id": {
+                    "type": "string",
+                    "description": "Rev_id of the revision to run at.",
+                },
+            },
+            "required": ["rev_id"],
+        },
+    },
+    {
         "name": "run_at",
         "description": "Run the test at given commit",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "rev_id": {
+                    "type": "string",
+                    "description": "Rev_id of the revision to run at.",
+                },
+            },
+            "required": ["rev_id"],
+        },
+    },
+    {
+        "name": "conclude",
+        "description": (
+            "Make conclusion on the culprit CL. The conclusion must be "
+            "verified on the culprit and its previous commit."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -143,6 +181,7 @@ class GeminiAgent:
         Returns the response from Gemini.
         """
         contents = self._contents + [reply]
+        logger.info('Replying %s', reply)
         response = self._client.models.generate_content(
             model=MODEL, contents=contents, config=self._config
         )
@@ -156,19 +195,66 @@ class BisectAgent:
     """The agent that allows Gemini to analyze commit messages, diffs for
     smarter bisection."""
 
-    def __init__(self, test_name: str):
+    def __init__(self, test_name: str, repo: str, revlist: list[str]):
         """Initializes BisectAgent.
 
         test_name: Name of the regressed test."""
         self._agent = GeminiAgent(prompt=PROMPT, functions=FUNCTIONS)
         self._test_name = test_name
         self._started = False
+        self._repo = repo
+        self._revlist = revlist
+        self._conclusion = None
+
+        # TODO(fqj): add support for ChromeOS CLs.
+        rev2commit = {}
+        # Use build_revlist to generate revlist and commits fast.
+        _, details = cr_util.build_revlist(self._repo, revlist[0], revlist[-1])
+        for x in revlist:
+            rev2commit[x] = {
+                'repo': self._repo,
+                'commit': (
+                    details[x]['actions'][0]['rev']
+                    if x in details
+                    # In case of any bug, try to recover commit individually
+                    # build_revlist doesn't have this item
+                    else cr_util.query_git_rev_by_commit_position(self._repo, x)
+                ),
+            }
+        self._rev2commit = rev2commit
 
     def _get_revisions(self) -> list[dict]:
         """Returns the revlist and their subjects."""
-        raise NotImplementedError()
+        return [
+            {
+                'rev_id': x,
+                'repo': self._rev2commit[x]['repo'],
+                'subject': git_util.CommitMeta.get_summary(
+                    git_util.get_commit_metadata(
+                        self._rev2commit[x]['repo'],
+                        self._rev2commit[x]['commit'],
+                    )
+                ),
+            }
+            for x in self._revlist
+        ]
 
-    def _run(self, reply: genai.types.Part = None) -> str:
+    def _get_revision_detail(self, rev_id: str) -> dict:
+        """Returns the commit details of given rev_id.
+
+        rev_id: the revision id.
+
+        Returns the dict of revision detail."""
+        return {
+            'rev_id': rev_id,
+            'repo': self._rev2commit[rev_id]['repo'],
+            'git show': git_util.git_show(
+                self._rev2commit[rev_id]['repo'],
+                self._rev2commit[rev_id]['commit'],
+            ),
+        }
+
+    def _run(self, reply: Optional[genai.types.Part] = None) -> str:
         """Call GeminiAgent recursively until a target revision is determined.
 
         reply: reply from previous run.
@@ -186,14 +272,22 @@ class BisectAgent:
             )
         thoughts = '\n'.join(
             [
-                v.text if v.thought else ''
+                v.text
                 for v in ret.candidates[0].content.parts
+                if v.text and v.thought
             ]
         )
-        logger.debug(
-            'Gemini thought %s, replied %s, calling %s',
-            thoughts,
-            ret.text,
+        text = '\n'.join(
+            [
+                v.text
+                for v in ret.candidates[0].content.parts
+                if v.text and not v.thought
+            ]
+        )
+        logger.debug('Gemini thought %s', thoughts)
+        logger.info(
+            'Gemini replied %s, calling %s',
+            text,
             ret.function_calls,
         )
         call = ret.function_calls[0]
@@ -210,15 +304,56 @@ class BisectAgent:
                     response={'revisions': self._get_revisions()},
                 )
             )
+        if call.name == 'get_revision_detail':
+            return self._run(
+                genai.types.Part.from_function_response(
+                    name='get_revision_detail',
+                    response=self._get_revision_detail(call.args['rev_id']),
+                )
+            )
         if call.name == 'run_at':
-            return ret.function_calls[0].args['rev_id']
+            return call.args['rev_id']
+        if call.name == 'conclude':
+            self._conclusion = call.args['rev_id']
+            return None
         raise NotImplementedError()
 
-    def next(self) -> str:
-        """Returns the next target revision for bisector to run."""
-        return self._run()
+    def next(self, good: Optional[bool] = None) -> str:
+        """Returns the next target revision for bisector to run.
+
+        good: whether previous run is good or not."""
+        if self._conclusion:
+            return None
+        if good is None:
+            return self._run()
+        return self._run(
+            genai.types.Part.from_function_response(
+                name='run_at', response={'is_good': good}
+            )
+        )
+
+    def get_result(self) -> str:
+        """Returns the concluded culprit revision."""
+        return self._conclusion
+
+
+def demo(testname, good, bad, culprit):
+    agent = BisectAgent(
+        testname,
+        os.path.join(os.getenv('HOME'), 'bisect-workdir/test/chrome/src'),
+        ['refs/heads/main@{#%d}' % (x) for x in range(good, bad + 1)],
+    )
+    attempt = agent.next()
+    while attempt:
+        attempt = int(re.search(r'#(\d+)', attempt).group(1))
+        if attempt >= culprit:
+            attempt = agent.next(False)
+        else:
+            attempt = agent.next(True)
+
+    print('Concluded Culprit: ', agent.get_result())
 
 
 if __name__ == '__main__':
     # PoC purporse only (should replace with unittest)
-    BisectAgent('tast.oobe.SmokeOOBE').next()
+    demo('tast.ui.WebUIJSErrors', 1416515, 1416531, 1416520)

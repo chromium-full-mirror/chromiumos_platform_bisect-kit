@@ -723,6 +723,21 @@ def get_commit_log(git_repo: str, rev: str) -> str:
     return msg
 
 
+def git_show(git_repo: str, rev: str) -> str:
+    """Get git show.
+
+    Args:
+      git_repo: path of git repo.
+      rev: git commit revision.
+
+    Returns:
+      git show result
+    """
+    cmd = ['show', rev]
+    msg = git_output(cmd, cwd=git_repo)
+    return msg
+
+
 def get_commit_hash(git_repo: str, rev: str) -> str:
     """Get git commit hash.
 
