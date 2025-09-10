@@ -67,8 +67,6 @@ GS_ARCHIVE_BASE = 'gs://{gcp_bucket}/'
 GS_ARCHIVE_PATH = 'gs://{gcp_bucket}/{board}-{bucket}/{version}'
 RELEASE_BUCKET = 'release'
 FACTORY_BUCKET = 'factory'
-PREBUILT_IMAGE_BUCKETS_INTERNAL = [RELEASE_BUCKET, FACTORY_BUCKET]
-PREBUILT_IMAGE_BUCKETS_PUBLIC = ['public']
 
 # only fetches manifest from gs when milestone >= 92
 gs_manifest_cutoff_milestone = 92
@@ -81,7 +79,6 @@ gs_manifest_path = (
 # Since snapshots with version >= 12618.0.0 have android and chrome version
 # info.
 snapshot_cutover_version = '12618.0.0'
-snapshot_buckets = ['postsubmit', 'snapshot']
 
 # http://crbug.com/1170601, small snapshot ids should be ignored
 # 21000 is R80-12617.0.0
@@ -257,7 +254,6 @@ class NeedRecreateChrootException(Exception):
 class SnapshotStore:
     """Stores image version of snapshots."""
 
-    default_path = 'gs://chromeos-image-archive/{board}-{bucket}/{snapshot_version}-*/{filename}'
     images: dict[str, ImageInfo] = {}
 
     @classmethod
@@ -281,7 +277,10 @@ class SnapshotStore:
 
     @classmethod
     def query_snapshot_image(
-        cls, board: str, snapshot_version: str
+        cls,
+        board: str,
+        snapshot_version: str,
+        is_public_build: bool,
     ) -> str | None:
         """Query a snapshot image path from SnapshotStore or gs bucket.
 
@@ -290,6 +289,8 @@ class SnapshotStore:
         Args:
           board: CrOS board name
           snapshot_version: CrOS snapshot version
+          is_public_build: Whether to use public build buckets.
+              If None, use both public and internal buckets.
 
         Returns:
           A gs path for specific version or None if not exists.
@@ -303,17 +304,29 @@ class SnapshotStore:
                     sample_partition_filename,
                 ]
             logger.warning(
-                '%s not found in SnapshotStore, try to fetch from buckets %s',
+                '%s not found in SnapshotStore, try to fetch from the archive',
                 snapshot_version,
-                snapshot_buckets,
             )
+
+            gcp_bucket = (
+                GCP_BUCKET_PUBLIC if is_public_build else GCP_BUCKET_INTERNAL
+            )
+            path_template = (
+                f'gs://{gcp_bucket}'
+                f'/{board}-{{bucket}}'
+                f'/{snapshot_version}-*'
+                '/{filename}'
+            )
+
+            buckets = _generate_possible_bucket_list(
+                is_public_build=is_public_build, is_snapshot=None
+            )
+
             image_info = ImageInfo()
-            for bucket in snapshot_buckets:
+            for bucket in buckets:
                 for filename in query_files:
-                    path = cls.default_path.format(
-                        board=board,
+                    path = path_template.format(
                         bucket=bucket,
-                        snapshot_version=snapshot_version,
                         filename=filename,
                     )
                     output = gs_util.ls(path, ignore_errors=True)
@@ -334,12 +347,14 @@ class SnapshotStore:
 
     @classmethod
     def query_snapshot_buildbucket_id(
-        cls, board: str, snapshot_version: str
+        cls, board: str, snapshot_version: str, is_public_build: bool
     ) -> int | None:
         """Query buildbucket id of a snapshot"""
         if not is_cros_snapshot_version(snapshot_version):
             return None
-        path = cls.query_snapshot_image(board, snapshot_version)
+        path = cls.query_snapshot_image(
+            board, snapshot_version, is_public_build
+        )
         if not path:
             raise errors.ExternalError(
                 'board=%s snapshot=%s not found' % (board, snapshot_version)
@@ -355,7 +370,9 @@ class SnapshotStore:
     ) -> str | None:
         """Given a snapshot id, return its corresponding snapshot version."""
         for snapshot_version in cls.images:
-            gs_path = cls.query_snapshot_image(board, snapshot_version)
+            gs_path = cls.query_snapshot_image(
+                board, snapshot_version, is_public_build
+            )
             if (
                 gs_path
                 and cls.parse_snapshot_path(gs_path).get('snapshot_id')
@@ -363,14 +380,18 @@ class SnapshotStore:
             ):
                 return snapshot_version
 
+        buckets = _generate_possible_bucket_list(
+            is_public_build=is_public_build, is_snapshot=True
+        )
+
         # No existing BisectStates or version not found in the state file,
         # fetch snapshots from cloud storage
         logger.warning(
             'snapshot_id %s not found in SnapshotStore, fetch from buckets %s',
             snapshot_id,
-            snapshot_buckets,
+            buckets,
         )
-        for bucket in snapshot_buckets:
+        for bucket in buckets:
             gs_path = GS_ARCHIVE_PATH.format(
                 gcp_bucket=(
                     GCP_BUCKET_PUBLIC
@@ -391,13 +412,14 @@ class SnapshotStore:
 
     @classmethod
     def search_snapshot_image(
-        cls, board: str, snapshot_version: str
+        cls, board: str, snapshot_version: str, is_public_build: bool
     ) -> ImageInfo:
         """Searches chromeos snapshot image.
 
         Args:
           board: ChromeOS board name
           snapshot_version: ChromeOS snapshot version number
+          is_public_build: Search from the public build bucket or internal one.
 
         Returns:
           ImageInfo object
@@ -407,7 +429,7 @@ class SnapshotStore:
 
         # No existing BisectStates or version not found in the state file
         if not cls.images.get(snapshot_version):
-            cls.query_snapshot_image(board, snapshot_version)
+            cls.query_snapshot_image(board, snapshot_version, is_public_build)
 
         for img_type, gs_path in cls.images[snapshot_version].items():
             if img_type == ImageType.PARTITION_IMAGE:
@@ -432,9 +454,11 @@ class SnapshotStore:
         return m.groupdict() if m else {}
 
     @classmethod
-    def query_snapshot_info(cls, board, version) -> dict[str, str]:
+    def query_snapshot_info(
+        cls, board: str, version: str, is_public_build: bool
+    ) -> dict[str, str]:
         """Query snapshot information by board and version."""
-        path = cls.query_snapshot_image(board, version)
+        path = cls.query_snapshot_image(board, version, is_public_build)
         if not path:
             raise errors.ExternalError(
                 'board=%s snapshot=%s not found' % (board, version)
@@ -1065,14 +1089,13 @@ def _iter_valid_prebuilt_gs_path(
 
       `"gs://chromeos-image-archive/samus-release/R64-10123.0.0"`
     """
-    if buckets is None:
-        buckets = (
-            PREBUILT_IMAGE_BUCKETS_PUBLIC
-            if is_public_build
-            else PREBUILT_IMAGE_BUCKETS_INTERNAL
-        )
     if is_cros_short_version(version):
         version = f'R*-{version}'
+    if buckets is None:
+        buckets = _generate_possible_bucket_list(
+            is_public_build=is_public_build,
+            is_snapshot=is_cros_snapshot_version(version),
+        )
     for bucket in buckets:
         path = GS_ARCHIVE_PATH.format(
             gcp_bucket=(
@@ -1105,12 +1128,6 @@ def query_prebuilt_gs_path(
       The first valid prebuilt path matches given `board`, `version`, and
       `buckets`.  An empty string `''` if there is no valid prebuilt path.
     """
-    if buckets is None:
-        buckets = (
-            PREBUILT_IMAGE_BUCKETS_PUBLIC
-            if is_public_build
-            else PREBUILT_IMAGE_BUCKETS_INTERNAL
-        )
     for archive_path in _iter_valid_prebuilt_gs_path(
         board, version, is_public_build, buckets
     ):
@@ -1272,14 +1289,15 @@ def version_to_full(
 
 def _find_files_from_image_archive(
     board: str,
-    buckets: list[str],
     filenames: list[str],
     old: str,
     new: str,
     is_public_build: bool,
+    is_snapshot: bool,
 ) -> list[tuple[str, str]]:
     assert is_cros_full_version(old) or is_cros_snapshot_version(old)
     assert is_cros_full_version(new) or is_cros_snapshot_version(new)
+    assert is_cros_snapshot_version(old) == is_cros_snapshot_version(new)
 
     old_milestone = int(version_split(old)[0])
     new_milestone = int(version_split(new)[0])
@@ -1302,6 +1320,11 @@ def _find_files_from_image_archive(
             int(extract_major_version(old)), int(extract_major_version(new)) + 1
         ):
             version_prefixes.append('R%d-%d.' % (old_milestone, major))
+
+    buckets = _generate_possible_bucket_list(
+        is_public_build=is_public_build,
+        is_snapshot=is_snapshot,
+    )
 
     with multiprocessing.Pool() as pool:
         async_requests = []
@@ -1417,27 +1440,22 @@ def _list_prebuilt_from_image_archive(
             sample_partition_filename,
         ]
 
-    prebuilt_image_buckets = (
-        PREBUILT_IMAGE_BUCKETS_PUBLIC
-        if is_public_build
-        else PREBUILT_IMAGE_BUCKETS_INTERNAL
-    )
     files = _find_files_from_image_archive(
         board,
-        prebuilt_image_buckets,
         files_to_find,
         old,
         new,
         is_public_build=is_public_build,
+        is_snapshot=False,
     )
     if use_snapshot:
         files += _find_files_from_image_archive(
             board,
-            snapshot_buckets,
             files_to_find_snapshot,
             old,
             new,
             is_public_build=is_public_build,
+            is_snapshot=True,
         )
     logger.debug('Found prebuilt image files: %s', files)
 
@@ -1528,6 +1546,50 @@ def _cache_path_for_download(chromeos_root, url):
     return os.path.join(cached_images_dir, name)
 
 
+def _generate_possible_bucket_list(
+    is_public_build: typing.Optional[bool], is_snapshot: typing.Optional[bool]
+):
+    """Generates a list of possible bucket names.
+
+    Args:
+        is_public_build: Whether to use public build buckets.
+            If None, use both public and internal buckets.
+        is_snapshot: Whether to use snapshot buckets.
+            If None, use both snapshot and non-snapshot buckets.
+
+    Returns:
+        A list of possible bucket names.
+    """
+    PREBUILT_IMAGE_BUCKETS_INTERNAL = [RELEASE_BUCKET, FACTORY_BUCKET]
+    PREBUILT_IMAGE_BUCKETS_PUBLIC = ['public']
+    SNAPSHOT_BUCKETS = ['postsubmit', 'snapshot']
+
+    if is_public_build is None:
+        buckets_main = (
+            PREBUILT_IMAGE_BUCKETS_INTERNAL + PREBUILT_IMAGE_BUCKETS_PUBLIC
+        )
+    elif is_public_build:
+        buckets_main = PREBUILT_IMAGE_BUCKETS_PUBLIC
+    else:
+        buckets_main = PREBUILT_IMAGE_BUCKETS_INTERNAL
+
+    if is_snapshot is None:
+        buckets_sub = SNAPSHOT_BUCKETS + ['']
+    elif is_snapshot:
+        buckets_sub = SNAPSHOT_BUCKETS
+    else:
+        buckets_sub = ['']
+
+    bucket_list = []
+    for bucket_main in buckets_main:
+        for bucket_sub in buckets_sub:
+            if bucket_sub:
+                bucket_list.append(bucket_main + '-' + bucket_sub)
+            else:
+                bucket_list.append(bucket_main)
+    return bucket_list
+
+
 def extract_info_from_prebuilt_gs_path(gs_path) -> dict:
     """Extract the board, bucket, and version info from the given prebuilt path.
 
@@ -1540,13 +1602,14 @@ def extract_info_from_prebuilt_gs_path(gs_path) -> dict:
     """
     # TODO(acewu): Pre-compile all the regex patterns
     gcp_bucket_pattern = '|'.join([GCP_BUCKET_PUBLIC, GCP_BUCKET_INTERNAL])
-    prebuilt_image_buckets = (
-        PREBUILT_IMAGE_BUCKETS_INTERNAL + PREBUILT_IMAGE_BUCKETS_PUBLIC
+    prebuilt_image_buckets = _generate_possible_bucket_list(
+        is_public_build=None, is_snapshot=None
     )
     bucket_pattern = '|'.join(prebuilt_image_buckets)
     gs_path_pattern = (
         rf'gs://(?P<gcp_bucket>{gcp_bucket_pattern})/'
-        + rf'(?P<board>[^/]+?)-(?P<bucket>{bucket_pattern})/(?P<version>[^/]+)/'
+        rf'(?P<board>[^/]+?)-(?P<bucket>{bucket_pattern})?/'
+        rf'(?P<version>[^/]+)/'
     )
     if m := re.search(gs_path_pattern, gs_path):
         return m.groupdict()
@@ -1679,7 +1742,9 @@ def _quick_provision(chromeos_root, host, image_info, is_public_build: bool):
     return True
 
 
-def verify_dut_version(host, board, version):
+def verify_dut_version(
+    host: str, board: str, version: str, is_public_build: bool
+):
     if version:
         # In the past, cros flash may fail with returncode=0
         # So let's have an extra check.
@@ -1687,7 +1752,9 @@ def verify_dut_version(host, board, version):
             builder_path = query_dut_lsb_release(host).get(
                 'CHROMEOS_RELEASE_BUILDER_PATH', ''
             )
-            snapshot_info = SnapshotStore.query_snapshot_info(board, version)
+            snapshot_info = SnapshotStore.query_snapshot_info(
+                board, version, is_public_build
+            )
             expect_prefix = '%s-%s/%s-' % (
                 board,
                 snapshot_info['bucket'],
@@ -1733,7 +1800,7 @@ def provision_image(
     """
     try:
         if quick_provision(chromeos_root, host, image_info):
-            verify_dut_version(host, board, version)
+            verify_dut_version(host, board, version, is_public_build)
             return
         logger.debug('quick-provision is not supported; fallback to cros flash')
     except errors.ExternalError as e:
@@ -1753,7 +1820,7 @@ def provision_image(
     workaround_b378126412(
         host, version, force_reboot_callback=force_reboot_callback
     )
-    verify_dut_version(host, board, version)
+    verify_dut_version(host, board, version, is_public_build)
 
 
 def powerwash(
@@ -1821,7 +1888,9 @@ def _search_prebuilt_image(board, version, is_public_build: bool) -> ImageInfo:
 
 def search_image(board, version, is_public_build: bool) -> ImageInfo:
     if is_cros_snapshot_version(version):
-        return SnapshotStore.search_snapshot_image(board, version)
+        return SnapshotStore.search_snapshot_image(
+            board, version, is_public_build
+        )
     return _search_prebuilt_image(board, version, is_public_build)
 
 
@@ -2154,7 +2223,9 @@ def query_version_info(
     )
     buildbucket_id = (
         info.buildbucket_id
-        or SnapshotStore.query_snapshot_buildbucket_id(board, cros_version)
+        or SnapshotStore.query_snapshot_buildbucket_id(
+            board, cros_version, is_public_build
+        )
     )
 
     if buildbucket_id is None:
@@ -3086,10 +3157,10 @@ class ChromeOSSpecManager(codechange.SpecManager):
         old_timestamp = None
         new_timestamp = None
         old_path = SnapshotStore.query_snapshot_image(
-            self.config.get('board'), old
+            self.config.get('board'), old, self.is_public_build
         )
         new_path = SnapshotStore.query_snapshot_image(
-            self.config.get('board'), new
+            self.config.get('board'), new, self.is_public_build
         )
         if old_path:
             old_timestamp = gs_util.stat_max_creation_time(old_path) - 86400
@@ -3367,7 +3438,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             snapshot_version = SnapshotStore.query_snapshot_version_by_id(
                 self.config.get('board'),
                 snapshot_id,
-                is_public_build=self.config.get('is_public_build'),
+                is_public_build=self.is_public_build,
             )
             if snapshot_version:
                 result.append(

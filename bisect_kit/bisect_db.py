@@ -72,7 +72,7 @@ def to_dut_allocate_spec(
             raise errors.DutAllocateSpecError('Missing New.Version')
         spec.version_hints = [old_version, new_version]
 
-    spec.public = b.get('PublicBuild', False)
+    spec.public = 'public-build' in b.get('Flags', [])
 
     user_dut = b.get('UserDUT')
     if user_dut:

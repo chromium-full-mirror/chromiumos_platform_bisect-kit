@@ -263,8 +263,9 @@ class DutAllocator:
                     for v in versions
                 ):
                     logger.warning(
-                        'builder=%s does not have prebuilt test image for %s, ignore',
+                        'builder=%s (%s) does not have prebuilt test image for %s, ignore',
                         builder,
+                        'public' if spec.public else 'internal',
                         spec.version_hints,
                     )
                     continue
