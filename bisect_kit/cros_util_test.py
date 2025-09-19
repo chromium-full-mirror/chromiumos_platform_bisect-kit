@@ -7,6 +7,7 @@
 import fnmatch
 import logging
 import os
+import random
 import subprocess
 import textwrap
 import unittest
@@ -466,6 +467,188 @@ class TestCrosUtil(unittest.TestCase):
             self.assertEqual(
                 cros_util.version_to_full('samus', 'R64-10123.0.0-12345'),
                 'R64-10123.0.0',
+            )
+
+    # pylint: disable=protected-access
+    @mock.patch('bisect_kit.gs_util.ls')
+    def test_find_files_from_image_archive(self, mock_gs_ls):
+        def fake_gs_util_ls(path, ignore_errors=False):
+            gs_files = [
+                'gs://chromeos-image-archive/foo-release/R63-9995.0.0/image.zip',
+                'gs://chromeos-image-archive/foo-release/R63-9997.0.0/image.zip',
+                'gs://chromeos-image-archive/foo-release/R63-9997.0.1/image.zip',
+                'gs://chromeos-image-archive/foo-factory/R63-9998.0.0/image.zip',
+                'gs://chromeos-image-archive/foo-release/R63-9999.0.0/image.zip',
+                'gs://chromeos-image-archive/foo-release/R63-9999.0.1/image.zip',
+                'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30102-000/image.zip',
+                'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-001/image.zip',
+                'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-002/image.zip',
+                'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-003/image.zip',
+                'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30104-000/image.zip',
+                'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30105-000/image.zip',
+                'gs://chromeos-image-archive/foo-snapshot/R63-9993.0.0-20105-000/image.zip',
+                'gs://chromiumos-image-archive/foo-public/R63-9991.0.0/image.zip',
+                'gs://chromiumos-image-archive/foo-public-snapshot/R63-9993.0.0-20103-000/image.zip',
+                'gs://chromiumos-image-archive/foo-public-snapshot/R63-9994.0.0-20104-000/image.zip',
+                'gs://chromiumos-image-archive/foo-public-snapshot/R63-9995.0.0-20105-000/image.zip',
+                # Unsupported paths
+                'gs://chromeos-image-archive/foo-public/R63-9991.0.0/image.zip',
+                'gs://chromeos-image-archive/foo-release-main/R63-9997.0.0/image.zip',
+                'gs://chromiumos-image-archive/foo-snapshot/R63-9990.0.0-20100-000/image.zip',
+                'gs://chromiumos-image-archive/foo-public-main/R63-9991.0.0/image.zip',
+                'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0a-30103-002/image.zip',
+            ]
+            result = [p for p in gs_files if fnmatch.fnmatchcase(p, path)]
+            random.seed(a=20250919, version=2)
+            random.shuffle(result)
+            return result
+
+        mock_gs_ls.side_effect = fake_gs_util_ls
+
+        class MockAsyncResult:
+            """Mock for multiprocessing.pool.AsyncResult."""
+
+            def __init__(self, result):
+                self._result = result
+
+            def get(self, timeout=None):
+                return self._result
+
+        class MockPool:
+            """Mock for multiprocessing.Pool."""
+
+            def apply_async(self, func, args, kwargs):
+                return MockAsyncResult(func(*args, **kwargs))
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        with mock.patch('multiprocessing.Pool', MockPool):
+            # Test case 1: non-snapshot, private build
+            result = cros_util._find_files_from_image_archive(
+                board='foo',
+                filenames=['image.zip'],
+                old='R63-9995.0.0',
+                new='R63-9999.0.0',
+                is_public_build=False,
+                is_snapshot=False,
+            )
+            self.assertEqual(
+                sorted(result),
+                sorted(
+                    [
+                        (
+                            'R63-9995.0.0',
+                            'gs://chromeos-image-archive/foo-release/R63-9995.0.0/image.zip',
+                        ),
+                        (
+                            'R63-9997.0.0',
+                            'gs://chromeos-image-archive/foo-release/R63-9997.0.0/image.zip',
+                        ),
+                        # 'R63-9997.0.1' (Non-'Rxxx-xxx-0.0`) is ignored.
+                        (
+                            'R63-9998.0.0',
+                            'gs://chromeos-image-archive/foo-factory/R63-9998.0.0/image.zip',
+                        ),
+                        (
+                            'R63-9999.0.0',
+                            'gs://chromeos-image-archive/foo-release/R63-9999.0.0/image.zip',
+                        ),
+                    ]
+                ),
+            )
+
+            # Test case 2: snapshot, private build
+            result = cros_util._find_files_from_image_archive(
+                board='foo',
+                filenames=['image.zip'],
+                old='R63-9996.0.0-30103',
+                new='R63-9996.0.0-30104',
+                is_public_build=False,
+                is_snapshot=True,
+            )
+            self.assertEqual(
+                sorted(result),
+                sorted(
+                    [
+                        (
+                            'R63-9996.0.0-30103',
+                            'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-001/image.zip',
+                        ),
+                        (
+                            'R63-9996.0.0-30103',
+                            'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-002/image.zip',
+                        ),
+                        (
+                            'R63-9996.0.0-30103',
+                            'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30103-003/image.zip',
+                        ),
+                        (
+                            'R63-9996.0.0-30104',
+                            'gs://chromeos-image-archive/foo-snapshot/R63-9996.0.0-30104-000/image.zip',
+                        ),
+                    ]
+                ),
+            )
+
+            # Test case 3: snapshot, public build
+            result = cros_util._find_files_from_image_archive(
+                board='foo',
+                filenames=['image.zip'],
+                old='R63-9994.0.0',
+                new='R63-9995.0.0',
+                is_public_build=True,
+                is_snapshot=True,
+            )
+            self.assertEqual(
+                sorted(result),
+                sorted(
+                    [
+                        (
+                            'R63-9994.0.0-20104',
+                            'gs://chromiumos-image-archive/foo-public-snapshot/R63-9994.0.0-20104-000/image.zip',
+                        ),
+                        # 'R63-9995.0.0-XXXX' is not matched since it's older than 'R63-9995.0.0'.
+                    ]
+                ),
+            )
+
+            # Test case 4: non-snapshot, public build
+            result = cros_util._find_files_from_image_archive(
+                board='foo',
+                filenames=['image.zip'],
+                old='R63-9990.0.0',
+                new='R63-9999.0.0',
+                is_public_build=True,
+                is_snapshot=False,
+            )
+            self.assertEqual(
+                sorted(result),
+                sorted(
+                    [
+                        (
+                            'R63-9991.0.0',
+                            'gs://chromiumos-image-archive/foo-public/R63-9991.0.0/image.zip',
+                        ),
+                    ]
+                ),
+            )
+
+            # Test case 5: no results
+            result = cros_util._find_files_from_image_archive(
+                board='foo',
+                filenames=['image.zip'],
+                old='R63-8000.0.0',
+                new='R63-8009.0.0',
+                is_public_build=True,
+                is_snapshot=True,
+            )
+            self.assertEqual(
+                result,
+                [],
             )
 
     @mock.patch('bisect_kit.gs_util.ls')
@@ -1266,6 +1449,88 @@ class TestCrosUtil(unittest.TestCase):
             self.assertEqual(versions, ['R100-10000.0.0', 'R100-10001.0.0'])
             self.assertIn('R100-10000.0.0', details)
             self.assertIn('R100-10001.0.0', details)
+
+    # pylint: disable=protected-access
+    def test_generate_possible_bucket_list(self):
+        # is_public_build = True
+        self.assertEqual(
+            cros_util._generate_possible_bucket_list(
+                is_public_build=True, is_snapshot=True
+            ),
+            ['public-snapshot'],
+        )
+        self.assertEqual(
+            cros_util._generate_possible_bucket_list(
+                is_public_build=True, is_snapshot=False
+            ),
+            ['public'],
+        )
+        self.assertEqual(
+            sorted(
+                cros_util._generate_possible_bucket_list(
+                    is_public_build=True, is_snapshot=None
+                )
+            ),
+            sorted(['public', 'public-snapshot']),
+        )
+
+        # is_public_build = False
+        self.assertEqual(
+            cros_util._generate_possible_bucket_list(
+                is_public_build=False, is_snapshot=True
+            ),
+            ['snapshot'],
+        )
+        self.assertEqual(
+            sorted(
+                cros_util._generate_possible_bucket_list(
+                    is_public_build=False, is_snapshot=False
+                )
+            ),
+            sorted(['release', 'factory']),
+        )
+        self.assertEqual(
+            sorted(
+                cros_util._generate_possible_bucket_list(
+                    is_public_build=False, is_snapshot=None
+                )
+            ),
+            sorted(['release', 'factory', 'snapshot']),
+        )
+
+        # is_public_build = None
+        self.assertEqual(
+            sorted(
+                cros_util._generate_possible_bucket_list(
+                    is_public_build=None, is_snapshot=True
+                )
+            ),
+            sorted(['snapshot', 'public-snapshot']),
+        )
+        self.assertEqual(
+            sorted(
+                cros_util._generate_possible_bucket_list(
+                    is_public_build=None, is_snapshot=False
+                )
+            ),
+            sorted(['release', 'factory', 'public']),
+        )
+        self.assertEqual(
+            sorted(
+                cros_util._generate_possible_bucket_list(
+                    is_public_build=None, is_snapshot=None
+                )
+            ),
+            sorted(
+                [
+                    'release',
+                    'factory',
+                    'public',
+                    'snapshot',
+                    'public-snapshot',
+                ]
+            ),
+        )
 
 
 if __name__ == '__main__':

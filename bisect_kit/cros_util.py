@@ -1297,7 +1297,6 @@ def _find_files_from_image_archive(
 ) -> list[tuple[str, str]]:
     assert is_cros_full_version(old) or is_cros_snapshot_version(old)
     assert is_cros_full_version(new) or is_cros_snapshot_version(new)
-    assert is_cros_snapshot_version(old) == is_cros_snapshot_version(new)
 
     old_milestone = int(version_split(old)[0])
     new_milestone = int(version_split(new)[0])
@@ -1562,31 +1561,30 @@ def _generate_possible_bucket_list(
     """
     PREBUILT_IMAGE_BUCKETS_INTERNAL = [RELEASE_BUCKET, FACTORY_BUCKET]
     PREBUILT_IMAGE_BUCKETS_PUBLIC = ['public']
-    SNAPSHOT_BUCKETS = ['postsubmit', 'snapshot']
+    SNAPSHOT_BUCKETS_INTERNAL = ['snapshot']
+    SNAPSHOT_BUCKETS_PUBLIC = ['public-snapshot']
 
     if is_public_build is None:
-        buckets_main = (
+        non_snapshot_bucket_list = (
             PREBUILT_IMAGE_BUCKETS_INTERNAL + PREBUILT_IMAGE_BUCKETS_PUBLIC
         )
+        snapshot_bucket_list = (
+            SNAPSHOT_BUCKETS_INTERNAL + SNAPSHOT_BUCKETS_PUBLIC
+        )
     elif is_public_build:
-        buckets_main = PREBUILT_IMAGE_BUCKETS_PUBLIC
+        non_snapshot_bucket_list = PREBUILT_IMAGE_BUCKETS_PUBLIC
+        snapshot_bucket_list = SNAPSHOT_BUCKETS_PUBLIC
     else:
-        buckets_main = PREBUILT_IMAGE_BUCKETS_INTERNAL
+        non_snapshot_bucket_list = PREBUILT_IMAGE_BUCKETS_INTERNAL
+        snapshot_bucket_list = SNAPSHOT_BUCKETS_INTERNAL
 
     if is_snapshot is None:
-        buckets_sub = SNAPSHOT_BUCKETS + ['']
+        bucket_list = non_snapshot_bucket_list + snapshot_bucket_list
     elif is_snapshot:
-        buckets_sub = SNAPSHOT_BUCKETS
+        bucket_list = snapshot_bucket_list
     else:
-        buckets_sub = ['']
+        bucket_list = non_snapshot_bucket_list
 
-    bucket_list = []
-    for bucket_main in buckets_main:
-        for bucket_sub in buckets_sub:
-            if bucket_sub:
-                bucket_list.append(bucket_main + '-' + bucket_sub)
-            else:
-                bucket_list.append(bucket_main)
     return bucket_list
 
 
