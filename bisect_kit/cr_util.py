@@ -332,20 +332,6 @@ def determine_targets_to_build(
     return result
 
 
-def show_gn_args(
-    out_dir: str,
-) -> None:
-    logger.info('=== SHOWING GN ARGS ===')
-    args_path = os.path.join(out_dir, 'args.gn')
-    if os.path.exists(args_path):
-        return
-
-    with open(args_path, 'r') as f:
-        logger.info(f.read())
-
-    logger.info('===============')
-
-
 def build(
     chrome_src: str,
     board: str,
@@ -373,10 +359,8 @@ def build(
             with_tests=with_tests,
         )
 
-    out_dir = os.path.join('out_%s' % board, 'Release')
-    show_gn_args(out_dir)
-
     logger.info('build %s', targets)
+    out_dir = os.path.join('out_%s' % board, 'Release')
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
         cmd = ['autoninja', '-C', out_dir] + targets
         # Chrome build shouldn't take more than 3 hours. Set timeout to abort
