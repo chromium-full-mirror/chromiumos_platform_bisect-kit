@@ -173,7 +173,6 @@ def switch_main(args: tuple[str] | None):
                 opts.board,
                 opts.dut,
                 opts.target,
-                is_public_build=opts.public_build,
                 with_tests=opts.with_tests,
             )
         elif opts.deploy_method == 'image':

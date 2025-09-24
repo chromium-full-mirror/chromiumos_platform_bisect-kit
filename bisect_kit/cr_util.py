@@ -398,7 +398,6 @@ def deploy_to_staging_dir(
     chrome_src: str,
     board: str,
     targets: list[str],
-    is_public_build: bool,
     out_dir: str,
     staging_dir: str,
 ) -> None:
@@ -414,17 +413,18 @@ def deploy_to_staging_dir(
     # Deploy chrome to the staging dir if needed.
     if set(CHROME_BINARIES).intersection(targets):
         cmd = [
-            'deploy_chrome',
+            './third_party/chromite/bin/deploy_chrome',
             '--force',
+            '--board',
+            board,
             '--build-dir',
             out_dir,
             '--staging-dir',
             staging_dir,
             '--staging-only',
         ]
-        _simple_chrome_shell(
-            chrome_src, board, command=cmd, is_public_build=is_public_build
-        )
+        chromite_util.check_output(*cmd, cwd=chrome_src)
+
     # Deploy test binaries to the staging dir if needed.
     test_binaries = set(CHROME_TEST_BINARIES).intersection(targets)
     for target in test_binaries:
@@ -442,7 +442,6 @@ def deploy(
     board: str,
     dut: str,
     targets: list[str],
-    is_public_build: bool,
     with_tests: bool = True,
     out_dir: str | None = None,
 ) -> None:
@@ -453,7 +452,6 @@ def deploy(
       board: ChromeOS board name.
       dut: DUT address.
       targets: ninja targets. If empty, deploys any target found in out_dir.
-      is_public_build: Whether this is a public build.
       with_tests: Deploy test binaries as well.
       out_dir: Optional output dir from which to deploy binaries.
     """
@@ -467,17 +465,17 @@ def deploy(
     # Deploy chrome if needed.
     if set(CHROME_BINARIES).intersection(targets):
         cmd = [
-            'deploy_chrome',
+            './third_party/chromite/bin/deploy_chrome',
             '--force',
+            '--board',
+            board,
             '--build-dir',
             out_dir,
             '--device',
             dut,
         ]
         try:
-            _simple_chrome_shell(
-                chrome_src, board, command=cmd, is_public_build=is_public_build
-            )
+            chromite_util.check_output(*cmd, cwd=chrome_src)
         except subprocess.CalledProcessError as e:
             raise errors.ExternalError('chrome deploy failed') from e
 
@@ -490,7 +488,6 @@ def deploy(
                 chrome_src,
                 board,
                 test_binaries,
-                is_public_build=is_public_build,
                 out_dir=out_dir,
                 staging_dir=staging_dir,
             )
