@@ -319,7 +319,7 @@ class SnapshotStore:
             )
 
             buckets = _generate_possible_bucket_list(
-                is_public_build=is_public_build, is_snapshot=None
+                is_public_build=is_public_build, is_snapshot=True
             )
 
             image_info = ImageInfo()
