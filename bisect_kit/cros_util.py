@@ -67,6 +67,9 @@ GS_ARCHIVE_BASE = 'gs://{gcp_bucket}/'
 GS_ARCHIVE_PATH = 'gs://{gcp_bucket}/{board}-{bucket}/{version}'
 RELEASE_BUCKET = 'release'
 FACTORY_BUCKET = 'factory'
+SNAPSHOT_BUCKET = 'snapshot'
+PUBLIC_BUCKET = 'public'
+PUBLIC_SNAPSHOT_BUCKET = 'public-snapshot'
 
 # only fetches manifest from gs when milestone >= 92
 gs_manifest_cutoff_milestone = 92
@@ -1565,9 +1568,9 @@ def _generate_possible_bucket_list(
         A list of possible bucket names.
     """
     PREBUILT_IMAGE_BUCKETS_INTERNAL = [RELEASE_BUCKET, FACTORY_BUCKET]
-    PREBUILT_IMAGE_BUCKETS_PUBLIC = ['public']
-    SNAPSHOT_BUCKETS_INTERNAL = ['snapshot']
-    SNAPSHOT_BUCKETS_PUBLIC = ['public-snapshot']
+    PREBUILT_IMAGE_BUCKETS_PUBLIC = [PUBLIC_BUCKET]
+    SNAPSHOT_BUCKETS_INTERNAL = [SNAPSHOT_BUCKET]
+    SNAPSHOT_BUCKETS_PUBLIC = [PUBLIC_SNAPSHOT_BUCKET]
 
     if is_public_build is None:
         non_snapshot_bucket_list = (
@@ -1660,7 +1663,18 @@ def prepare_image_for_cros_flash(
                 )
             return cache_path
 
+        if info.get('bucket') in [
+            SNAPSHOT_BUCKET,
+            PUBLIC_BUCKET,
+            PUBLIC_SNAPSHOT_BUCKET,
+        ]:
+            # The image files place directly under the version-named directory.
+            return os.path.dirname(path)
+
         if path.startswith(gs_archive_base):
+            # TODO(yoshiki): Check if this logic is actually necessary.
+            # Probably all the cases of `archive_base` are handled by the above
+            # conditions.
             return path.replace(disk_image_bundle_filename, 'test')
 
         # 'cros flash' doesn't support other gs bucket, download to local.

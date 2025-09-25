@@ -1261,6 +1261,159 @@ class TestCrosUtil(unittest.TestCase):
             },
         )
 
+    @mock.patch('os.makedirs')
+    @mock.patch('bisect_kit.git_util.is_ancestor_commit')
+    @mock.patch('shutil.move')
+    @mock.patch('bisect_kit.util.check_call')
+    @mock.patch('bisect_kit.gs_util.cp')
+    @mock.patch('tempfile.TemporaryDirectory')
+    @mock.patch('os.path.exists')
+    @mock.patch('bisect_kit.cros_util.extract_info_from_prebuilt_gs_path')
+    def test_prepare_image_for_cros_flash(
+        self,
+        mock_extract,
+        mock_exists,
+        mock_tempdir,
+        mock_cp,
+        mock_check_call,
+        mock_move,
+        mock_is_ancestor,
+        mock_makedirs,
+    ):
+        chromeos_root = '/path/to/root'
+        image_info = cros_util.ImageInfo()
+
+        with self.subTest('disk_image_release_bucket'):
+            mock_extract.return_value = {
+                'board': 'eve',
+                'bucket': 'release',
+                'version': 'R1-1.2.3',
+            }
+            image_info.clear()
+            image_info[cros_util.ImageType.DISK_IMAGE] = (
+                'gs://chromeos-image-archive/eve-release/R1-1.2.3/chromiumos_test_image.tar.xz'
+            )
+            result = cros_util.prepare_image_for_cros_flash(
+                chromeos_root, image_info, is_public_build=False
+            )
+            self.assertEqual(result, 'xbuddy://remote/eve/R1-1.2.3/test')
+
+        with self.subTest('disk_image_public_bucket'):
+            mock_extract.return_value = {
+                'board': 'eve',
+                'bucket': 'public',
+                'version': 'R1-1.2.3',
+            }
+            image_info.clear()
+            image_info[cros_util.ImageType.DISK_IMAGE] = (
+                'gs://chromiumos-image-archive/eve-public/R1-1.2.3/chromiumos_test_image.tar.xz'
+            )
+            result = cros_util.prepare_image_for_cros_flash(
+                chromeos_root, image_info, is_public_build=True
+            )
+            self.assertEqual(
+                result,
+                'gs://chromiumos-image-archive/eve-public/R1-1.2.3',
+            )
+
+        with self.subTest('disk_image_public_snapshot_bucket'):
+            mock_extract.return_value = {
+                'board': 'amd64-generic',
+                'bucket': 'public-snapshot',
+                'version': 'R1-1.2.3-456-7890',
+            }
+            image_info.clear()
+            image_info[cros_util.ImageType.DISK_IMAGE] = (
+                'gs://chromiumos-image-archive/amd64-generic-public-snapshot/R1-1.2.3-456-7890/chromiumos_test_image.tar.xz'
+            )
+            result = cros_util.prepare_image_for_cros_flash(
+                chromeos_root, image_info, is_public_build=True
+            )
+            self.assertEqual(
+                result,
+                'gs://chromiumos-image-archive/amd64-generic-public-snapshot/R1-1.2.3-456-7890',
+            )
+
+        with self.subTest('disk_image_snapshot_bucket'):
+            mock_extract.return_value = {
+                'board': 'betty-arc-t',
+                'bucket': 'snapshot',
+                'version': 'R1-1.2.3-456-7890',
+            }
+            image_info.clear()
+            image_info[cros_util.ImageType.DISK_IMAGE] = (
+                'gs://chromeos-image-archive/betty-arc-t-snapshot/R1-1.2.3-456-7890/chromiumos_test_image.tar.xz'
+            )
+            result = cros_util.prepare_image_for_cros_flash(
+                chromeos_root, image_info, is_public_build=True
+            )
+            self.assertEqual(
+                result,
+                'gs://chromeos-image-archive/betty-arc-t-snapshot/R1-1.2.3-456-7890',
+            )
+
+        with self.subTest('partition_image_new_chromite'):
+            mock_is_ancestor.return_value = True
+            image_info.clear()
+            image_info[cros_util.ImageType.PARTITION_IMAGE] = (
+                'gs://chromeos-image-archive/eve-release/R1-1.2.3/full_dev_part_KERN.bin.gz'
+            )
+            result = cros_util.prepare_image_for_cros_flash(
+                chromeos_root, image_info, is_public_build=False
+            )
+            self.assertEqual(
+                result,
+                'gs://chromeos-image-archive/eve-release/R1-1.2.3/full_dev_part_KERN.bin.gz',
+            )
+
+        with self.subTest('partition_image_old_chromite'):
+            mock_is_ancestor.return_value = False
+            image_info.clear()
+            image_info[cros_util.ImageType.PARTITION_IMAGE] = (
+                'gs://chromeos-image-archive/eve-release/R1-1.2.3/full_dev_part_KERN.bin.gz'
+            )
+            result = cros_util.prepare_image_for_cros_flash(
+                chromeos_root, image_info, is_public_build=False
+            )
+            self.assertIsNone(result)
+
+        with self.subTest('zip_file_cache_miss'):
+            mock_exists.reset_mock()
+            mock_exists.side_effect = [False, True]
+            mock_tempdir.return_value.__enter__.return_value = '/tmp/dir'
+            image_info.clear()
+            image_info[cros_util.ImageType.ZIP_FILE] = (
+                'gs://chromeos-image-archive/eve-release/R1-1.2.3/image.zip'
+            )
+            result = cros_util.prepare_image_for_cros_flash(
+                chromeos_root, image_info, is_public_build=False
+            )
+            self.assertTrue(result.startswith('tmp/images/'))
+            mock_cp.assert_called_with(
+                'gs://chromeos-image-archive/eve-release/R1-1.2.3/image.zip',
+                '/tmp/dir',
+            )
+            mock_check_call.assert_called_with(
+                'unzip',
+                '-j',
+                '/tmp/dir/image.zip',
+                'chromiumos_test_image.bin',
+                cwd='/tmp/dir',
+            )
+            mock_move.assert_called()
+
+        with self.subTest('zip_file_cache_hit'):
+            mock_exists.reset_mock()
+            mock_exists.side_effect = [True, True]
+            image_info.clear()
+            image_info[cros_util.ImageType.ZIP_FILE] = (
+                'gs://chromeos-image-archive/eve-release/R1-1.2.3/image.zip'
+            )
+            result = cros_util.prepare_image_for_cros_flash(
+                chromeos_root, image_info, is_public_build=False
+            )
+            self.assertTrue(result.startswith('tmp/images/'))
+
     def test_determine_image_type(self):
         self.assertEqual(
             cros_util.ImageType.determine(
