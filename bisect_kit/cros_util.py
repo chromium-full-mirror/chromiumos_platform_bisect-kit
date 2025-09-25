@@ -440,14 +440,19 @@ class SnapshotStore:
     @classmethod
     def parse_snapshot_path(cls, path: str) -> dict[str, str]:
         """Parse information in snapshot path."""
+        possible_buckets = _generate_possible_bucket_list(
+            is_public_build=None, is_snapshot=None
+        )
+        bucket_pattern = '|'.join(possible_buckets)
         m = re.match(
-            r"""
-      .*/ # gs://.../
-      (?P<board>[^/]+)-(?P<bucket>[^-/]+)/ # eve-postsubmit/
-      (?P<snapshot_version>R\d+-\d+\.\d+\.\d+-(?P<snapshot_id>\d+))
-      -(?P<buildbucket_id>.+)/ # R91-12345.0.0-67890-123456/
-      (?P<filename>[^/]+) # image.zip
-    """,
+            rf"""
+                .*/ # gs://.../
+                (?P<board>[^/]+?)-  # eg. eve, amd64-generic, ...
+                (?P<bucket>{bucket_pattern})/ # release, public-snapshot, ...
+                (?P<snapshot_version>R\d+-\d+\.\d+\.\d+-(?P<snapshot_id>\d+))
+                -(?P<buildbucket_id>.+)/ # R91-12345.0.0-67890-123456/
+                (?P<filename>[^/]+) # image.zip
+            """,
             path,
             re.VERBOSE,
         )

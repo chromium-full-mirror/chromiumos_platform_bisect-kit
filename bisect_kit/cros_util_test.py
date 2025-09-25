@@ -937,6 +937,7 @@ class TestCrosUtil(unittest.TestCase):
                 'version': 'R63-10001.0.0',
             },
         )
+
         info = cros_util.extract_info_from_prebuilt_gs_path(
             'gs://chromeos-image-archive/bar-factory/R71-10082.30.0/chromiumos_test_image.tar.xz'
         )
@@ -949,10 +950,12 @@ class TestCrosUtil(unittest.TestCase):
                 'version': 'R71-10082.30.0',
             },
         )
+
         info = cros_util.extract_info_from_prebuilt_gs_path(
             'gs://chromeos-image-archive/bar-factory/R71-10082.30.0'
         )
         self.assertDictEqual(info, {})
+
         info = cros_util.extract_info_from_prebuilt_gs_path(
             'gs://chromiumos-image-archive/hoge-public/R141-12345.30.0/chromiumos_test_image.tar.xz'
         )
@@ -965,10 +968,37 @@ class TestCrosUtil(unittest.TestCase):
                 'version': 'R141-12345.30.0',
             },
         )
+
         info = cros_util.extract_info_from_prebuilt_gs_path(
             'gs://chromeos-image-archive/hoge-public/R141-12345.30.0'
         )
         self.assertDictEqual(info, {})
+
+        info = cros_util.extract_info_from_prebuilt_gs_path(
+            'gs://chromeos-image-archive/betty-arc-t-snapshot/R141-12345.30.0-12345-1234567/image.zip'
+        )
+        self.assertDictEqual(
+            info,
+            {
+                'gcp_bucket': 'chromeos-image-archive',
+                'board': 'betty-arc-t',
+                'bucket': 'snapshot',
+                'version': 'R141-12345.30.0-12345-1234567',
+            },
+        )
+
+        info = cros_util.extract_info_from_prebuilt_gs_path(
+            'gs://chromiumos-image-archive/amd64-generic-public-snapshot/R141-12345.30.0-12345-1234567/image.zip'
+        )
+        self.assertDictEqual(
+            info,
+            {
+                'gcp_bucket': 'chromiumos-image-archive',
+                'board': 'amd64-generic',
+                'bucket': 'public-snapshot',
+                'version': 'R141-12345.30.0-12345-1234567',
+            },
+        )
 
     def test_is_cros_version_lesseq(self):
         self.assertTrue(
@@ -1191,15 +1221,43 @@ class TestCrosUtil(unittest.TestCase):
 
         self.assertDictEqual(
             cros_util.SnapshotStore.parse_snapshot_path(
-                'gs://my-bucket/eve-kernelnext-postsubmit/R96-14171.0.0-53037-123456789/full_dev_part_KERN.bin.gz'
+                'gs://my-bucket/eve-kernelnext-release/R96-14171.0.0-53037-123456789/full_dev_part_KERN.bin.gz'
             ),
             {
                 'board': 'eve-kernelnext',
-                'bucket': 'postsubmit',
+                'bucket': 'release',
                 'snapshot_version': 'R96-14171.0.0-53037',
                 'snapshot_id': '53037',
                 'buildbucket_id': '123456789',
                 'filename': 'full_dev_part_KERN.bin.gz',
+            },
+        )
+
+        self.assertDictEqual(
+            cros_util.SnapshotStore.parse_snapshot_path(
+                'gs://my-bucket/octopus-public-snapshot/R96-14171.0.0-53037-123456789/image.zip'
+            ),
+            {
+                'board': 'octopus',
+                'bucket': 'public-snapshot',
+                'snapshot_version': 'R96-14171.0.0-53037',
+                'snapshot_id': '53037',
+                'buildbucket_id': '123456789',
+                'filename': 'image.zip',
+            },
+        )
+
+        self.assertDictEqual(
+            cros_util.SnapshotStore.parse_snapshot_path(
+                'gs://my-bucket/amd64-generic-public-snapshot/R96-14171.0.0-53037-123456789/image.zip'
+            ),
+            {
+                'board': 'amd64-generic',
+                'bucket': 'public-snapshot',
+                'snapshot_version': 'R96-14171.0.0-53037',
+                'snapshot_id': '53037',
+                'buildbucket_id': '123456789',
+                'filename': 'image.zip',
             },
         )
 
