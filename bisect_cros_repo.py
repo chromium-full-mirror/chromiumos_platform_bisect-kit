@@ -83,6 +83,11 @@ class ChromeOSRepoDomain(core.BisectDomain):
             default=os.environ.get('CHROMEOS_MIRROR', ''),
             help='ChromeOS repo mirror path',
         )
+        parser.add_argument(
+            '--public-build',
+            action='store_true',
+            help='Use public build artifacts instead of internal ones.',
+        )
 
     @staticmethod
     def init(opts):
@@ -117,6 +122,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
             "board": opts.board,
             "chromeos_root": opts.chromeos_root,
             "chromeos_mirror": opts.chromeos_mirror,
+            "is_public_build": opts.public_build,
         }
 
         spec_manager = cros_util.ChromeOSSpecManager(config)
