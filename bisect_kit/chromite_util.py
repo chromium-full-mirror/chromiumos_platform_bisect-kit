@@ -96,7 +96,17 @@ def _get_required_python_version(
     if not chromite_dir or not git_util.is_git_root(chromite_dir):
         return None
 
-    current_commit_hash = git_util.get_commit_hash(chromite_dir, 'HEAD')
+    try:
+        current_commit_hash = git_util.get_commit_hash(chromite_dir, 'HEAD')
+    except ValueError:
+        # Sometimes the git repo gets broken for some reason. In that case, it
+        # proceeds without doing the hack.
+        # TODO(yoshiki): Investigate why it breaks and find altanative way to
+        # check the commit hadh
+        logger.error(
+            'Chromite git repo seems to be broken, but git comannd failed.'
+        )
+        return None
 
     # If the current python is 3.12+ but the chromite doesn't support it, use
     # python3.11.
