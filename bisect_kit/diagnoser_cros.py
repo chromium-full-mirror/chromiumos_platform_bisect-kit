@@ -402,6 +402,11 @@ class CrosDiagnoser:
                     '--session',
                     self.config.get('session'),
                 ]
+                + (
+                    ['--public-build']
+                    if self.config.get('is_public_build')
+                    else []
+                )
             ),
         )
 

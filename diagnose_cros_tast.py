@@ -46,12 +46,13 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         common_eval_cmd = [
             './eval_cros_tast.py',
             '--rich-result',
-            '--with-private-bundles',
             '--chromeos-root',
             self.config.get('chromeos_root'),
             '--test-name',
             self.config.get('test_name'),
         ]
+        if not self.config.get('is_public_build'):
+            common_eval_cmd.append('--with-private-bundles')
         if self.config.get('metric'):
             common_eval_cmd += [
                 '--metric',
