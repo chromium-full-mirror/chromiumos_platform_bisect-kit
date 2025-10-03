@@ -3136,6 +3136,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
         self.manifest_dir = os.path.join(
             self.config.get('chromeos_root'), '.repo', 'manifests'
         )
+        self.manifest_external_dir = os.path.join(
+            self.config.get('chromeos_mirror'), 'chromiumos/manifest.git'
+        )
         self.manifest_internal_dir = os.path.join(
             self.config.get('chromeos_mirror'), 'manifest-internal.git'
         )
@@ -3192,7 +3195,11 @@ class ChromeOSSpecManager(codechange.SpecManager):
         result = []
         _, _, old_snapshot_id = snapshot_version_split(old)
         _, _, new_snapshot_id = snapshot_version_split(new)
-        repo = self.manifest_internal_dir
+        repo = (
+            self.manifest_external_dir
+            if self.is_public_build
+            else self.manifest_internal_dir
+        )
         path = 'snapshot.xml'
         branch = 'snapshot'
         commits = git_util.get_history(
@@ -3222,13 +3229,17 @@ class ChromeOSSpecManager(codechange.SpecManager):
             match = re.match(r'^annealing manifest snapshot (\d+)', msg)
             if match:
                 snapshot_id = match.group(1)
-            elif 'Annealing manifest snapshot' in msg:
+            elif (
+                not self.is_public_build
+            ) and 'Annealing manifest snapshot' in msg:
                 snapshot_id = str(count)
                 count -= 1
             else:
                 continue
             # b/151054108: snapshot version in [29288, 29439] is broken
-            if 29288 <= int(snapshot_id) <= 29439:
+            if (not self.is_public_build) and (
+                29288 <= int(snapshot_id) <= 29439
+            ):
                 continue
             if int(old_snapshot_id) <= int(snapshot_id) <= int(new_snapshot_id):
                 result.append((commit.timestamp, commit.rev, snapshot_id))
@@ -3586,7 +3597,13 @@ class ChromeOSSpecManager(codechange.SpecManager):
             revisions = self.lookup_snapshot_manifest_revisions(rev, rev)
             commit_id = revisions[0][1]
             manifest = git_util.get_file_from_revision(
-                self.manifest_internal_dir, commit_id, 'snapshot.xml'
+                (
+                    self.manifest_external_dir
+                    if self.is_public_build
+                    else self.manifest_internal_dir
+                ),
+                commit_id,
+                'snapshot.xml',
             )
         return manifest
 
