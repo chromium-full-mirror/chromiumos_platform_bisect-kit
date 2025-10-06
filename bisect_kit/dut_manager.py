@@ -661,10 +661,11 @@ class DutManager:
                     or self._should_force_monitoring
                 ):
                     logger.info('monitoring DUT lease status for %s', dut)
-                    reason = cros_lab_util.make_lease_reason(
-                        self.config.get('session')
-                    )
-                    with cros_lab_util.dut_lease_status_monitor(dut, reason):
+                    session_id = self.config.get('session')
+                    reason = cros_lab_util.make_lease_reason(session_id)
+                    with cros_lab_util.dut_lease_status_monitor(
+                        dut, reason, session_id
+                    ):
                         yield dut
                         return
             yield dut

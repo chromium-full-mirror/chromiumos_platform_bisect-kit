@@ -19,6 +19,7 @@ import asyncio
 import calendar
 import contextlib
 import dataclasses
+import datetime
 import errno
 import json
 import logging
@@ -33,6 +34,7 @@ import threading
 import time
 import timeit
 import typing
+import uuid
 
 from bisect_kit import common
 from bisect_kit import cros_util
@@ -55,7 +57,27 @@ LAB_DUT_EXCEPTIONS = [
     r'cre.+',
 ]
 
+# Prefixes of bisecor task identifier string. On Prod/Staging/Dev environments,
+# the previs should be a host name so an identifier will be an URL.
+BISECTOR_HOST_PROD = 'https://crosperf.googleplex.com/'
+BISECTOR_HOST_STAGING = 'https://crosperf-staging.googleplex.com/'
+BISECTOR_HOST_DEV = 'https://crosperf-dev.googleplex.com/'
+BISECTOR_LOCAL_TEST_PREFIX = 'cros-bisect:'
+
+PROD_SERVICE_ACCOUNT = (
+    'bisect-runner@crosperf.google.com.iam.gserviceaccount.com'
+)
+DEV_SERVICE_ACCOUNT = (
+    'bisect-runner@crosperf-dev.google.com.iam.gserviceaccount.com'
+)
+STAGING_SERVICE_ACCOUNT = (
+    'bisect-runner@crosperf-staging.google.com.iam.gserviceaccount.com'
+)
+
 SWARMING_PRPC_SERVER = 'chromeos-swarming.appspot.com'
+DEVICE_LEASE_SERVICE_PRPC_SERVER = (
+    'device-lease-service-prod-bbx5lsj5jq-uc.a.run.app'
+)
 # https://chromium.googlesource.com/infra/luci/luci-py/+/733d5d3b5299408cbc6a5e5b33b1a461ea9e0acd/appengine/swarming/proto/api_v2/swarming.proto#162
 SWARMING_PRPC_QUERY_ALL = 10
 SWARMING_PRPC_DEFAULT_LIMIT = 1000
@@ -75,7 +97,6 @@ class LeaseStatus:
         is_leased: Whether the DUT is leased now (bool). If false, following
             fields are not available.
         leased_by: User id leases the dut.
-        is_leased_by_me: Whether is leased by current account.
         end_time: Timestamp at which this lease ends. (seconds since unix epoch time)
     """
 
@@ -83,9 +104,9 @@ class LeaseStatus:
     bot_id: typing.Optional[str] = None
     task_name: typing.Optional[str] = None
     task_id: typing.Optional[str] = None
+    lease_id_in_dls: typing.Optional[str] = None
     is_leased: bool = False
     leased_by: typing.Optional[str] = None
-    is_leased_by_me: typing.Optional[bool] = None
     end_time: typing.Optional[int] = None
 
 
@@ -233,13 +254,24 @@ def crosfleet_dut_info(dut_name):
     return info
 
 
-def swarming_grpc(method: str, content: dict, log_stdout: bool = True) -> str:
-    """Call swarming prpc.
+def _grpc(
+    server: str,
+    method: str,
+    content: dict,
+    log_stdout: bool = True,
+    use_id_token: bool = False,
+    verbose: bool = False,
+) -> str:
+    """Call a grpc method.
 
     Args:
+      server (str): server host name.
       method (str): grpc method name.
       content (dict): content send to grpc method.
-      log_stdout (bool): Whether to write the stdout output of the child process to log.
+      log_stdout (bool): Whether to write the stdout output of the child process
+          to log.
+      use_id_token (bool): Whether to use ID token.
+      verbose (bool): Whether to run in verbose mode.
 
     Returns:
       A string, the result of grpc call.
@@ -248,11 +280,14 @@ def swarming_grpc(method: str, content: dict, log_stdout: bool = True) -> str:
     cmd = [
         'prpc',
         'call',
-        SWARMING_PRPC_SERVER,
-        method,
     ]
+    if verbose:
+        cmd += ['-verbose']
+    if use_id_token:
+        cmd += ['-use-id-token']
     if not common.under_luci_context() and service_account_json:
         cmd += ['-service-account-json', service_account_json]
+    cmd += [server, method]
     # TODO(zjchang): To communicate with subprocess without opening new file.
     with tempfile.TemporaryFile(mode='w', suffix='.json') as temp:
         json.dump(content, temp)
@@ -263,6 +298,45 @@ def swarming_grpc(method: str, content: dict, log_stdout: bool = True) -> str:
             stdin=temp,
             log_stdout=log_stdout,
         )
+
+
+def swarming_grpc(method: str, content: dict, log_stdout: bool = True) -> str:
+    """Call swarming prpc.
+
+    Args:
+      method (str): grpc method name.
+      content (dict): content send to grpc method.
+      log_stdout (bool): Whether to write the stdout output of the child process
+          to log.
+
+    Returns:
+      A string, the result of grpc call.
+    """
+    return _grpc(SWARMING_PRPC_SERVER, method, content, log_stdout)
+
+
+def device_lease_service_grpc(
+    method: str, content: dict, log_stdout: bool = True
+) -> str:
+    """Call device lease service prpc.
+
+    Args:
+      method (str): grpc method name.
+      content (dict): content send to grpc method.
+      log_stdout (bool): Whether to write the stdout output of the child process
+          to log.
+
+    Returns:
+      A string, the result of grpc call.
+    """
+    return _grpc(
+        DEVICE_LEASE_SERVICE_PRPC_SERVER,
+        method,
+        content,
+        log_stdout,
+        use_id_token=True,
+        verbose=True,
+    )
 
 
 def swarming_cancel(task_id):
@@ -481,40 +555,6 @@ def swarming_bot_tasks(bot_id, limit=None):
     return json.loads(swarming_grpc(method, content))['items']
 
 
-def swarming_task_request(task_id, verbose_log=True):
-    """Gets the request of given task.
-
-    Args:
-      task_id: task id
-      verbose_log: log more if True
-
-    Returns:
-      task request dict
-    """
-    del verbose_log
-    assert task_id
-    method = 'swarming.v2.Tasks.GetRequest'
-    content = {'task_id': task_id}
-    return json.loads(swarming_grpc(method, content))
-
-
-def swarming_task_result(task_id, verbose_log=True):
-    """Gets the current result of given task.
-
-    Args:
-      task_id: task id
-      verbose_log: log more if True
-
-    Returns:
-      task result dict
-    """
-    del verbose_log
-    assert task_id
-    method = 'swarming.v2.Tasks.GetResult'
-    content = {'task_id': task_id}
-    return json.loads(swarming_grpc(method, content))
-
-
 def is_skylab_dut(dut_name):
     """Determines whether the DUT is in skylab.
 
@@ -527,17 +567,13 @@ def is_skylab_dut(dut_name):
     return bool(bots)
 
 
-def is_dut_leased_by_me(status: LeaseStatus):
+def is_dut_leased(status: LeaseStatus):
     if not status.is_leased:
         logger.debug(
             '%s current task: %s, is not leased',
             status.dut_name,
             status.task_name,
         )
-        return False
-
-    if not status.is_leased_by_me:
-        logger.debug('%s is not leased by me', status.dut_name)
         return False
 
     return True
@@ -798,7 +834,7 @@ class AsyncDutLeaser:
             for _ in range(10):
                 await asyncio.sleep(5)
                 status = query_lease_status(dut_name)
-                if is_dut_leased_by_me(status):
+                if is_dut_leased(status):
                     logger.info('lease: %s', pending_lease)
                     break
             else:
@@ -870,6 +906,9 @@ class AsyncDutLeaser:
                     'lease failed, will retry %d seconds later', delay
                 )
                 await asyncio.sleep(delay)
+            except Exception:
+                logger.exception("Error on leasing DUT.")
+                return None
 
 
 def make_lease_reason(session):
@@ -916,7 +955,7 @@ def crosfleet_lease_dut(
         for _ in range(10):
             time.sleep(5)
             status = query_lease_status(dut_name)
-            if is_dut_leased_by_me(status):
+            if is_dut_leased(status):
                 logger.info('lease for %s: %s', dut_name, pending_lease)
                 break
         else:
@@ -953,7 +992,7 @@ def crosfleet_release_dut(dut_name):
     Args:
       dut_name: DUT name
     """
-    if not is_dut_leased_by_me(query_lease_status(dut_name)):
+    if not is_dut_leased(query_lease_status(dut_name)):
         raise errors.DutLeaseException(
             '%s is not leased, or not leased by me' % dut_name
         )
@@ -963,7 +1002,7 @@ def crosfleet_release_dut(dut_name):
     # wait the state propagated
     for _ in range(10):
         time.sleep(5)
-        if not is_dut_leased_by_me(query_lease_status(dut_name)):
+        if not is_dut_leased(query_lease_status(dut_name)):
             break
     else:
         raise errors.DutLeaseException('release verification failed')
@@ -997,17 +1036,74 @@ def query_lease_status(dut_name) -> LeaseStatus:
     """
     status = LeaseStatus(dut_name=dut_name)
 
-    task_states = scheduke_util.get_task_states(
+    # There are theree ways to manage DUT lease.
+    # * DLS (device lease service):
+    #   Lower-layer DUT management service. Manages the leases. Provides
+    #   "ExtendLease" API.
+    # * FrontDoor service:
+    #   Higher-layer DUT management service. Manages the leases by calling DLS
+    #   internally. Does not provides an API to extend lease. Has the
+    #   information of leased username.
+    # * crosfleet command:
+    #   Command line program. Calling FrontDoor service API.
+    #
+    # The problem here is
+    # - lease-extension can be done only via DLS
+    # - DLS and FD have their own databases
+    # As the result, FD will have wrong expiration time after we extend the
+    # lease via DLS, which doesn't update the information in FD database.
+    #
+    # So that we use:
+    # 1) If the lease has never extended
+    #    -> use the information from FD
+    # 2) If the lease has extended
+    #    -> use the information from DLS + lease user from FD
+    #
+    # TODO(yoshiki): consollidate to use DLS for the all DUT oparations.
+
+    task_states_from_dls = _get_task_states_from_device_lease_service(dut_name)
+    if not task_states_from_dls:
+        # If DeviceLeaseService doesn't have any record, the DUT is not leased.
+        status.is_leased = False
+        return status
+
+    status.lease_id_in_dls = task_states_from_dls['id']
+    status.end_time = datetime.datetime.fromisoformat(
+        task_states_from_dls['expirationTime']
+    ).timestamp()
+
+    if task_states_from_dls['releasedTime'] != '0001-01-01T00:00:00Z':
+        # The DUT has been released.
+        status.is_leased = False
+        return status
+
+    bisect_value = task_states_from_dls.get("userPayload", {}).get(
+        'cros_bisect', ''
+    )
+    if bisect_value:
+        # If the record in the DLS has the metadata, it means the lease was
+        # extended before. In that case, the record in the scheduke may not
+        # refrect actual (= extended) end-time, because the database in
+        # scheduke was not changed after the extension. So we use the
+        # information from DLS.
+        # Note that: the record in DLS doesn't have a field of leasing user.
+        status.is_leased = True
+        return status
+
+    # If not, the lease has not been extended. We use the information from the
+    # scheduke to determine the leasing user.
+    # TODO(yoshiki): rewrite the lease logic not to use the leasing user info.
+
+    task_states = scheduke_util.get_task_states_from_frontdoor(
         users=[scheduke_util.get_active_gcloud_user()], device_names=[dut_name]
     )
     if task_states.tasks:
         status.is_leased = True
-        status.is_leased_by_me = True
         status.task_id = task_states.tasks[0].task_state_id
         status.end_time = task_states.tasks[0].end_time / 1000000
     else:
         status.is_leased = False
-        status.is_leased_by_me = False
+
     return status
 
 
@@ -1024,7 +1120,57 @@ def _cancel_lease_and_raise_exception(dut_name, error_message):
     raise errors.DutLeaseException(error_message)
 
 
-def lease_keeper(dut_name, reason, quit_event, error_queue):
+def _get_task_states_from_device_lease_service(
+    device_id: str,
+):
+    """Returns a ReadTaskStatesResponse for the given params."""
+    method = 'chromiumos.test.api.DeviceLeaseService.ListDeviceLeases'
+    content = {
+        'device_id': device_id,
+        'page_size': 100,
+    }
+    result = json.loads(device_lease_service_grpc(method, content))
+    lease_records = result.get('leaseRecords', [])
+    if lease_records:
+        return lease_records[0]
+    return None
+
+
+def _extend_lease(lease_id, session_id):
+    def _generate_bisector_identifier():
+        """Generate the string representing the current bisector task.
+
+        On prod/staging/dev environment, returns URL of the task.
+        Otherwise, returns the string including the bisect session ID.
+        """
+        active_gcloud_user = scheduke_util.get_active_gcloud_user()
+        if active_gcloud_user == PROD_SERVICE_ACCOUNT:
+            return '%s%s' % (BISECTOR_HOST_PROD, session_id)
+        if active_gcloud_user == STAGING_SERVICE_ACCOUNT:
+            return '%s%s' % (BISECTOR_HOST_STAGING, session_id)
+        if active_gcloud_user == DEV_SERVICE_ACCOUNT:
+            return '%s%s' % (BISECTOR_HOST_DEV, session_id)
+        return '%s%s:%s' % (
+            BISECTOR_LOCAL_TEST_PREFIX,
+            active_gcloud_user,
+            session_id,
+        )
+
+    method = 'chromiumos.test.api.DeviceLeaseService.ExtendLease'
+    content = {
+        'idempotency_key': str(uuid.uuid4()),
+        'lease_id': lease_id,
+        # Extend the lease by 43200s = 12h.
+        'extend_duration': '43200s',
+        'user_payload': {
+            # Add the metadata to mark this lease as a request by the bisector.
+            'cros_bisect': _generate_bisector_identifier(),
+        },
+    }
+    return json.loads(device_lease_service_grpc(method, content))
+
+
+def lease_keeper(dut_name, reason, quit_event, error_queue, session_id):
     """Monitors and maintains skylab lease status.
 
     This function checks DUT lease status periodically in order to ensure the DUT
@@ -1037,6 +1183,7 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
       reason: lease reason
       quit_event: a threading.Event object, which indicates program stop event.
       error_queue: a queue.Queue object, for passing exception to main thread.
+      session_id: an ID of the current bisect task.
     """
 
     # TODO(b/394220130) Remove `reason` or use it for easier debugging.
@@ -1046,24 +1193,64 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
         previous_status = {}
         while True:
             lease_status = query_lease_status(dut_name)
-            if not (lease_status.is_leased and lease_status.is_leased_by_me):
+            if previous_status and (
+                previous_status.lease_id_in_dls != lease_status.lease_id_in_dls
+            ):
+                # Checking if the latest lease is still by us. There are rare
+                # cases where the lease was unexpectedly released. It's
+                # probably due to the infra bug: b/379001772.
+                if previous_status.task_id and lease_status.task_id:
+                    previous_task_url = (
+                        'https://chromeos-swarming.appspot.com/task?id=%s'
+                        % previous_status.task_id
+                    )
+                    current_task_url = (
+                        'https://chromeos-swarming.appspot.com/task?id=%s'
+                        % lease_status.task_id
+                    )
+                    raise errors.DutLeaseException(
+                        'the DUT was unexpectedly taken by another bisector '
+                        'task (ID: %s, swarming: %s) before finishing the '
+                        'current lease (ID: %s, swarming: %s)'
+                        % (
+                            previous_status.lease_id_in_dls,
+                            previous_task_url,
+                            lease_status.lease_id_in_dls,
+                            current_task_url,
+                        )
+                    )
+                raise errors.DutLeaseException(
+                    'the DUT was unexpectedly taken by another task (ID: %s) '
+                    'before finishing the current lease (ID: %s)'
+                    % (
+                        previous_status.lease_id_in_dls,
+                        lease_status.lease_id_in_dls,
+                    )
+                )
+
+            if not lease_status.is_leased:
                 if previous_status and previous_status.task_id:
                     task_url = (
                         'https://chromeos-swarming.appspot.com/task?id=%s'
                         % previous_status.task_id
                     )
                     raise errors.DutLeaseException(
-                        'the DUT was leased by me %s , but now is not unexpectedly: %s'
-                        % (task_url, lease_status)
+                        'the DUT was leased by me (ID: %s, swarming :%s), but '
+                        'now is not unexpectedly: %s'
+                        % (
+                            previous_status.lease_id_in_dls,
+                            task_url,
+                            lease_status,
+                        )
                     )
                 raise errors.DutLeaseException(
-                    'the DUT is expected to be leased by me, but not: %s'
+                    'the DUT was expected to be leased by me, but now is not: %s'
                     % lease_status
                 )
             previous_status = lease_status
 
             # We need buffer time (like querying lease status, network latency, etc.)
-            # before actual lease request, 100 must be enough.
+            # before actual lease request, 100 seconds must be enough.
             to_lease_again = lease_status.end_time - 100
 
             now = time.time()
@@ -1080,13 +1267,12 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
                     return
                 continue
 
-            # TODO(b/394220130): Implement a mechanism to handle lease expiration more gracefully.
-            logger.info(
-                "Previous lease is near expiration, but currently we don't have a way to extend the current lease"
-            )
-            raise errors.DutLeaseException(
-                'Lease is expired and unable to extend the lease'
-            )
+            result = _extend_lease(lease_status.lease_id_in_dls, session_id)
+
+            if not result.get("leaseId", ""):
+                raise errors.DutLeaseException(
+                    f"Failed to extend lease: {result}"
+                )
 
     except (
         errors.DutLeaseException,
@@ -1101,7 +1287,7 @@ def lease_keeper(dut_name, reason, quit_event, error_queue):
 
 
 @contextlib.contextmanager
-def dut_lease_status_monitor(dut, reason):
+def dut_lease_status_monitor(dut, reason, session_id):
     """Takes care DUT lease status.
 
     If the DUT is leased from skylab, this manager will spawn a thread to monitor
@@ -1123,7 +1309,8 @@ def dut_lease_status_monitor(dut, reason):
     error_queue = queue.Queue()
     try:
         thread = threading.Thread(
-            target=lease_keeper, args=(host, reason, quit_event, error_queue)
+            target=lease_keeper,
+            args=(host, reason, quit_event, error_queue, session_id),
         )
         thread.start()
         yield

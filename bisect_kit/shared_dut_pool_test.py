@@ -786,15 +786,9 @@ class TestCleanUpStaleDuts(unittest.TestCase):
 
     def test_all(self):
         self._mock_query_lease_status.side_effect = [
-            cros_lab_util.LeaseStatus(
-                dut_name='dut_name_1', is_leased=True, is_leased_by_me=False
-            ),
-            cros_lab_util.LeaseStatus(
-                dut_name='dut_name_2', is_leased=False, is_leased_by_me=False
-            ),
-            cros_lab_util.LeaseStatus(
-                dut_name='dut_name_3', is_leased=True, is_leased_by_me=True
-            ),
+            cros_lab_util.LeaseStatus(dut_name='dut_name_1', is_leased=False),
+            cros_lab_util.LeaseStatus(dut_name='dut_name_2', is_leased=False),
+            cros_lab_util.LeaseStatus(dut_name='dut_name_3', is_leased=True),
         ]
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         # pylint: disable=protected-access
@@ -807,13 +801,9 @@ class TestCleanUpStaleDuts(unittest.TestCase):
 
     def test_failed_to_query_lease_status(self):
         self._mock_query_lease_status.side_effect = [
-            cros_lab_util.LeaseStatus(
-                dut_name='dut_name_1', is_leased=True, is_leased_by_me=False
-            ),
+            cros_lab_util.LeaseStatus(dut_name='dut_name_1', is_leased=False),
             errors.DutLeaseException('failed to query'),
-            cros_lab_util.LeaseStatus(
-                dut_name='dut_name_3', is_leased=True, is_leased_by_me=True
-            ),
+            cros_lab_util.LeaseStatus(dut_name='dut_name_3', is_leased=True),
         ]
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         # pylint: disable=protected-access

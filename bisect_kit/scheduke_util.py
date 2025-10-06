@@ -26,19 +26,21 @@ def get_active_gcloud_user() -> str:
     ).strip()
 
 
-def is_dut_leased_by_me(dut_name: str) -> bool:
-    task_states = get_task_states(
+def is_dut_leased(dut_name: str) -> bool:
+    task_states = get_task_states_from_frontdoor(
         users=[get_active_gcloud_user()], device_names=[dut_name]
     )
     return len(task_states.tasks) != 0
 
 
-def get_task_states(
+def get_task_states_from_frontdoor(
     ids: list[str] | None = None,
     users: list[str] | None = None,
     device_names: list[str] | None = None,
 ):
-    """Returns a ReadTaskStatesResponse for the given params."""
+    """Returns a ReadTaskStatesResponse for the given params.
+    The information is retrieved from FrontDoor service.
+    """
     params = []
     if ids:
         params.append("ids=%s" % (",".join(ids)))

@@ -190,7 +190,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.assertEqual(dut, 'pre_allocated_dut')
         self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'pre_allocated_dut', cros_lab_util.make_lease_reason('stateless')
+            'pre_allocated_dut',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_not_called()
         self.mock_allocate_dut.assert_not_called()
@@ -267,7 +269,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', False, False, mock.ANY
@@ -385,7 +389,9 @@ class TestDutManagerAllocation(unittest.TestCase):
         # Since the DUT is restored, _update_states() is not called again.
         self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', False, False, mock.ANY
@@ -428,7 +434,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host2.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host2.cros', cros_lab_util.make_lease_reason('stateless')
+            'host2.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host2.cros', False, False, mock.ANY
@@ -469,7 +477,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', False, False, mock.ANY
@@ -503,7 +513,9 @@ class TestDutManagerAllocation(unittest.TestCase):
 
         self.mock_update_states.assert_not_called()
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', False, False, mock.ANY
@@ -540,7 +552,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', False, False, mock.ANY
@@ -576,7 +590,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host2.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host2.cros', cros_lab_util.make_lease_reason('stateless')
+            'host2.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host2.cros', False, False, mock.ANY
@@ -616,7 +632,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', False, False, mock.ANY
@@ -645,7 +663,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host2.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host2.cros', cros_lab_util.make_lease_reason('stateless')
+            'host2.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host2.cros', False, False, mock.ANY
@@ -684,7 +704,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', False, False, mock.ANY
@@ -723,7 +745,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', True, False, mock.ANY
@@ -764,7 +788,9 @@ class TestDutManagerAllocation(unittest.TestCase):
             dut_manager, 'host.cros'
         )
         self.mock_dut_lease_status_monitor.assert_called_once_with(
-            'host.cros', cros_lab_util.make_lease_reason('stateless')
+            'host.cros',
+            cros_lab_util.make_lease_reason('stateless'),
+            'stateless',
         )
         self.mock_delayed_dut_releaser_cls.assert_called_once_with(
             'host.cros', False, False, mock.ANY

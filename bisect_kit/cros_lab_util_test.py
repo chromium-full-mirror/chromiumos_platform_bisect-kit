@@ -4,7 +4,10 @@
 
 """Test cros_lab_util module."""
 
+import queue
 import subprocess
+import threading
+import time
 import unittest
 from unittest import mock
 
@@ -208,6 +211,228 @@ class TestCrosLab(unittest.TestCase):
                     'dummy_DUT', common.get_default_chromeos_root()
                 )
             )
+
+
+class LeaseKeeperTest(unittest.TestCase):
+    """Test lease_keeper function."""
+
+    def setUp(self):
+        self.mock_query_lease_status = self.enterContext(
+            mock.patch.object(cros_lab_util, 'query_lease_status')
+        )
+        self.mock_extend_lease = self.enterContext(
+            mock.patch.object(cros_lab_util, '_extend_lease')
+        )
+        self.mock_time = self.enterContext(mock.patch.object(time, 'time'))
+        self.mock_notify_error = self.enterContext(
+            mock.patch.object(cros_lab_util, '_notify_error_from_lease_keeper')
+        )
+        self.quit_event = threading.Event()
+        self.error_queue = queue.Queue()
+        self.session_id = 'test_session_id'
+
+    def test_quit_event(self):
+        self.mock_time.return_value = 1000000000
+        self.mock_query_lease_status.return_value = cros_lab_util.LeaseStatus(
+            dut_name='dut1',
+            is_leased=True,
+            end_time=1000000101,
+        )
+
+        thread = threading.Thread(
+            target=cros_lab_util.lease_keeper,
+            args=(
+                'dut1',
+                'reason',
+                self.quit_event,
+                self.error_queue,
+                self.session_id,
+            ),
+        )
+        thread.start()
+
+        # Let the thread run for a bit
+        time.sleep(0.1)
+
+        self.quit_event.set()
+        thread.join(timeout=2)
+
+        self.assertFalse(thread.is_alive())
+        self.assertTrue(self.error_queue.empty())
+
+    def test_lease_lost(self):
+        self.mock_time.return_value = 1000000000
+        self.mock_query_lease_status.side_effect = [
+            cros_lab_util.LeaseStatus(
+                dut_name='dut1',
+                is_leased=True,
+                end_time=1000001000,
+                task_id='task1',
+            ),
+            cros_lab_util.LeaseStatus(dut_name='dut1', is_leased=False),
+        ]
+        self.quit_event.wait = mock.Mock()
+
+        cros_lab_util.lease_keeper(
+            'dut1', 'reason', self.quit_event, self.error_queue, self.session_id
+        )
+
+        self.mock_notify_error.assert_called_once()
+        self.assertIsInstance(
+            self.mock_notify_error.call_args[0][0], errors.DutLeaseException
+        )
+
+    def test_lease_extension(self):
+        self.mock_time.return_value = 1000000000
+        self.mock_query_lease_status.side_effect = [
+            cros_lab_util.LeaseStatus(
+                dut_name='dut1',
+                is_leased=True,
+                end_time=1000000050,
+                lease_id_in_dls='lease1',
+            ),
+            cros_lab_util.LeaseStatus(
+                dut_name='dut1',
+                is_leased=True,
+                end_time=1000000000 + 3600,  # extended
+                lease_id_in_dls='lease2',
+            ),
+        ]
+        self.mock_extend_lease.return_value = {'leaseId': 'lease2'}
+
+        # Let the loop run twice and then quit
+        wait_count = 0
+
+        def wait_and_quit(_t):
+            nonlocal wait_count
+            wait_count += 1
+            if wait_count >= 2:
+                self.quit_event.set()
+
+        self.quit_event.wait = wait_and_quit
+
+        cros_lab_util.lease_keeper(
+            'dut1', 'reason', self.quit_event, self.error_queue, self.session_id
+        )
+
+        self.mock_extend_lease.assert_called_once_with(
+            'lease1', self.session_id
+        )
+        self.assertTrue(self.error_queue.empty())
+
+
+class QueryLeaseStatusTest(unittest.TestCase):
+    """Test query_lease_status function."""
+
+    SAMPLE_GET_TASK_STATES_FROM_DEVICE_LEASE_SERVICE_RESPONSE = {
+        'id': 'lease1',
+        'deviceId': 'chromeos8-row10-rack9-host2',
+        'dutId': 'C298832',
+        'deviceAddress': {},
+        'deviceType': 'DEVICE_TYPE_PHYSICAL',
+        'leasedTime': '2025-10-06T04:33:30.677219Z',
+        'releasedTime': '2025-10-07T06:35:01.713224Z',
+        'expirationTime': '2025-10-07T10:00:00Z',
+        'lastUpdatedTime': '2025-10-07T06:35:01.713224Z',
+        'userPayload': {
+            'cros_bisect': 'https://crosperf.googleplex.com/test_session_id'
+        },
+    }
+
+    def setUp(self):
+        self.mock_get_task_states_from_device_lease_service = self.enterContext(
+            mock.patch.object(
+                cros_lab_util, '_get_task_states_from_device_lease_service'
+            )
+        )
+        self.mock_get_task_states_from_frontdoor = self.enterContext(
+            mock.patch.object(
+                cros_lab_util.scheduke_util, 'get_task_states_from_frontdoor'
+            )
+        )
+        self.mock_get_active_gcloud_user = self.enterContext(
+            mock.patch.object(
+                cros_lab_util.scheduke_util, 'get_active_gcloud_user'
+            )
+        )
+
+    def test_not_leased(self):
+        self.mock_get_task_states_from_device_lease_service.return_value = None
+        self.mock_get_task_states_from_frontdoor.return_value = mock.Mock(
+            tasks=[]
+        )
+
+        status = cros_lab_util.query_lease_status('dut1')
+        self.assertFalse(status.is_leased)
+
+    def test_leased_by_me_from_dls_and_exipired_on_scheduke(self):
+        """DUT was expired on Scheduke but is extended on DLS."""
+        self.mock_get_task_states_from_device_lease_service.return_value = {
+            **self.SAMPLE_GET_TASK_STATES_FROM_DEVICE_LEASE_SERVICE_RESPONSE,
+            # Overriding to simulate an on-going lease state in DLS record.
+            'releasedTime': '0001-01-01T00:00:00Z',
+        }
+        self.mock_get_task_states_from_frontdoor.return_value = mock.Mock(
+            tasks=[]
+        )
+
+        status = cros_lab_util.query_lease_status('dut1')
+
+        self.assertTrue(status.is_leased)
+        self.assertEqual(status.lease_id_in_dls, 'lease1')
+
+    def test_leased_by_me_from_dls(self):
+        """DUT isn't expired on Scheduke yet and is extended on DLS."""
+        self.mock_get_task_states_from_device_lease_service.return_value = {
+            **self.SAMPLE_GET_TASK_STATES_FROM_DEVICE_LEASE_SERVICE_RESPONSE,
+            # Overriding to simulate an on-going lease state in DLS record.
+            'releasedTime': '0001-01-01T00:00:00Z',
+        }
+        self.mock_get_task_states_from_frontdoor.return_value = mock.Mock(
+            tasks=[]
+        )
+
+        status = cros_lab_util.query_lease_status('dut1')
+
+        self.assertTrue(status.is_leased)
+        self.assertEqual(status.lease_id_in_dls, 'lease1')
+
+    def test_leased_by_me_from_scheduke(self):
+        """DUT isn't expired on Scheduke yet and is not extended on DLS."""
+        self.mock_get_task_states_from_device_lease_service.return_value = {
+            **self.SAMPLE_GET_TASK_STATES_FROM_DEVICE_LEASE_SERVICE_RESPONSE,
+            # Overriding to simulate an on-going lease state in DLS record.
+            'releasedTime': '0001-01-01T00:00:00Z',
+        }
+        self.mock_get_task_states_from_frontdoor.return_value = mock.Mock(
+            tasks=[
+                mock.Mock(
+                    task_state_id='task1',
+                    end_time=1728300000000000,  # 2025-10-07 10:00:00
+                )
+            ]
+        )
+        self.mock_get_active_gcloud_user.return_value = 'test_user'
+
+        status = cros_lab_util.query_lease_status('dut1')
+
+        self.assertTrue(status.is_leased)
+
+    def test_leased_by_other(self):
+        response = (
+            self.SAMPLE_GET_TASK_STATES_FROM_DEVICE_LEASE_SERVICE_RESPONSE
+        )
+        response['userPayload'].pop('cros_bisect')
+        self.mock_get_task_states_from_device_lease_service.return_value = (
+            response
+        )
+        self.mock_get_task_states_from_frontdoor.return_value = mock.Mock(
+            tasks=[]
+        )
+
+        status = cros_lab_util.query_lease_status('dut1')
+
+        self.assertFalse(status.is_leased)
 
 
 if __name__ == '__main__':

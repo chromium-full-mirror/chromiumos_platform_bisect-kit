@@ -529,9 +529,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
                     'failed to check lease status for %s: %s', dut_name, e
                 )
             else:
-                if not (
-                    lease_status.is_leased and lease_status.is_leased_by_me
-                ):
+                if not lease_status.is_leased:
                     stale_duts.append(dut_name)
         logger.info(
             'removing stale DUTs from the shared DUT pool: %s', stale_duts
