@@ -2333,6 +2333,7 @@ def cros_sdk(
     chromeos_root: str,
     *args: str,
     replace: bool = False,
+    update: bool = False,
     chrome_root: str | None = None,
     env: dict[str, str] | None = None,
     log_stdout: bool = True,
@@ -2347,6 +2348,7 @@ def cros_sdk(
       chromeos_root: chromeos tree root
       *args: command to run
       replace: whether replace an existing chroot
+      update: whether update an existing chroot
       chrome_root: pass to cros_sdk; mount this path into the SDK chroot
       env: (dict) environment variables for the command
       log_stdout: Whether write the stdout output of the child process to log.
@@ -2372,6 +2374,8 @@ def cros_sdk(
         prefix += ['--goma-dir', goma_dir]
     if replace:
         prefix += ['--replace']
+    if update:
+        prefix += ['--update']
 
     prefix += envs + ['--']
 
@@ -2750,18 +2754,11 @@ def build_packages(
         with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
             env = common_env.copy()
             env['FEATURES'] += ' -separatedebug splitdebug'
-            cros_sdk(
-                chromeos_root,
-                'update_chroot',
-                '--toolchain-boards',
-                board,
-                env=env,
-                stderr_callback=stderr_callback,
-            )
 
             env = common_env.copy()
             cmd = [
-                'build_packages',
+                'cros',
+                'build-packages',
                 '--board',
                 board,
                 '--withdev',
@@ -2786,6 +2783,7 @@ def build_packages(
                 chrome_root=chrome_root,
                 stderr_callback=stderr_callback,
                 goma_dir=goma_dir,
+                update=True,
             )
 
 
@@ -2803,7 +2801,8 @@ def build_image(chromeos_root, board):
         with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
             cros_sdk(
                 chromeos_root,
-                './build_image',
+                'cros',
+                'build-image',
                 '--board',
                 board,
                 '--no-enable-rootfs-verification',
