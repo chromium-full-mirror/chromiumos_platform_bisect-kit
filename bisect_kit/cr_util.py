@@ -362,7 +362,14 @@ def build(
     logger.info('build %s', targets)
     out_dir = os.path.join('out_%s' % board, 'Release')
     with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
-        cmd = ['autoninja', '-C', out_dir] + targets
+        # Need to call .py directly, since it is calling the non-initialized
+        # (non-bootstrapped) script.
+        # See. https://chromium.googlesource.com/chromium/tools/depot_tools/+/HEAD/README.md#installing
+        cmd = [
+            './third_party/depot_tools/autoninja.py',
+            '-C',
+            out_dir,
+        ] + targets
         # Chrome build shouldn't take more than 3 hours. Set timeout to abort
         # the process in case it gets deadlocked. b/369498616
         timeout = 3 * 60 * 60
