@@ -10,7 +10,9 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import shutil
 import sys
+import tempfile
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -19,6 +21,7 @@ from bisect_kit import common
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
+from bisect_kit import gs_util
 from bisect_kit import repo_util
 from bisect_kit import util
 import switch_helper
@@ -227,6 +230,45 @@ def _do_build(opts, do_mark_as_stable=True):
             os.path.join('../../..', built_image_folder),
             chromeos_root_image_folder,
         )
+
+    # Upload the artifacts to Google Storage if the board is VM.
+    # GCP VM images can be converted only from the GS location.
+    if cros_util.is_vm_board(opts.board):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            DISK_FILENAME = 'disk.raw'
+            tmp_disk_file_path = os.path.join(tmpdir, DISK_FILENAME)
+            shutil.copy(chromeos_root_image_path, tmp_disk_file_path)
+
+            try:
+                tmp_archive_file_path = os.path.join(
+                    tmpdir, cros_util.disk_vm_image_bundle_filename
+                )
+                util.check_call(
+                    'tar',
+                    '-zcvf',
+                    tmp_archive_file_path,
+                    DISK_FILENAME,
+                    cwd=tmpdir,
+                )
+            except Exception as e:
+                logger.error(
+                    'failed to tar %s to %s: %s',
+                    chromeos_root_image_path,
+                    tmp_archive_file_path,
+                    e,
+                )
+
+            gs_path = os.path.join(
+                'gs://crosperf-chromeos-builds/',
+                opts.board,
+                util.escape_rev(opts.rev),
+                cros_util.disk_vm_image_bundle_filename,
+            )
+            logger.info('uploading %s to %s', tmp_archive_file_path, gs_path)
+            try:
+                gs_util.cp(tmp_archive_file_path, gs_path)
+            except Exception as e:
+                logger.error('failed to upload %s: %s', gs_path, e)
 
 
 def build(opts):
