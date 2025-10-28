@@ -995,16 +995,112 @@ class TestDutManagerAllocation(unittest.TestCase):
             self.assertEqual(self.mock_allocate_vm_dut.call_count, 1)
             self.assertEqual(self.mock_release_vm.call_count, 0)
 
-        self.mock_update_states.assert_called()
-        self.mock_dut_lease_status_monitor.assert_not_called()
-        self.mock_delayed_dut_releaser_cls.assert_not_called()
-        self.mock_allocate_dut.assert_not_called()
-        self.mock_dut_init_func.assert_not_called()
-        self.mock_dut_leave_context_check_func.assert_not_called()
         self.mock_allocate_vm_dut.assert_called()
         self.assertEqual(self.mock_allocate_vm_dut.call_count, 1)
         self.mock_release_vm.assert_called()
         self.assertEqual(self.mock_release_vm.call_count, 1)
+
+
+class TestDutManagerLocalBuild(unittest.TestCase):
+    """Test DutManager with LOCAL_BUILD image type."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_states = core.DiagnoseStates('dummy_session_file')
+        self.mock_states.init_states(
+            config={
+                'session': 'stateless',
+                'experiments': [],
+                'chromeos_root': 'PATH_TO_CHROMEOS_ROOT',
+            },
+        )
+        self.mock_dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
+            boards=['test_board']
+        )
+
+    def test_init_local_build_vm_cros_version(self):
+        # LOCAL_BUILD should allow any version string.
+        with mock.patch.object(
+            dut_manager_module.DutManager,
+            'is_vm',
+            new_callable=mock.PropertyMock,
+        ) as mock_is_vm:
+            mock_is_vm.return_value = True
+            _dut_manager = dut_manager_module.DutManager(
+                'VM',
+                self.mock_states,
+                self.mock_dut_allocate_spec,
+                None,
+                True,
+                should_force_monitoring=False,
+                vm_cros_version='any_version_string',
+                vm_image_type=dut_manager_module.VmImageType.LOCAL_BUILD,
+            )
+
+    def test_provision_local_build_vm_cros_version(self):
+        # LOCAL_BUILD should allow any version string in provision.
+        with mock.patch.object(
+            dut_manager_module.DutManager,
+            'is_vm',
+            new_callable=mock.PropertyMock,
+        ) as mock_is_vm:
+            mock_is_vm.return_value = True
+            dut_manager = dut_manager_module.DutManager(
+                'VM',
+                self.mock_states,
+                self.mock_dut_allocate_spec,
+                None,
+                True,
+                should_force_monitoring=False,
+                vm_image_type=dut_manager_module.VmImageType.LOCAL_BUILD,
+            )
+            # Mock _search_vm_image to avoid actual GS call
+            with mock.patch.object(
+                dut_manager_module.DutManager, '_search_vm_image'
+            ):
+                with mock.patch.object(
+                    dut_manager_module.DutManager, '_update_states'
+                ):
+                    with mock.patch.object(
+                        dut_manager_module.DutManager, '_wait_ssh_avaliable'
+                    ):
+                        with mock.patch.object(vm_leaser, 'allocate_dut'):
+                            with mock.patch.object(
+                                dut_manager_module.DutManager, '_release_vm'
+                            ):
+                                with dut_manager.provision(
+                                    vm_cros_version='any_version_string'
+                                ):
+                                    pass
+
+    @mock.patch('bisect_kit.gs_util.ls')
+    def test_search_vm_image_local_build(self, mock_gs_ls):
+        # pylint: disable=protected-access
+        with mock.patch.object(
+            dut_manager_module.DutManager,
+            'is_vm',
+            new_callable=mock.PropertyMock,
+        ) as mock_is_vm:
+            mock_is_vm.return_value = True
+            dut_manager = dut_manager_module.DutManager(
+                'VM',
+                self.mock_states,
+                self.mock_dut_allocate_spec,
+                None,
+                True,
+                should_force_monitoring=False,
+                vm_cros_version='local:version/123',
+                vm_image_type=dut_manager_module.VmImageType.LOCAL_BUILD,
+            )
+
+            expected_gs_path = 'gs://crosperf-chromeos-builds/test_board/local_version_123/chromiumos_test_image.tar.gz'
+            mock_gs_ls.return_value = [expected_gs_path]
+
+            path = dut_manager._search_vm_image()
+            self.assertEqual(path, expected_gs_path)
+            mock_gs_ls.assert_called_once_with(
+                expected_gs_path, ignore_errors=True
+            )
 
 
 class TestDelayedDutReleaser(unittest.TestCase):

@@ -12,7 +12,6 @@ import time
 from typing import Optional
 import uuid
 
-from bisect_kit import cros_util
 from bisect_kit import util
 from google.api_core.client_options import ClientOptions
 from google.api_core.exceptions import NotFound
@@ -124,14 +123,14 @@ def _to_vm_leaser_image_link(gcp_project: str, image_name: str) -> str:
 
 
 def lease_vm(
-    gs_vm_image_path: str, board: str, full_version: str
+    gs_vm_image_path: str, board: str, vm_cros_version: str
 ) -> VMLeaseResult:
     """Lease a VM machine.
 
     Args:
         gs_vm_image_path: The gs path of GCE tarball.
         board: ChromeOS board name.
-        full_version: ChromeOS version of gs_vm_image_path.
+        vm_cros_version: ChromeOS version (maybe followed by bisection info).
 
     Returns:
         The lease result.
@@ -139,7 +138,7 @@ def lease_vm(
     method = 'chromiumos.test.api.VMLeaserService.LeaseVM'
     # TODO(zjchang): make other options adjustable.
     # TODO(zjchang): add lease_vm into switch time.
-    inserted_image = insert_image(gs_vm_image_path, board, full_version)
+    inserted_image = insert_image(gs_vm_image_path, board, vm_cros_version)
     content = {
         # prpc may retry automatically and is unable to remove timeout creation,
         # use this key to compute vm name to ensure everytime it creates the
@@ -236,7 +235,7 @@ def _get_public_ip(gce_instance: compute_v1.Instance) -> Optional[str]:
 def insert_image(
     gs_path: str,
     board: str,
-    full_version: str,
+    vm_cros_version: str,
     gcp_project: str = VMLEASER_DEFAULT_PROJECT,
 ) -> str:
     """Inserts image from GS to GCE.
@@ -244,19 +243,34 @@ def insert_image(
     Args:
         gs_path: gs path of GCE image tarball.
         board: ChromeOS board name, used for tagging.
-        full_version: ChromeOS version, used for tagging.
+        vm_cros_version: ChromeOS version (maybe followed by bisection info),
+            used for tagging.
         gcp_project: GCP project to insert image.
 
     Returns:
         Image name created.
     """
-    assert cros_util.is_cros_or_snapshot_version(full_version)
     assert gs_path.startswith('gs://')
 
     client = compute_v1.ImagesClient(client_options=get_default_client_option())
     gs_path = 'https://storage.googleapis.com/' + gs_path[len('gs://') :]
-    version_tag = full_version.lower().replace(".", "-").replace("~", "-")
-    name = f'{board}-{version_tag}-{str(uuid.uuid4())[:8]}'
+
+    # Sanitize
+    version_tag = (
+        vm_cros_version.lower()
+        .replace(".", "-")
+        .replace("~", "-")
+        .replace("/", "-")
+    )
+
+    # Generate an image name and make sure it's <63 chars.
+    GCP_IMAGE_NAME_MAX_LEN = 63
+    version_tag_max_len = GCP_IMAGE_NAME_MAX_LEN - len(board) - 1 - 1 - 8
+    name = (
+        f'{board}-{version_tag[:version_tag_max_len]}-{str(uuid.uuid4())[:8]}'
+    )
+    assert len(name) <= GCP_IMAGE_NAME_MAX_LEN
+
     request = compute_v1.InsertImageRequest(
         project=gcp_project,
         image_resource=compute_v1.types.Image(
@@ -358,16 +372,16 @@ def get_vm_public_ip(vm: VMLeaseResult) -> Optional[str]:
 
 
 def allocate_dut(
-    board: str, gs_vm_image_path: str, full_version: str
+    board: str, gs_vm_image_path: str, vm_cros_version: str
 ) -> VMLeaseResult:
     """Allocate a VM DUT.
 
     Args:
         booard: board name.
         gs_vm_image_path: GS path of GCE image tarball.
-        full_version: full ChromeOS version.
+        vm_cros_version: ChromeOS version (maybe followed by bisection info).
 
     Returns:
         Leased VM info.
     """
-    return lease_vm(gs_vm_image_path, board, full_version)
+    return lease_vm(gs_vm_image_path, board, vm_cros_version)

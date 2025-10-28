@@ -288,16 +288,22 @@ class DutManager:
                     % ", ".join(self.dut_allocate_spec.boards),
                 )
 
-            if (
-                self._vm_cros_version is not None
-                and not cros_util.is_cros_or_snapshot_version(
+            if self._vm_cros_version is not None:
+                if self._vm_image_type in [
+                    VmImageType.RELEASE_BUILD,
+                    VmImageType.BUILDBUCKET_BUILD,
+                ] and not cros_util.is_cros_or_snapshot_version(
                     self._vm_cros_version
-                )
-            ):
-                raise errors.ArgumentError(
-                    '--base-cros-version',
-                    'No CrOS image of "%s" found' % self._vm_cros_version,
-                )
+                ):
+                    raise errors.ArgumentError(
+                        '--base-cros-version',
+                        'No CrOS VM image of "%s" found'
+                        % self._vm_cros_version,
+                    )
+
+                # We don't check the image in case of VmImageType.LOCAL_BUILD,
+                # since it needs to check the existence of the image. The check
+                # will be done in self._search_image() later.
         else:
             assert self._vm_cros_version is None
             assert self._vm_image_type is None
@@ -386,6 +392,7 @@ class DutManager:
         assert (
             self._vm_image_type is not None
         ), "Only VM DUT should use this method."
+        assert self._vm_cros_version, "CrOS version must be set."
 
         if self._vm_image_type == VmImageType.RELEASE_BUILD:
             images = cros_util.search_image(
@@ -406,9 +413,27 @@ class DutManager:
             return images[cros_util.ImageType.VM_IMAGE]
 
         if self._vm_image_type == VmImageType.LOCAL_BUILD:
-            raise errors.InternalError(
-                'VM with locally built image is not supported yet'
-            )
+            if self._vm_cros_version:
+                gs_path = os.path.join(
+                    'gs://crosperf-chromeos-builds/',
+                    self.dut_allocate_spec.boards[0],
+                    util.escape_rev(self._vm_cros_version),
+                    cros_util.disk_vm_image_bundle_filename,
+                )
+                logger.info('Downloading CrOS image "%s"', gs_path)
+                if gs_util.ls(gs_path, ignore_errors=True):
+                    return gs_path
+
+                logger.warning(
+                    'CrOS build image for the revision "%s" does not '
+                    + 'exists: "%s"',
+                    self._vm_cros_version,
+                    gs_path,
+                )
+            else:
+                raise errors.InternalError(
+                    'vm_cros_version is not set',
+                )
 
         if self._vm_image_type == VmImageType.BUILDBUCKET_BUILD:
             # TODO(zjchang): Currently it's not possible for build script to pass
@@ -655,12 +680,22 @@ class DutManager:
                 logger.warning('vm version is not defined, skip provision')
                 yield None
                 return
+
             if vm_cros_version:
-                if not cros_util.is_cros_or_snapshot_version(vm_cros_version):
+                if self._vm_image_type in [
+                    VmImageType.RELEASE_BUILD,
+                    VmImageType.BUILDBUCKET_BUILD,
+                ] and not cros_util.is_cros_or_snapshot_version(
+                    vm_cros_version
+                ):
                     raise errors.ArgumentError(
                         '--base-cros-version',
                         'No CrOS VM image of "%s" found' % vm_cros_version,
                     )
+
+                # We don't check the image in case of VmImageType.LOCAL_BUILD,
+                # since it needs to check the existence of the image. The check
+                # will be done in self._search_image() later.
 
                 self._vm_cros_version = vm_cros_version
         else:
