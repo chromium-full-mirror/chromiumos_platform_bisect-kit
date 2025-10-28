@@ -340,6 +340,17 @@ def determine_targets_to_build(
             'failed to determine chrome targets to build'
         ) from e
 
+    # Show the GN flags to the log.
+    try:
+        test = chromite_util.check_output(
+            'cat',
+            os.path.join(out_dir, 'args.gn'),
+            cwd=chrome_src,
+        )
+        logger.info("gn args: %s", test)
+    except subprocess.CalledProcessError:
+        logger.exception("Failed to show the GN flags.")
+
     mandatory = CHROME_BINARIES
     optional = list(CHROME_BINARIES_OPTIONAL)
     if with_tests:
