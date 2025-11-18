@@ -175,6 +175,16 @@ class TestCrUtil(unittest.TestCase):
         ]
         return commits
 
+    def test_query_git_rev_by_commit_position_remotely(self):
+        self.assertEqual(
+            'e261b16ec7149db6debc70a47f93b20abc8de334',
+            cr_util.query_git_rev_by_commit_position_remotely('308022'),
+        )
+        self.assertEqual(
+            'e261b16ec7149db6debc70a47f93b20abc8de334',
+            cr_util.query_git_rev_by_commit_position_remotely(308022),
+        )
+
     def test_query_git_rev_by_commit_position(self):
         with tempfile.TemporaryDirectory() as fake_chrome_src:
             commits = self._prepare_fake_chrome_repository(fake_chrome_src)

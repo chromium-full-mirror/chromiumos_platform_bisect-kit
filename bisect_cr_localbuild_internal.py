@@ -57,6 +57,15 @@ def guess_chrome_version(opts, rev):
         )
         rev = chrome_version
 
+    if cr_util.is_chrome_version_with_pre(rev):
+        splitted = rev.split('_pre')
+        assert len(splitted) == 2
+        snapshot_identifier = splitted[1]
+        assert snapshot_identifier.isdigit()
+        return cr_util.query_git_rev_by_commit_position_remotely(
+            snapshot_identifier
+        )
+
     return rev
 
 
@@ -75,6 +84,7 @@ class ChromeSrcDomain(core.BisectDomain):
     revtype = staticmethod(
         cli.argtype_multiplexer(
             cr_util.argtype_chrome_version,
+            cr_util.argtype_chrome_version_with_pre,
             cros_util.argtype_cros_version,
             git_util.argtype_git_rev,
         )
@@ -162,12 +172,12 @@ class ChromeSrcDomain(core.BisectDomain):
 
         # Disable guessing LCA if any of the versions are git hash and not a
         # chrome version.
-        if git_util.is_git_rev(opts.old) or git_util.is_git_rev(opts.new):
+        if git_util.is_git_rev(old) or git_util.is_git_rev(new):
             if not git_util.is_ancestor_commit(chrome_src, old_hash, new_hash):
                 raise errors.ArgumentError(
                     '--old and --new',
                     '--old chrome git hash (%s) is not an ancestor of the --new git hash (%s)'
-                    % (opts.old, opts.new),
+                    % (old, new),
                 )
         else:
             if not cr_util.is_version_lesseq(old, new):

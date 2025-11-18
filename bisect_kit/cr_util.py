@@ -24,6 +24,7 @@ from bisect_kit import util
 logger = logging.getLogger(__name__)
 
 RE_CHROME_VERSION = r'^\d+\.\d+\.\d+\.\d+$'
+RE_CHROME_VERSION_WITH_PRE = r'^\d+\.\d+\.\d+\.\d+_pre\d+$'
 
 CHROME_BINARIES = ['chrome']
 CHROME_BINARIES_OPTIONAL = ['nacl_helper']
@@ -66,6 +67,11 @@ CHROME_TEST_BINARIES = [
 def is_chrome_version(s):
     """Is a chrome version string?"""
     return bool(re.match(RE_CHROME_VERSION, s))
+
+
+def is_chrome_version_with_pre(s):
+    """Is a chrome version string with a '_preXXXX' suffix?"""
+    return bool(re.match(RE_CHROME_VERSION_WITH_PRE, s))
 
 
 def is_commit_position(s):
@@ -135,6 +141,14 @@ def argtype_chrome_version(s):
     return s
 
 
+def argtype_chrome_version_with_pre(s):
+    if not is_chrome_version_with_pre(s):
+        raise errors.ArgTypeError(
+            'invalid chrome version', '144.0.7503.0_pre1537931'
+        )
+    return s
+
+
 def get_commit_position(metadata: git_util.CommitMeta) -> str | None:
     if not metadata.message:
         return None
@@ -172,6 +186,30 @@ def query_git_rev_by_commit_position(chrome_src, commit_position):
     ).strip()
     if not rev:
         raise ValueError('unable to find commits with given commit_position')
+    return rev
+
+
+def query_git_rev_by_commit_position_remotely(number):
+    number_str = str(number)
+    assert number_str.isdigit()
+    query = urllib.parse.urlencode(
+        {
+            'number': number_str,
+            'numbering_identifier': 'refs/heads/main',
+            'numbering_type': 'COMMIT_POSITION',
+            'project': 'chromium',
+            'repo': 'chromium/src',
+        }
+    )
+    url = 'https://cr-rev.appspot.com/_ah/api/crrev/v1/get_numbering?' + query
+    content = urllib.request.urlopen(url).read().decode('utf8')
+    obj = json.loads(content)
+    rev = obj['git_sha']
+    if not git_util.is_git_rev(rev):
+        raise ValueError(
+            'The response of cr-rev.appspot.com, %s, is not a git commit hash'
+            % rev
+        )
     return rev
 
 
