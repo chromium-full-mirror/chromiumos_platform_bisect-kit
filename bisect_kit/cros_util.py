@@ -79,6 +79,13 @@ gs_manifest_path = (
     '/{short_version}.xml'
 )
 
+PUBLIC_MANIFEST_REPO_URL = (
+    'https://chromium.googlesource.com/chromiumos/manifest'
+)
+INTERNAL_MANIFEST_REPO_URL = (
+    'https://chrome-internal.googlesource.com/chromeos/manifest-internal'
+)
+
 # Since snapshots with version >= 12618.0.0 have android and chrome version
 # info.
 snapshot_cutover_version = '12618.0.0'
@@ -2732,22 +2739,31 @@ def get_chroot_recreation_reason(stdout: str, stderr: str) -> str | None:
 
 
 def build_packages(
-    chromeos_root, board, chrome_root=None, goma_dir=None, afdo_use=False
+    chromeos_root,
+    board,
+    is_public_build,
+    chrome_root=None,
+    goma_dir=None,
+    afdo_use=False,
 ):
     """Build ChromeOS packages.
 
     Args:
       chromeos_root: chromeos tree root
       board: ChromeOS board name
+      is_public_build: Whether this is a public build.
       chrome_root: Chrome tree root. If specified, build chrome using the provided
         tree
       goma_dir: Goma installed directory to mount into the chroot. If specified,
         build chrome with goma.
       afdo_use: build chrome with AFDO optimization
     """
+    use_flags = ['-cros-debug']
+    if not is_public_build:
+        use_flags.append('chrome_internal')
 
     common_env = {
-        'USE': '-cros-debug chrome_internal',
+        'USE': ' '.join(use_flags),
         'FEATURES': 'separatedebug',
     }
     with raise_if_chroot_recreation_needed() as stderr_callback:
@@ -2787,16 +2803,26 @@ def build_packages(
             )
 
 
-def build_image(chromeos_root, board):
+def build_image(chromeos_root, board, is_public_build):
     """Build ChromeOS image.
 
     Args:
       chromeos_root: chromeos tree root
       board: ChromeOS board name
+      is_public_build: Whether this is a public build.
 
     Returns:
       image folder; relative to chromeos_root
     """
+    use_flags = ['-cros-debug']
+    if not is_public_build:
+        use_flags.append('chrome_internal')
+
+    env = {
+        'USE': ' '.join(use_flags),
+        'FEATURES': 'separatedebug',
+    }
+
     with raise_if_chroot_recreation_needed() as stderr_callback:
         with locking.lock_file(locking.LOCK_FILE_FOR_BUILD):
             cros_sdk(
@@ -2807,10 +2833,7 @@ def build_image(chromeos_root, board):
                 board,
                 '--no-enable-rootfs-verification',
                 'test',
-                env={
-                    'USE': '-cros-debug chrome_internal',
-                    'FEATURES': 'separatedebug',
-                },
+                env=env,
                 stderr_callback=stderr_callback,
             )
 
@@ -3656,17 +3679,28 @@ class ChromeOSSpecManager(codechange.SpecManager):
     def sync_disk_state(self, rev: str) -> None:
         manifest_name = self.get_manifest_file(rev)
 
+        manifest_url = (
+            PUBLIC_MANIFEST_REPO_URL
+            if self.is_public_build
+            else INTERNAL_MANIFEST_REPO_URL
+        )
+
+        # b/150753074: moblab is in non-default group and causes mark_as_stable
+        # fail
+        groups = 'default,moblab'
+        if not self.is_public_build:
+            # 'platform-linux' exists only in the internal manifest.
+            groups += ',platform-linux'
+
         # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
         # manifest. 'repo sync -m' is not enough
         repo_util.init(
             self.config.get('chromeos_root'),
-            'https://chrome-internal.googlesource.com/chromeos/manifest-internal',
+            manifest_url,
             manifest_name=manifest_name,
             repo_url='https://gerrit.googlesource.com/git-repo',
             reference=self.config.get('chromeos_mirror'),
-            # b/150753074: moblab is in non-default group and causes mark_as_stable
-            # fail
-            groups='default,moblab,platform-linux',
+            groups=groups,
         )
 
         # Note, don't sync with current_branch=True for chromeos. One of its

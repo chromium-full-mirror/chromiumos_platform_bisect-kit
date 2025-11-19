@@ -38,6 +38,7 @@ import xml.etree.ElementTree
 from bisect_kit import btrfs_util
 from bisect_kit import cli
 from bisect_kit import common
+from bisect_kit import cros_util
 from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import locking
@@ -156,14 +157,16 @@ def _add_local_mount(chromeos_tree: str):
             print('\n'.join(mount_config), file=f)
 
 
-def _setup_chromeos_repos(path_factory, use_btrfs: bool):
+def _setup_chromeos_repos(path_factory, use_btrfs: bool, is_public_build: bool):
     chromeos_mirror = path_factory.get_chromeos_mirror()
     chromeos_tree = path_factory.get_chromeos_tree()
     btrfs_util.makedirs(chromeos_mirror, use_btrfs=False)
     btrfs_util.makedirs(chromeos_tree, use_btrfs)
 
     manifest_url = (
-        'https://chrome-internal.googlesource.com/chromeos/manifest-internal'
+        cros_util.PUBLIC_MANIFEST_REPO_URL
+        if is_public_build
+        else cros_util.INTERNAL_MANIFEST_REPO_URL
     )
     repo_url = 'https://gerrit.googlesource.com/git-repo'
 
@@ -484,7 +487,9 @@ def cmd_init(opts):
     path_factory = common.TemplatePathFactory(opts.work_base, opts.mirror_base)
 
     if opts.chromeos:
-        _setup_chromeos_repos(path_factory, opts.btrfs)
+        _setup_chromeos_repos(
+            path_factory, opts.btrfs, is_public_build=opts.public_build
+        )
     if opts.chrome:
         _setup_chrome_repos(
             path_factory, opts.btrfs, is_public_build=opts.public_build
@@ -526,7 +531,11 @@ def do_sync_template(opts):
             chromeos_tree = template_factory.get_chromeos_tree()
             btrfs_util.delete_tree(chromeos_tree, missing_ok=True)
             # Alaways re-create it in btrfs.
-            _setup_chromeos_repos(template_factory, use_btrfs=True)
+            _setup_chromeos_repos(
+                template_factory,
+                use_btrfs=True,
+                is_public_build=opts.public_build,
+            )
     if sync_all or opts.chrome:
         use_btrfs = btrfs_util.is_btrfs_subvolume(
             template_factory.get_chrome_tree()
@@ -758,7 +767,9 @@ def _check_chromeos_tree(
     if not should_fix:
         return False
     btrfs_util.delete_tree(chromeos_tree, missing_ok=True)
-    _setup_chromeos_repos(path_factory, use_btrfs=True)
+    # Fix fetches the internal code (assuming the public code is a subset of
+    # the internal).
+    _setup_chromeos_repos(path_factory, use_btrfs=True, is_public_build=False)
     return True
 
 

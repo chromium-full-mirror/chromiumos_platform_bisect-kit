@@ -176,6 +176,7 @@ def _build_packages(opts):
         chrome_root=chrome_root,
         goma_dir=opts.goma_chromeos_dir,
         afdo_use=True,
+        is_public_build=opts.public_build,
     )
 
 
@@ -214,7 +215,9 @@ def _do_build(opts, do_mark_as_stable=True):
     chromeos_root_image_path = os.path.join(chromeos_root, image_path)
     if not os.path.exists(chromeos_root_image_path):
         _build_packages(opts)
-        built_image_folder = cros_util.build_image(chromeos_root, opts.board)
+        built_image_folder = cros_util.build_image(
+            chromeos_root, opts.board, is_public_build=opts.public_build
+        )
         os.makedirs(os.path.dirname(chromeos_root_image_folder), exist_ok=True)
         if os.path.exists(chromeos_root_image_folder):
             os.unlink(chromeos_root_image_folder)

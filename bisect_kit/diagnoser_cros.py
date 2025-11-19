@@ -1330,12 +1330,6 @@ class CrosDiagnoser:
             )
             return
 
-        if self.config.get('is_public_build'):
-            self.make_decision(
-                'Skipping CrOS localbuild bisection, since it is not implemented for public builds yet.'
-            )
-            return
-
         self.states.add_history(
             'bisect',
             text='bisect chromeos local build',
@@ -1353,9 +1347,17 @@ class CrosDiagnoser:
             switch_cmd = [
                 './switch_cros_localbuild.py',
                 '--rich-result',
+                '--board',
+                self.config.get('board'),
                 '--session',
                 self.config.get('session'),
+                '--chromeos-root',
+                self.config.get('chromeos_root'),
+                '--chromeos-mirror',
+                self.config.get('chromeos_mirror'),
             ]
+            if self.config.get('is_public_build'):
+                switch_cmd.append('--public-build')
         else:
             switch_cmd = [
                 './switch_cros_localbuild_buildbucket.py',
@@ -1387,17 +1389,21 @@ class CrosDiagnoser:
         if buildbucket_build and switch_test_harness_cmd:
             switch_cmds.append(switch_test_harness_cmd)
 
+        init_args = [
+            '--board',
+            self.config.get('board'),
+            '--chromeos-root',
+            self.config.get('chromeos_root'),
+            '--chromeos-mirror',
+            self.config.get('chromeos_mirror'),
+        ]
+        if self.config.get('is_public_build'):
+            init_args.append('--public-build')
+
         bisector.init_if_necessary(
             self.cros_old,
             self.cros_new,
-            init_args=[
-                '--board',
-                self.config.get('board'),
-                '--chromeos-root',
-                self.config.get('chromeos_root'),
-                '--chromeos-mirror',
-                self.config.get('chromeos_mirror'),
-            ],
+            init_args=init_args,
             switch_cmds=switch_cmds,
             eval_cmd=eval_cmd,
             future_build_cmd=future_build_cmd,
