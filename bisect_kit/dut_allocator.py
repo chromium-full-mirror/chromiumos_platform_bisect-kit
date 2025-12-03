@@ -486,6 +486,28 @@ def add_dut_to_shared_pool(host: str, session: str):
     logger.info('putting %s into the shared DUT pool', host)
 
     bots = cros_lab_util.swarming_bots_list(['dut_name:' + host])
+    if len(bots) == 0:
+        raise errors.InternalError(
+            "No swarming bot for the DUT (%s) found" % host
+        )
+
+    if len(bots) >= 2:
+        # Multiple bots found for some reason (b/465246668).
+        # This is a hack to find one good bot. In the case attached in the bug,
+        # there was only one alive bot and the logic should work. But we are
+        # not sure the logic would work in all cases. We should update the
+        # logic when a following assertion hits.
+        bots = [b for b in bots if not b.get("isDead", False)]
+        if len(bots) == 0:
+            raise errors.InternalError(
+                "No live swarming bots for the DUT (%s) found." % host
+            )
+        if len(bots) >= 2:
+            raise errors.InternalError(
+                "Multiple live swarming bots for the single DUT (%s) found."
+                % host
+            )
+
     assert len(bots) == 1
     bot = bots[0]
 
