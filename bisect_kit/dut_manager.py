@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+from enum import Enum
 import functools
 import inspect
 import json
@@ -37,6 +38,17 @@ from google.protobuf import json_format
 
 
 logger = logging.getLogger(__name__)
+
+
+class VmImageType(Enum):
+    """Image type which VM use"""
+
+    # Release or snapshot image, which is built periodically on CI.
+    RELEASE_BUILD = 1
+    # Localbuild: image built by the local bisector instance.
+    LOCAL_BUILD = 2
+    # Localbuild: image built by the remote builder on buildbucket.
+    BUILDBUCKET_BUILD = 3
 
 
 @dataclasses.dataclass
@@ -204,7 +216,7 @@ class DutManager:
         ) = None,
         should_force_monitoring: bool = False,
         vm_cros_version: Optional[str] = None,
-        is_cros_localbuild_vm: bool = False,
+        vm_image_type: Optional[VmImageType] = None,
     ):
         """initializer.
 
@@ -225,7 +237,7 @@ class DutManager:
             should_force_monitoring: Whether to spawn a thread to monitor DUT lease
                 status.
             vm_cros_version: ChromeOS version used to boot up a VM machine.
-            is_cros_localbuild_vm: True if bisecting localbuild images for VM.
+            vm_image_type: Type of image to run a VM machine with.
         """
         self._name: str = name
         self._states: core.DiagnoseStates | None = states
@@ -263,7 +275,7 @@ class DutManager:
         # Arguments for VM bisection.
         self._vm_cros_version: Optional[str] = vm_cros_version
         self._allocated_vm: Optional[vm_leaser.VMLeaseResult] = None
-        self._is_cros_localbuild_vm = is_cros_localbuild_vm
+        self._vm_image_type = vm_image_type
         if self.is_vm:
             assert not should_force_monitoring
 
@@ -287,7 +299,7 @@ class DutManager:
                 )
         else:
             assert self._vm_cros_version is None
-            assert not self._is_cros_localbuild_vm
+            assert self._vm_image_type is None
 
     @property
     def config(self):
@@ -369,7 +381,12 @@ class DutManager:
             errors.ExecutionFatalError: If an image for given board and version
                 not exists.
         """
-        if not self._is_cros_localbuild_vm:
+        assert self.is_vm, "Only VM DUT should use this method."
+        assert (
+            self._vm_image_type is not None
+        ), "Only VM DUT should use this method."
+
+        if self._vm_image_type == VmImageType.RELEASE_BUILD:
             images = cros_util.search_image(
                 self.dut_allocate_spec.boards[0],
                 self._vm_cros_version,
@@ -387,28 +404,41 @@ class DutManager:
                 )
             return images[cros_util.ImageType.VM_IMAGE]
 
-        # TODO(zjchang): Currently it's not possible for build script to pass
-        # gs path to dut_manager. We should have a way to communicate between
-        # them.
-        # TODO(zjchang): Handle the error here gracefully as same as normal
-        # switch script.
-        api = buildbucket_util.BuildbucketApi()
-        build = api.search_usable_build(
-            board=self.dut_allocate_spec.boards[0],
-            filter_digests=False,
-            bisector_chromeos_version=self._vm_cros_version,
-            return_ongoing_builds=False,
-        )
-        assert build
+        if self._vm_image_type == VmImageType.LOCAL_BUILD:
+            raise errors.InternalError(
+                'VM with locally built image is not supported yet'
+            )
 
-        output_properties = json_format.MessageToDict(build.output.properties)
-        gs_bucket = output_properties['artifacts']['gs_bucket']
-        gs_path = output_properties['artifacts']['gs_path']
-        gs_image_path = (
-            f'gs://{gs_bucket}/{gs_path}/{cros_util.vm_image_filename}'
+        if self._vm_image_type == VmImageType.BUILDBUCKET_BUILD:
+            # TODO(zjchang): Currently it's not possible for build script to pass
+            # gs path to dut_manager. We should have a way to communicate between
+            # them.
+            # TODO(zjchang): Handle the error here gracefully as same as normal
+            # switch script.
+            api = buildbucket_util.BuildbucketApi()
+            build = api.search_usable_build(
+                board=self.dut_allocate_spec.boards[0],
+                filter_digests=False,
+                bisector_chromeos_version=self._vm_cros_version,
+                return_ongoing_builds=False,
+            )
+            assert build
+
+            output_properties = json_format.MessageToDict(
+                build.output.properties
+            )
+            gs_bucket = output_properties['artifacts']['gs_bucket']
+            gs_path = output_properties['artifacts']['gs_path']
+            gs_image_path = (
+                f'gs://{gs_bucket}/{gs_path}/{cros_util.vm_image_filename}'
+            )
+            gs_util.ls(gs_image_path)
+            return gs_image_path
+
+        # Should not reach this code.
+        raise errors.InternalError(
+            'Unsupported VM image: %s' % self._vm_image_type
         )
-        gs_util.ls(gs_image_path)
-        return gs_image_path
 
     def _lease_dut(self):
         """Lease a DUT."""
