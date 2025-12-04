@@ -545,20 +545,6 @@ class CrosDiagnoser:
             )
 
         # Step 5: Narrowdown chromeos localbuild.
-        use_buildbucket_build_for_cros = (
-            buildbucket_buildable
-            and not self.config.get('disable_buildbucket_chromeos')
-        )
-        if not self.is_vm_board:
-            vm_image_type = None
-            vm_cros_version = None
-        else:
-            vm_cros_version = self.cros_old
-            if use_buildbucket_build_for_cros:
-                vm_image_type = dut_manager_module.VmImageType.BUILDBUCKET_BUILD
-            else:
-                vm_image_type = dut_manager_module.VmImageType.LOCAL_BUILD
-
         self._dut_manager.reset(
             dut_manager_module.DutManager(
                 'LocalChromeOS',
@@ -566,14 +552,14 @@ class CrosDiagnoser:
                 self.dut_allocate_spec,
                 self.pre_allocated_dut,
                 self.is_stateless,
-                vm_cros_version=vm_cros_version,
-                vm_image_type=vm_image_type,
+                is_cros_localbuild_vm=self.is_vm_board,
             )
         )
         self.narrow_down_chromeos_localbuild(
             self._dut_manager.get(),
             cros_localbuild_eval_cmd,
-            use_buildbucket_build_for_cros,
+            buildbucket_buildable
+            and not self.config.get('disable_buildbucket_chromeos'),
             switch_test_harness_cmd=switch_test_harness_cmd,
         )
 
