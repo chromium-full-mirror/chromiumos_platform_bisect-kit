@@ -849,6 +849,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             None,
             True,
             should_force_monitoring=False,
+            vm_image_type=dut_manager_module.VmImageType.RELEASE_BUILD,
             # dut_init_func and dut_leave_context_check_func are missing.
         )
         with self.assertRaises(errors.ArgumentError):
@@ -867,6 +868,7 @@ class TestDutManagerAllocation(unittest.TestCase):
                 True,
                 should_force_monitoring=False,
                 vm_cros_version='invalid_version',
+                vm_image_type=dut_manager_module.VmImageType.RELEASE_BUILD,
                 # dut_init_func and dut_leave_context_check_func are missing.
             )
 
@@ -925,6 +927,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             None,
             True,
             should_force_monitoring=False,
+            vm_image_type=dut_manager_module.VmImageType.RELEASE_BUILD,
             # dut_init_func and dut_leave_context_check_func are missing.
         )
         with dut_manager.provision() as dut:
@@ -944,6 +947,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             True,
             should_force_monitoring=False,
             vm_cros_version='R102-19999.0.0-12345',
+            vm_image_type=dut_manager_module.VmImageType.RELEASE_BUILD,
             # dut_init_func and dut_leave_context_check_func are missing.
         )
         self.mock_allocate_vm_dut.assert_not_called()
@@ -978,6 +982,7 @@ class TestDutManagerAllocation(unittest.TestCase):
             None,
             True,
             should_force_monitoring=False,
+            vm_image_type=dut_manager_module.VmImageType.RELEASE_BUILD,
             # dut_init_func and dut_leave_context_check_func are missing.
         )
         self.mock_allocate_vm_dut.assert_not_called()
