@@ -1981,7 +1981,27 @@ def _cros_flash(
 
     # Handle relative path.
     if '://' not in image_path and not os.path.isabs(image_path):
-        image_path = os.path.join(chromeos_root_inside_chroot, image_path)
+        image_path = os.path.join(chromeos_root, image_path)
+
+        # Raise an exception with info in case of no image found.
+        if not os.path.exists(image_path):
+            logger.error('No image found in %s.', image_path)
+
+            # The image may exists inside the chroot if we overlooked the code
+            # path. Checking the existence inside the chroot just in case.
+            chroot_image_path = os.path.join(
+                chromeos_root_inside_chroot, image_path
+            )
+            chroot_image_existence = os.path.exists(chroot_image_path)
+            logger.info(
+                'FYI: Existence of the image in the chroot (%s): %s.',
+                chroot_image_path,
+                chroot_image_existence,
+            )
+
+            raise errors.InternalError(
+                'Image does not exist in  %s.' % image_path
+            )
 
     # The arguments --send-payload-in-parallel and --no-copy-payloads-to-device
     # have been deprecated. Please see
