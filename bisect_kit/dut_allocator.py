@@ -246,6 +246,9 @@ class DutAllocator:
         # Filter variants by prebuilt images.
         boards_with_prebuilt: list[str] | None = None
         if spec.version_hints:
+            # Remove empty. Sometimes builder list contains an empty string.
+            spec.builder_hints = [b for b in spec.builder_hints if b]
+
             if not spec.builder_hints:
                 spec.builder_hints = spec.boards
             if not spec.builder_hints:
@@ -255,20 +258,29 @@ class DutAllocator:
                 )
             boards_with_prebuilt = []
             versions = spec.version_hints
+            unavailable_images_detail_strs = []
             for builder in spec.builder_hints:
-                if not all(
-                    cros_util.has_test_image(
+                unavailable_images = []
+                for v in versions:
+                    if not cros_util.has_test_image(
                         builder, v, is_public_build=spec.public
+                    ):
+                        unavailable_images.append(v)
+
+                if unavailable_images:
+                    images_str = ",".join(unavailable_images)
+                    unavailable_images_detail_strs.append(
+                        f'{builder} has no prebuilt for {images_str}.'
                     )
-                    for v in versions
-                ):
                     logger.warning(
-                        'builder=%s (%s) does not have prebuilt test image for %s, ignore',
+                        'builder=%s (%s) does not have prebuilt test image '
+                        'for %s, ignore',
                         builder,
                         'public' if spec.public else 'internal',
-                        spec.version_hints,
+                        images_str,
                     )
                     continue
+
                 boards_with_prebuilt.append(
                     _normalize_board_name(self._chromeos_root, builder)
                 )
@@ -276,8 +288,8 @@ class DutAllocator:
             if not boards_with_prebuilt:
                 raise errors.ArgumentError(
                     '--version-hint',
-                    'given builders have no prebuilt for %s'
-                    % spec.version_hints,
+                    'None of the builders have all the necessary prebuilts: %s'
+                    % ' '.join(unavailable_images_detail_strs),
                 )
             filtered = _filter_dimensions_by_board(
                 boards_with_prebuilt, variants, None
