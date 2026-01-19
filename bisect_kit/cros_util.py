@@ -306,6 +306,27 @@ class SnapshotStore:
         Returns:
           A gs path for specific version or None if not exists.
         """
+
+        def __check_file_on_dir(gcp_bucket, dir_pattern, query_files):
+            image_info = ImageInfo()
+            found = False
+            buckets = _generate_possible_bucket_list(
+                is_public_build=is_public_build, is_snapshot=True
+            )
+            for bucket in buckets:
+                for filename in query_files:
+                    path = (
+                        f'gs://{gcp_bucket}/{board}-{bucket}'
+                        f'/{dir_pattern}/{filename}'
+                    )
+                    output = gs_util.ls(path, ignore_errors=True)
+                    if not output:
+                        continue
+                    found = True
+                    img_type = ImageType.determine(output[0])
+                    image_info[img_type] = output[0]
+            return image_info if found else None
+
         if snapshot_version not in cls.images:
             if is_vm_board(board):
                 query_files = [vm_image_filename]
@@ -322,31 +343,28 @@ class SnapshotStore:
             gcp_bucket = (
                 GCP_BUCKET_PUBLIC if is_public_build else GCP_BUCKET_INTERNAL
             )
-            path_template = (
-                f'gs://{gcp_bucket}'
-                f'/{board}-{{bucket}}'
-                f'/{snapshot_version}-*'
-                '/{filename}'
+
+            # First: Assuiming the suffix number is a snapshot sequence number.
+            image_info = __check_file_on_dir(
+                gcp_bucket, f'{snapshot_version}-*', query_files
             )
 
-            buckets = _generate_possible_bucket_list(
-                is_public_build=is_public_build, is_snapshot=True
-            )
-
-            image_info = ImageInfo()
-            for bucket in buckets:
-                for filename in query_files:
-                    path = path_template.format(
-                        bucket=bucket,
-                        filename=filename,
+            # Fall back: Assuiming the suffix number is a snapshot identifier.
+            if not image_info:
+                _, _, snapshot_id = snapshot_version_split(snapshot_version)
+                lastest_file_content = gs_util.cat(
+                    f'gs://{gcp_bucket}/{board}-snapshot'
+                    f'/LATEST-SNAPSHOT-{snapshot_id}',
+                    ignore_errors=True,
+                )
+                if lastest_file_content:
+                    image_info = __check_file_on_dir(
+                        gcp_bucket, lastest_file_content.strip(), query_files
                     )
-                    output = gs_util.ls(path, ignore_errors=True)
-                    if not output:
-                        continue
 
-                    img_type = ImageType.determine(output[0])
-                    image_info[img_type] = output[0]
-            cls.images[snapshot_version] = image_info
+            cls.images[snapshot_version] = (
+                image_info if image_info else ImageInfo()
+            )
 
         if is_vm_board(board):
             return cls.images[snapshot_version].get(ImageType.VM_IMAGE)

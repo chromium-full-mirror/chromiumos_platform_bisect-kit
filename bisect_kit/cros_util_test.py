@@ -1743,6 +1743,116 @@ class TestCrosUtil(unittest.TestCase):
             ),
         )
 
+    @mock.patch('bisect_kit.gs_util.ls')
+    @mock.patch('bisect_kit.gs_util.cat')
+    def test_query_snapshot_image_fallback(self, mock_gs_cat, mock_gs_ls):
+        cros_util.SnapshotStore.images = {}
+        board = 'board'
+        snapshot_version = 'R123-15678.0.0-9999'
+        is_public_build = False
+
+        def fake_ls(path, ignore_errors=False):
+            if (
+                path
+                == 'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-8888/image.zip'
+            ):
+                return [
+                    'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-8888/image.zip'
+                ]
+            return []
+
+        mock_gs_ls.side_effect = fake_ls
+        mock_gs_cat.return_value = 'R123-15678.0.0-9999-8888\n'
+
+        with mock.patch('bisect_kit.cros_util.is_vm_board', return_value=False):
+            path = cros_util.SnapshotStore.query_snapshot_image(
+                board, snapshot_version, is_public_build
+            )
+
+        self.assertEqual(
+            path,
+            'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-8888/image.zip',
+        )
+
+        # Verify calls
+        mock_gs_ls.assert_any_call(
+            'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-*/image.zip',
+            ignore_errors=True,
+        )
+        mock_gs_cat.assert_called_with(
+            'gs://chromeos-image-archive/board-snapshot/LATEST-SNAPSHOT-9999',
+            ignore_errors=True,
+        )
+        mock_gs_ls.assert_any_call(
+            'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-8888/image.zip',
+            ignore_errors=True,
+        )
+
+    @mock.patch('bisect_kit.gs_util.ls')
+    @mock.patch('bisect_kit.gs_util.cat')
+    def test_query_snapshot_image_success(self, mock_gs_cat, mock_gs_ls):
+        cros_util.SnapshotStore.images = {}
+        board = 'board'
+        snapshot_version = 'R123-15678.0.0-9999'
+        is_public_build = False
+
+        def fake_ls(path, ignore_errors=False):
+            if (
+                path
+                == 'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-*/image.zip'
+            ):
+                return [
+                    'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-1234/image.zip'
+                ]
+            return []
+
+        mock_gs_ls.side_effect = fake_ls
+
+        with mock.patch('bisect_kit.cros_util.is_vm_board', return_value=False):
+            path = cros_util.SnapshotStore.query_snapshot_image(
+                board, snapshot_version, is_public_build
+            )
+
+        self.assertEqual(
+            path,
+            'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-1234/image.zip',
+        )
+
+        # Verify calls
+        mock_gs_ls.assert_any_call(
+            'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-*/image.zip',
+            ignore_errors=True,
+        )
+        mock_gs_cat.assert_not_called()
+
+    @mock.patch('bisect_kit.gs_util.ls')
+    @mock.patch('bisect_kit.gs_util.cat')
+    def test_query_snapshot_image_not_found(self, mock_gs_cat, mock_gs_ls):
+        cros_util.SnapshotStore.images = {}
+        board = 'board'
+        snapshot_version = 'R123-15678.0.0-9999'
+        is_public_build = False
+
+        mock_gs_ls.return_value = []
+        mock_gs_cat.return_value = None
+
+        with mock.patch('bisect_kit.cros_util.is_vm_board', return_value=False):
+            path = cros_util.SnapshotStore.query_snapshot_image(
+                board, snapshot_version, is_public_build
+            )
+
+        self.assertIsNone(path)
+
+        # Verify calls
+        mock_gs_ls.assert_any_call(
+            'gs://chromeos-image-archive/board-snapshot/R123-15678.0.0-9999-*/image.zip',
+            ignore_errors=True,
+        )
+        mock_gs_cat.assert_called_with(
+            'gs://chromeos-image-archive/board-snapshot/LATEST-SNAPSHOT-9999',
+            ignore_errors=True,
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
