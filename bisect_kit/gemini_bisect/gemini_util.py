@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import sys
 from typing import Optional
 
 from bisect_kit import cr_util
@@ -22,7 +23,7 @@ GEMINI_API_KEY_SECRET_LOCATION = (
     'https://secretmanager.googleapis.com/'
     'v1/projects/43146777051/secrets/gemini-api-key/versions/1'
 )
-MODEL = 'gemini-2.5-pro'
+MODEL = 'gemini-3-pro'
 
 PROMPT = (
     "You're a Software Engineer investigating test regressions.\n"
@@ -344,16 +345,41 @@ def demo(testname, good, bad, culprit):
         ['refs/heads/main@{#%d}' % (x) for x in range(good, bad + 1)],
     )
     attempt = agent.next()
+    runs_llm = 0
     while attempt:
         attempt = int(re.search(r'#(\d+)', attempt).group(1))
+        runs_llm += 1
         if attempt >= culprit:
             attempt = agent.next(False)
         else:
             attempt = agent.next(True)
+    runs_bisect = 0
+    low, high = good, bad
+    while high - low > 1:
+        runs_bisect += 1
+        mid = (low + high) // 2
+        if mid < culprit:
+            low = mid
+        else:
+            high = mid
 
-    print('Concluded Culprit: ', agent.get_result())
+    print(
+        'Concluded culprit',
+        agent.get_result(),
+        'in',
+        runs_llm,
+        'runs instead of',
+        runs_bisect,
+        'runs.',
+    )
 
 
 if __name__ == '__main__':
     # PoC purporse only (should replace with unittest)
+    MODEL = 'gemini-3-flash-preview'
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
     demo('tast.ui.WebUIJSErrors', 1416515, 1416531, 1416520)
+    demo('tast.a11y.Smoke', 1513012, 1513038, 1513018)
