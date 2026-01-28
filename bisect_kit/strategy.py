@@ -12,6 +12,7 @@ import sys
 from bisect_kit import errors
 from bisect_kit import math_util
 from bisect_kit import strategy_states
+from bisect_kit.gemini_bisect import gemini_util
 from scipy.stats import boschloo_exact
 
 
@@ -1489,6 +1490,7 @@ class NoisyBinarySearch:
 
         assert self.state == self.STARTED
         assert self.prob
+
         return self._next_idx_by_utility(
             self.old_p, self.new_p, self.prob, cost_table
         )
@@ -1505,3 +1507,81 @@ class NoisyBinarySearch:
                 self.count_revnew_old += 1
             if status == 'new':
                 self.count_revnew_new += 1
+
+
+class GeminiFusionStrategy(NoisyBinarySearch):
+    """GeminiFusionStrategy that fusions NoisyBinarySearch with Gemini."""
+
+    def __init__(
+        self,
+        *args,
+        enable_gemini=False,
+        test_name=None,
+        source_root=None,
+        **kwargs,
+    ):
+        """
+        Initializes a GeminiFusionStrategy that fusions NoisyBinarySearch with Gemini.
+
+        Args:
+          enable_gemini: should use gemini to analyze commit message and diffs.
+          test_name: test name of the bisected test.
+          source_root: root of the source tree bisected.
+        """
+        super().__init__(*args, **kwargs)
+
+        # Initialize gemini agent
+        self.gemini = None
+        if enable_gemini:
+            self._gemini_waiting_result = {}
+            self.gemini = gemini_util.BisectAgent(
+                test_name,
+                source_root,
+                [x.rev for x in self.rev_info[self.old_idx : self.new_idx]],
+            )
+
+    def add_sample(self, idx, status=None, **kwargs):
+        sample = {"status": status, **kwargs}
+        if (
+            self.gemini
+            and self.rev_info[idx].rev in self._gemini_waiting_result
+        ):
+            self._gemini_waiting_result[self.rev_info[idx].rev] = sample[
+                'status'
+            ] in ['old', 'PASS']
+
+        return super().add_sample(idx, status, **kwargs)
+
+    def next_idx(self, cost_table=None):
+        """Determines next index to binary search.
+
+        Args:
+          cost_table: list of cost estimation of candidates, optional. Each
+                      estimation is a tuple (estimated_old, estimated_new) where
+            estimated_old: estimated cost if this candidate has old behavior
+            estimated_new: estimated cost if this candidate has new behavior
+
+        Returns:
+          Index to try for binary search. The returned index is optimized for
+          minimal total cost.
+        """
+        if self.state == self.INITED:
+            idx = self._next_idx_for_initial()
+            assert idx is not None
+            return idx
+
+        assert self.state == self.STARTED
+        assert self.prob
+
+        if self.gemini and not self.is_done():
+            gemini_reasoning = self.gemini.next(
+                list(self._gemini_waiting_result.values() or [None])[0]
+            )
+            self._gemini_waiting_result = {}
+            if gemini_reasoning:
+                self._gemini_waiting_result = {gemini_reasoning: None}
+                return gemini_reasoning
+
+        return self._next_idx_by_utility(
+            self.old_p, self.new_p, self.prob, cost_table
+        )

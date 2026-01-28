@@ -29,6 +29,7 @@ from bisect_kit import errors
 from bisect_kit import math_util
 from bisect_kit import strategy
 from bisect_kit import util
+import experiment
 
 
 logger = logging.getLogger(__name__)
@@ -1504,6 +1505,48 @@ class BisectorCommandLine:
             ignore_history=ignore_history,
         )
         assert rev_info
+        enable_gemini = bool(
+            # Only enable gemini under experiments.
+            # If experiment flag is ON,
+            experiment.is_in_experiment(
+                self.config.get('experiments'),
+                experiment.ID.GEMINI_ASSIT,
+            )
+            # and is bisecting Chrome
+            and self.config.get('new').startswith('refs/heads/main@')
+            # and is regression from pass to fail
+            and self.config.get('term_old') == 'PASS'
+            and self.config.get('term_new') == 'FAIL'
+            # without flakiness
+            and self.config.get('noisy') == 'old=0/30,new=30/30'
+        )
+        if enable_gemini:
+            return strategy.GeminiFusionStrategy(
+                rev_info,
+                self.states.rev2idx(self.config.get('old')),
+                self.states.rev2idx(self.config.get('new')),
+                old_value=self.config.get('old_value'),
+                new_value=self.config.get('new_value'),
+                term_map=term_map,
+                recompute_init_values=self.config.get('recompute_init_values'),
+                confidence=self.config.get('confidence'),
+                observation=self.config.get('noisy'),
+                endpoint_verification=self.config.get('endpoint_verification'),
+                saved_states=(
+                    None if ignore_history else self.states.strategy_states
+                ),
+                enable_gemini=enable_gemini,
+                test_name=self.config.get('test_name'),
+                source_root=(
+                    os.path.join(self.config.get('chrome_root'), 'src')
+                    if (
+                        self.config.get('new').startswith('refs/heads/main@')
+                        and self.config.get('chrome_root')
+                    )
+                    else None
+                ),
+            )
+
         return strategy.NoisyBinarySearch(
             rev_info,
             self.states.rev2idx(self.config.get('old')),
@@ -1845,6 +1888,11 @@ class BisectorCommandLine:
             '--endpoint-verification',
             action='store_true',
             help='Enable statistical method to verify endpoints',
+        )
+        parser_init.add_argument(
+            '--test-name',
+            type=str,
+            help='name of the test to be bisected.',
         )
         parser_init.set_defaults(func=self.cmd_init)
         self.domain_cls.add_init_arguments(parser_init)

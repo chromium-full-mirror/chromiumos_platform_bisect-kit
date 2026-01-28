@@ -27,6 +27,7 @@ class ID(StrEnum):
     VM = 'vm'
     SHARED_DUT_POOL = 'shared_dut_pool'
     EXT4_CHROME_CHECKOUT = 'ext4_chrome_checkout'
+    GEMINI_ASSIT = 'gemini_assist'
 
 
 # TODO b/328452015: either record the version when an experimental bisection
