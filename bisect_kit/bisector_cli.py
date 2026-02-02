@@ -1820,7 +1820,7 @@ class BisectorCommandLine:
         parser_init = subparsers.add_parser(
             'init',
             help='Initializes bisect session',
-            parents=parents,
+            parents=parents + [experiment.common_flags()],
             formatter_class=argparse.RawDescriptionHelpFormatter,
             description=textwrap.dedent(
                 """

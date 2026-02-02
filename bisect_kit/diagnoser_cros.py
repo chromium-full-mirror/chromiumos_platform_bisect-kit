@@ -1311,6 +1311,7 @@ class CrosDiagnoser:
                 noisy=self.noisy,
                 endpoint_verification=self.config.get('endpoint_verification'),
                 test_name=self.config.get('test_name'),
+                experiments=self.config.get('experiments'),
             )
 
             bisector.narrow_down(should_allocate_dut=False, init_once=init_once)
