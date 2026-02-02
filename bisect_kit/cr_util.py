@@ -261,6 +261,7 @@ def _simple_chrome_shell(
     is_public_build: bool = False,
     env: dict[str, str] | None = None,
     timeout: int | None = None,
+    gn_extra_args: str | None = None,
 ) -> str:
     """Runs a command inside the chrome-sdk shell.
 
@@ -273,6 +274,7 @@ def _simple_chrome_shell(
       is_public_build: Whether this is a public build.
       env: Environment variables for the command.
       timeout: Timeout in seconds for the command.
+      gn_extra_args: Extra GN flags passed to the wrapper command.
     """
     prefix = [
         'cros',
@@ -283,6 +285,10 @@ def _simple_chrome_shell(
         prefix.append('--use-external-config')
     else:
         prefix.append('--internal')
+
+    if gn_extra_args:
+        prefix.append('--gn-extra-args')
+        prefix.append(gn_extra_args)
 
     prefix.append('--use-remoteexec')
 
@@ -319,9 +325,12 @@ def determine_targets_to_build(
     board: str,
     is_public_build: bool,
     with_tests: bool = True,
+    gn_extra_args: str | None = None,
 ):
     logger.info('is_public_build %s', is_public_build)
     out_dir = os.path.join('out_%s' % board, 'Release')
+
+    # Show the GN flags to the log.
     try:
         available_targets = _simple_chrome_shell(
             chrome_src,
@@ -334,6 +343,7 @@ def determine_targets_to_build(
                 out_dir,
             ],
             is_public_build=is_public_build,
+            gn_extra_args=gn_extra_args,
         ).splitlines()
     except subprocess.CalledProcessError as e:
         raise errors.BuildError(
@@ -387,6 +397,7 @@ def build(
     targets: list[str],
     is_public_build: bool,
     with_tests: bool = True,
+    gn_extra_args: str | None = None,
 ) -> str:
     """Build Chrome binaries.
 
@@ -396,6 +407,7 @@ def build(
       targets: ninja targets. If empty, targets are determined automatically.
       is_public_build: Whether this is a public build.
       with_tests: Build test binaries as well if targets is not specified.
+      gn_extra_args: Extra GN flags used on build.
 
     Returns:
       The output directory of the build.
@@ -406,6 +418,7 @@ def build(
             board,
             is_public_build=is_public_build,
             with_tests=with_tests,
+            gn_extra_args=gn_extra_args,
         )
 
     logger.info('build %s', targets)
@@ -429,6 +442,7 @@ def build(
                 command=cmd,
                 is_public_build=is_public_build,
                 timeout=timeout,
+                gn_extra_args=gn_extra_args,
             )
         except subprocess.CalledProcessError:
             logger.warning('build failed, delete out directory and retry again')
@@ -443,6 +457,7 @@ def build(
                     command=cmd,
                     is_public_build=is_public_build,
                     timeout=timeout,
+                    gn_extra_args=gn_extra_args,
                 )
             except subprocess.CalledProcessError as e:
                 raise errors.BuildError('failed to build chrome') from e
