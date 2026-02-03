@@ -729,6 +729,11 @@ class BisectorCommandLine:
             new_idx = revlist.index(config['new'])
             assert old_idx < new_idx
 
+            if opts.test_name:
+                config['test_name'] = opts.test_name
+            if opts.experiments:
+                config['experiments'] = opts.experiments
+
             config.update(
                 confidence=opts.confidence,
                 noisy=opts.noisy,
