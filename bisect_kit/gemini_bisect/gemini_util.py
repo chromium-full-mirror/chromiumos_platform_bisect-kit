@@ -23,7 +23,7 @@ GEMINI_API_KEY_SECRET_LOCATION = (
     'https://secretmanager.googleapis.com/'
     'v1/projects/43146777051/secrets/gemini-api-key/versions/1'
 )
-MODEL = 'gemini-3-pro'
+MODEL = 'gemini-3-pro-preview'
 
 PROMPT = (
     "You're a Software Engineer investigating test regressions.\n"
