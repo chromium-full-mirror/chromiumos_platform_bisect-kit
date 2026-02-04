@@ -310,6 +310,31 @@ class TestSwitchMain(unittest.TestCase):
         mock_sync.assert_called_once()
         mock_patch_cls.assert_called_once_with(self.chrome_src, [CL_NUMBER])
 
+    @mock.patch(
+        'switch_cros_cr_localbuild_internal.cache_util.BuildArtifactsCache'
+    )
+    @mock.patch.object(switch_cros_cr_localbuild_internal, 'patch_cls')
+    @mock.patch.object(gclient_util, 'sync')
+    def test_gn_extra_args_inhibit_cache(
+        self,
+        mock_sync,
+        mock_patch_cls,
+        mock_build_artifacts_cache,
+    ):
+        """Tests that cache is not used when --gn-extra-args is provided."""
+        args = self.common_args + [
+            '--gn-extra-args',
+            'dcheck_always_on=true',
+            '--sync-code-only',
+        ]
+
+        switch_cros_cr_localbuild_internal.switch_main(args)
+
+        # Cache should not be used with custom GN args.
+        mock_build_artifacts_cache.assert_not_called()
+        mock_sync.assert_called_once()
+        mock_patch_cls.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

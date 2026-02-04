@@ -77,6 +77,12 @@ def create_argument_parser():
         help='Use public build artifacts instead of internal ones.',
     )
     parser.add_argument(
+        '--gn-extra-args',
+        action='store',
+        type=str,
+        help='Enable DCHECK on building Chrome/Chromium.',
+    )
+    parser.add_argument(
         '--chrome-root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
@@ -169,6 +175,7 @@ def switch_main(args: tuple[str] | None):
                 opts.board,
                 targets,
                 is_public_build=opts.public_build,
+                gn_extra_args=opts.gn_extra_args,
             )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.build(opts)

@@ -306,5 +306,52 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
                 self.assertIn(arg, kwargs[cmd_key])
 
 
+class TestCrosDiagnoser(unittest.TestCase):
+    """Test CrosDiagnoser class."""
+
+    class FakeDiagnoser(diagnoser_cros.CrosDiagnoser):
+        """A mock class for CrosDiagnoser"""
+
+        # pylint: disable=W0231
+        # Not called the __init__method in the parent.
+        def __init__(self, config):
+            self.config = config
+            self.states = mock.Mock()
+            self.old_info = mock.Mock()
+            self.new_info = mock.Mock()
+            self.noisy = False
+            self.is_stateless = True
+
+    def setUp(self):
+        self.config = {
+            'chrome_root': '/path/to/chrome',
+            'chrome_mirror': '/path/to/mirror',
+            'board': 'eve',
+            'board_cpu_arch': 'amd64',
+        }
+        self.diagnoser = self.FakeDiagnoser(self.config)
+
+    @mock.patch('bisect_kit.wrapper.BisectorWrapper')
+    def test_bisect_with_chrome_localbuild_gn_extra_args(
+        self, MockBisectorWrapper
+    ):
+        # pylint: disable=protected-access
+        mock_dut_manager = mock.Mock()
+        self.diagnoser._narrow_down_chrome(
+            mock_dut_manager,
+            eval_cmd=['eval.sh'],
+            init_once=None,
+            gn_extra_args='dcheck_always_on=true',
+        )
+
+        MockBisectorWrapper.return_value.init_if_necessary.assert_called()
+        _, kwargs = MockBisectorWrapper.return_value.init_if_necessary.call_args
+        switch_cmds = kwargs['switch_cmds']
+        self.assertEqual(len(switch_cmds), 1)
+        cmd = switch_cmds[0]
+        self.assertIn('--gn-extra-args', cmd)
+        self.assertIn('dcheck_always_on=true', cmd)
+
+
 if __name__ == '__main__':
     unittest.main()

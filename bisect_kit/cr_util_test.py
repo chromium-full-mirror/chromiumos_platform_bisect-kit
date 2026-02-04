@@ -303,6 +303,21 @@ class SimpleChromeShellTest(unittest.TestCase):
         self.assertNotIn('--use-external-config', call_args)
 
     @mock.patch('bisect_kit.util.check_output')
+    def test_simple_chrome_shell_gn_extra_args(self, mock_check_output):
+        # pylint: disable=protected-access
+        cr_util._simple_chrome_shell(
+            '/path/to/chrome',
+            'board_name',
+            command=['build', 'chrome'],
+            is_public_build=False,
+            gn_extra_args='dcheck_always_on=true',
+        )
+        mock_check_output.assert_called_once()
+        call_args, _ = mock_check_output.call_args
+        self.assertIn('--gn-extra-args', call_args)
+        self.assertIn('dcheck_always_on=true', call_args)
+
+    @mock.patch('bisect_kit.util.check_output')
     def test_simple_chrome_shell_public(self, mock_check_output):
         # pylint: disable=protected-access
         cr_util._simple_chrome_shell(

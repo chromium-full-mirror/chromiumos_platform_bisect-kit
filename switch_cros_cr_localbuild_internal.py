@@ -103,8 +103,9 @@ def create_argument_parser():
         help='Use public build artifacts instead of internal ones.',
     )
     parser.add_argument(
-        '--chrome-dcheck-build',
-        action='store_true',
+        '--gn-extra-args',
+        action='store',
+        type=str,
         help='Enable DCHECK on building Chrome/Chromium.',
     )
     group = parser.add_mutually_exclusive_group()
@@ -213,7 +214,7 @@ def switch_main(args: tuple[str] | None):
     if (
         opts.deploy_method == 'chrome_deploy'
         and not opts.chromium_patch_cl
-        and not opts.chrome_dcheck_build
+        and not opts.gn_extra_args
     ):
         chrome_cache = cache_util.BuildArtifactsCache(
             cache_util.BuildArtifactsCache.BuildType.CHROME,
@@ -251,20 +252,15 @@ def switch_main(args: tuple[str] | None):
                         opts.board,
                         with_tests=opts.with_tests,
                         is_public_build=opts.public_build,
+                        gn_extra_args=opts.gn_extra_args,
                     )
-
-                gn_extra_args = (
-                    None
-                    if opts.chrome_dcheck_build
-                    else 'dcheck_always_on=true'
-                )
 
                 out_dir = cr_util.build(
                     opts.chrome_src,
                     opts.board,
                     targets,
                     is_public_build=opts.public_build,
-                    gn_extra_args=gn_extra_args,
+                    gn_extra_args=opts.gn_extra_args,
                 )
 
                 # Upload the binaries to the cache.

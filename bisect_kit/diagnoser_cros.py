@@ -531,14 +531,20 @@ class CrosDiagnoser:
                 ),
             )
         )
+
+        gn_extra_arg_list = []
+        if self.config.get('chrome_dcheck_build'):
+            gn_extra_arg_list.append('dcheck_always_on=true')
         chromium_patch_cls = self.config.get('chromium_patch_cls')
         buildbucket_buildable = (
             cros_util.is_buildbucket_buildable(
                 self.config.get('cros_prebuilt_old')
             )
-            # Currently only local build supports custom patches to chromium
+            # Currently the buildbucket server doesn't support custom patches.
             and not chromium_patch_cls
-            # Currently a public build can't be built by the build bucket server.
+            # Currently the buildbucket server doesn't support custom gn flags.
+            and not gn_extra_arg_list
+            # Currently no buildbucket servers support public build.
             and not self.config.get('is_public_build')
         )
 
@@ -553,6 +559,7 @@ class CrosDiagnoser:
                 ),
                 should_build_with_tests=should_build_chrome_localbuild_with_tests,
                 chromium_patch_cls=chromium_patch_cls,
+                gn_extra_args=' '.join(gn_extra_arg_list),
             ):
                 return
         except errors.DiagnoseContradiction:
@@ -1188,6 +1195,7 @@ class CrosDiagnoser:
         buildbucket_build: bool = False,
         should_build_with_tests: bool = True,
         chromium_patch_cls: Optional[list[str]] = None,
+        gn_extra_args: str | None = None,
     ) -> bool:
         """Bisect with Chrome localbuild.
 
@@ -1199,6 +1207,7 @@ class CrosDiagnoser:
           buildbucket_build: to build Chrome image on buildbucket
           should_build_with_tests: build test binaries as well
           init_once: init func which should be called once.
+          gn_extra_args: Extra GN flags passed to 'cros chrome-sdk' command.
 
         Returns:
           True: culprit is inside Chrome
@@ -1253,6 +1262,7 @@ class CrosDiagnoser:
             # Currently only local build supports custom patches to chromium.
             # This assertion must be true here since the condition should have been checked.
             assert len(chromium_patch_cls) == 0
+            assert gn_extra_args is None or gn_extra_args == ''
         else:
             switch_cmd = [
                 './switch_cros_cr_localbuild_internal.py',
@@ -1278,6 +1288,8 @@ class CrosDiagnoser:
             if chromium_patch_cls:
                 for cl in chromium_patch_cls:
                     switch_cmd += ['--chromium-patch-cl', cl]
+            if gn_extra_args:
+                switch_cmd += ['--gn-extra-args', gn_extra_args]
 
         init_args = [
             '--chrome-root',
@@ -1848,6 +1860,7 @@ class DiagnoseCommandLineBase:
             "cros_prebuilt_new": cros_prebuilt_new,
             "chrome_localbuild_old": chrome_localbuild_old,
             "chrome_localbuild_new": chrome_localbuild_new,
+            "chrome_dcheck_build": opts.chrome_dcheck_build,
             "chromium_patch_cls": opts.chromium_patch_cl,
             "android_prebuilt_old": android_prebuilt_old,
             "android_prebuilt_new": android_prebuilt_new,
@@ -2037,6 +2050,11 @@ class DiagnoseCommandLineBase:
             metavar='BOARD',
             default=os.environ.get('BOARD'),
             help='ChromeOS board name; auto detected if DUT is not auto allocated',
+        )
+        group.add_argument(
+            '--chrome-dcheck-build',
+            action='store_true',
+            help='Enable DCHECK on building Chrome/Chromium.',
         )
         group.add_argument(
             '--public-build',
