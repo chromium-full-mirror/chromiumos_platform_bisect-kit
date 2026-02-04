@@ -177,7 +177,7 @@ class TestChromiteUtil(unittest.TestCase):
         # Case 1: No python override needed.
         mock_get_version.return_value = None
         chromite_util._run_with_python_version(
-            'arg1', 'arg2', func=mock_func, cwd=cwd
+            mock_func, 'arg1', 'arg2', cwd=cwd
         )
         mock_func.assert_called_once_with('arg1', 'arg2', cwd=cwd)
         mock_find_dir.assert_called_once_with(Path(cwd))
@@ -188,7 +188,7 @@ class TestChromiteUtil(unittest.TestCase):
         mock_get_version.return_value = ['python3.11']
         mock_exists.return_value = True
         chromite_util._run_with_python_version(
-            'arg1', 'arg2', func=mock_func, cwd=cwd
+            mock_func, 'arg1', 'arg2', cwd=cwd
         )
         mock_func.assert_called_once()
         # Check that env was modified
@@ -200,12 +200,12 @@ class TestChromiteUtil(unittest.TestCase):
     @mock.patch.object(chromite_util, '_run_with_python_version')
     def test_check_call(self, mock_execute):
         chromite_util.check_call('ls', '-l')
-        mock_execute.assert_called_once_with('ls', '-l', func=util.check_call)
+        mock_execute.assert_called_once_with(util.check_call, 'ls', '-l')
 
     @mock.patch.object(chromite_util, '_run_with_python_version')
     def test_check_output(self, mock_execute):
         chromite_util.check_output('ls', '-l')
-        mock_execute.assert_called_once_with('ls', '-l', func=util.check_output)
+        mock_execute.assert_called_once_with(util.check_output, 'ls', '-l')
 
 
 if __name__ == '__main__':

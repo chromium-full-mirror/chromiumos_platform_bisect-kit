@@ -6,6 +6,7 @@
 
 import contextlib
 import io
+import typing
 import unittest
 from unittest import mock
 
@@ -15,6 +16,14 @@ from bisect_kit import core
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
 from bisect_kit import testing
+
+
+class NoisyTestCaseType(typing.TypedDict):
+    """Type Definition for a test case in test_run_noisy_many_times"""
+
+    rate: tuple[float, float]
+    times: int
+    expect_correct_rate: float
 
 
 class DummyDomain(core.BisectDomain):
@@ -393,7 +402,7 @@ class TestBisectorCommandLine(unittest.TestCase):
         total_correct_count = 0
         total_wrong_count = 0
 
-        cases = [
+        cases: list[NoisyTestCaseType] = [
             {"rate": (0.1, 0.9), "times": 100, "expect_correct_rate": 0.99},
             {"rate": (0.2, 0.8), "times": 50, "expect_correct_rate": 0.99},
             {"rate": (0.3, 0.7), "times": 50, "expect_correct_rate": 0.8},

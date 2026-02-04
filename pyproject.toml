@@ -119,25 +119,16 @@ strict = false
 
 # TODO: Enable the suppressed errors.
 disable_error_code = [
-    "abstract",
     "arg-type",
     "assignment",
     "attr-defined",
     "call-arg",
-    "call-overload",
-    "dict-item",
-    "func-returns-value",
     "index",
     "list-item",
     "misc",
-    "name-defined",
     "operator",
-    "override",
-    "return",
     "return-value",
     "syntax",
-    "type-var",
     "union-attr",
     "var-annotated",
-    "valid-type",
 ]

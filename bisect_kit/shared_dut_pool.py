@@ -84,7 +84,7 @@ def dut_matches_spec(
       matched or not.
     """
 
-    def field_matched(field_name, values_to_match: any) -> bool:
+    def field_matched(field_name, values_to_match: typing.Any) -> bool:
         value = dimensions.get(field_name)
         if not value:
             return False
@@ -287,7 +287,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
 
         def split_dimensions(
             dimensions: list[str],
-        ) -> list(typing.Tuple[str, str]):
+        ) -> list[typing.Tuple[str, str]]:
             # dimensions are in the format of <key>:<value> pairs
             # E.g., label-model:quackingstick, label-pools:DUT_POOL_QUOTA.
             return [d.split(':', 1) for d in dimensions]

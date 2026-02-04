@@ -17,6 +17,6 @@ sys.path.append(str(PLATFORM_ROOT / 'bisect-kit-internal'))
 
 try:
     # load plugins
-    from internal import internal
+    from internal import internal  # type: ignore
 except ImportError:
     pass

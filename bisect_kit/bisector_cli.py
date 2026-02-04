@@ -360,7 +360,7 @@ def do_switch(
 
 def do_future_build(
     future_build_cmd,
-    domain: core.Domain,
+    domain: core.BisectDomain,
     rev: str,
     rev_details,
     log_file: str | None = None,
@@ -625,7 +625,7 @@ class BisectorCommandLine:
             prev_rev: str,
             remain_depth: int,
             possible_status: list[str],
-        ) -> typing.Interator[int]:
+        ) -> typing.Iterator[int]:
             """Recursively enumerates all the possible test result combinations."""
             if remain_depth < 0:
                 return
@@ -1375,7 +1375,7 @@ class BisectorCommandLine:
             new = self.states.idx2rev(new_idx)
             summary.update(
                 {
-                    'current_range': (old, new),
+                    'current_range': [old, new],
                     'highlight_range': [
                         self.states.idx2rev(highlight_old_idx),
                         self.states.idx2rev(highlight_new_idx),

@@ -137,7 +137,9 @@ class PathSpec:
             r'https://chrome-internal.googlesource.com/',
         )
 
-    def __eq__(self, rhs: PathSpec) -> bool:
+    def __eq__(self, rhs: object) -> bool:
+        if not isinstance(rhs, PathSpec):
+            return NotImplemented
         if self.path != rhs.path:
             return False
         if self.rev != rhs.rev:
@@ -306,7 +308,7 @@ class Action:
         class_name, values = action_data
         for subclass in Action.__subclasses__():
             if class_name == subclass.__name__:
-                return subclass(**values)
+                return subclass(**values)  # type: ignore[abstract]
         raise ValueError(f'Unknown action class: {class_name}')
 
 

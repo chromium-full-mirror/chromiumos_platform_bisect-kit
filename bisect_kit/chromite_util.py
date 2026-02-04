@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from typing import Optional
+from typing import Callable, Optional, ParamSpec, TypeVar
 
 from bisect_kit import git_util
 from bisect_kit import util
@@ -133,7 +133,15 @@ def _get_required_python_version(
     return None
 
 
-def _run_with_python_version(*args, func, **kwargs) -> None:
+FuncParam = ParamSpec("FuncParam")
+FuncRetType = TypeVar("FuncRetType")
+
+
+def _run_with_python_version(
+    func: Callable[FuncParam, FuncRetType],
+    *args: FuncParam.args,
+    **kwargs: FuncParam.kwargs,
+) -> FuncRetType:
     """Run a function with a specific python version if needed.
 
     It checks the chromite version and if the current python is not supported,
@@ -186,9 +194,9 @@ def _run_with_python_version(*args, func, **kwargs) -> None:
 
 def check_call(*args, **kwargs) -> None:
     """Wrapper for util.check_call to run with appropriate python version."""
-    return _run_with_python_version(*args, func=util.check_call, **kwargs)
+    return _run_with_python_version(util.check_call, *args, **kwargs)
 
 
 def check_output(*args, **kwargs) -> str:
     """Wrapper for util.check_output to run with appropriate python version."""
-    return _run_with_python_version(*args, func=util.check_output, **kwargs)
+    return _run_with_python_version(util.check_output, *args, **kwargs)

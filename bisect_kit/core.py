@@ -396,7 +396,7 @@ class BisectStates(States):
         """
         super().__init__(session_file)
 
-        self.data = {
+        self.data: dict[str, typing.Any] = {
             # What have been done so far. Each entry contains at least
             # timestamp, rev, and result.
             "history": []
@@ -436,7 +436,9 @@ class BisectStates(States):
             # Returns a copy so the internal states is not modified
             # accidentally.
             # Call setter strategy_states() to set it explicitly.
-            return dataclasses.replace(states)
+            return dataclasses.replace(
+                typing.cast(strategy_states.States, states)
+            )
         return None
 
     @strategy_states.setter

@@ -214,7 +214,7 @@ def gen_view(
     out_dir: str,
     regenerate: bool = False,
     download: bool = True,
-) -> dict[str, int]:
+) -> None:
     """Generates view.json for a single bisect.
 
     Args:
@@ -224,6 +224,7 @@ def gen_view(
         downoload: whether to download session files from gsbucket. If False, assume the files are downloaded before.
 
     Returns:
+        None
     """
     logger.info('processing %s', bisect_id)
 

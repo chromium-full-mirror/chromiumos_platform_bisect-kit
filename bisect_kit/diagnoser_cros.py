@@ -250,10 +250,10 @@ class CrosDiagnoser:
                 should_always_reflash=self.config.get('always_reflash'),
             )
 
-        def switch_test_harness_to_old(dut):
+        def switch_test_harness_to_old(cmd, dut):
             logger.info('switch test harness to old for %s', dut)
             run_switch_or_eval_cmd(
-                switch_test_harness_cmd
+                cmd
                 + [
                     self.cros_old,
                     '--session',
@@ -431,7 +431,7 @@ class CrosDiagnoser:
             if not self.is_vm_board:
                 init_dut_to_old_cros(dut)
             if switch_test_harness_cmd:
-                switch_test_harness_to_old(dut)
+                switch_test_harness_to_old(switch_test_harness_cmd, dut)
 
         self._dut_manager.reset(
             dut_manager_module.DutManager(
@@ -501,7 +501,7 @@ class CrosDiagnoser:
             if not self.is_vm_board:
                 init_dut_to_old_cros(dut)
             if switch_test_harness_cmd:
-                switch_test_harness_to_old(dut)
+                switch_test_harness_to_old(switch_test_harness_cmd, dut)
             init_autotest_deps_workaround(dut)
 
         def bisect_local_chrome_dut_leave_context_check_func(
