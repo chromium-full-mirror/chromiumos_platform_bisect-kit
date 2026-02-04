@@ -1590,7 +1590,12 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             self._gemini_waiting_result = {}
             if gemini_reasoning:
                 self._gemini_waiting_result = {gemini_reasoning: None}
-                return gemini_reasoning
+                logger.info('Gemini suggested %s', gemini_reasoning)
+                return list(
+                    idx
+                    for idx, rev in enumerate(self.rev_info)
+                    if rev == gemini_reasoning
+                )[0]
 
         return self._next_idx_by_utility(
             self.old_p, self.new_p, self.prob, cost_table
