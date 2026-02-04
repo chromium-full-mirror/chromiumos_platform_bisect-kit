@@ -1514,7 +1514,7 @@ class BisectorCommandLine:
             # Only enable gemini under experiments.
             # If experiment flag is ON,
             experiment.is_in_experiment(
-                self.config.get('experiments'),
+                self.config.get('experiments', []),
                 experiment.ID.GEMINI_ASSIT,
             )
             # and is bisecting Chrome
