@@ -341,7 +341,7 @@ class ActionGroup:
         }
 
     def summary(self) -> dict:
-        result = {}
+        result: dict[str, typing.Any] = {}
         if self.comment:
             result['comment'] = self.comment
         result['actions'] = [action.summary() for action in self.actions]

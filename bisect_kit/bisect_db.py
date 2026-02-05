@@ -8,6 +8,7 @@
 import datetime
 import enum
 import logging
+import typing
 
 from bisect_kit import cros_lab_util
 from bisect_kit import dut_allocate_spec_type
@@ -122,7 +123,7 @@ def update_retry_device_spec(
     b: datastore.Entity,
     spec: dut_allocate_spec_type.DutAllocateSpec,
 ) -> bool:
-    to_update = {}
+    to_update: dict[str, typing.Any] = {}
     if b.get('Autotest.Metric'):
         if not spec.skus:
             logger.warning('unable to update retry device spec: no skus')

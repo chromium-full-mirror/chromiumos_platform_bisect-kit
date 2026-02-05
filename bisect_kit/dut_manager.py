@@ -118,7 +118,7 @@ class DelayedDutReleaser:
         self._enable_shared_dut_pool = enable_shared_dut_pool
         self._callback = callback
 
-        self._timer = None
+        self._timer: threading.Timer | None = None
 
         self._lock = threading.Lock()
         self._has_released = False
@@ -248,9 +248,11 @@ class DutManager:
         self._pre_allocated_dut: str | None = None
         if pre_allocated_dut != cros_lab_util.LAB_DUT:
             self._pre_allocated_dut = pre_allocated_dut
-        self._dut_init_func: typing.Callable[[str], None] | None = dut_init_func
+        self._dut_init_func: typing.Callable[[DutManager], None] | None = (
+            dut_init_func
+        )
         self._dut_leave_context_check_func: (
-            typing.Callable[[str], None] | None
+            typing.Callable[[DutManager], None] | None
         ) = dut_leave_context_check_func
         self._should_force_monitoring: bool = should_force_monitoring
 
@@ -263,7 +265,7 @@ class DutManager:
         self._is_dut_initialized: bool = False
 
         # Object handling dut releasing
-        self._dut_releaser: typing.Type[DelayedDutReleaser] | None = None
+        self._dut_releaser: DelayedDutReleaser | None = None
 
         # Whether dut is the previous leased one in consecutive
         # provision() calls of a DutManager instance.

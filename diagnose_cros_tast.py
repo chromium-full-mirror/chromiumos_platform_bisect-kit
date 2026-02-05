@@ -37,7 +37,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
     def _build_cmds(self):
         # prebuilt version will be specified later.
-        switch_test_harness_cmd = [
+        switch_test_harness_cmd: list[str] | None = [
             './switch_tast_prebuilt.py',
             '--rich-result',
             '--chromeos-root',

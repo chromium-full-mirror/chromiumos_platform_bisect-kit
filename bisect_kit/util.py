@@ -697,8 +697,8 @@ def copy_file_to_log_folder(file_path: str) -> bool:
         )
         return False
 
-    file_path = pathlib.Path(file_path)
-    if not file_path.is_file():
+    path = pathlib.Path(file_path)
+    if not path.is_file():
         logger.debug('Result file deos not exist.')
         return False
 
@@ -706,9 +706,7 @@ def copy_file_to_log_folder(file_path: str) -> bool:
     # and file_path = some_directory/results.json
     # destination_file_name will be log_file_name.results.json
     # destination_file_path will be bisect.sessions/session_name/log/log_file_name.results.json
-    destination_file_name = (
-        log_path.stem + '.' + file_path.stem + file_path.suffix
-    )
+    destination_file_name = log_path.stem + '.' + path.stem + path.suffix
     destination_file_path = log_path.parents[0] / destination_file_name
     append_to_file(file_path, destination_file_path)
     return True

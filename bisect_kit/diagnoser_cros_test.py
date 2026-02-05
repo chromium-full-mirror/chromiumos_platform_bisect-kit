@@ -31,7 +31,9 @@ class TestDiagnose(unittest.TestCase):
             self.is_stateless = is_stateless
 
     def init(self, config: dict, is_stateless: bool):
-        self._diagnoser = self.FakeDiagnoser(config, is_stateless)
+        self._diagnoser: TestDiagnose.FakeDiagnoser | None = self.FakeDiagnoser(
+            config, is_stateless
+        )
 
     def diagnose(self):
         self._diagnoser.diagnose(
@@ -215,7 +217,7 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
             self.states = states_instance
 
         def _build_cmds(self):
-            switch_test_harness_cmd = [
+            switch_test_harness_cmd: list[str] | None = [
                 './switch_tast_prebuilt.py',
                 '--rich-result',
                 '--chromeos-root',

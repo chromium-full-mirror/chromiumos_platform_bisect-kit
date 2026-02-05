@@ -996,7 +996,7 @@ class TestLeaseForSession(unittest.TestCase):
     def test_no_matched_dut_and_no_owned_dut(self):
         pool_manager = FakeSharedDutPoolManager(self._mock_client)
         self._mock_fetch.return_value = iter([])
-        self._mock_query_by_owner = []
+        self._mock_query_by_owner.return_value = []
         dut_name, orig_owner = pool_manager.lease_for_bisect(
             'bisect_1', [], [], []
         )

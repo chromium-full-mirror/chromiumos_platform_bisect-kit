@@ -455,8 +455,8 @@ class NoisyBinarySearch:
           ((old false-positive, old trials), (new true-positive, new trials))
         """
         # default not noisy
-        old_f = NOT_NOISY
-        new_t = NOT_NOISY
+        old_f: tuple[int | None, int | None] = NOT_NOISY
+        new_t: tuple[int | None, int | None] = NOT_NOISY
         if not observation:
             return old_f, new_t
 

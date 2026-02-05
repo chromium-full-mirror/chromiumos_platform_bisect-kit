@@ -74,12 +74,12 @@ def fix_missing_files(chromeos_root: str, board: str, dut: str) -> None:
     for file_name in ['lsb-release', 'update_engine.conf']:
         if not (chroot_build_etc / file_name).exists():
             with tempfile.TemporaryDirectory() as tmp_folder:
-                tmp_folder = pathlib.Path(tmp_folder)
-                util.scp_cmd(f'{dut}:/etc/{file_name}', str(tmp_folder))
+                tmp_path = pathlib.Path(tmp_folder)
+                util.scp_cmd(f'{dut}:/etc/{file_name}', str(tmp_path))
                 util.check_call(
                     'sudo',
                     'cp',
-                    str(tmp_folder / file_name),
+                    str(tmp_path / file_name),
                     str(chroot_build_etc),
                 )
         util.check_call(

@@ -186,7 +186,7 @@ def lease_vm(
         gce_image_project=VMLEASER_DEFAULT_PROJECT,
         gce_image_name=inserted_image,
     )
-    result.public_host = get_vm_public_ip(result)
+    result.public_host = get_vm_public_ip(result) or ''
     logger.info('Leased a VM: %s in %s.', result.public_host, result.gce_region)
     return result
 

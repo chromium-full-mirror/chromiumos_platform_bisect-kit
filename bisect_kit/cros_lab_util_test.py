@@ -271,7 +271,7 @@ class LeaseKeeperTest(unittest.TestCase):
             ),
             cros_lab_util.LeaseStatus(dut_name='dut1', is_leased=False),
         ]
-        self.quit_event.wait = mock.Mock()
+        self.quit_event.wait = mock.Mock()  # type: ignore
 
         cros_lab_util.lease_keeper(
             'dut1', 'reason', self.quit_event, self.error_queue, self.session_id
@@ -309,7 +309,7 @@ class LeaseKeeperTest(unittest.TestCase):
             if wait_count >= 2:
                 self.quit_event.set()
 
-        self.quit_event.wait = wait_and_quit
+        self.quit_event.wait = wait_and_quit  # type: ignore
 
         cros_lab_util.lease_keeper(
             'dut1', 'reason', self.quit_event, self.error_queue, self.session_id

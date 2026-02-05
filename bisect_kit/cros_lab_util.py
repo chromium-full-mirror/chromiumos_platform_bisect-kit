@@ -107,7 +107,7 @@ class LeaseStatus:
     lease_id_in_dls: typing.Optional[str] = None
     is_leased: bool = False
     leased_by: typing.Optional[str] = None
-    end_time: typing.Optional[int] = None
+    end_time: typing.Optional[float] = None
 
 
 def normalize_sku_name(sku):
@@ -209,9 +209,10 @@ def skylab_cmd(cmd, *args, **kwargs):
       kwargs: additional arguments to control how to run the command
     """
     service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+    full_args = list(args)
     if service_account_json:
-        args = ['-service-account-json', service_account_json] + list(args)
-    return _run_labtools_command('skylab', cmd, *args, **kwargs)
+        full_args = ['-service-account-json', service_account_json] + full_args
+    return _run_labtools_command('skylab', cmd, *full_args, **kwargs)
 
 
 def crosfleet_cmd(cmd, *args, **kwargs):
@@ -223,10 +224,11 @@ def crosfleet_cmd(cmd, *args, **kwargs):
       kwargs: additional arguments to control how to run the command
     """
     service_account_json = os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+    full_args = list(args)
     if service_account_json:
-        args = ['-service-account-json', service_account_json] + list(args)
-    cmd = cmd.split(' ')
-    return _run_labtools_command('crosfleet', *cmd, *args, **kwargs)
+        full_args = ['-service-account-json', service_account_json] + full_args
+    cmd_list = cmd.split(' ')
+    return _run_labtools_command('crosfleet', *cmd_list, *full_args, **kwargs)
 
 
 def crosfleet_dut_info(dut_name):
@@ -1190,7 +1192,7 @@ def lease_keeper(dut_name, reason, quit_event, error_queue, session_id):
     del reason
 
     try:
-        previous_status = {}
+        previous_status: LeaseStatus | None = None
         while True:
             lease_status = query_lease_status(dut_name)
             if previous_status and (

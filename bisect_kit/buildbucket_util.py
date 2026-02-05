@@ -218,15 +218,16 @@ class BuildbucketApi:
                 response_content = response.read()
                 if response.status == 500:
                     # Retry when HTTP status 500 (server error).
+                    response_text = ''
                     if response_content:
-                        response_content = response_content.decode('utf-8')
+                        response_text = response_content.decode('utf-8')
                     if max_retries <= 0:
                         raise errors.ExternalError(
-                            'buildbucket api server error: ' + response_content
+                            'buildbucket api server error: ' + response_text
                         )
                     logger.warning(
                         'retry buildbucket api due to server error: %s',
-                        response_content,
+                        response_text,
                     )
                     time.sleep(30)
                     continue
@@ -234,13 +235,12 @@ class BuildbucketApi:
                 result.ParseFromString(response_content)
                 return result
             except DecodeError as e:
+                response_text = ''
                 if response_content:
-                    response_content = response_content.decode('utf-8')
-                logger.exception(
-                    'Error in buildbucket post: %s', response_content
-                )
+                    response_text = response_content.decode('utf-8')
+                logger.exception('Error in buildbucket post: %s', response_text)
                 raise errors.BuildError(
-                    'buildbucket api response: ' + response_content
+                    'buildbucket api response: ' + response_text
                 ) from e
             except (ConnectionError, socket.timeout, ssl.SSLError) as e:
                 if max_retries <= 0:

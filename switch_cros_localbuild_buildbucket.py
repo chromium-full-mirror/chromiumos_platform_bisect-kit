@@ -521,7 +521,7 @@ def wait_for_build_completion(opts, build_id: int):
       errors.BuildError
     """
     api = buildbucket_util.BuildbucketApi()
-    last_log_time = 0
+    last_log_time = 0.0
     while True:
         build = api.get_build(build_id)
         if not api.is_running(build):

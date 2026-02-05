@@ -347,9 +347,9 @@ def demo(testname, good, bad, culprit):
     attempt = agent.next()
     runs_llm = 0
     while attempt:
-        attempt = int(re.search(r'#(\d+)', attempt).group(1))
+        rev = int(re.search(r'#(\d+)', attempt).group(1))
         runs_llm += 1
-        if attempt >= culprit:
+        if rev >= culprit:
             attempt = agent.next(False)
         else:
             attempt = agent.next(True)

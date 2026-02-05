@@ -128,9 +128,11 @@ class CrosDiagnoser:
         self._switch_vm_cmd: list[str] = ['./switch_cros_vm.py']
 
         # Initialized in diagnose().
-        self.dut_allocate_spec = None
-        self.is_vm_board = None
-        self._dut_manager = None
+        self.dut_allocate_spec: (
+            dut_allocate_spec_module.DutAllocateSpec | None
+        ) = None
+        self.is_vm_board: bool | None = None
+        self._dut_manager: DutManagerRecycler | None = None
 
     def _verified_chromeos_prebuilt(self):
         if self.config.get('bypass_chromeos_prebuilt'):
@@ -396,7 +398,7 @@ class CrosDiagnoser:
         # Switches CrOS repository and DUT to narrowed down old version.
         # This is time consuming and only needs to be done once for domains
         # which are based on old CrOS image.
-        switch_cros_repo_to_old = util.InitOnce(
+        switch_cros_repo_to_old: util.InitOnce | None = util.InitOnce(
             'switch_cros_repo_to_old',
             lambda: run_switch_or_eval_cmd(
                 [

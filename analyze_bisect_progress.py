@@ -560,7 +560,7 @@ def cmd_count_waiting_time(opts):
     count = 0
     failed_count = 0
     success_count = 0
-    total_waiting_time = 0
+    total_waiting_time = 0.0
 
     for dir_name in os.listdir(opts.work_dir):
         if not os.path.isdir(os.path.join(opts.work_dir, dir_name)):

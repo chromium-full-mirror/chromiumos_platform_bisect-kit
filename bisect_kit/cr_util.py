@@ -649,7 +649,7 @@ def get_RBE_environment_variables() -> dict[str, str]:
     bisect_runner_json_path = os.environ.get(
         'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON'
     )
-    env['RBE_credential_file'] = bisect_runner_json_path
+    env['RBE_credential_file'] = bisect_runner_json_path or ''
     env['RBE_use_application_default_credentials'] = 'true'
     env['RBE_use_gce_credentials'] = 'false'
     env['RBE_automatic_auth'] = 'false'

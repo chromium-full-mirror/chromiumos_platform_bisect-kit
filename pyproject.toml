@@ -120,7 +120,6 @@ strict = false
 # TODO: Enable the suppressed errors.
 disable_error_code = [
     "arg-type",
-    "assignment",
     "attr-defined",
     "call-arg",
     "index",

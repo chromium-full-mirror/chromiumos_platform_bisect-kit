@@ -95,7 +95,7 @@ def sync(
     gclient_dir: str,
     with_branch_heads: bool = False,
     with_tags: bool = False,
-    revision: str = None,
+    revision: str | None = None,
     jobs: int = 8,
     max_attempts: int = 3,
     retry_interval: int = 60,
@@ -823,7 +823,7 @@ class TimeSeriesTree:
 
         # Intermediate dict to keep track alive children for the time being.
         # Maintained by add_snapshot() and no_more_snapshot().
-        self.alive_children = {}
+        self.alive_children: dict[str, tuple[float, dict[str, str]]] | None = {}
 
         # All historical children (TimeSeriesTree object) between start_time and
         # end_time. It's possible that children with the same entry appear more than

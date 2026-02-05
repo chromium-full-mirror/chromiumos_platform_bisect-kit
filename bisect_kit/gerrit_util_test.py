@@ -91,7 +91,7 @@ class TestGerritUtil(unittest.TestCase):
     def test_get_gerrit_cl_info_http_error(self):
         http_error = urllib.error.HTTPError("url", 404, "Not Found", {}, None)
         # Mock the read method for the HTTPError object itself
-        http_error.read = MagicMock(return_value=b"Error content")
+        http_error.read = MagicMock(return_value=b"Error content")  # type: ignore
 
         with patch('urllib.request.urlopen', side_effect=http_error):
             result = gerrit_util.get_gerrit_cl_info("123")

@@ -456,7 +456,7 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
             'failed when prepare, assume it is temporary: %s' % e
         )
 
-    last_test_result: core.StepResult = None
+    last_test_result: core.StepResult | None = None
     for test in tests:
         # Remove the "tast." prefix prepended by autotest.
         test = re.sub(r'^tast\.', '', test)

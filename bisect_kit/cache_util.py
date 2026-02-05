@@ -147,9 +147,9 @@ class BuildArtifactsCache:
         identifier = 'default'
         if self._targets:
             # Hash of the targets is used as an identifier of the file content.
-            identifier = (
-                hashlib.md5('_'.join(self._targets).encode('utf8')).hexdigest(),
-            )
+            identifier = hashlib.md5(
+                '_'.join(self._targets).encode('utf8')
+            ).hexdigest()
 
         return '%s_%s.tar.xz' % (rev, identifier)
 
