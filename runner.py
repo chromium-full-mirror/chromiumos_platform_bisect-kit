@@ -73,15 +73,15 @@ def create_argument_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=parents,
     )
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
+    bisect_range_group = parser.add_mutually_exclusive_group(required=True)
+    bisect_range_group.add_argument(
         '--new',
         dest='want',
         action='store_const',
         const='new',
         help='Let WANT=NEW',
     )
-    group.add_argument(
+    bisect_range_group.add_argument(
         '--old',
         dest='want',
         action='store_const',
@@ -91,52 +91,56 @@ def create_argument_parser():
     parser.add_argument('exec_cmd')
     parser.add_argument('exec_args', nargs=argparse.REMAINDER)
 
-    group = parser.add_argument_group(
+    precondition_group = parser.add_argument_group(
         title='Preconditions to match (optional)',
         description='All specified preconditions must match, '
         'otherwise return SKIP.',
     )
-    group.add_argument(
+    precondition_group.add_argument(
         '--precondition-output',
         metavar='REGEX',
         type=re.compile,
         help='Precondition to match %(metavar)s',
     )
 
-    group = parser.add_argument_group(
+    condition_group = parser.add_argument_group(
         title='Conditions to match (mutual exclusive, required)',
         description='If the specified condition matches, return WANT.',
     )
-    group = group.add_mutually_exclusive_group(required=True)
-    group.add_argument(
+    condition_exclusive_group = condition_group.add_mutually_exclusive_group(
+        required=True
+    )
+    condition_exclusive_group.add_argument(
         '--output',
         metavar='REGEX',
         type=re.compile,
         help='Regex to match stdout|stderr',
     )
-    group.add_argument('--returncode', type=int, help='Value of exit code')
-    group.add_argument(
+    condition_exclusive_group.add_argument(
+        '--returncode', type=int, help='Value of exit code'
+    )
+    condition_exclusive_group.add_argument(
         '--timeout',
         type=float,
         metavar='SECONDS',
         help='If command executes longer than SECONDS secs',
     )
 
-    group = parser.add_argument_group(
+    execution_group = parser.add_argument_group(
         title='Execution options',
         description='Controls how to execute, terminate, and how many times',
     )
-    group.add_argument(
+    execution_group.add_argument(
         '--cwd', type=cli.argtype_dir_path, help='Working directory'
     )
-    group.add_argument(
+    execution_group.add_argument(
         '--repeat',
         type=int,
         default=1,
         metavar='NUM',
         help='Repeat NUM times (default: %(default)s)',
     )
-    group.add_argument(
+    execution_group.add_argument(
         '--ratio',
         default='=1',
         metavar='{op}{value}',
@@ -144,12 +148,12 @@ def create_argument_parser():
         help='Match if meet |ratio| condition. Example: ">0", "<0.5", "=1", etc. '
         '(default: %(default)r)',
     )
-    group.add_argument(
+    execution_group.add_argument(
         '--noshortcut',
         action='store_true',
         help="Don't stop earlier if we know ratio will meet or not by calculation",
     )
-    group.add_argument(
+    execution_group.add_argument(
         '--terminate-output',
         metavar='REGEX',
         type=re.compile,

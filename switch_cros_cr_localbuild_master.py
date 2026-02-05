@@ -90,15 +90,15 @@ def create_argument_parser():
         help='Root of Chrome source tree, like ~/chromium',
     )
 
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
+    exclusive_group = parser.add_mutually_exclusive_group()
+    exclusive_group.add_argument(
         '--target',
         action='append',
         help='Binary to build and deploy, like unittest or fuzzers. '
         'Example value: "video_decode_accelerator_unittest". '
         'This option could be specified multiple times.',
     )
-    group.add_argument(
+    exclusive_group.add_argument(
         '--with-tests',
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -113,10 +113,10 @@ def create_argument_parser():
         help='Deploy method (default: %(default)s)',
     )
 
-    group = parser.add_argument_group(
+    build_group = parser.add_argument_group(
         title='Options for building chrome in chromeos sdk chroot'
     )
-    group.add_argument(
+    build_group.add_argument(
         '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
@@ -124,7 +124,7 @@ def create_argument_parser():
         help='ChromeOS tree root; only necessary if deploy_method is '
         'cros_deploy or image',
     )
-    switch_cros_localbuild.add_build_and_deploy_arguments(group)
+    switch_cros_localbuild.add_build_and_deploy_arguments(build_group)
     return parser
 
 
