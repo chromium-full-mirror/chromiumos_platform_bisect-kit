@@ -1594,7 +1594,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 return list(
                     idx
                     for idx, rev in enumerate(self.rev_info)
-                    if rev == gemini_reasoning
+                    if rev.rev == gemini_reasoning
                 )[0]
 
         return self._next_idx_by_utility(
