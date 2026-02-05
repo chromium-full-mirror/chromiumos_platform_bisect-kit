@@ -396,7 +396,6 @@ def build(
     board: str,
     targets: list[str],
     is_public_build: bool,
-    with_tests: bool = True,
     gn_extra_args: str | None = None,
 ) -> str:
     """Build Chrome binaries.
@@ -404,22 +403,15 @@ def build(
     Args:
       chrome_src: git repo path of chrome/src.
       board: ChromeOS board name.
-      targets: ninja targets. If empty, targets are determined automatically.
+      targets: ninja targets. Must not be empty.
       is_public_build: Whether this is a public build.
-      with_tests: Build test binaries as well if targets is not specified.
       gn_extra_args: Extra GN flags used on build.
 
     Returns:
       The output directory of the build.
     """
     if not targets:
-        targets = determine_targets_to_build(
-            chrome_src,
-            board,
-            is_public_build=is_public_build,
-            with_tests=with_tests,
-            gn_extra_args=gn_extra_args,
-        )
+        raise errors.InternalError('Build target must not be empty')
 
     logger.info('build %s', targets)
     out_dir = os.path.join('out_%s' % board, 'Release')

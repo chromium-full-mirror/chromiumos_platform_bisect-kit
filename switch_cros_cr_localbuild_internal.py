@@ -263,7 +263,6 @@ def switch_main(args: tuple[str] | None):
                     opts.chrome_src,
                     opts.board,
                     targets,
-                    with_tests=opts.with_tests,
                     is_public_build=opts.public_build,
                     gn_extra_args=gn_extra_args,
                 )

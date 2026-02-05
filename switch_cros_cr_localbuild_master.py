@@ -155,12 +155,20 @@ def switch_main(args: tuple[str] | None):
     if not opts.no_build:
         # TODO(kcwu): support local patch.
         if opts.deploy_method == 'chrome_deploy':
+            targets = opts.target
+            if not targets:
+                targets = cr_util.determine_targets_to_build(
+                    opts.chrome_src,
+                    opts.board,
+                    with_tests=opts.with_tests,
+                    is_public_build=opts.public_build,
+                )
+
             cr_util.build(
                 opts.chrome_src,
                 opts.board,
-                opts.target,
+                targets,
                 is_public_build=opts.public_build,
-                with_tests=opts.with_tests,
             )
         elif opts.deploy_method == 'image':
             switch_cros_localbuild.build(opts)
