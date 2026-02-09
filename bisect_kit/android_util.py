@@ -12,6 +12,8 @@ Terminology used in this module:
       "cts_arm_64"
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -136,7 +138,7 @@ def get_build_ids_between(branch, flavor, start, end):
     del flavor  # not used
 
     # TODO(kcwu): remove pagination hack after b/68239878 fixed
-    build_id_set = set()
+    build_id_set: set[int] = set()
     tmp_end = end
     while True:
         url = BUILD_IDS_BETWEEN_URL_TEMPLATE.format(
@@ -271,7 +273,7 @@ class AndroidSpecManager(codechange.SpecManager):
         del fixed_specs  # unused
         path = 'default.xml'
 
-        commits = []
+        commits: list[git_util.Commit] = []
         old_timestamp = lookup_build_timestamp(self.config.get('flavor'), old)
         new_timestamp = lookup_build_timestamp(self.config.get('flavor'), new)
         for commit in git_util.get_history(self.manifest_dir, path):

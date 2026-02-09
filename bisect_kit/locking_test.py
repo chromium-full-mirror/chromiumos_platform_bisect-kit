@@ -4,6 +4,8 @@
 
 """Test locking module"""
 
+from __future__ import annotations
+
 import multiprocessing
 import os
 import tempfile
@@ -13,7 +15,12 @@ import unittest
 from bisect_kit import locking
 
 
-def lock_test_helper(filename, queue):
+def lock_test_helper(
+    filename: str,
+    # pylint: disable=unsubscriptable-object
+    # Suppressing a false warning: https://github.com/pylint-dev/pylint/issues/3488
+    queue: multiprocessing.Queue[float],
+):
     # Use smaller polling_time for shorter test duration.
     with locking.lock_file(filename, polling_time=0.01):
         queue.put(time.time())
@@ -34,7 +41,10 @@ class TestLocking(unittest.TestCase):
         # Because the lock cannot reenter in the same process and cannot be shared
         # between threads, run the test on two separated processes via
         # multiprocessing.
-        queue = multiprocessing.Queue()
+        #
+        # pylint: disable=unsubscriptable-object
+        # Suppressing a false warning: https://github.com/pylint-dev/pylint/issues/3488
+        queue: multiprocessing.Queue[float] = multiprocessing.Queue()
         processes = []
         for _ in range(2):
             p = multiprocessing.Process(

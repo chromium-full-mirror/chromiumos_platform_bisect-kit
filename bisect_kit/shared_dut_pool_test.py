@@ -4,6 +4,8 @@
 
 """Test shared_dut_pool module."""
 
+from __future__ import annotations
+
 import logging
 import unittest
 from unittest import mock
@@ -223,7 +225,7 @@ class TestFilterDimensions(unittest.TestCase):
             'dut_state:ready',
             'label-servo:True',
         ]
-        to_filter = []
+        to_filter: list[str] = []
         self.assertEqual(
             ['label-touchscreen:True', 'dut_state:ready', 'label-servo:True'],
             shared_dut_pool.filter_dimensions(dimensions, to_filter),

@@ -4,6 +4,8 @@
 
 """Test cros_lab_util module."""
 
+from __future__ import annotations
+
 import queue
 import subprocess
 import threading
@@ -228,7 +230,7 @@ class LeaseKeeperTest(unittest.TestCase):
             mock.patch.object(cros_lab_util, '_notify_error_from_lease_keeper')
         )
         self.quit_event = threading.Event()
-        self.error_queue = queue.Queue()
+        self.error_queue: queue.Queue[Exception] = queue.Queue()
         self.session_id = 'test_session_id'
 
     def test_quit_event(self):

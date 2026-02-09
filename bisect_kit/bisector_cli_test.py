@@ -4,6 +4,8 @@
 
 """Test bisector_cli module."""
 
+from __future__ import annotations
+
 import contextlib
 import io
 import typing
@@ -68,7 +70,7 @@ class TestBisectorCli(unittest.TestCase):
 
     def test_collect_bisect_result_values(self):
         # pylint: disable=protected-access
-        values = []
+        values: list[float] = []
         bisector_cli._collect_bisect_result_values(values, '')
         self.assertEqual(values, [])
 

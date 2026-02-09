@@ -30,8 +30,11 @@ will be set:
 
 # Note, this script only works for the main branch of chrome.
 
+from __future__ import annotations
+
 import logging
 import os
+import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -102,7 +105,7 @@ def guess_git_rev(opts, rev):
 
 def verify_gclient_dep(chrome_root):
     """Makes sure gclient deps_file follow git checkout."""
-    context = {}
+    context: dict[str, typing.Any] = {}
     with open(os.path.join(chrome_root, '.gclient')) as f:
         code = compile(f.read(), '.gclient', 'exec')
         # pylint: disable=exec-used

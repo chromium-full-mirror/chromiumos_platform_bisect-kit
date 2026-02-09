@@ -334,7 +334,7 @@ class DiagnoseStates(States):
 
     def __init__(self, session_file: str):
         super().__init__(session_file)
-        self._data = {}
+        self._data: dict[str, typing.Any] = {}
 
     def init_states(self, config: dict):
         self._data = {

@@ -313,7 +313,7 @@ def main(args=None):
     opts = parser.parse_args(args)
     common.config_logging(opts)
 
-    counter = collections.Counter()
+    counter: collections.Counter[str] = collections.Counter()
 
     meet = None
     runtime = []

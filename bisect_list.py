@@ -24,8 +24,11 @@ Example:
   p.s. seq(1) prints a sequence of numbers, one at a line.
 """
 
+from __future__ import annotations
+
 import logging
 import sys
+import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -47,7 +50,7 @@ class ListDomain(core.BisectDomain):
 
     @staticmethod
     def init(opts):
-        config = {}
+        config: dict[str, typing.Any] = {}
         revlist = [line.strip() for line in sys.stdin.readlines()]
         return config, {'revlist': revlist}
 

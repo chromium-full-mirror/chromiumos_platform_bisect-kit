@@ -4,13 +4,14 @@
 
 """Gemini utilities."""
 
+from __future__ import annotations
+
 import base64
 import json
 import logging
 import os
 import re
 import sys
-from typing import Optional
 
 from bisect_kit import cr_util
 from bisect_kit import git_util
@@ -145,7 +146,7 @@ class GeminiAgent:
                 )
             ),
         )
-        self._contents = []
+        self._contents: list[genai.types.Content] = []
 
     def _get_credentials(self) -> google.oauth2.service_account.Credentials:
         """Get credentials to Cloud Secret Manager.
@@ -255,7 +256,7 @@ class BisectAgent:
             ),
         }
 
-    def _run(self, reply: Optional[genai.types.Part] = None) -> str:
+    def _run(self, reply: genai.types.Part | None = None) -> str:
         """Call GeminiAgent recursively until a target revision is determined.
 
         reply: reply from previous run.
@@ -319,7 +320,7 @@ class BisectAgent:
             return None
         raise NotImplementedError()
 
-    def next(self, good: Optional[bool] = None) -> str:
+    def next(self, good: bool | None = None) -> str:
         """Returns the next target revision for bisector to run.
 
         good: whether previous run is good or not."""

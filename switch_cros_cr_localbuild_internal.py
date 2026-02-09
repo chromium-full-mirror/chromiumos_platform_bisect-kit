@@ -149,7 +149,7 @@ def create_argument_parser():
 def patch_cls(chrome_src: str, chromium_patch_cls: list[str]):
     base_commit_hash = git_util.get_commit_hash(chrome_src, 'HEAD')
 
-    applied_cls = []
+    applied_cls: list[str] = []
     for cl in chromium_patch_cls:
         cl_info = gerrit_util.get_gerrit_cl_info(cl)
         if not cl_info:

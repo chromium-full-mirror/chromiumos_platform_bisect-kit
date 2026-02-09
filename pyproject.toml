@@ -129,5 +129,4 @@ disable_error_code = [
     "return-value",
     "syntax",
     "union-attr",
-    "var-annotated",
 ]

@@ -1111,7 +1111,9 @@ class BisectorCommandLine:
     def estimate_cost(self, prev_rev):
         avg_switch_time = math_util.Averager()
         avg_eval_time = math_util.Averager()
-        avg_eval_time_by_status = collections.defaultdict(math_util.Averager)
+        avg_eval_time_by_status: collections.defaultdict[
+            str, math_util.Averager
+        ] = collections.defaultdict(math_util.Averager)
         for entry in self.states.data['history']:
             if entry['event'] != 'sample':
                 continue
@@ -1338,7 +1340,7 @@ class BisectorCommandLine:
                 print('not init yet')
             return
 
-        summary = {
+        summary: dict[str, typing.Any] = {
             'rev_info': [],
         }
         for sample in self.states.history:

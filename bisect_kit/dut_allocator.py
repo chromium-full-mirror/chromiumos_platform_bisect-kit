@@ -48,7 +48,7 @@ def _filter_dimensions_by_board(
     dimensions: list[str],
     pools: list[str] | None,
 ) -> list[str]:
-    result = set()
+    result: set[str] = set()
 
     def sample_bots(constraints, result):
         # Ideally, we need only one result. Here we get more (limit=10) in order to

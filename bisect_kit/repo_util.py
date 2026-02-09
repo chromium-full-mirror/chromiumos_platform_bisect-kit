@@ -8,6 +8,8 @@ This module provides wrapper for "repo" (a Google-built repository management
 tool that runs on top of git) and related utility functions.
 """
 
+from __future__ import annotations
+
 import logging
 import multiprocessing
 import os
@@ -32,7 +34,7 @@ REPO_META_DIR = '.repo'
 LOCAL_MANIFESTS_DIR = os.path.join(REPO_META_DIR, 'local_manifests')
 
 
-def get_manifest_url(manifest_dir):
+def get_manifest_url(manifest_dir: str):
     """Get manifest URL of repo project.
 
     Args:
@@ -45,7 +47,7 @@ def get_manifest_url(manifest_dir):
     return url
 
 
-def find_repo_root(path):
+def find_repo_root(path: str):
     """Find the root path of a repo project
 
     Args:
@@ -403,7 +405,7 @@ def cleanup_unexpected_files(repo_dir):
 
     # When we clean up project X, we don't want to touch files under X's
     # subprojects. Collect the nested project relationship here.
-    nested = {}
+    nested: dict[str, list[str]] = {}
     # By sorting, parent directory will loop before subdirectories.
     for project_path in sorted(projects):
         components = project_path.split(os.sep)
@@ -468,7 +470,7 @@ class ManifestParser:
         root = xml.etree.ElementTree.fromstring(content)
         default = None
         notice = None
-        remotes = {}
+        remotes: dict[str, xml.etree.ElementTree.Element] = {}
         manifest_server = None
         result = xml.etree.ElementTree.Element('manifest')
 

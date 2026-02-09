@@ -2690,7 +2690,7 @@ def prepare_chroot(chromeos_root, replace=False):
 
 @contextlib.contextmanager
 def raise_if_chroot_recreation_needed():
-    stderr_lines = []
+    stderr_lines: list[str] = []
     stderr_callback = stderr_lines.append
     try:
         yield stderr_callback
@@ -3100,7 +3100,7 @@ def parse_chromeos_overlays(chromeos_root):
                 continue
 
             path = os.path.join(overlay, 'metadata', 'layout.conf')
-            masters = []
+            masters: list[str] = []
             if os.path.exists(path):
                 with open(path) as f:
                     for line in f:

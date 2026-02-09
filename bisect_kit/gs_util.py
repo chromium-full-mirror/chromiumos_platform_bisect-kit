@@ -35,7 +35,7 @@ def _gsutil(*args, **kwargs) -> str:
       errors.ExternalError: gsutil failed to run
       subprocess.CalledProcessError: command failed
     """
-    stderr_lines = []
+    stderr_lines: list[str] = []
     try:
         return util.check_output(
             _BIN, *args, stderr_callback=stderr_lines.append
@@ -181,7 +181,7 @@ def stat(*args, **kwargs) -> dict[str, dict[str, typing.Any]]:
         'Metageneration': str,
     }
 
-    result = {}
+    result: dict[str, dict[str, typing.Any]] = {}
     current_file = None
 
     for line in _gsutil('stat', *args, **kwargs).splitlines():

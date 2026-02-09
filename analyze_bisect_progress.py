@@ -273,7 +273,7 @@ def gen_view(
     with open(os.path.join(bisect_dir, main_session_file)) as f:
         data = json.load(f)
 
-    retries = collections.Counter()
+    retries: collections.Counter[str] = collections.Counter()
     records = []
     previous_entry = None
     for entry in data.get('history'):
@@ -304,7 +304,7 @@ def gen_view(
 
 
 def cmd_count_retries(opts):
-    total_retries = collections.Counter()
+    total_retries: collections.Counter[str] = collections.Counter()
     count = 0
     for dir_name in os.listdir(opts.work_dir):
         if not os.path.isdir(os.path.join(opts.work_dir, dir_name)):

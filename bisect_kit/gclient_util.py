@@ -4,6 +4,8 @@
 
 """Gclient utility."""
 
+from __future__ import annotations
+
 import ast
 import collections
 import itertools
@@ -17,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import typing
 import urllib.parse
 
 from bisect_kit import codechange
@@ -199,10 +202,10 @@ def runhook(gclient_dir, jobs=8, gclientfile=None):
         util.check_call(*cmd, cwd=gclient_dir, env=new_env)
 
 
-def load_gclient_entries(gclient_dir):
+def load_gclient_entries(gclient_dir: str):
     """Loads .gclient_entries."""
     repo_project_list = os.path.join(gclient_dir, '.gclient_entries')
-    scope = {}
+    scope: dict[str, typing.Any] = {}
     with open(repo_project_list) as f:
         code = compile(f.read(), repo_project_list, 'exec')
         # pylint: disable=exec-used
@@ -965,7 +968,7 @@ class TimeSeriesTree:
         ):
             # It's possible that one deps is removed and added at the same timestamp,
             # i.e. modification, so use counter to track.
-            end_counter = collections.Counter()
+            end_counter: collections.Counter[str] = collections.Counter()
 
             for _timestamp, entry, deps, end in events:
                 forest[entry] = deps
@@ -1018,7 +1021,7 @@ class DepsParser:
             return str(name)
 
         global_scope = {"Var": var_function, "Str": str_function}
-        local_scope = {}
+        local_scope: dict[str, typing.Any] = {}
         # pylint: disable=exec-used
         exec(content, global_scope, local_scope)
         return local_scope
@@ -1284,7 +1287,9 @@ class DepsParser:
                     deps_queue.put(name)
 
         result = solutions[entry_point]
-        deps_queue = queue.SimpleQueue()
+        deps_queue: queue.SimpleQueue[str | tuple[str, ...]] = (
+            queue.SimpleQueue()
+        )
         visited = set()
         visited.add(entry_point)
         _add_unvisited_recursedeps(deps_queue, visited, solutions[entry_point])

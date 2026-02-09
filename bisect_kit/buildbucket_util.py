@@ -4,6 +4,8 @@
 
 """Buildbucket api utility."""
 
+from __future__ import annotations
+
 import http.client
 import json
 import logging
@@ -552,7 +554,7 @@ class BuildbucketApi:
             page_size=page_size,
         )
 
-        result = []
+        result: list[Build] = []
         while len(result) < limit:
             response = self._post(
                 'SearchBuilds', request, SearchBuildsResponse, timeout=120

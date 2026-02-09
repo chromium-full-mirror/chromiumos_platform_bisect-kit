@@ -186,7 +186,7 @@ def _run_labtools_command(name, *args, **kwargs):
     try:
         # Because skylab_lease_dut() need to capture output even for
         # KeyboardInterrupt, we cannot use util.check_output here.
-        stdout_lines = []
+        stdout_lines: list[str] = []
         if 'stdout_callback' not in kwargs:
             kwargs = kwargs.copy()
             kwargs['stdout_callback'] = stdout_lines.append
@@ -935,8 +935,8 @@ def crosfleet_lease_dut(
     logger.debug('crosfleet_lease_dut %s', dut_name)
     if not lease_duration_seconds:
         lease_duration_seconds = LEASE_DURATION_SECONDS
-    stdout_lines = []
-    stderr_lines = []
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
     orphan_task = True
     try:
         crosfleet_cmd(
@@ -1308,7 +1308,7 @@ def dut_lease_status_monitor(dut, reason, session_id):
         return
 
     quit_event = threading.Event()
-    error_queue = queue.Queue()
+    error_queue: queue.Queue[Exception] = queue.Queue()
     try:
         thread = threading.Thread(
             target=lease_keeper,
