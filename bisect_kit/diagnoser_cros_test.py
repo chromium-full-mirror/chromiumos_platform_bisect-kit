@@ -306,6 +306,38 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
                 self.assertIn(arg, kwargs[cmd_key])
 
 
+class TestDiagnoseCommandLine(unittest.TestCase):
+    """Test DiagnoseCommandLineBase class."""
+
+    class FakeDiagnoseCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
+        """A fake class for DiagnoseCommandLineBase."""
+
+        def do_run(self):
+            pass
+
+        def cmd_run(self, opts):
+            pass
+
+    def setUp(self):
+        self.cli = self.FakeDiagnoseCommandLine()
+        self.parser = self.cli.create_argument_parser()
+
+    def test_chrome_cfi_thinlto_build_arg(self):
+        opts = self.parser.parse_args(
+            [
+                'init',
+                '--old',
+                'old_ver',
+                '--new',
+                'new_ver',
+                '--chrome-cfi-thinlto-build',
+                '--session',
+                's',
+            ]
+        )
+        self.assertTrue(opts.chrome_cfi_thinlto_build)
+
+
 class TestCrosDiagnoser(unittest.TestCase):
     """Test CrosDiagnoser class."""
 
@@ -321,6 +353,12 @@ class TestCrosDiagnoser(unittest.TestCase):
             self.new_info = mock.Mock()
             self.noisy = False
             self.is_stateless = True
+            self.cros_old = '1.2.3'
+            self.is_vm_board = False
+            self.dut_allocate_spec = mock.Mock()
+            self.dut_allocate_spec.boards = []
+            self.pre_allocated_dut = 'dut'
+            self._dut_manager = mock.Mock()
 
     def setUp(self):
         self.config = {
@@ -330,6 +368,55 @@ class TestCrosDiagnoser(unittest.TestCase):
             'board_cpu_arch': 'amd64',
         }
         self.diagnoser = self.FakeDiagnoser(self.config)
+
+    @mock.patch('bisect_kit.diagnoser_cros.cros_util.is_buildbucket_buildable')
+    @mock.patch.object(diagnoser_cros.CrosDiagnoser, '_narrow_down_chrome')
+    @mock.patch('bisect_kit.diagnoser_cros.cros_util.version_to_short')
+    def test_diagnose_chrome_cfi_thinlto_build(
+        self,
+        mock_version_to_short,
+        mock_narrow_down_chrome,
+        mock_is_buildbucket_buildable,
+    ):
+        # pylint: disable=protected-access
+        self.config['chrome_cfi_thinlto_build'] = True
+        mock_version_to_short.return_value = '1.2.3'
+        mock_is_buildbucket_buildable.return_value = False
+
+        # We only want to test the part that sets gn_extra_args.
+        # Since _diagnose is long, we might need to mock a lot of things.
+        # Alternatively, we can test _narrow_down_chrome which is already tested.
+
+        # Let's try to mock the steps before step 4.
+        with mock.patch.object(
+            self.diagnoser, 'narrow_down_chromeos_prebuilt'
+        ), mock.patch.object(
+            self.diagnoser, 'narrow_down_android'
+        ) as mock_narrow_down_android, mock.patch.object(
+            self.diagnoser, 'narrow_down_dlc_prebuilt'
+        ) as mock_narrow_down_dlc, mock.patch(
+            'bisect_kit.diagnoser_cros.run_switch_or_eval_cmd'
+        ):
+            mock_narrow_down_android.return_value = False
+            mock_narrow_down_dlc.return_value = False
+            mock_narrow_down_chrome.return_value = True
+
+            self.diagnoser._diagnose(
+                is_autotest=False,
+                switch_test_harness_cmd=None,
+                cros_prebuilt_eval_cmd=[],
+                android_prebuilt_eval_cmd=[],
+                chrome_localbuild_eval_cmd=['eval_chrome'],
+                should_build_chrome_localbuild_with_tests=True,
+                cros_localbuild_eval_cmd=[],
+            )
+
+        mock_narrow_down_chrome.assert_called_once()
+        _, kwargs = mock_narrow_down_chrome.call_args
+        gn_extra_args = kwargs['gn_extra_args']
+        self.assertIn('use_thin_lto=true', gn_extra_args)
+        self.assertIn('is_cfi=true', gn_extra_args)
+        self.assertIn('use_cfi_cast=true', gn_extra_args)
 
     @mock.patch('bisect_kit.wrapper.BisectorWrapper')
     def test_bisect_with_chrome_localbuild_gn_extra_args(

@@ -535,6 +535,10 @@ class CrosDiagnoser:
         gn_extra_arg_list = []
         if self.config.get('chrome_dcheck_build'):
             gn_extra_arg_list.append('dcheck_always_on=true')
+        if self.config.get('chrome_cfi_thinlto_build'):
+            gn_extra_arg_list.append('use_thin_lto=true')
+            gn_extra_arg_list.append('is_cfi=true')
+            gn_extra_arg_list.append('use_cfi_cast=true')
         chromium_patch_cls = self.config.get('chromium_patch_cls')
         buildbucket_buildable = (
             cros_util.is_buildbucket_buildable(
@@ -1861,6 +1865,7 @@ class DiagnoseCommandLineBase:
             "chrome_localbuild_old": chrome_localbuild_old,
             "chrome_localbuild_new": chrome_localbuild_new,
             "chrome_dcheck_build": opts.chrome_dcheck_build,
+            "chrome_cfi_thinlto_build": opts.chrome_cfi_thinlto_build,
             "chromium_patch_cls": opts.chromium_patch_cl,
             "android_prebuilt_old": android_prebuilt_old,
             "android_prebuilt_new": android_prebuilt_new,
@@ -2050,6 +2055,11 @@ class DiagnoseCommandLineBase:
             metavar='BOARD',
             default=os.environ.get('BOARD'),
             help='ChromeOS board name; auto detected if DUT is not auto allocated',
+        )
+        group.add_argument(
+            '--chrome-cfi-thinlto-build',
+            action='store_true',
+            help='Enable CFI and ThinLTO on building Chrome/Chromium.',
         )
         group.add_argument(
             '--chrome-dcheck-build',
