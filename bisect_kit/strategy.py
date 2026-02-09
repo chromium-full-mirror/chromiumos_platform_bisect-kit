@@ -1576,12 +1576,12 @@ class GeminiFusionStrategy(NoisyBinarySearch):
         if (
             self.gemini
             and self._gemini_waiting_result.values()
-            and self._gemini_waiting_result.values()[0] is None
+            and list(self._gemini_waiting_result.values())[0] is None
         ):
             # We should always return previous reasoning until run result is
             # provided. next_idx may be called multiple times by different
             # callers in one iteration.
-            return self._gemini_waiting_result.keys()[0]
+            return list(self._gemini_waiting_result.keys())[0]
 
         if self.gemini and not self.is_done():
             gemini_reasoning = self.gemini.next(
