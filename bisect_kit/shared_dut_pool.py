@@ -287,7 +287,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
 
         def split_dimensions(
             dimensions: list[str],
-        ) -> list[typing.Tuple[str, str]]:
+        ) -> list[list[str]]:
             # dimensions are in the format of <key>:<value> pairs
             # E.g., label-model:quackingstick, label-pools:DUT_POOL_QUOTA.
             return [d.split(':', 1) for d in dimensions]

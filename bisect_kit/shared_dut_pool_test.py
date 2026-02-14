@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import typing
 import unittest
 from unittest import mock
 
@@ -20,6 +21,15 @@ import google.cloud.exceptions
 
 
 logger = logging.getLogger(__name__)
+
+
+class DutData(typing.TypedDict):
+    """A dict to represent a DUT entity in the shared pool."""
+
+    name: str
+    owner: str
+    dimensions: dict[str, list[str]]
+    state: shared_dut_pool.DutState
 
 
 class TestDutMatchesSpec(unittest.TestCase):
@@ -549,16 +559,18 @@ class TestYieldsDuts(unittest.TestCase):
         return mock_transfer_owner
 
     def test_all_yielded(self):
-        duts = []
+        duts: list[DutData] = []
         for i in range(3):
-            dut = datastore.Entity()
+            # Entity is a dict-like object.
+            dut = typing.cast(DutData, datastore.Entity())
             dut.update(
                 {
                     'name': 'dut_name_%s' % str(i + 1),
-                    'owner': 'bisect_100',
+                    'owner': 'bisect_1',
                     'dimensions': {
                         'label-board': ['board1'],
                     },
+                    'state': shared_dut_pool.DutState.IDLE,
                 }
             )
             duts.append(dut)
@@ -595,9 +607,10 @@ class TestYieldsDuts(unittest.TestCase):
         self.assertEqual([], not_yielded)
 
     def test_partially_yielded(self):
-        duts = []
+        duts: list[DutData] = []
         for i in range(3):
-            dut = datastore.Entity()
+            # Entity is a dict-like object.
+            dut = typing.cast(DutData, datastore.Entity())
             dut.update(
                 {
                     'name': 'dut_name_%s' % str(i + 1),
@@ -605,11 +618,11 @@ class TestYieldsDuts(unittest.TestCase):
                     'dimensions': {
                         'label-board': ['board1'],
                     },
+                    'state': shared_dut_pool.DutState.IDLE,
                 }
             )
             duts.append(dut)
         self._mock_client.get_multi.return_value = duts
-
         self._mock_bisect_db_client.dut_alloc_spec_for_unfinished_bisects.return_value = {
             'bisect_id_1': dut_allocate_spec_type.DutAllocateSpec(
                 boards=['board1']
@@ -635,16 +648,18 @@ class TestYieldsDuts(unittest.TestCase):
         self.assertEqual(['dut_name_3'], not_yielded)
 
     def test_not_yield_to_self(self):
-        duts = []
+        duts: list[DutData] = []
         for i in range(3):
-            dut = datastore.Entity()
+            # Entity is a dict-like object.
+            dut = typing.cast(DutData, datastore.Entity())
             dut.update(
                 {
                     'name': 'dut_name_%s' % str(i + 1),
-                    'owner': 'bisect_1',
+                    'owner': 'bisect_100',
                     'dimensions': {
                         'label-board': ['board1'],
                     },
+                    'state': shared_dut_pool.DutState.IDLE,
                 }
             )
             duts.append(dut)
