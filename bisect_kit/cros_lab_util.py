@@ -170,7 +170,7 @@ def dut_host_name(dut: str):
     return dut[:-5]
 
 
-def dut_name_to_address(dut_name: str):
+def dut_name_to_address(dut_name: str) -> str:
     """Converts DUT name to DUT address.
 
     Args:

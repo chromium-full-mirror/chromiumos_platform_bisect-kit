@@ -12,6 +12,7 @@ Example:
   $ ./bisect_git.py run
 """
 
+import argparse
 import logging
 
 from bisect_kit import bisector_cli
@@ -40,7 +41,7 @@ class GitDomain(core.BisectDomain):
         )
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
         try:
             opts.old = git_util.get_commit_hash(opts.git_repo, opts.old)
         except ValueError as e:
@@ -63,7 +64,7 @@ class GitDomain(core.BisectDomain):
 
         return config, {'revlist': revlist}
 
-    def __init__(self, config):
+    def __init__(self, config: core.BisectConfig):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):

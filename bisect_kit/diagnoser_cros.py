@@ -76,12 +76,14 @@ class DutManagerRecycler:
 class CrosDiagnoser:
     """Integrated bisectors API for ChromeOS regression analysis."""
 
-    def __init__(self, states: core.DiagnoseStates, config: dict):
+    def __init__(
+        self, states: core.DiagnoseStates, config: core.DiagnoserConfig
+    ):
         """Initializer.
 
         Args:
           states: a core.DiagnoseStates objejct.
-          config: a config from a core.DiagnoseStates object.
+          config: a DiagnoserConfig object.
         """
         self.states = states
         self.config = config
@@ -1581,7 +1583,8 @@ class DiagnoseCommandLineBase:
         self.states = None
 
     @property
-    def config(self):
+    def config(self) -> core.DiagnoserConfig:
+        assert self.states
         return self.states.config
 
     def check_cros_image_exists(
@@ -1820,6 +1823,8 @@ class DiagnoseCommandLineBase:
         self.states.save()
 
     def cmd_init(self, opts):
+        assert self.states
+
         self.check_options(opts)
 
         if opts.dut != cros_lab_util.LAB_DUT and not cros_util.is_good_dut(
@@ -1843,7 +1848,7 @@ class DiagnoseCommandLineBase:
         else:
             cros_prebuilt_old, cros_prebuilt_new = opts.old, opts.new
 
-        config = {
+        config: core.DiagnoserConfig = {
             "session": opts.session,
             "mirror_base": opts.mirror_base,
             "work_base": opts.work_base,

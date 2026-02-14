@@ -22,6 +22,7 @@ will be set:
   CHROMEOS_ROOT (e.g. ~/chromiumos).
 """
 
+import argparse
 import logging
 import os
 
@@ -90,7 +91,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
         )
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
         if not opts.dut and not opts.board:
             raise errors.ArgumentError(
                 '--dut and --board', 'Neither is specified'
@@ -146,7 +147,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
 
         return config, {'revlist': revlist, 'details': details}
 
-    def __init__(self, config):
+    def __init__(self, config: core.BisectConfig):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):

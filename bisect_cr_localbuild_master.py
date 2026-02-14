@@ -32,6 +32,7 @@ will be set:
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import typing
@@ -157,7 +158,7 @@ class ChromeSrcMasterDomain(core.BisectDomain):
         )
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
         chrome_src = os.path.join(opts.chrome_root, 'src')
         if not os.path.exists(chrome_src):
             raise errors.ArgumentError(
@@ -206,7 +207,7 @@ class ChromeSrcMasterDomain(core.BisectDomain):
 
         return config, {'revlist': revlist, 'details': details}
 
-    def __init__(self, config):
+    def __init__(self, config: core.BisectConfig):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):

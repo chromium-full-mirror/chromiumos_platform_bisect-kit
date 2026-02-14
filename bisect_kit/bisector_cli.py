@@ -25,11 +25,105 @@ import typing
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import core
+from bisect_kit import dut_manager
 from bisect_kit import errors
 from bisect_kit import math_util
 from bisect_kit import strategy
 from bisect_kit import util
 import experiment
+
+
+class BaseOptions(argparse.Namespace):
+    """Base options common to all subcommands."""
+
+    session: str
+    func: typing.Callable[..., typing.Any]
+
+
+class InitOptions(BaseOptions):
+    """Options for the 'init' command."""
+
+    command: typing.Literal['init']
+    old: str
+    new: str
+    term_old: str
+    term_new: str
+    noisy: str
+    old_value: float
+    new_value: float
+    recompute_init_values: bool
+    confidence: float
+    endpoint_verification: bool
+    test_name: str
+    experiments: list[experiment.ID]
+    # Common dynamic args from domains
+    dut: str
+    board: str
+
+
+class RunOptions(BaseOptions):
+    """Options for the 'run' command."""
+
+    command: typing.Literal['run']
+    once: bool
+    force: bool
+    current_rev: str | None
+    revs: list[str]
+
+
+class ConfigOptions(BaseOptions):
+    """Options for the 'config' command."""
+
+    command: typing.Literal['config']
+    key: typing.Literal[
+        'clear',
+        'switch',
+        'eval',
+        'confidence',
+        'noisy',
+        'term_old',
+        'term_new',
+        'future_build',
+    ]
+    value: list[str]
+
+
+class OldNewSkipOptions(BaseOptions):
+    """Options for 'old', 'new', 'skip' commands."""
+
+    command: typing.Literal['old', 'new', 'skip']
+    revs: list[str]
+
+
+class ViewOptions(BaseOptions):
+    """Options for the 'view' command."""
+
+    command: typing.Literal['view']
+    verbose: bool
+    json: bool
+    timestamp: float | None
+
+
+class LogOptions(BaseOptions):
+    """Options for the 'log' command."""
+
+    command: typing.Literal['log']
+    before: float | None
+    after: float | None
+    json: bool
+
+
+class NextOptions(BaseOptions):
+    """Options for the 'next' command."""
+
+    command: typing.Literal['next']
+    current_rev: str | None
+
+
+class ResetOptions(BaseOptions):
+    """Options for the 'reset' command."""
+
+    command: typing.Literal['reset']
 
 
 logger = logging.getLogger(__name__)
@@ -470,7 +564,10 @@ def switch_main_wrapper(
     return step_main_wrapper(func, args)
 
 
-class BisectorCommandLine:
+T_co = typing.TypeVar('T_co', bound=core.BisectDomain, covariant=True)
+
+
+class BisectorCommandLine(typing.Generic[T_co]):
     """Bisector command line interface.
 
     The typical usage pattern:
@@ -576,20 +673,25 @@ class BisectorCommandLine:
     so to the eval script.
     """
 
-    def __init__(self, domain_cls, dut_manager=None):
+    def __init__(  # pylint: disable=redefined-outer-name
+        self,
+        domain_cls: type[T_co],
+        dut_manager: dut_manager.DutManager | None = None,
+    ):
         self.domain_cls = domain_cls
         self.dut_manager = dut_manager
 
-        self.domain = None
-        self.session = None
-        self.states = None
-        self.strategy = None
-        self.future_build_depth = 1
+        self.domain: T_co | None = None
+        self.session: str | None = None
+        self.states: core.BisectStates | None = None
+        self.strategy: strategy.NoisyBinarySearch | None = None
+        self.future_build_depth: int = 1
 
-        self.previous_strategy_state = None
+        self.previous_strategy_state: str | None = None
 
     @property
-    def config(self):
+    def config(self) -> core.BisectConfig:
+        assert self.states
         return self.states.config
 
     def _get_term_map(self):
@@ -685,11 +787,11 @@ class BisectorCommandLine:
         )
         return [self.states.idx2rev(x) for x in dedup_indexes]
 
-    def cmd_reset(self, _opts):
+    def cmd_reset(self, _opts: ResetOptions):
         """Resets bisect session and clean up saved result."""
         self.states.reset()
 
-    def cmd_init(self, opts):
+    def cmd_init(self, opts: InitOptions):
         """Initializes bisect session.
 
         See init command's help message for more detail.
@@ -788,6 +890,8 @@ class BisectorCommandLine:
         Returns:
           Whether the eval is successful.
         """
+        assert self.strategy
+
         if action == EvalAction.WITH_DUT:
             assert dut, 'dut must be present with action %s' % action
             eval_cmd = eval_cmd + [dut]
@@ -1151,7 +1255,7 @@ class BisectorCommandLine:
             cost_table.append(cost)
         return cost_table
 
-    def _next_idx_iter(self, opts, force):
+    def _next_idx_iter(self, opts: RunOptions, force):
         prev_rev = None
         if opts.revs:
             for rev in opts.revs:
@@ -1187,6 +1291,7 @@ class BisectorCommandLine:
                 self.previous_strategy_state == self.strategy.INITED
                 and current_state == self.strategy.STARTED
             ):
+                assert self.strategy.threshold is not None
                 self._make_decision(
                     'After verifying with the initial revisions, '
                     'use %f as the bisect threshold.' % self.strategy.threshold
@@ -1225,7 +1330,7 @@ class BisectorCommandLine:
             self.states.strategy_states = self.strategy.export_states()
             self.states.save()
 
-    def cmd_run(self, opts):
+    def cmd_run(self, opts: RunOptions):
         """Performs bisection.
 
         See run command's help message for more detail.
@@ -1250,7 +1355,7 @@ class BisectorCommandLine:
                 new=self.config.get('new'),
             )
             term_map = self._get_term_map()
-            prev_rev = opts.current_rev
+            prev_rev: str | None = opts.current_rev
             force = opts.force
             idx_gen = self._next_idx_iter(opts, force)
             while True:
@@ -1331,7 +1436,7 @@ class BisectorCommandLine:
                 )
                 self.states.save()
 
-    def cmd_view(self, opts):
+    def cmd_view(self, opts: ViewOptions):
         """Shows remaining candidates."""
         if not self.states.inited:
             if opts.json:
@@ -1642,7 +1747,7 @@ class BisectorCommandLine:
         }
         return result
 
-    def cmd_log(self, opts):
+    def cmd_log(self, opts: LogOptions):
         """Prints what has been done so far."""
         history = []
         for entry in self.states.data['history']:
@@ -1677,7 +1782,7 @@ class BisectorCommandLine:
             else:
                 print('%s %r' % (entry_time, entry))
 
-    def cmd_next(self, opts):
+    def cmd_next(self, opts: NextOptions):
         """Prints next suggested rev to bisect."""
         if self.strategy.is_done():
             print('done')
@@ -1699,17 +1804,17 @@ class BisectorCommandLine:
                 sample['times'] = times
             self.save_progress_with_sample(sample)
 
-    def cmd_new(self, opts):
+    def cmd_new(self, opts: OldNewSkipOptions):
         """Tells bisect engine the said revs have "new" behavior."""
         logger.info('set [%s] as %s', opts.revs, self.config.get('term_new'))
         self._add_revs_status_helper(opts.revs, 'new')
 
-    def cmd_old(self, opts):
+    def cmd_old(self, opts: OldNewSkipOptions):
         """Tells bisect engine the said revs have "old" behavior."""
         logger.info('set [%s] as %s', opts.revs, self.config.get('term_old'))
         self._add_revs_status_helper(opts.revs, 'old')
 
-    def cmd_skip(self, opts):
+    def cmd_skip(self, opts: OldNewSkipOptions):
         """Tells bisect engine the said revs have "skip" behavior."""
         logger.info('set [%s] as skip', opts.revs)
         self._add_revs_status_helper(opts.revs, 'skip')
@@ -1725,14 +1830,17 @@ class BisectorCommandLine:
         else:
             self.states = core.BisectStates(session_file)
 
-    def cmd_config(self, opts):
+    def cmd_config(self, opts: ConfigOptions):
         """Configures additional setting.
 
         See config command's help message for more detail.
         """
+        assert self.states
+
         if not self.states.inited and not self.states.load_states():
             raise errors.Uninitialized
         self.domain = self.domain_cls(self.states.config)
+
         if opts.key != 'clear' and not opts.value:
             print(self.states.config[opts.key])
             return
@@ -1748,8 +1856,8 @@ class BisectorCommandLine:
                 raise errors.ArgumentError('%s command' % opts.key, result)
 
             if opts.key == 'switch':
-                self.states.config.setdefault(opts.key, [])
-                self.states.config[opts.key].append(opts.value)
+                self.states.config.setdefault('switch', [])
+                self.states.config['switch'].append(opts.value)
             else:
                 self.states.config[opts.key] = opts.value
 

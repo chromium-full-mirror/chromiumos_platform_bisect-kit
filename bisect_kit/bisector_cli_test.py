@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import io
 import typing
@@ -42,7 +43,7 @@ class DummyDomain(core.BisectDomain):
         parser.add_argument('--dut', type=str)
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
         config = {
             "ans": opts.ans,
             "old_p": opts.old_p,
@@ -55,7 +56,7 @@ class DummyDomain(core.BisectDomain):
         revlist = [str(i) for i in range(opts.num)]
         return config, {'revlist': revlist}
 
-    def __init__(self, config):
+    def __init__(self, config: core.BisectConfig):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):

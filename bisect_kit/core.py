@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import importlib
 import json
@@ -19,6 +20,7 @@ import typing
 from bisect_kit import common
 from bisect_kit import math_util
 from bisect_kit import strategy_states
+import experiment
 
 
 logger = logging.getLogger(__name__)
@@ -329,6 +331,100 @@ class DiagnoseStatistics:
     duration_secs: float | None = None
 
 
+class BisectConfig(typing.TypedDict, total=False):
+    """Configuration for BisectDomain."""
+
+    board: str | None
+    term_old: str | None
+    term_new: str | None
+    noisy: str | None
+    old: str
+    new: str
+    test_name: str | None
+    experiments: list[experiment.ID] | None
+    confidence: float
+    switch: list[list[str]]
+    eval: list[str]
+    clear: str
+    future_build: list[str]
+    chrome_root: str
+
+
+class DiagnoserConfig(typing.TypedDict, total=False):
+    """Configuration for CrosDiagnoser."""
+
+    session: str
+    mirror_base: str
+    work_base: str
+    chrome_work_base: str
+    chromeos_root: str
+    chromeos_mirror: str
+    chrome_root: str
+    chrome_mirror: str
+    android_root: str
+    android_mirror: str
+    dut: str
+    board: str | None
+    old: str
+    new: str
+    is_public_build: bool
+    bisect_chrome: bool
+    bisect_android: bool
+    base_cros_version: str
+    cros_prebuilt_old: str | None
+    cros_prebuilt_new: str | None
+    chrome_localbuild_old: str | None
+    chrome_localbuild_new: str | None
+    chrome_dcheck_build: bool
+    chrome_cfi_thinlto_build: bool
+    chromium_patch_cls: list[str] | None
+    android_prebuilt_old: str | None
+    android_prebuilt_new: str | None
+    term_old: str | None
+    term_new: str | None
+    test_name: str | None
+    tast_patch_cls: list[str] | None
+    tast_revision: str | None
+    tast_private_revision: str | None
+    tast_runtime_revision: str | None
+    fail_to_pass: bool
+    metric: str | None
+    old_value: float | None
+    new_value: float | None
+    recompute_init_values: bool
+    noisy: str | None
+    always_reflash: bool
+    reboot_before_test: bool
+    bypass_chromeos_prebuilt: bool
+    bypass_chromeos_build: bool
+    bypass_chrome_build: bool
+    bypass_android_prebuilt: bool
+    bypass_android_build: bool
+    bypass_dlc_prebuilt: bool
+    disable_rootfs_verification: bool
+    chrome_deploy_image: bool
+    disable_snapshot: bool
+    disable_buildbucket_chromeos: bool
+    enable_buildbucket_chrome: bool
+    extra_test_variables: list[str]
+    endpoint_verification: bool
+    consider_test_crash_as_failure: bool
+    experiments: list[experiment.ID] | None
+    sync_dut_allocate_spec_with_db: bool
+    board_cpu_arch: str | None
+    allocated_dut: str | None
+
+
+class _BisectStatesData(typing.TypedDict, total=False):
+    """Data for BisectStates."""
+
+    history: typing.Required[list[typing.Any]]
+    config: DiagnoserConfig
+    revlist: list[str]
+    details: dict[str, typing.Any]
+    strategy_states: strategy_states.States | None
+
+
 class DiagnoseStates(States):
     """Diagnose states."""
 
@@ -336,7 +432,7 @@ class DiagnoseStates(States):
         super().__init__(session_file)
         self._data: dict[str, typing.Any] = {}
 
-    def init_states(self, config: dict):
+    def init_states(self, config: DiagnoserConfig):
         self._data = {
             'config': config,
             'history': [],
@@ -362,7 +458,7 @@ class DiagnoseStates(States):
         return self._data
 
     @property
-    def config(self) -> dict:
+    def config(self) -> DiagnoserConfig:
         assert self.inited
         return self._data['config']
 
@@ -396,7 +492,7 @@ class BisectStates(States):
         """
         super().__init__(session_file)
 
-        self.data: dict[str, typing.Any] = {
+        self.data: _BisectStatesData = {
             # What have been done so far. Each entry contains at least
             # timestamp, rev, and result.
             "history": []
@@ -414,9 +510,9 @@ class BisectStates(States):
         return cls(session_file)
 
     @property
-    def config(self):
+    def config(self) -> BisectConfig:
         assert self.inited
-        return self.data.get('config')
+        return self.data.get('config', {})
 
     @property
     def details(self) -> dict[str, typing.Any]:
@@ -447,7 +543,12 @@ class BisectStates(States):
         # doesn't propogate.
         self.data['strategy_states'] = dataclasses.replace(states)
 
-    def init_states(self, config, revlist, details=None):
+    def init_states(
+        self,
+        config: BisectConfig,
+        revlist: list[str],
+        details: dict[str, typing.Any] | None = None,
+    ):
         """Initializes attributes data, rev_info and rev_index.
 
         Args:
@@ -524,11 +625,11 @@ class BisectStates(States):
             return entry['verified_status']
         return False
 
-    def idx2rev(self, idx):
+    def idx2rev(self, idx: int) -> str:
         assert self.inited
         return self.data['revlist'][idx]
 
-    def rev2idx(self, rev):
+    def rev2idx(self, rev: str) -> int:
         assert self.inited
         return self.rev_index[rev]
 
@@ -603,7 +704,7 @@ class BisectDomain:
         """
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[BisectConfig, dict]:
         """Initializes BisectDomain.
 
         This is called by bisector's "init" command.
@@ -621,6 +722,10 @@ class BisectDomain:
                   unnecessary to be the first and the last one).
               details (dict): detail information for each rev
         """
+        raise NotImplementedError
+
+    def __init__(self, config: BisectConfig):
+        raise NotImplementedError
 
     def setenv(self, env, rev, rev_details=None):
         """Sets environment variables needed by switchers and evaluators.

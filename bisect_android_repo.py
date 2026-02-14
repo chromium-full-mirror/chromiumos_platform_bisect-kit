@@ -26,6 +26,7 @@ will be set:
   DUT (e.g. samus-dut, if available).
 """
 
+import argparse
 import logging
 import os
 
@@ -134,7 +135,7 @@ class AndroidRepoDomain(core.BisectDomain):
         )
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
         old = determine_android_build_id(opts, opts.old)
         new = determine_android_build_id(opts, opts.new)
 
@@ -168,7 +169,7 @@ class AndroidRepoDomain(core.BisectDomain):
 
         return config, {'revlist': revlist, 'details': details}
 
-    def __init__(self, config):
+    def __init__(self, config: core.BisectConfig):
         self.config = config
 
     def setenv(self, env, rev=None, rev_details=None):

@@ -21,6 +21,7 @@ will be set:
   CHROMEOS_ROOT (e.g. ~/chromiumos).
 """
 
+import argparse
 import logging
 import os
 
@@ -84,7 +85,7 @@ class BorealisVersionDomain(core.BisectDomain):
         )
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
         if not opts.dut and not opts.board:
             raise errors.ArgumentError(
                 '--dut and --board', 'Neither is specified'
@@ -115,11 +116,18 @@ class BorealisVersionDomain(core.BisectDomain):
                     '--old and --new',
                     '%s is not ancestor of %s' % (opts.old, opts.new),
                 )
+            if not opts.board:
+                raise errors.ArgumentError(
+                    '--board',
+                    'Board must be specified.',
+                )
             spec_manager = cros_util.ChromeOSSpecManager(
                 {
                     "board": opts.board,
                     "chromeos_root": opts.chromeos_root,
                     "chromeos_mirror": opts.chromeos_mirror,
+                    # DLC is only with internal builds.
+                    "is_public_build": False,
                 }
             )
             fixed_specs = spec_manager.collect_fixed_spec(opts.old, opts.new)
@@ -160,7 +168,7 @@ class BorealisVersionDomain(core.BisectDomain):
 
         return config, {'revlist': revlist, 'details': details}
 
-    def __init__(self, config):
+    def __init__(self, config: core.BisectConfig):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):

@@ -8,6 +8,7 @@
 This bisector bisects commits between branched chrome and releases.
 """
 
+import argparse
 import logging
 import os
 
@@ -134,7 +135,7 @@ class ChromeSrcDomain(core.BisectDomain):
         )
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
         chrome_src = os.path.join(opts.chrome_root, 'src')
         if not os.path.exists(chrome_src):
             raise errors.ArgumentError(
@@ -224,7 +225,7 @@ class ChromeSrcDomain(core.BisectDomain):
         }
         return config, {'revlist': revlist, 'details': details}
 
-    def __init__(self, config):
+    def __init__(self, config: core.BisectConfig):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):

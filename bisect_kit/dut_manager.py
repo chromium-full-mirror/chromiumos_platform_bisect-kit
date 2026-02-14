@@ -311,7 +311,8 @@ class DutManager:
             assert self._vm_image_type is None
 
     @property
-    def config(self):
+    def config(self) -> core.DiagnoserConfig:
+        assert self._states
         return self._states.config
 
     @property
@@ -738,7 +739,7 @@ class DutManager:
                         return
             yield dut
 
-    def _update_states_from_swarming(self, dut):
+    def _update_states_from_swarming(self, dut: str):
         """Updates states from swarming by the leased dut.
 
         Args:

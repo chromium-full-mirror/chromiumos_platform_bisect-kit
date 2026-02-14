@@ -24,13 +24,13 @@ class TestDiagnose(unittest.TestCase):
     class FakeDiagnoser(diagnoser_cros.CrosDiagnoser):
         """A subclass of Diagnoser to facilitate testing."""
 
-        def __init__(self, config: dict, is_stateless: bool):
+        def __init__(self, config: core.DiagnoserConfig, is_stateless: bool):
             # pylint: disable=super-init-not-called
             # Only initializes needed fields.
             self.config = config
             self.is_stateless = is_stateless
 
-    def init(self, config: dict, is_stateless: bool):
+    def init(self, config: core.DiagnoserConfig, is_stateless: bool):
         self._diagnoser: TestDiagnose.FakeDiagnoser | None = self.FakeDiagnoser(
             config, is_stateless
         )
@@ -348,14 +348,14 @@ class TestCrosDiagnoser(unittest.TestCase):
 
         # pylint: disable=W0231
         # Not called the __init__method in the parent.
-        def __init__(self, config):
+        def __init__(self, config: core.DiagnoserConfig):
             self.config = config
             self.states = mock.Mock()
             self.old_info = mock.Mock()
             self.new_info = mock.Mock()
-            self.noisy = False
+            self.noisy: str | None = None
             self.is_stateless = True
-            self.cros_old = '1.2.3'
+            self.cros_old: str | None = '1.2.3'
             self.is_vm_board = False
             self.dut_allocate_spec = mock.Mock()
             self.dut_allocate_spec.boards = []
@@ -363,7 +363,7 @@ class TestCrosDiagnoser(unittest.TestCase):
             self._dut_manager = mock.Mock()
 
     def setUp(self):
-        self.config = {
+        self.config: core.DiagnoserConfig = {
             'chrome_root': '/path/to/chrome',
             'chrome_mirror': '/path/to/mirror',
             'board': 'eve',

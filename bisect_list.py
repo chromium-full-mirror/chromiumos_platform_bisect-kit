@@ -26,6 +26,7 @@ Example:
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 import typing
@@ -49,12 +50,12 @@ class ListDomain(core.BisectDomain):
         pass
 
     @staticmethod
-    def init(opts):
+    def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
         config: dict[str, typing.Any] = {}
         revlist = [line.strip() for line in sys.stdin.readlines()]
         return config, {'revlist': revlist}
 
-    def __init__(self, config):
+    def __init__(self, config: core.BisectConfig):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):

@@ -204,7 +204,7 @@ class TestBisectStates(unittest.TestCase):
         states = core.BisectStates(self.session_file)
         revlist = [str(i) for i in range(10)]
         states.init_states({}, revlist, self.fake_details)
-        states.config['foo'] = 'bar'
+        states.config['board'] = 'bar'
         strategy_states_to_save = strategy_states.States(
             state='blah',
         )
@@ -215,7 +215,7 @@ class TestBisectStates(unittest.TestCase):
         loaded_states.load_states()
 
         self.assertTrue(loaded_states.inited)
-        self.assertEqual(loaded_states.config, {'foo': 'bar'})
+        self.assertEqual(loaded_states.config, {'board': 'bar'})
         self.assertEqual(loaded_states.details, self.fake_details)
         self.assertEqual(loaded_states.rev2idx('5'), 5)
         self.assertEqual(loaded_states.strategy_states, strategy_states_to_save)
@@ -233,7 +233,7 @@ class TestBisectStates(unittest.TestCase):
         states = core.BisectStates(self.session_file)
         revlist = [str(i) for i in range(10)]
         states.init_states({}, revlist)
-        states.config['foo'] = 'bar'
+        states.config['board'] = 'bar'
         states.save()
 
         states = core.BisectStates(self.session_file)
