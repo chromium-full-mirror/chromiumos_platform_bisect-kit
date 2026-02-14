@@ -492,10 +492,12 @@ class NoisyBinarySearch:
             (left_new, left_trial), (right_new, right_trial) = self.observation
             return left_new, left_trial, right_new, right_trial
 
+        assert self.prior_observation is not None
         (left_new, left_trial), (
             right_new,
             right_trial,
         ) = self.prior_observation
+
         if (left_new, left_trial) != NOT_NOISY:
             info = self.rev_info[self.old_idx]
             left_trial += info['old'] + info['new']

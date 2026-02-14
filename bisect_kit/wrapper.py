@@ -124,7 +124,7 @@ class BisectorWrapper:
             'config',
             'eval',
             '--mode=bisectkit',
-            *eval_cmd,
+            *(eval_cmd or []),
         )
         if future_build_cmd:
             self.call(

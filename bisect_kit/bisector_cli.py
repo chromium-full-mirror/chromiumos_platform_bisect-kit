@@ -1863,8 +1863,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
 
         elif opts.key == 'clear':
             for value in opts.value:
-                if value in self.states.config:
-                    del self.states.config[value]
+                self.states.config.pop(value, None)  # type: ignore[misc]
 
         elif opts.key == 'confidence':
             if len(opts.value) != 1:
