@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from typing import Callable, Optional, ParamSpec, TypeVar
+from typing import Callable, cast, Optional, ParamSpec, TypeVar
 
 from bisect_kit import git_util
 from bisect_kit import util
@@ -168,7 +168,7 @@ def _run_with_python_version(
             os.symlink(desired_python_path, Path(temp_dir) / 'python3')
 
             # Add the temp_dir to PATH.
-            env = kwargs.get('env', os.environ).copy()
+            env = cast(dict[str, str], kwargs.get('env', os.environ)).copy()
             env['PATH'] = f'{temp_dir}:{env.get("PATH")}'
             kwargs['env'] = env
 

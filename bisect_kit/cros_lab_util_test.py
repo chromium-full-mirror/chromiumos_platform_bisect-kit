@@ -326,7 +326,9 @@ class LeaseKeeperTest(unittest.TestCase):
 class QueryLeaseStatusTest(unittest.TestCase):
     """Test query_lease_status function."""
 
-    SAMPLE_GET_TASK_STATES_FROM_DEVICE_LEASE_SERVICE_RESPONSE = {
+    SAMPLE_GET_TASK_STATES_FROM_DEVICE_LEASE_SERVICE_RESPONSE: dict[
+        str, str | dict[str, str]
+    ] = {
         'id': 'lease1',
         'deviceId': 'chromeos8-row10-rack9-host2',
         'dutId': 'C298832',

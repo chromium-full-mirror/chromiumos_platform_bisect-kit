@@ -334,7 +334,7 @@ def _sync_chromeos_code(path_factory):
 
 
 def _configure_chrome_repos(
-    path_factory: common.WorkBasePathFactory,
+    path_factory: common.ProjectPathFactory,
     use_btrfs: bool,
     is_public_build: bool,
 ) -> None:
@@ -381,7 +381,7 @@ cache_dir = {chrome_cache!r}
 
 
 def _setup_chrome_repos(
-    path_factory: common.WorkBasePathFactory,
+    path_factory: common.ProjectPathFactory,
     use_btrfs: bool,
     is_public_build: bool,
 ) -> None:
@@ -403,7 +403,7 @@ def _setup_chrome_repos(
 
 
 def _sync_chrome_code(
-    path_factory: common.WorkBasePathFactory,
+    path_factory: common.ProjectPathFactory,
     use_btrfs: bool,
     is_public_build: bool,
 ) -> None:

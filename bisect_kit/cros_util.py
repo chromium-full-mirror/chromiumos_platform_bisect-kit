@@ -1360,7 +1360,9 @@ def _find_files_from_image_archive(
     )
 
     with multiprocessing.Pool() as pool:
-        async_requests = []
+        async_requests: list[
+            {"path": str, "result": multiprocessing.pool.AsyncResult[str]}
+        ] = []
         for bucket in buckets:
             for version_prefix in version_prefixes:
                 for filename in filenames:

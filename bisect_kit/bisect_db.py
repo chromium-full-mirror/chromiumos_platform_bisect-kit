@@ -167,14 +167,14 @@ class Client(gcloud.DataStoreClient):
         self, spec: dut_allocate_spec_type.DutAllocateSpec
     ) -> bool:
         if not spec.session:
-            logger.errors('missing bisect key %s', spec.session)
+            logger.error('missing bisect key %s', spec.session)
             return False
 
         with self._client.transaction():
             key = self._client.key(self._KIND_BISECT, spec.session)
             b = self._client.get(key)
             if not b:
-                logger.errors('unable to get bisect with key %s', spec.session)
+                logger.error('unable to get bisect with key %s', spec.session)
                 return False
 
             if not update_retry_device_spec(b, spec):

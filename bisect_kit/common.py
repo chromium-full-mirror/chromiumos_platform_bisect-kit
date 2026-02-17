@@ -192,6 +192,10 @@ def is_valid_uuid(uuid_str: str) -> bool:
         return False
 
 
+# Global variable to store the logging initialization state
+_logging_configured = False
+
+
 def config_logging(opts):
     """Config logging handlers.
 
@@ -204,9 +208,10 @@ def config_logging(opts):
     Args:
       opts: An argparse.Namespace to hold command line arguments.
     """
-    if getattr(config_logging, 'configured', False):
+    global _logging_configured  # pylint: disable=global-statement
+    if _logging_configured:
         return
-    config_logging.configured = True
+    _logging_configured = True
 
     log_file: str
     if opts.log_file is not None:

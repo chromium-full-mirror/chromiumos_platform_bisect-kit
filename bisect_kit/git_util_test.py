@@ -134,6 +134,10 @@ class GitOperation:
 class TestGitOperationReadOnly(unittest.TestCase):
     """Tests git_util module with real git operations without mock."""
 
+    git_repo: str
+    git: GitOperation
+    revs: list[str]
+
     @classmethod
     def setUpClass(cls):
         cls.git_repo = tempfile.mkdtemp()

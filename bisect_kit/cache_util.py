@@ -57,6 +57,9 @@ class Cache:
             self.data[args] = result
         return result
 
+    def __name__(self):
+        return self.wrapped.__name__
+
     def enable_cache(self):
         self.enabled = True
 

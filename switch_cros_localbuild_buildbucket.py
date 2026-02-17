@@ -209,7 +209,7 @@ def get_chrome_managers(opts):
         "chrome_root": opts.chrome_root,
         "chrome_mirror": opts.chrome_mirror,
     }
-    spec_manager = cr_util.ChromeSpecManager(config)
+    spec_manager = cr_util.ChromeSpecManager(config)  # type: ignore
     code_manager = codechange.CodeManager(
         opts.chrome_root,
         spec_manager,

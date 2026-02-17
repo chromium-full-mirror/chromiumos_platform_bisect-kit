@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 
 from bisect_kit import chromite_util

@@ -5,6 +5,7 @@
 """Test common module."""
 
 import logging
+import os
 import pathlib
 import tempfile
 import unittest
@@ -26,9 +27,7 @@ class TestCommon(unittest.TestCase):
     def tearDown(self):
         pathlib.Path(self.log_file).unlink(missing_ok=True)
 
-    @mock.patch(
-        'bisect_kit.common.config_logging.configured', False, create=True
-    )
+    @mock.patch('bisect_kit.common._logging_configured', False, create=True)
     def test_logging(self):
         parents = [cli.create_common_argument_parser()]
         parser = cli.ArgumentParser(parents=parents)
@@ -38,6 +37,19 @@ class TestCommon(unittest.TestCase):
         logger.debug('test')
         with open(self.log_file) as f:
             self.assertIn('test', f.read())
+
+    @mock.patch('bisect_kit.common._logging_configured', True, create=True)
+    def test_logging_configured(self):
+        parents = [cli.create_common_argument_parser()]
+        parser = cli.ArgumentParser(parents=parents)
+        opts = parser.parse_args(['--log-file', self.log_file])
+        # Should do nothing, since the logging is considered to be configured.
+        common.config_logging(opts)
+
+        logger.debug('test')
+        # Log file should not have been created, since the logging is not
+        # configured to route to the file.
+        self.assertFalse(os.path.exists(self.log_file))
 
     def test_is_valid_uuid(self):
         self.assertTrue(
