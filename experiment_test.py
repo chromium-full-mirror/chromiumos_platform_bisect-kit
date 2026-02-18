@@ -20,14 +20,6 @@ class FakeID(StrEnum):
     EXP4 = 'exp4'
 
 
-# A fake map to mock out the real _VERSION_MAP.
-FAKE_VERSION_MAP = {
-    FakeID.EXP1: 'dev',
-    FakeID.EXP2: 'beta',
-    FakeID.EXP3: 'beta',
-}
-
-
 class IsInExperimentTest(unittest.TestCase):
     """Test is_in_experiment."""
 
@@ -35,10 +27,6 @@ class IsInExperimentTest(unittest.TestCase):
         super().setUp()
         self._mock_id_class = self.enterContext(
             mock.patch.object(experiment, 'ID', FakeID)
-        )
-
-        self._mock_version_map = self.enterContext(
-            mock.patch.object(experiment, '_VERSION_MAP', FAKE_VERSION_MAP)
         )
 
     def test_experiments_empty_list(self):

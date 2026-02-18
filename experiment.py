@@ -15,9 +15,12 @@
 import argparse
 from enum import StrEnum
 import logging
+import typing
 
 
 logger = logging.getLogger(__name__)
+
+IDType = typing.TypeVar('IDType', bound=StrEnum)
 
 
 class ID(StrEnum):
@@ -30,15 +33,7 @@ class ID(StrEnum):
     GEMINI_ASSIT = 'gemini_assist'
 
 
-# TODO b/328452015: either record the version when an experimental bisection
-# runs, or remove it if the version doesn't matter.
-_VERSION_MAP = {
-    ID.STATELESS: '20230901',
-    ID.VM: '20240207',
-}
-
-
-def is_in_experiment(experiments: list[ID], exp_in_query: ID) -> bool:
+def is_in_experiment(experiments: list[IDType], exp_in_query: IDType) -> bool:
     """Returns whether a bisect is in a specific exepriment.
 
     Args:
