@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import sys
+from typing import Any, Union
 
 from bisect_kit import cr_util
 from bisect_kit import git_util
@@ -120,6 +121,9 @@ def _is_retriable_gemini_error(e) -> bool:
     return False
 
 
+NestedDict = dict[str, Union[str, int, 'NestedDict']]
+
+
 class GeminiAgent:
     """A stub agent to Gemini"""
 
@@ -187,7 +191,6 @@ class GeminiAgent:
         Returns the response from Gemini.
         """
         contents = self._contents + [reply]
-        logger.info('Replying %s', reply)
         response = self._client.models.generate_content(
             model=MODEL, contents=contents, config=self._config
         )
@@ -262,7 +265,26 @@ class BisectAgent:
             ),
         }
 
-    def _run(self, reply: genai.types.Part | None = None) -> str | None:
+    def _short(self, d: NestedDict) -> NestedDict:
+        """Create a shorter dict for logging purpose.
+
+        d: a dict to be logged.
+        Returns a dict with shorter values.
+        """
+        ret = {}
+        for k, v in d.items():
+            if isinstance(v, str):
+                _N = 1024
+                ret[k] = v if len(v) <= _N else (v[:_N] + '...')
+            elif isinstance(v, dict):
+                ret[k] = self._short(v)
+            else:
+                ret[k] = v
+        return ret
+
+    def _run(
+        self, reply: genai.types.Part | None = None, log: Any = True
+    ) -> str | None:
         """Call GeminiAgent recursively until a target revision is determined.
 
         reply: reply from previous run.
@@ -272,6 +294,11 @@ class BisectAgent:
             ret = self._agent.start()
             self._started = True
         else:
+            if log:
+                logger.info(
+                    'Sending response to Gemini: %s',
+                    reply if log is True else log,
+                )
             ret = self._agent.reply(
                 genai.types.Content(
                     role='function',
@@ -313,11 +340,12 @@ class BisectAgent:
                 )
             )
         if call.name == 'get_revision_detail':
+            revision_detail = self._get_revision_detail(call.args['rev_id'])
             return self._run(
                 genai.types.Part.from_function_response(
-                    name='get_revision_detail',
-                    response=self._get_revision_detail(call.args['rev_id']),
-                )
+                    name='get_revision_detail', response=revision_detail
+                ),
+                log=self._short(revision_detail),
             )
         if call.name == 'run_at':
             return call.args['rev_id']
