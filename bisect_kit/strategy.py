@@ -1546,9 +1546,13 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             self.gemini
             and self.rev_info[idx].rev in self._gemini_waiting_result
         ):
-            self._gemini_waiting_result[self.rev_info[idx].rev] = sample[
-                'status'
-            ] in ['old', 'PASS']
+            self._gemini_waiting_result[self.rev_info[idx].rev] = (
+                self.term_map.get(sample['status'], sample['status'])
+            )
+            self.gemini.add_sample(
+                self.rev_info[idx].rev,
+                self.term_map.get(sample['status'], sample['status']),
+            )
 
         return super().add_sample(idx, status, **kwargs)
 

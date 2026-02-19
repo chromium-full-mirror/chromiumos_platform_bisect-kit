@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import base64
+from collections import defaultdict
 import json
 import logging
 import os
@@ -52,7 +53,10 @@ FUNCTIONS = [
             "for these revisions from known bad to known good (aka newest to "
             "oldest), inclusive on both end. Returns list of (rev_id, subject)."
             " rev_id are unique string to identify a revision, similar to git "
-            "commit hash, but in different format."
+            "commit hash, but in different format.\n"
+            "In addition, it also returns run result history of past runs. The"
+            " run result history updates dynamically after every run. Calling "
+            "get_range again after run_at will have different run history."
         ),
     },
     {
@@ -206,6 +210,7 @@ class BisectAgent:
         self._started = False
         self._repo = repo
         self._revlist = revlist
+        self._rev_samples = defaultdict(list)
         self._conclusion = None
 
         # TODO(fqj): add support for ChromeOS CLs.
@@ -237,6 +242,7 @@ class BisectAgent:
                         self._rev2commit[x]['commit'],
                     )
                 ),
+                'run_results': self._rev_samples[x],
             }
             for x in self._revlist
         ]
@@ -320,17 +326,24 @@ class BisectAgent:
             return None
         raise NotImplementedError()
 
-    def next(self, good: bool | None = None) -> str:
+    def add_sample(self, rev: str, status: str):
+        """Add run result
+
+        rev: revision
+        status: status of a run."""
+        self._rev_samples[rev].append(status)
+
+    def next(self, status: str = None) -> str:
         """Returns the next target revision for bisector to run.
 
         good: whether previous run is good or not."""
         if self._conclusion:
             return None
-        if good is None:
+        if status is None:
             return self._run()
         return self._run(
             genai.types.Part.from_function_response(
-                name='run_at', response={'is_good': good}
+                name='run_at', response={'status': status}
             )
         )
 
@@ -345,15 +358,19 @@ def demo(testname, good, bad, culprit):
         os.path.join(os.getenv('HOME'), 'bisect-workdir/test/chrome/src'),
         ['refs/heads/main@{#%d}' % (x) for x in range(good, bad + 1)],
     )
+    agent.add_sample('refs/heads/main@{#%d}' % good, 'PASS')
+    agent.add_sample('refs/heads/main@{#%d}' % bad, 'FAIL')
     attempt = agent.next()
     runs_llm = 0
     while attempt:
         rev = int(re.search(r'#(\d+)', attempt).group(1))
         runs_llm += 1
         if rev >= culprit:
-            attempt = agent.next(False)
+            status = 'FAIL'
         else:
-            attempt = agent.next(True)
+            status = 'PASS'
+        agent.add_sample('refs/heads/main@{#%d}' % rev, status)
+        attempt = agent.next(status)
     runs_bisect = 0
     low, high = good, bad
     while high - low > 1:
