@@ -13,7 +13,7 @@ import logging
 import os
 import re
 import sys
-from typing import Any, Union
+from typing import Any, TypedDict, Union
 
 from bisect_kit import cr_util
 from bisect_kit import git_util
@@ -124,6 +124,13 @@ def _is_retriable_gemini_error(e) -> bool:
 NestedDict = dict[str, Union[str, int, 'NestedDict']]
 
 
+class ProbModelResultType(TypedDict):
+    """Type annotation for dict values for per-commit prob model result"""
+
+    prob: float
+    status: dict[str, int]
+
+
 class GeminiAgent:
     """A stub agent to Gemini"""
 
@@ -214,6 +221,7 @@ class BisectAgent:
         self._repo = repo
         self._revlist = revlist
         self._rev_samples: dict[str, list[str]] = defaultdict(list)
+        self._rev_stats: dict[str, ProbModelResultType] = {}
         self._conclusion = None
 
         # TODO(fqj): add support for ChromeOS CLs.
@@ -246,6 +254,7 @@ class BisectAgent:
                     )
                 ),
                 'run_results': self._rev_samples[x],
+                'stats': self._rev_stats.get(x),
             }
             for x in self._revlist
         ]
@@ -361,6 +370,12 @@ class BisectAgent:
         status: status of a run."""
         self._rev_samples[rev].append(status)
 
+    def update_stats(self, stats: dict[str, ProbModelResultType]):
+        """Updates prob model stats
+
+        stats: new stats."""
+        self._rev_stats = stats
+
     def next(self, status: str | None = None) -> str | None:
         """Returns the next target revision for bisector to run.
 
@@ -388,16 +403,53 @@ def demo(testname, good, bad, culprit):
     )
     agent.add_sample('refs/heads/main@{#%d}' % good, 'PASS')
     agent.add_sample('refs/heads/main@{#%d}' % bad, 'FAIL')
+    stat = defaultdict(list)
+    stat[good].append('PASS')
+    stat[bad].append('FAIL')
+    agent.update_stats(
+        {
+            'refs/heads/main@{#%d}'
+            % (x): {
+                'prob': (1.0 / (bad - good) if good < x <= bad else 0),
+                'status': {
+                    'PASS': stat[x].count('PASS'),
+                    'FAIL': stat[x].count('FAIL'),
+                },
+            }
+            for x in range(good, bad + 1)
+        }
+    )
     attempt = agent.next()
     runs_llm = 0
+    now_good, now_bad = good, bad
     while attempt:
         rev = int(re.search(r'#(\d+)', attempt).group(1))
         runs_llm += 1
         if rev >= culprit:
             status = 'FAIL'
+            now_bad = min(bad, now_bad)
         else:
             status = 'PASS'
+            now_good = max(good, now_good)
+        stat[rev].append(status)
         agent.add_sample('refs/heads/main@{#%d}' % rev, status)
+        agent.update_stats(
+            {
+                'refs/heads/main@{#%d}'
+                % (x): {
+                    'prob': (
+                        1.0 / (now_bad - now_good)
+                        if now_good < x <= now_bad
+                        else 0
+                    ),
+                    'status': {
+                        'PASS': stat[x].count('PASS'),
+                        'FAIL': stat[x].count('FAIL'),
+                    },
+                }
+                for x in range(good, bad + 1)
+            }
+        )
         attempt = agent.next(status)
     runs_bisect = 0
     low, high = good, bad
