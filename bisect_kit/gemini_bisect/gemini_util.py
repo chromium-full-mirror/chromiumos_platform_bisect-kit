@@ -210,7 +210,7 @@ class BisectAgent:
         self._started = False
         self._repo = repo
         self._revlist = revlist
-        self._rev_samples = defaultdict(list)
+        self._rev_samples: dict[str, list[str]] = defaultdict(list)
         self._conclusion = None
 
         # TODO(fqj): add support for ChromeOS CLs.
@@ -262,7 +262,7 @@ class BisectAgent:
             ),
         }
 
-    def _run(self, reply: genai.types.Part | None = None) -> str:
+    def _run(self, reply: genai.types.Part | None = None) -> str | None:
         """Call GeminiAgent recursively until a target revision is determined.
 
         reply: reply from previous run.
@@ -333,7 +333,7 @@ class BisectAgent:
         status: status of a run."""
         self._rev_samples[rev].append(status)
 
-    def next(self, status: str = None) -> str:
+    def next(self, status: str | None = None) -> str | None:
         """Returns the next target revision for bisector to run.
 
         good: whether previous run is good or not."""
