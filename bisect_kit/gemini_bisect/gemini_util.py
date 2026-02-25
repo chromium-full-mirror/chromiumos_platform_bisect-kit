@@ -280,7 +280,7 @@ class BisectAgent:
         d: a dict to be logged.
         Returns a dict with shorter values.
         """
-        ret = {}
+        ret: NestedDict = {}
         for k, v in d.items():
             if isinstance(v, str):
                 _N = 1024

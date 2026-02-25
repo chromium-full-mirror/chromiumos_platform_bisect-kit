@@ -58,19 +58,19 @@ class TestBorealisUtil(unittest.TestCase):
             borealis_util.download_rootfs_and_kernel(
                 dummy_chromeos_root, dummy_version
             )
-            dummy_chromeos_root = pathlib.Path(dummy_chromeos_root)
+            dummy_chromeos_root_path = pathlib.Path(dummy_chromeos_root)
             mock_gs_cp.assert_called_once_with(
                 f'gs://chromeos-localmirror-private/borealis/borealis-dlc-{dummy_version}.tar.xz',
-                dummy_chromeos_root / 'tmp/images-borealis-dlc',
+                dummy_chromeos_root_path / 'tmp/images-borealis-dlc',
             )
             mock_check_call.assert_called_once_with(
                 'tar',
                 'xf',
-                dummy_chromeos_root
+                dummy_chromeos_root_path
                 / f'tmp/images-borealis-dlc/borealis-dlc-{dummy_version}.tar.xz',
                 '-C',
-                dummy_chromeos_root / 'src/platform/borealis',
-                cwd=(dummy_chromeos_root / 'tmp/images-borealis-dlc'),
+                dummy_chromeos_root_path / 'src/platform/borealis',
+                cwd=(dummy_chromeos_root_path / 'tmp/images-borealis-dlc'),
             )
 
     @mock.patch('bisect_kit.git_util.get_history')
