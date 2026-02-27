@@ -124,6 +124,7 @@ disable_error_code = [
     "call-arg",
     "index",
     "list-item",
+    "misc",
     "operator",
     "return-value",
     "syntax",

@@ -130,7 +130,7 @@ def stat_max_creation_time(*args, **kwargs) -> int:
       subprocess.CalledProcessError: gsutil failed, usually means path not found
       errors.ExternalError: creation time is not found
     """
-    timestamps: list[int | None] = [
+    timestamps: list[float] = [
         (
             x['create_time_seconds']
             if 'create_time_seconds' in x
@@ -142,7 +142,7 @@ def stat_max_creation_time(*args, **kwargs) -> int:
         raise errors.ExternalError(
             "didn't find creation time or create_time_seconds"
         )
-    return max(typing.cast(list[int], timestamps))
+    return max(timestamps)
 
 
 def stat(*args, **kwargs) -> dict[str, dict[str, typing.Any]]:

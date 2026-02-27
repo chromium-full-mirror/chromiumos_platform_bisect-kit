@@ -1022,9 +1022,7 @@ def query_dut_boot_id(
     ).strip()
 
 
-def reboot(
-    host, force_reboot_callback: typing.Callable[[str], bool] | None = None
-):
+def reboot(host, force_reboot_callback=None):
     """Reboot a DUT and verify.
 
     Args:
@@ -1837,7 +1835,7 @@ def provision_image(
     version=None,
     clobber_stateful=False,
     disable_rootfs_verification=False,
-    force_reboot_callback: typing.Callable[[str], bool] | None = None,
+    force_reboot_callback=None,
 ):
     # Try quick_provision first, but fallback to cros flash.
     # TODO(kcwu): only use quick_provision for DUTs in the lab
@@ -1869,8 +1867,7 @@ def provision_image(
 
 
 def powerwash(
-    dut: str,
-    force_reboot_callback: typing.Callable[[str], bool] | None = None,
+    dut: str, force_reboot_callback: typing.Callable[[str]] | None = None
 ) -> bool:
     """Powerwash the DUT
 
@@ -1951,7 +1948,7 @@ def _cros_flash(
     is_public_build,
     clobber_stateful=False,
     disable_rootfs_verification=True,
-    force_reboot_callback: typing.Callable[[str], bool] | None = None,
+    force_reboot_callback=None,
 ):
     """Flash a DUT with given ChromeOS image.
 
@@ -2053,7 +2050,7 @@ def provision_image_with_retry(
     clobber_stateful=False,
     disable_rootfs_verification=False,
     repair_callback=None,
-    force_reboot_callback: typing.Callable[[str], bool] | None = None,
+    force_reboot_callback=None,
 ):
     # 'cros flash' is not 100% reliable, retry if necessary.
     retry = 2
@@ -2892,10 +2889,7 @@ def build_image(chromeos_root, board, is_public_build):
 
 
 def workaround_b183567529(
-    host,
-    board,
-    version=None,
-    force_reboot_callback: typing.Callable[[str], bool] | None = None,
+    host, board, version=None, force_reboot_callback=None
 ):
     """Workaround for volteer failure.
 
@@ -2939,11 +2933,7 @@ def workaround_b183567529(
 
 # TODO(b/378126412): Remove this function after CrOS version '16083.0.0' to
 # '16089.0.0' are no longer active.
-def workaround_b378126412(
-    host,
-    version,
-    force_reboot_callback: typing.Callable[[str], bool] | None = None,
-):
+def workaround_b378126412(host, version, force_reboot_callback=None):
     """Workaround for python path failure.
 
     The python path was broken in the build range after cros flash.
