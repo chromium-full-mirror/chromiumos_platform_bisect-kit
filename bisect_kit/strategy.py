@@ -1550,7 +1550,18 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 self.term_map.get(sample['status'], sample['status']),
             )
 
-            assert self.prob
+            prob = self.prob
+            if not prob:
+                # Prob can be None if the initial range verification is not
+                # complete yet.
+                # In theory, Gemini inference will not be involved at this
+                # moment, and the values will not be used by Gemini even passed
+                # to the agent class.
+                # Populate a [0, 1/(N-1), ....] as an in-theory value to the
+                # agent class.
+                prob = [0.0] + [1.0 / (len(self.rev_info) - 1)] * (
+                    len(self.rev_info) - 1
+                )
             self.gemini.update_stats(
                 {
                     self.rev_info[i].rev: {
@@ -1558,7 +1569,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                             self.term_map.get(k, k): v
                             for k, v in self.rev_info[i].result_counter.items()
                         },
-                        'prob': self.prob[i],
+                        'prob': prob[i],
                     }
                     for i in range(len(self.rev_info))
                 }
