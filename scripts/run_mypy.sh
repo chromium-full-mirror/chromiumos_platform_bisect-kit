@@ -5,7 +5,7 @@
 
 set -eu
 
-cd $(dirname $0)/..
+cd "$(dirname "$0")"/..
 
 # Try to load the venv if any.
 [ -f ./venv/bin/activate ] && source ./venv/bin/activate
@@ -14,6 +14,7 @@ cd $(dirname $0)/..
 REQUIRED_VER="1.19.1"
 CURRENT_VER=$(python3 -m mypy --version | awk '{print $2}')
 LOWER_VER=$(printf '%s\n' "$REQUIRED_VER" "$CURRENT_VER" | sort -V | head -n1)
+
 if [ "$LOWER_VER" = "$REQUIRED_VER" ]; then
   echo "mypy version is ok (current $CURRENT_VER >= required $REQUIRED_VER)."
 else
@@ -24,12 +25,16 @@ fi
 
 if [ $# -eq 0 ]; then
   # if no arguments supplied, processes all python files
+
+  # Enables shopt -s nullglob in case no files match
+  shopt -s nullglob
   PYTHON_FILES=(*.py bisect_kit/*.py bisect_kit/*/*.py)
+  shopt -u nullglob
 else
   # if arguments supplied, extract python files from them
   PYTHON_FILES=()
 
-  for file in $@; do
+  for file in "$@"; do
     if [[ $file == *.py ]]; then
       PYTHON_FILES+=("$file")
     fi
@@ -37,7 +42,7 @@ else
 fi
 
 if [ ${#PYTHON_FILES[@]} -eq 0 ]; then
-  echo No Python files found.
+  echo "No Python files found."
   exit 0
 else
   exec python3 -m mypy "${PYTHON_FILES[@]}" --check-untyped-defs
