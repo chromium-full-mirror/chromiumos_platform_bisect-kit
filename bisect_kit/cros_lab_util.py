@@ -1253,6 +1253,7 @@ def lease_keeper(dut_name, reason, quit_event, error_queue, session_id):
 
             # We need buffer time (like querying lease status, network latency, etc.)
             # before actual lease request, 100 seconds must be enough.
+            assert lease_status.end_time is not None
             to_lease_again = lease_status.end_time - 100
 
             now = time.time()

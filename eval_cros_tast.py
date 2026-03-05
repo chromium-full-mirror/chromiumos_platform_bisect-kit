@@ -270,7 +270,7 @@ def tast_cmd(opts, cmd, *args):
     return [tast_bin, '-verbose', cmd] + flags + list(args)
 
 
-def get_tast_bundle_info(opts, pattern=None):
+def get_tast_bundle_info(opts, pattern: str | None = None) -> dict[str, str]:
     bundles = ['cros']
     if opts.with_private_bundles:
         bundles.append('crosint')
@@ -298,7 +298,7 @@ def get_tast_bundle_info(opts, pattern=None):
     return result
 
 
-def run_test(opts: argparse.Namespace, test_name: str, bundle: dict) -> str:
+def run_test(opts: argparse.Namespace, test_name: str, bundle: str) -> str:
     """Runs an autotest test.
 
     Args:

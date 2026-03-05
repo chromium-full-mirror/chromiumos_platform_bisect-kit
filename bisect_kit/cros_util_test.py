@@ -1147,15 +1147,15 @@ class TestCrosUtil(unittest.TestCase):
             'refs/remotes/cros/',
             'refs/remotes/origin/',
         ]
-        tests = [
-            ['master', 1],
-            ['release-R64-10176.B', 2],
-            ['release-R56-9000.B', 2],
-            ['stabilize-3881.0.B', 2],
-            ['firmware-octopus-11297.83.B', 3],
-            ['stabilize-10323.67.B', 3],
-            ['stabilize-9000.87.0.B', 3],
-            ['factory-atlas-11907.B-master', 0],
+        tests: list[tuple[str, int]] = [
+            ('master', 1),
+            ('release-R64-10176.B', 2),
+            ('release-R56-9000.B', 2),
+            ('stabilize-3881.0.B', 2),
+            ('firmware-octopus-11297.83.B', 3),
+            ('stabilize-10323.67.B', 3),
+            ('stabilize-9000.87.0.B', 3),
+            ('factory-atlas-11907.B-master', 0),
         ]
 
         for prefix in ref_prefix:

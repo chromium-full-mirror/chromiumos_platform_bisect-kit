@@ -489,6 +489,7 @@ class Dep:
 
     def parse_url(self):
         assert self.dep_type == 'git'
+        assert self.url is not None
 
         if '@' in self.url:
             repo_url, at = self.url.split('@')
@@ -867,6 +868,7 @@ class TimeSeriesTree:
         """
         assert timestamp not in self.snapshots
         self.snapshots[timestamp] = deps
+        assert self.alive_children is not None
 
         for child_entry in set(
             list(self.alive_children.keys()) + children_entries

@@ -57,7 +57,10 @@ def _filter_dimensions_by_board(
         bots = cros_lab_util.swarming_bots_list(constraints, limit=10)
         for bot in bots:
             board = bot['dimensions']['label-board'][0]
-            if board not in boards_with_prebuilt:
+            if (
+                boards_with_prebuilt is not None
+                and board not in boards_with_prebuilt
+            ):
                 logger.warning(
                     'dimension=%s (board=%s) does not have corresponding '
                     'prebuilt image, ignore',

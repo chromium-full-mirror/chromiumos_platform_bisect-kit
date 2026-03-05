@@ -123,7 +123,6 @@ disable_error_code = [
     "call-arg",
     "index",
     "list-item",
-    "operator",
     "return-value",
     "union-attr",
 ]

@@ -1545,7 +1545,9 @@ class BisectorCommandLine(typing.Generic[T_co]):
             if not any(
                 [
                     verbose,
-                    old_idx is not None and old_idx <= i <= new_idx,
+                    old_idx is not None
+                    and new_idx is not None
+                    and old_idx <= i <= new_idx,
                     rev_info['result_counter'],
                 ]
             ):

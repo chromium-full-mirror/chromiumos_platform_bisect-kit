@@ -886,6 +886,8 @@ class NoisyBinarySearch:
         if self.state == self.INITED and self.recompute_init_values:
             return 'value'
         assert self.threshold is not None
+        assert self.old_avg is not None
+        assert self.new_avg is not None
         assert values
         avg = math_util.average(values)
         if self.old_avg < self.new_avg:
