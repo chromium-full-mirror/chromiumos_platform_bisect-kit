@@ -125,6 +125,5 @@ disable_error_code = [
     "list-item",
     "operator",
     "return-value",
-    "syntax",
     "union-attr",
 ]

@@ -444,7 +444,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
 
     def yield_duts(
         self, owner: str, dut_names: list[str]
-    ) -> (list[str], list[str]):
+    ) -> tuple[list[str], list[str]]:
         """Yields a list of DUTs to some other bisects.
 
         It searches for all unfinished bisects. If some other bisect
@@ -550,7 +550,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         dimensions: list[str],
         variants: list[str],
         pools: list[str],
-    ) -> (str | None, str | None):
+    ) -> tuple[str | None, str | None]:
         """Try leasing a DUT for a bisect.
 
         It searches for all idle DUTs in the shared DUT pool which match the given spec.
