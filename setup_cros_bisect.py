@@ -313,15 +313,13 @@ def _sync_chromeos_code(path_factory):
     )
     _delete_extra_manifest(chromeos_mirror)
     # current_branch=False to ignore "sync-c=true" in the manifest file.
-    # TEMPORARY: setting current_branch=True for b/489552548.
-    repo_util.sync(chromeos_mirror, current_branch=True)
+    repo_util.sync(chromeos_mirror, current_branch=False)
     # If there are repos deleted after last sync, generate custom manifest and
     # sync again for those repos. So we can mirror commits just before the repo
     # deletion.
     if _generate_extra_manifest_for_deleted_repo(chromeos_mirror) != 0:
         logger.info('repo sync again')
-        # TEMPORARY: setting current_branch=True for b/489552548.
-        repo_util.sync(chromeos_mirror, current_branch=True)
+        repo_util.sync(chromeos_mirror, current_branch=False)
     _write_sync_time(chromeos_mirror, start_sync_time)
 
     logger.info('repo sync for chromeos tree')
