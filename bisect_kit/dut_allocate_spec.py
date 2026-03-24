@@ -72,11 +72,40 @@ def load(session: str, sync_with_db=False) -> DutAllocateSpec | None:
     return spec
 
 
-def _str_to_list(val):
+def _str_to_list(val: str | list[str]) -> list[str]:
     """Turns a comma separated string into a list."""
     if not val:
         return []
-    return val.split(',')
+
+    if isinstance(val, list):
+        val_list = val
+    else:
+        assert isinstance(val, str)
+        val_list = [val]
+
+    result: list[str] = []
+    for v in val_list:
+        # HACK: Treat the 3 SKUs containing a comma:
+        # - kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB
+        # - karis_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_8GB
+        # - screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB
+        for part in v.split(','):
+            if (
+                len(result) > 0
+                and result[-1]
+                in [
+                    'kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
+                    'karis_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
+                    'screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
+                ]
+                and part.strip() in ['IPU_8GB', 'IPU_16GB']
+            ):
+                result[-1] += ', '
+                result[-1] += part.strip()
+            else:
+                result.append(part)
+
+    return result
 
 
 def parse_from_command_line_args(opts: argparse.Namespace) -> DutAllocateSpec:

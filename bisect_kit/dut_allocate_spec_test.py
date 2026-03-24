@@ -43,3 +43,54 @@ class TestDutAllocateSpec(unittest.TestCase):
 
         loaded_spec = dut_allocate_spec_module.load(session_name)
         self.assertEqual(spec, loaded_spec)
+
+    # pylint: disable=protected-access
+    def test_str_to_list(self):
+        self.assertEqual(dut_allocate_spec_module._str_to_list(""), [])
+        self.assertEqual(dut_allocate_spec_module._str_to_list([]), [])
+
+        self.assertEqual(
+            dut_allocate_spec_module._str_to_list("a,b,c"), ["a", "b", "c"]
+        )
+        self.assertEqual(
+            dut_allocate_spec_module._str_to_list(["a", "b,c"]), ["a", "b", "c"]
+        )
+
+        self.assertEqual(
+            dut_allocate_spec_module._str_to_list(
+                "screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox,IPU_8GB"
+            ),
+            ["screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_8GB"],
+        )
+        self.assertEqual(
+            dut_allocate_spec_module._str_to_list(
+                "kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB"
+            ),
+            ["kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB"],
+        )
+        self.assertEqual(
+            dut_allocate_spec_module._str_to_list(
+                "foo,kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox,IPU_16GB,bar"
+            ),
+            [
+                "foo",
+                "kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB",
+                "bar",
+            ],
+        )
+        self.assertEqual(
+            dut_allocate_spec_module._str_to_list(
+                "karis_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox,IPU_8GB,"
+                + "kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox,IPU_16GB,"
+                + "screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox,IPU_8GB"
+            ),
+            [
+                "karis_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_8GB",
+                "kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB",
+                "screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_8GB",
+            ],
+        )
+
+
+if __name__ == '__main__':
+    unittest.main()
