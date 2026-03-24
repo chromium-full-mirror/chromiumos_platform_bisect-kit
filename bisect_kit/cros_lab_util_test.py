@@ -85,6 +85,42 @@ class TestCrosLab(unittest.TestCase):
             None,
         )
 
+    @mock.patch('bisect_kit.cros_lab_util.crosfleet_cmd')
+    def test_crosfleet_dut_leases(self, mock_cmd):
+        mock_cmd.return_value = '''
+DUT_HOSTNAME=chromeos8-row13-rack17-host2
+MODEL=willow
+BOARD=jacuzzi
+SERVO_HOSTNAME=chromeos8-row13-rack17-labstation1
+SERVO_PORT=9998
+SERVO_SERIAL=SERVOV4P1-S-2204211229
+MINS_REMAINING=1438.64
+LEASE_ID=73967319
+
+DUT_HOSTNAME=chromeos8-row13-rack17-host3
+MODEL=willow
+BOARD=jacuzzi
+SERVO_HOSTNAME=chromeos8-row13-rack17-labstation2
+SERVO_PORT=9998
+SERVO_SERIAL=SERVOV4P1-S-2204211230
+MINS_REMAINING=1438.64
+LEASE_ID=73967320
+'''
+        info = cros_lab_util.crosfleet_dut_leases()
+        self.assertEqual(len(info), 2)
+        self.assertIn('chromeos8-row13-rack17-host2', info)
+        self.assertIn('chromeos8-row13-rack17-host3', info)
+        self.assertEqual(
+            info['chromeos8-row13-rack17-host2']['dut_hostname'],
+            'chromeos8-row13-rack17-host2',
+        )
+        self.assertEqual(
+            info['chromeos8-row13-rack17-host2']['lease_id'], '73967319'
+        )
+        self.assertEqual(
+            info['chromeos8-row13-rack17-host3']['lease_id'], '73967320'
+        )
+
     def test_extract_lease_info(self):
         info = cros_lab_util.extract_lease_info(
             'Internal Scheduke lase ID (can be used for cancellation): 1234567'

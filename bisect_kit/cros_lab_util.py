@@ -85,6 +85,19 @@ LEASE_DURATION_SECONDS = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
 
 
+class CrosfleetDutLease(typing.TypedDict, total=False):
+    """A data represents the DUT lease status fetched from crosfleet command."""
+
+    dut_hostname: str
+    model: str
+    board: str
+    servo_hostname: str
+    servo_port: str
+    servo_serial: str
+    mins_remaining: str
+    lease_id: str
+
+
 @dataclasses.dataclass(eq=True)
 class LeaseStatus:
     """A data represents the swarming DUT lease status.
@@ -231,7 +244,7 @@ def crosfleet_cmd(cmd, *args, **kwargs):
     return _run_labtools_command('crosfleet', *cmd_list, *full_args, **kwargs)
 
 
-def crosfleet_dut_info(dut_name):
+def crosfleet_dut_info(dut_name) -> CrosfleetDutLease:
     """Run crosfleet dut info.
 
     Args:
@@ -253,6 +266,73 @@ def crosfleet_dut_info(dut_name):
         m = re.fullmatch(r'(\S+)=(\S+)', line)
         if m:
             info[m.group(1).lower()] = m.group(2)
+    return info
+
+
+def crosfleet_dut_leases() -> dict[str, CrosfleetDutLease]:
+    """Run crosfleet dut leases.
+
+    Returns:
+      A dict of dut info.
+    """
+    info: dict[str, CrosfleetDutLease] = {}
+    # Sample stdout:
+    #
+    # ===
+    # DUT_HOSTNAME=chromeos8-row13-rack17-host2
+    # MODEL=willow
+    # BOARD=jacuzzi
+    # SERVO_HOSTNAME=chromeos8-row13-rack17-labstation1
+    # SERVO_PORT=9998
+    # SERVO_SERIAL=SERVOV4P1-S-2204211229
+    # MINS_REMAINING=1438.64
+    # LEASE_ID=73967319
+    #
+    # DUT_HOSTNAME=chromeos8-row13-rack17-host2
+    # MODEL=willow
+    # BOARD=jacuzzi
+    # SERVO_HOSTNAME=chromeos8-row13-rack17-labstation1
+    # SERVO_PORT=9998
+    # SERVO_SERIAL=SERVOV4P1-S-2204211229
+    # MINS_REMAINING=1438.64
+    # LEASE_ID=73967319
+    # ===
+    current_section_info: dict[str, str] = {}
+    error = False
+    output = crosfleet_cmd('dut leases')
+    for line in output.split('\n'):
+        if not line and current_section_info:
+            dut_name = current_section_info.get('dut_hostname', '')
+            if dut_name:
+                info[dut_name] = typing.cast(
+                    CrosfleetDutLease, current_section_info
+                )
+            else:
+                error = True
+                logger.error(
+                    '[crosfleet dut leases] Invalid section: %s',
+                    current_section_info,
+                )
+            current_section_info = {}
+        m = re.fullmatch(r'([^=\s]+)=(\S+)', line)
+        if m:
+            current_section_info[m.group(1).lower()] = m.group(2)
+
+    if not error and current_section_info:
+        dut_name = current_section_info.get('dut_hostname', '')
+        if dut_name:
+            info[dut_name] = typing.cast(
+                CrosfleetDutLease, current_section_info
+            )
+        else:
+            error = True
+            logger.error(
+                '[crosfleet dut leases] Invalid section: %s',
+                current_section_info,
+            )
+
+    if error:
+        logger.info('`crosfleet dut leases` Output:===\n%s\n===', output)
     return info
 
 
@@ -988,7 +1068,7 @@ def crosfleet_lease_dut(
     return status
 
 
-def crosfleet_release_dut(dut_name):
+def crosfleet_release_dut(dut_name: str):
     """Release DUT which was leased by me.
 
     Args:
@@ -999,7 +1079,30 @@ def crosfleet_release_dut(dut_name):
             '%s is not leased, or not leased by me' % dut_name
         )
 
-    crosfleet_cmd('dut abandon', dut_name)
+    leases = crosfleet_dut_leases()
+    lease_info: CrosfleetDutLease = leases.get(dut_name, {})
+    lease_id = lease_info.get('lease_id', '')
+    if lease_id:
+        try:
+            crosfleet_cmd('dut abandon', '-lease-ids', lease_id)
+        except subprocess.CalledProcessError as e:
+            logger.warning(
+                'Failed on `crosfleet dut abandon` with lease-id %s: %s',
+                lease_id,
+                e,
+            )
+            logger.warning(
+                '`crosfleet` command is potentially too old to support '
+                + 'lease-id. Falling back to hostname just in case.'
+            )
+            crosfleet_cmd('dut abandon', dut_name)
+    else:
+        logger.warning(
+            'Lease ID cound not be fetched. Trying abandoning without lease '
+            + 'ID.'
+        )
+        logger.warning('Leases: %s', leases)
+        crosfleet_cmd('dut abandon', dut_name)
 
     # wait the state propagated
     for _ in range(10):
