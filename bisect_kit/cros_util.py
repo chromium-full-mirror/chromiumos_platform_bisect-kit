@@ -3106,7 +3106,7 @@ def parse_chromeos_overlays(chromeos_root):
             if not name:
                 continue
             # Special cases which have variant boards.
-            if name in ['auron', 'guado', 'nyan', 'veyron']:
+            if name in ['nirva']:
                 continue
 
             path = os.path.join(overlay, 'metadata', 'layout.conf')
