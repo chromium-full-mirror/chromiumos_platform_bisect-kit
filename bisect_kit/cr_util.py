@@ -425,6 +425,17 @@ def build(
             '-C',
             out_dir,
         ] + targets
+
+        env = os.environ.copy()
+        # Recently clang started complaining with a "clang: warning: future
+        # releases of the clang compiler will prefer GCC installations
+        # containing libstdc++ include directories" on some systems (b/496032655).
+        # But an old code uses the clang library and the build stops.
+        # Disabling the warning by modifying CXXFLAGS.
+        env['CXXFLAGS'] = (
+            env.get('CXXFLAGS', '') + ' -Wno-gcc-install-dir-libstdcxx'
+        )
+
         # Chrome build shouldn't take more than 3 hours. Set timeout to abort
         # the process in case it gets deadlocked. b/369498616
         timeout = 3 * 60 * 60
@@ -433,6 +444,7 @@ def build(
                 chrome_src,
                 board,
                 command=cmd,
+                env=env,
                 is_public_build=is_public_build,
                 timeout=timeout,
                 gn_extra_args=gn_extra_args,
@@ -448,6 +460,7 @@ def build(
                     chrome_src,
                     board,
                     command=cmd,
+                    env=env,
                     is_public_build=is_public_build,
                     timeout=timeout,
                     gn_extra_args=gn_extra_args,
