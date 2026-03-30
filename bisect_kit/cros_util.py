@@ -3124,8 +3124,9 @@ def resolve_basic_boards(overlays: dict[str, list[str]]) -> str:
 
     def resolve(name: str) -> set[str]:
         # Special cases which have the parents but treated as basic boards.
-        if name in ['nirva']:
-            return {name}
+        normalized_name = normalize(name)
+        if normalized_name in ['nirva']:
+            return {normalized_name}
 
         result = set()
         for parent in overlays[name]:
