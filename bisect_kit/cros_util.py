@@ -3094,7 +3094,7 @@ def _get_overlay_name(overlay):
     return None
 
 
-def parse_chromeos_overlays(chromeos_root):
+def parse_chromeos_overlays(chromeos_root: str) -> dict[str, list[str]]:
     # ref: chromite's lib/portage_util.py ListOverlays().
     overlays = {}
     paths = ['src/overlays', 'src/private-overlays']
@@ -3104,9 +3104,6 @@ def parse_chromeos_overlays(chromeos_root):
         for overlay in sorted(glob.glob(path)):
             name = _get_overlay_name(overlay)
             if not name:
-                continue
-            # Special cases which have variant boards.
-            if name in ['nirva']:
                 continue
 
             path = os.path.join(overlay, 'metadata', 'layout.conf')
@@ -3121,11 +3118,15 @@ def parse_chromeos_overlays(chromeos_root):
     return overlays
 
 
-def resolve_basic_boards(overlays):
-    def normalize(name):
+def resolve_basic_boards(overlays: dict[str, list[str]]) -> str:
+    def normalize(name: str) -> str:
         return name.replace('-private', '')
 
-    def resolve(name):
+    def resolve(name: str) -> set[str]:
+        # Special cases which have the parents but treated as basic boards.
+        if name in ['nirva']:
+            return {name}
+
         result = set()
         for parent in overlays[name]:
             assert parent != name, 'recursive overlays definition?'

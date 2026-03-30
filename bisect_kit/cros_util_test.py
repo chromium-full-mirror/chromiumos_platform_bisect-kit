@@ -9,6 +9,7 @@ import logging
 import os
 import random
 import subprocess
+import tempfile
 import textwrap
 import unittest
 from unittest import mock
@@ -1118,6 +1119,55 @@ class TestCrosUtil(unittest.TestCase):
             self.assertTrue(cros_util.is_buildbucket_buildable('9998.100.100'))
             self.assertFalse(cros_util.is_buildbucket_buildable('9997.100.100'))
 
+    def test_parse_chromeos_overlays(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            overlays_dir = os.path.join(temp_dir, 'src', 'overlays')
+            private_overlays_dir = os.path.join(
+                temp_dir, 'src', 'private-overlays'
+            )
+            os.makedirs(overlays_dir)
+            os.makedirs(private_overlays_dir)
+
+            # Overlay 1: board1
+            board1_dir = os.path.join(overlays_dir, 'overlay-board1')
+            os.makedirs(os.path.join(board1_dir, 'metadata'))
+            with open(
+                os.path.join(board1_dir, 'metadata', 'layout.conf'), 'w'
+            ) as f:
+                f.write('repo-name = board1\n')
+                f.write('masters = portage-stable chromiumos eclass-overlay\n')
+
+            # Overlay 2: board2 in private
+            board2_dir = os.path.join(private_overlays_dir, 'overlay-board2')
+            os.makedirs(os.path.join(board2_dir, 'metadata'))
+            with open(
+                os.path.join(board2_dir, 'metadata', 'layout.conf'), 'w'
+            ) as f:
+                f.write('repo-name = board2\n')
+                f.write('masters = board1\n')
+
+            # Overlay 3: board3 (using profiles/repo_name)
+            board3_dir = os.path.join(overlays_dir, 'overlay-board3')
+            os.makedirs(os.path.join(board3_dir, 'profiles'))
+            with open(
+                os.path.join(board3_dir, 'profiles', 'repo_name'), 'w'
+            ) as f:
+                f.write('board3\n')
+            os.makedirs(os.path.join(board3_dir, 'metadata'))
+            with open(
+                os.path.join(board3_dir, 'metadata', 'layout.conf'), 'w'
+            ) as f:
+                f.write('masters = board2\n')
+
+            overlays = cros_util.parse_chromeos_overlays(temp_dir)
+
+            expected = {
+                'board1': ['portage-stable', 'chromiumos', 'eclass-overlay'],
+                'board2': ['board1'],
+                'board3': ['board2'],
+            }
+            self.assertEqual(overlays, expected)
+
     def test_resolve_basic_boards(self):
         overlays = {
             'foo': ['chromiumos'],
@@ -1127,6 +1177,8 @@ class TestCrosUtil(unittest.TestCase):
             'bar-private': ['foo-private', 'chromiumos'],
             'bar-kernelnext': ['chromiumos', 'bar-private'],
             'bar64': ['chromiumos', 'bar-private'],
+            # Special case (see the method implementation):
+            'nirva': ['nissa'],
         }
         self.assertDictEqual(
             cros_util.resolve_basic_boards(overlays),
@@ -1137,6 +1189,8 @@ class TestCrosUtil(unittest.TestCase):
                 'bar': 'foo',
                 'bar-kernelnext': 'foo',
                 'bar64': 'foo',
+                # Special case (see the method implementation):
+                'nirva': 'nirva',
             },
         )
 
