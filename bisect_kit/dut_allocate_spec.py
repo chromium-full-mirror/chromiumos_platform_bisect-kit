@@ -48,6 +48,14 @@ def _load_from_local_file(session: str) -> DutAllocateSpec:
     with open(session_file) as f:
         spec = DutAllocateSpec(**json.load(f))
     logger.info('DutAllocateSpec loaded from %s: %s', session_file, spec)
+    tweaked_skus = _tweak_sku_list(spec.skus)
+    if tweaked_skus != spec.skus:
+        logger.info(
+            'DutAllocateSpec: SKU updated from %s to %s',
+            spec.skus,
+            tweaked_skus,
+        )
+        spec.skus = tweaked_skus
     return spec
 
 
@@ -78,32 +86,39 @@ def _str_to_list(val: str | list[str]) -> list[str]:
         return []
 
     if isinstance(val, list):
-        val_list = val
-    else:
-        assert isinstance(val, str)
-        val_list = [val]
+        # Split and flatten to 1D list..
+        return sum(map(lambda x: x.split(','), val), [])
+
+    assert isinstance(val, str)
+    return val.split(',')
+
+
+def _tweak_sku_list(val: list[str]) -> list[str]:
+    """Adds a tweak to the SKU list to treat comma-included SKUs
+
+    This is a HACK to Treat some special SKUs (containing a comma).
+    Currently we have the following 3 SKUs including a comma:
+    - kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB
+    - karis_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_8GB
+    - screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB
+    """
 
     result: list[str] = []
-    for v in val_list:
-        # HACK: Treat the 3 SKUs containing a comma:
-        # - kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB
-        # - karis_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_8GB
-        # - screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox, IPU_16GB
-        for part in v.split(','):
-            if (
-                len(result) > 0
-                and result[-1]
-                in [
-                    'kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
-                    'karis_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
-                    'screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
-                ]
-                and part.strip() in ['IPU_8GB', 'IPU_16GB']
-            ):
-                result[-1] += ', '
-                result[-1] += part.strip()
-            else:
-                result.append(part)
+    for part in val:
+        if (
+            len(result) > 0
+            and result[-1]
+            in [
+                'kanix_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
+                'karis_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
+                'screebo_MTL-U 15W Ultra 5 T2 1.5/4.2 GT 1.8G 1VDBox',
+            ]
+            and part.strip() in ['IPU_8GB', 'IPU_16GB']
+        ):
+            result[-1] += ', '
+            result[-1] += part.strip()
+        else:
+            result.append(part.strip())
 
     return result
 
@@ -118,7 +133,7 @@ def parse_from_command_line_args(opts: argparse.Namespace) -> DutAllocateSpec:
         dimensions=[f'{k}:{v}' for k, v in opts.dimensions],
         boards=_str_to_list(opts.board),
         models=_str_to_list(opts.model),
-        skus=_str_to_list(opts.sku),
+        skus=_tweak_sku_list(_str_to_list(opts.sku)),
         dut_name=opts.dut_name,
         satlab_ip=opts.satlab_ip,
         version_hints=_str_to_list(opts.version_hint),
@@ -142,7 +157,7 @@ def parse_from_dut_allocate_command_line_args(
         dimensions=[f'{k}:{v}' for k, v in opts.allocate_dut_dimensions],
         boards=_str_to_list(opts.allocate_dut_board),
         models=_str_to_list(opts.allocate_dut_model),
-        skus=_str_to_list(opts.allocate_dut_sku),
+        skus=_tweak_sku_list(_str_to_list(opts.allocate_dut_sku)),
         dut_name=opts.allocate_dut_dut_name,
         satlab_ip=opts.allocate_dut_satlab_ip,
         version_hints=_str_to_list(opts.allocate_dut_version_hint),
