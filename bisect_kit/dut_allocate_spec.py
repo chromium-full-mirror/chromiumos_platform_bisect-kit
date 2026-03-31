@@ -48,15 +48,7 @@ def _load_from_local_file(session: str) -> DutAllocateSpec:
     with open(session_file) as f:
         spec = DutAllocateSpec(**json.load(f))
     logger.info('DutAllocateSpec loaded from %s: %s', session_file, spec)
-    tweaked_skus = _tweak_sku_list(spec.skus)
-    if tweaked_skus != spec.skus:
-        logger.info(
-            'DutAllocateSpec: SKU updated from %s to %s',
-            spec.skus,
-            tweaked_skus,
-        )
-        spec.skus = tweaked_skus
-    return spec
+    return _tweak_spec(spec)
 
 
 def load(session: str, sync_with_db=False) -> DutAllocateSpec | None:
@@ -77,7 +69,7 @@ def load(session: str, sync_with_db=False) -> DutAllocateSpec | None:
     logger.info(
         'DutAllocateSpec loaded from Datastore for %s: %s', session, spec
     )
-    return spec
+    return _tweak_spec(spec)
 
 
 def _str_to_list(val: str | list[str]) -> list[str]:
@@ -91,6 +83,26 @@ def _str_to_list(val: str | list[str]) -> list[str]:
 
     assert isinstance(val, str)
     return val.split(',')
+
+
+def _tweak_spec(spec: DutAllocateSpec) -> DutAllocateSpec:
+    """Tweaks the DutAllocateSpec to handle special SKUs.
+
+    Args:
+      spec: The DutAllocateSpec to tweak.
+
+    Returns:
+      The tweaked DutAllocateSpec.
+    """
+    tweaked_skus = _tweak_sku_list(spec.skus)
+    if tweaked_skus != spec.skus:
+        logger.info(
+            'DutAllocateSpec: SKU updated from %s to %s',
+            spec.skus,
+            tweaked_skus,
+        )
+        spec.skus = tweaked_skus
+    return spec
 
 
 def _tweak_sku_list(val: list[str]) -> list[str]:
@@ -128,12 +140,12 @@ def parse_from_command_line_args(opts: argparse.Namespace) -> DutAllocateSpec:
 
     It is used when invoked from cros_helper.py (i.e., stateful bisections).
     """
-    return DutAllocateSpec(
+    spec = DutAllocateSpec(
         pools=_str_to_list(opts.pool),
         dimensions=[f'{k}:{v}' for k, v in opts.dimensions],
         boards=_str_to_list(opts.board),
         models=_str_to_list(opts.model),
-        skus=_tweak_sku_list(_str_to_list(opts.sku)),
+        skus=_str_to_list(opts.sku),
         dut_name=opts.dut_name,
         satlab_ip=opts.satlab_ip,
         version_hints=_str_to_list(opts.version_hint),
@@ -143,6 +155,7 @@ def parse_from_command_line_args(opts: argparse.Namespace) -> DutAllocateSpec:
         parallel=opts.parallel,
         session=opts.session,
     )
+    return _tweak_spec(spec)
 
 
 def parse_from_dut_allocate_command_line_args(
@@ -152,12 +165,12 @@ def parse_from_dut_allocate_command_line_args(
 
     It is used when invoked from diagnose_cros_*.py init (i.e., stateless bisections).
     """
-    return DutAllocateSpec(
+    spec = DutAllocateSpec(
         pools=_str_to_list(opts.allocate_dut_pool),
         dimensions=[f'{k}:{v}' for k, v in opts.allocate_dut_dimensions],
         boards=_str_to_list(opts.allocate_dut_board),
         models=_str_to_list(opts.allocate_dut_model),
-        skus=_tweak_sku_list(_str_to_list(opts.allocate_dut_sku)),
+        skus=_str_to_list(opts.allocate_dut_sku),
         dut_name=opts.allocate_dut_dut_name,
         satlab_ip=opts.allocate_dut_satlab_ip,
         version_hints=_str_to_list(opts.allocate_dut_version_hint),
@@ -168,3 +181,4 @@ def parse_from_dut_allocate_command_line_args(
         session=opts.session,
         public=opts.public_build,
     )
+    return _tweak_spec(spec)
