@@ -532,12 +532,12 @@ def deploy(
       with_tests: Deploy test binaries as well.
       out_dir: Optional output dir from which to deploy binaries.
     """
+    if not out_dir:
+        out_dir = os.path.join('out_%s' % board, 'Release')
+
     if not targets:
         targets = os.listdir(out_dir)
     logger.info('deploy %s', targets)
-
-    if not out_dir:
-        out_dir = os.path.join('out_%s' % board, 'Release')
 
     # Deploy chrome if needed.
     if set(CHROME_BINARIES).intersection(targets):
