@@ -7,6 +7,7 @@
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -515,12 +516,12 @@ def deploy_to_staging_dir(
 
 
 def deploy(
-    chrome_src: str,
+    chrome_src: str | os.PathLike,
     board: str,
     dut: str,
     targets: list[str],
     with_tests: bool = True,
-    out_dir: str | None = None,
+    out_dir: str | os.PathLike | None = None,
 ) -> None:
     """Deploy Chrome binaries.
 
@@ -530,10 +531,17 @@ def deploy(
       dut: DUT address.
       targets: ninja targets. If empty, deploys any target found in out_dir.
       with_tests: Deploy test binaries as well.
-      out_dir: Optional output dir from which to deploy binaries.
+      out_dir: Optional output dir from which to deploy binaries. A relative
+         path would be interpreted as being based on `chrome_src`.
     """
+    chrome_src = Path(chrome_src)
+
     if not out_dir:
-        out_dir = os.path.join('out_%s' % board, 'Release')
+        out_dir = chrome_src / ('out_%s' % board) / 'Release'
+    elif not out_dir.is_absolute():
+        out_dir = (chrome_src / out_dir).resolve()
+    else:
+        out_dir = Path(out_dir)
 
     if not targets:
         targets = os.listdir(out_dir)
@@ -547,7 +555,7 @@ def deploy(
             '--board',
             board,
             '--build-dir',
-            out_dir,
+            str(out_dir),
             '--device',
             dut,
         ]
@@ -562,10 +570,10 @@ def deploy(
         with tempfile.TemporaryDirectory() as staging_dir:
             # Deploy test binaries to the staging directory.
             deploy_to_staging_dir(
-                chrome_src,
+                str(chrome_src),
                 board,
                 test_binaries,
-                out_dir=out_dir,
+                out_dir=str(out_dir),
                 staging_dir=staging_dir,
             )
             try:
