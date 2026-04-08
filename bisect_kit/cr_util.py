@@ -538,10 +538,10 @@ def deploy(
 
     if not out_dir:
         out_dir = chrome_src / ('out_%s' % board) / 'Release'
-    elif not out_dir.is_absolute():
-        out_dir = (chrome_src / out_dir).resolve()
     else:
         out_dir = Path(out_dir)
+        if not out_dir.is_absolute():
+            out_dir = (chrome_src / out_dir).resolve()
 
     if not targets:
         targets = os.listdir(out_dir)
@@ -572,7 +572,7 @@ def deploy(
             deploy_to_staging_dir(
                 str(chrome_src),
                 board,
-                test_binaries,
+                list(test_binaries),
                 out_dir=str(out_dir),
                 staging_dir=staging_dir,
             )
