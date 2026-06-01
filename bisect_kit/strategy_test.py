@@ -14,6 +14,7 @@ from bisect_kit import errors
 from bisect_kit import math_util
 from bisect_kit import strategy
 from bisect_kit import testing
+from bisect_kit.gemini_bisect import gemini_util
 
 
 class TestStrategy(unittest.TestCase):
@@ -1172,6 +1173,101 @@ class TestGeminiFusionStrategy(unittest.TestCase):
 
             idx = bsearch.next_idx()
             self.assertEqual(idx, 5)
+
+    def test_failure_reason_handling(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.next.return_value = '5'
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ):
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                oracle=(0.1, 0.9),
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            bsearch.add_sample(0, 'old')
+            bsearch.add_sample(9, 'new')
+
+            bsearch.next_idx()
+            bsearch.add_sample(
+                5, 'new', reason='Test crashed with null pointer'
+            )
+
+            mock_agent.add_sample.assert_any_call(
+                '5', 'new', reason='Test crashed with null pointer'
+            )
+
+
+class TestBisectAgent(unittest.TestCase):
+    """Test BisectAgent class."""
+
+    @mock.patch('google.auth.transport.requests.AuthorizedSession')
+    @mock.patch(
+        'google.oauth2.service_account.Credentials.from_service_account_file'
+    )
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    @mock.patch('bisect_kit.git_util.get_commit_metadata')
+    @mock.patch('bisect_kit.git_util.CommitMeta.get_summary')
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    def test_get_revisions_with_failure_reasons(
+        self,
+        mock_build_revlist,
+        mock_get_summary,
+        _mock_get_metadata,
+        _mock_gemini_agent,
+        _mock_creds,
+        _mock_session,
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'commit1'}]},
+                '2': {'actions': [{'rev': 'commit2'}]},
+            },
+        )
+        mock_get_summary.return_value = 'Subject message'
+
+        with mock.patch.dict(
+            'os.environ', {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'}
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='my_test',
+                repo='my_repo',
+                revlist=['1', '2'],
+            )
+
+            agent.add_sample('1', 'PASS')
+            agent.add_sample('2', 'FAIL', reason='Crashed with NullPointer')
+
+            # Default get_range: reasons not present
+            revs = agent._get_revisions()
+            self.assertEqual(revs[0]['rev_id'], '1')
+            self.assertEqual(revs[0]['run_results'], ['PASS'])
+            self.assertEqual(revs[1]['rev_id'], '2')
+            self.assertEqual(revs[1]['run_results'], ['FAIL'])
+
+            # get_range with include_reason=True
+            revs_with_reason = agent._get_revisions(include_reason=True)
+            self.assertEqual(revs_with_reason[0]['rev_id'], '1')
+            self.assertEqual(
+                revs_with_reason[0]['run_results'],
+                [{'status': 'PASS', 'reason': None}],
+            )
+            self.assertEqual(revs_with_reason[1]['rev_id'], '2')
+            self.assertEqual(
+                revs_with_reason[1]['run_results'],
+                [
+                    {
+                        'status': 'FAIL',
+                        'reason': 'Crashed with NullPointer',
+                    }
+                ],
+            )
 
 
 if __name__ == '__main__':

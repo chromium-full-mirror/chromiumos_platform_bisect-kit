@@ -1597,15 +1597,21 @@ class GeminiFusionStrategy(NoisyBinarySearch):
         super().add_sample(idx, status, **kwargs)
 
         if self.gemini:
+            reason = kwargs.get('reason')
             self.gemini.add_sample(
                 self.rev_info[idx].rev,
                 self.term_map.get(sample['status'], sample['status']),
+                reason=reason,
             )
 
             if self.rev_info[idx].rev in self._gemini_waiting_result:
-                self._gemini_waiting_result[self.rev_info[idx].rev] = (
-                    self.term_map.get(sample['status'], sample['status'])
+                status_str = self.term_map.get(
+                    sample['status'], sample['status']
                 )
+                self._gemini_waiting_result[self.rev_info[idx].rev] = {
+                    'status': status_str,
+                    'reason': reason,
+                }
 
     def next_idx(self, cost_table=None):
         """Determines next index to binary search.

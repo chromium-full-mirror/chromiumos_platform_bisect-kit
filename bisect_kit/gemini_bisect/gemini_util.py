@@ -38,9 +38,14 @@ PROMPT = (
     'find better bisection point than midpoint at each step.\n'
     '\n'
     'Each revision returned by get_range has an associated "stats" field '
-    'containing parameters from the underlying probability model. These statistics '
-    'are dynamic and will change after every test run. You can call get_range '
-    'again on-demand if you need to fetch the latest values.\n'
+    'containing parameters from the underlying probability model. These '
+    'statistics are dynamic and will change after every test run. You '
+    'can call get_range again on-demand if you need to fetch the latest '
+    'values. You can also optionally request the test failure log / reasons '
+    'by passing include_reason=True to get_range, which will populate '
+    'run_results with dictionaries containing the status and the test '
+    'failure reason (representing the error logs or timeout output from the '
+    'test execution if it failed).\n'
     '\n'
     'You must balance your code diff knowledge with the probability '
     'model:\n'
@@ -74,7 +79,11 @@ FUNCTIONS = [
             "Each dict contains:\n"
             "- 'rev_id': unique string to identify a revision.\n"
             "- 'subject': first line of commit message.\n"
-            "- 'run_results': history of past test runs on this revision.\n"
+            "- 'run_results': history of past test runs on this revision. "
+            "By default, this is a list of status strings (e.g., 'PASS', 'FAIL'). "
+            "If include_reason=True is passed, this will instead be a "
+            "list of dictionaries containing 'status' and 'reason' "
+            "(the test's failure output or error log if it failed).\n"
             "- 'stats': dict of probability model parameters:\n"
             "  - 'prob': the probability that this revision is the culprit "
             "(the first revision that introduces the regression).\n"
@@ -86,6 +95,18 @@ FUNCTIONS = [
             "after every run. Calling get_range again after run_at will "
             "return the updated values."
         ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "include_reason": {
+                    "type": "boolean",
+                    "description": (
+                        "Whether to include the test failure reason/error "
+                        "log for each revision's run results if they failed."
+                    ),
+                }
+            },
+        },
     },
     {
         "name": "get_revision_detail",
@@ -103,8 +124,8 @@ FUNCTIONS = [
                 "reason": {
                     "type": "string",
                     "description": (
-                        "A short explanation of 1-2 sentences regarding why "
-                        "you choose to run this revision."
+                        "Your justification / explanation (1-2 sentences) "
+                        "regarding why you choose to inspect this revision."
                     ),
                 },
             },
@@ -113,7 +134,12 @@ FUNCTIONS = [
     },
     {
         "name": "run_at",
-        "description": "Run the test at given commit",
+        "description": (
+            "Run the test at given commit. Returns a dictionary containing "
+            "the status (e.g., 'PASS', 'FAIL') and optionally a 'reason' "
+            "key containing the test failure output or error log if the "
+            "run failed."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -124,8 +150,9 @@ FUNCTIONS = [
                 "reason": {
                     "type": "string",
                     "description": (
-                        "A short explanation of 1-2 sentences regarding why "
-                        "you choose to run this revision."
+                        "Your justification / explanation (1-2 sentences) "
+                        "regarding why you choose to run the test at this "
+                        "revision."
                     ),
                 },
             },
@@ -160,6 +187,13 @@ def _is_retriable_gemini_error(e) -> bool:
     if isinstance(e, genai.errors.ServerError) and e.code == 503:
         return True
     return False
+
+
+class TrialResult(TypedDict):
+    """Type annotation for a single run trial result."""
+
+    status: str
+    reason: str | None
 
 
 NestedDict = dict[str, Union[str, int, 'NestedDict']]
@@ -297,7 +331,7 @@ class BisectAgent:
         self._started = False
         self._repo = repo
         self._revlist = revlist
-        self._rev_samples: dict[str, list[str]] = defaultdict(list)
+        self._rev_samples: dict[str, list[TrialResult]] = defaultdict(list)
         self._rev_stats: dict[str, ProbModelResultType] = {}
         self._conclusion: str | None = None
         self._pending_parts: list[genai.types.Part] = []
@@ -320,10 +354,18 @@ class BisectAgent:
             }
         self._rev2commit = rev2commit
 
-    def _get_revisions(self) -> list[dict]:
+    def _get_revisions(self, include_reason: bool = False) -> list[dict]:
         """Returns the revlist and their subjects."""
-        return [
-            {
+        revisions = []
+        for x in self._revlist:
+            run_results: list[str] | list[TrialResult]
+            if include_reason:
+                run_results = self._rev_samples[x]
+            else:
+                run_results = [
+                    sample['status'] for sample in self._rev_samples[x]
+                ]
+            rev_dict = {
                 'rev_id': x,
                 'repo': self._rev2commit[x]['repo'],
                 'subject': git_util.CommitMeta.get_summary(
@@ -332,11 +374,11 @@ class BisectAgent:
                         self._rev2commit[x]['commit'],
                     )
                 ),
-                'run_results': self._rev_samples[x],
+                'run_results': run_results,
                 'stats': self._rev_stats.get(x),
             }
-            for x in self._revlist
-        ]
+            revisions.append(rev_dict)
+        return revisions
 
     def _get_revision_detail(self, rev_id: str) -> dict:
         """Returns the commit details of given rev_id.
@@ -446,12 +488,17 @@ class BisectAgent:
                         )
                     )
                 elif call.name == 'get_range':
+                    include_reason = call.args.get('include_reason', False)
                     self._pending_parts.append(
                         genai.types.Part(
                             function_response=genai.types.FunctionResponse(
                                 id=call.id,
                                 name='get_range',
-                                response={'revisions': self._get_revisions()},
+                                response={
+                                    'revisions': self._get_revisions(
+                                        include_reason
+                                    )
+                                },
                             )
                         )
                     )
@@ -557,12 +604,12 @@ class BisectAgent:
                 self._pending_run_at_call = run_at_call
                 return run_at_call.args['rev_id']
 
-    def add_sample(self, rev: str, status: str):
+    def add_sample(self, rev: str, status: str, reason: str | None = None):
         """Add run result
 
         rev: revision
         status: status of a run."""
-        self._rev_samples[rev].append(status)
+        self._rev_samples[rev].append({'status': status, 'reason': reason})
 
     def update_stats(self, stats: dict[str, ProbModelResultType]):
         """Updates prob model stats
@@ -570,10 +617,8 @@ class BisectAgent:
         stats: new stats."""
         self._rev_stats = stats
 
-    def next(self, status: str | None = None) -> str | None:
-        """Returns the next target revision for bisector to run.
-
-        good: whether previous run is good or not."""
+    def next(self, status: TrialResult | None = None) -> str | None:
+        """Returns the next target revision for bisector to run."""
         if self._conclusion:
             return None
         if status is not None:
@@ -583,7 +628,7 @@ class BisectAgent:
                     function_response=genai.types.FunctionResponse(
                         id=self._pending_run_at_call.id,
                         name='run_at',
-                        response={'status': status},
+                        response=status,
                     )
                 )
             )
@@ -609,7 +654,40 @@ def _get_simulated_cost_table(good, bad, prev_rev):
 
 def demo(testname, good, bad, culprit):
     # pylint: disable=import-outside-toplevel
+    import uuid
+
     from bisect_kit import strategy
+
+    def get_reason() -> str | None:
+        if testname == 'tast.ui.WebUIJSErrors':
+            h = uuid.uuid4().hex
+            return (
+                'checkUnhandledPromiseRejectionError failed: WaitForCrashFiles '
+                f'failed for directory [/run/daemon-store/crash/{h}]: '
+                'timed out while waiting for crash files: no file matched '
+                'jserror\\.\\d{8}\\.\\d{6}\\.\\d+\\.\\d+\\.meta, '
+                'jserror\\.\\d{8}\\.\\d{6}\\.\\d+\\.\\d+\\.js_stack, '
+                'jserror\\.\\d{8}\\.\\d{6}\\.\\d+\\.\\d+\\.chrome.txt.gz '
+                f'(dirs /run/daemon-store/crash/{h}) (found )'
+            )
+        if testname == 'tast.a11y.Smoke':
+            return (
+                'Failed to find the UI element (Browser: New Tab) in the browser: '
+                'Uncaught (in promise): context deadline exceeded during a poll with '
+                'timeout 15s; "failed to find node with properties: {className: '
+                '/\\\\bBrowserFrame\\\\b/, role: window}"'
+            )
+        if testname == 'tast.arc.RemovableMedia.vm':
+            return (
+                'Failed to test Files app integration: failed to open a file '
+                'from Files app: failed to open Files app: launching the '
+                'Files App failed: Uncaught (in promise): context deadline '
+                'exceeded during a poll with timeout 60s; "failed to find '
+                'node with properties: {name: /^Downloads$/, role: treeItem, '
+                'ancestor: {name: /^Files/, className: '
+                '/\\\\bBrowserWidget\\\\b/, role: window, first: true}}"'
+            )
+        return None
 
     agent = BisectAgent(
         testname,
@@ -617,7 +695,7 @@ def demo(testname, good, bad, culprit):
         ['refs/heads/main@{#%d}' % (x) for x in range(good, bad + 1)],
     )
     agent.add_sample('refs/heads/main@{#%d}' % good, 'PASS')
-    agent.add_sample('refs/heads/main@{#%d}' % bad, 'FAIL')
+    agent.add_sample('refs/heads/main@{#%d}' % bad, 'FAIL', reason=get_reason())
     stat = defaultdict(list)
     stat[good].append('PASS')
     stat[bad].append('FAIL')
@@ -654,14 +732,18 @@ def demo(testname, good, bad, culprit):
     while attempt:
         rev = int(re.search(r'#(\d+)', attempt).group(1))
         runs_llm += 1
+        run_reason = None
         if rev >= culprit:
             status = 'FAIL'
+            run_reason = get_reason()
             now_bad = min(bad, now_bad)
         else:
             status = 'PASS'
             now_good = max(good, now_good)
         stat[rev].append(status)
-        agent.add_sample('refs/heads/main@{#%d}' % rev, status)
+        agent.add_sample(
+            'refs/heads/main@{#%d}' % rev, status, reason=run_reason
+        )
 
         prob = [
             1.0 / (now_bad - now_good) if now_good < x <= now_bad else 0.0
@@ -689,7 +771,7 @@ def demo(testname, good, bad, culprit):
                 for x in range(good, bad + 1)
             }
         )
-        attempt = agent.next(status)
+        attempt = agent.next({'status': status, 'reason': run_reason})
     runs_bisect = 0
     low, high = good, bad
     while high - low > 1:
@@ -720,3 +802,4 @@ if __name__ == '__main__':
     logger.addHandler(handler)
     demo('tast.ui.WebUIJSErrors', 1416515, 1416531, 1416520)
     demo('tast.a11y.Smoke', 1513012, 1513038, 1513018)
+    demo('tast.arc.RemovableMedia.vm', 1634593, 1634613, 1634610)
