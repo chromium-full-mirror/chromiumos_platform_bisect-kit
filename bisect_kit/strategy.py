@@ -1203,8 +1203,8 @@ class NoisyBinarySearch:
         return self.prob.index(max(self.prob))
 
     @staticmethod
-    def _next_idx_by_utility(old_p, new_p, prob, cost_table=None):
-        """Determines next index to binary search according to utility."""
+    def _calculate_utilities(old_p, new_p, prob, cost_table=None):
+        """Calculates information gain and utility (info gain per cost) for each index."""
         assert prob
         if cost_table is None:
             cost_table = [(1, 1)] * len(prob)
@@ -1213,10 +1213,7 @@ class NoisyBinarySearch:
         new_stats = orig_stats.multiply(old_p)
         old_stats = orig_stats.multiply(1.0 - old_p)
 
-        # Enumerate |i| as next to query, find best |i| to maximize utility.
-        best = float('-inf')
-        best_i = None
-        # |s| = cumulative probability of [p_0,..., p_i]
+        results = []
         s = 0.0
         for i, p in enumerate(prob):
             # If rev[i] is observed with old behavior, the result entropy is
@@ -1237,10 +1234,22 @@ class NoisyBinarySearch:
             information_gain = orig_entropy - entropy
             cost = r * cost_table[i][1] + (1.0 - r) * cost_table[i][0]
             utility = information_gain / cost
+            results.append((information_gain, utility))
+
+        return results
+
+    @staticmethod
+    def _next_idx_by_utility(old_p, new_p, prob, cost_table=None):
+        """Determines next index to binary search according to utility."""
+        utilities = NoisyBinarySearch._calculate_utilities(
+            old_p, new_p, prob, cost_table
+        )
+        best = float('-inf')
+        best_i = None
+        for i, (_, utility) in enumerate(utilities):
             if utility > best:
                 best = utility
                 best_i = i
-
         return best_i
 
     def statistics_test(self, round_idx):
@@ -1544,6 +1553,45 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 [x.rev for x in self.rev_info[self.old_idx : self.new_idx]],
             )
 
+    def _update_gemini_stats(self, cost_table=None):
+        if not self.gemini:
+            return
+
+        prob = self.prob
+        if not prob:
+            # Prob can be None if the initial range verification is not
+            # complete yet.
+            # In theory, Gemini inference will not be involved at this
+            # moment, and the values will not be used by Gemini even passed
+            # to the agent class.
+            # Populate a [0, 1/(N-1), ....] as an in-theory value to the
+            # agent class.
+            prob = [0.0] + [1.0 / (len(self.rev_info) - 1)] * (
+                len(self.rev_info) - 1
+            )
+
+        if self.prob:
+            utilities = self._calculate_utilities(
+                self.old_p, self.new_p, prob, cost_table
+            )
+        else:
+            utilities = [(None, None)] * len(prob)
+
+        self.gemini.update_stats(
+            {
+                self.rev_info[i].rev: {
+                    'status': {
+                        self.term_map.get(k, k): v
+                        for k, v in self.rev_info[i].result_counter.items()
+                    },
+                    'prob': prob[i],
+                    'info_gain': utilities[i][0],
+                    'info_gain_per_cost': utilities[i][1],
+                }
+                for i in range(len(self.rev_info))
+            }
+        )
+
     def add_sample(self, idx, status=None, **kwargs):
         sample = {"status": status, **kwargs}
         super().add_sample(idx, status, **kwargs)
@@ -1552,31 +1600,6 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             self.gemini.add_sample(
                 self.rev_info[idx].rev,
                 self.term_map.get(sample['status'], sample['status']),
-            )
-
-            prob = self.prob
-            if not prob:
-                # Prob can be None if the initial range verification is not
-                # complete yet.
-                # In theory, Gemini inference will not be involved at this
-                # moment, and the values will not be used by Gemini even passed
-                # to the agent class.
-                # Populate a [0, 1/(N-1), ....] as an in-theory value to the
-                # agent class.
-                prob = [0.0] + [1.0 / (len(self.rev_info) - 1)] * (
-                    len(self.rev_info) - 1
-                )
-            self.gemini.update_stats(
-                {
-                    self.rev_info[i].rev: {
-                        'status': {
-                            self.term_map.get(k, k): v
-                            for k, v in self.rev_info[i].result_counter.items()
-                        },
-                        'prob': prob[i],
-                    }
-                    for i in range(len(self.rev_info))
-                }
             )
 
             if self.rev_info[idx].rev in self._gemini_waiting_result:
@@ -1616,6 +1639,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             return list(self._gemini_waiting_result.keys())[0]
 
         if self.gemini and not self.is_done():
+            self._update_gemini_stats(cost_table=cost_table)
             gemini_reasoning = self.gemini.next(
                 list(self._gemini_waiting_result.values() or [None])[0]
             )

@@ -37,6 +37,21 @@ PROMPT = (
     'by reading changes, commits, and diffs within the culprit range to '
     'find better bisection point than midpoint at each step.\n'
     '\n'
+    'Each revision returned by get_range has an associated "stats" field '
+    'containing parameters from the underlying probability model. These statistics '
+    'are dynamic and will change after every test run. You can call get_range '
+    'again on-demand if you need to fetch the latest values.\n'
+    '\n'
+    'You must balance your code diff knowledge with the probability '
+    'model:\n'
+    '- If you are very confident in your code analysis (e.g., you find '
+    'a commit that obviously breaks the test), the probability model '
+    'can be ignored, and you can test or conclude that commit directly.\n'
+    '- If you have zero or low confidence in your code analysis, you '
+    'should move a step forward with the probability model (e.g., choose '
+    'the revision with high info_gain_per_cost or info_gain) to narrow '
+    'down the ranges, which can be better.\n'
+    '\n'
     'You have external functions available to use. '
     'You can call multiple independent query functions in parallel in a '
     'single turn (e.g., get_revision_detail, get_test_name, '
@@ -55,12 +70,21 @@ FUNCTIONS = [
         "description": (
             "Get all revisions and first line of commit message (aka subject) "
             "for these revisions from known bad to known good (aka newest to "
-            "oldest), inclusive on both end. Returns list of (rev_id, subject)."
-            " rev_id are unique string to identify a revision, similar to git "
-            "commit hash, but in different format.\n"
-            "In addition, it also returns run result history of past runs. The"
-            " run result history updates dynamically after every run. Calling "
-            "get_range again after run_at will have different run history."
+            "oldest), inclusive on both end. Returns list of dicts.\n"
+            "Each dict contains:\n"
+            "- 'rev_id': unique string to identify a revision.\n"
+            "- 'subject': first line of commit message.\n"
+            "- 'run_results': history of past test runs on this revision.\n"
+            "- 'stats': dict of probability model parameters:\n"
+            "  - 'prob': the probability that this revision is the culprit "
+            "(the first revision that introduces the regression).\n"
+            "  - 'info_gain': the expected decrease in entropy "
+            "(uncertainty) of the culprit range if you test this revision.\n"
+            "  - 'info_gain_per_cost': the info_gain divided by the estimated "
+            "cost (build + deploy + run time) of testing this revision.\n"
+            "Note that the run results and revision stats update dynamically "
+            "after every run. Calling get_range again after run_at will "
+            "return the updated values."
         ),
     },
     {
@@ -146,6 +170,8 @@ class ProbModelResultType(TypedDict):
 
     prob: float
     status: dict[str, int]
+    info_gain: float | None
+    info_gain_per_cost: float | None
 
 
 class GeminiAgent:
@@ -569,7 +595,22 @@ class BisectAgent:
         return self._conclusion
 
 
+def _get_simulated_cost_table(good, bad, prev_rev):
+    cost_table = []
+    for x in range(good, bad + 1):
+        if x == prev_rev:
+            # No build/deploy, only Tast run (PASS: 60s, FAIL: 30s)
+            cost_table.append((60.0, 30.0))
+        else:
+            # Incremental build & deploy (240s) + Tast run (PASS: 60s, FAIL: 30s)
+            cost_table.append((300.0, 270.0))
+    return cost_table
+
+
 def demo(testname, good, bad, culprit):
+    # pylint: disable=import-outside-toplevel
+    from bisect_kit import strategy
+
     agent = BisectAgent(
         testname,
         os.path.join(os.getenv('HOME'), 'bisect-workdir/test/chrome/src'),
@@ -580,15 +621,29 @@ def demo(testname, good, bad, culprit):
     stat = defaultdict(list)
     stat[good].append('PASS')
     stat[bad].append('FAIL')
+
+    prob = [
+        1.0 / (bad - good) if good < x <= bad else 0.0
+        for x in range(good, bad + 1)
+    ]
+    # The last run revision was 'bad'
+    cost_table = _get_simulated_cost_table(good, bad, bad)
+    # pylint: disable=protected-access
+    utilities = strategy.NoisyBinarySearch._calculate_utilities(
+        0.0, 1.0, prob, cost_table=cost_table
+    )
+
     agent.update_stats(
         {
             'refs/heads/main@{#%d}'
             % (x): {
-                'prob': (1.0 / (bad - good) if good < x <= bad else 0),
+                'prob': prob[x - good],
                 'status': {
                     'PASS': stat[x].count('PASS'),
                     'FAIL': stat[x].count('FAIL'),
                 },
+                'info_gain': utilities[x - good][0],
+                'info_gain_per_cost': utilities[x - good][1],
             }
             for x in range(good, bad + 1)
         }
@@ -607,19 +662,29 @@ def demo(testname, good, bad, culprit):
             now_good = max(good, now_good)
         stat[rev].append(status)
         agent.add_sample('refs/heads/main@{#%d}' % rev, status)
+
+        prob = [
+            1.0 / (now_bad - now_good) if now_good < x <= now_bad else 0.0
+            for x in range(good, bad + 1)
+        ]
+        # Current revision is 'rev'
+        cost_table = _get_simulated_cost_table(good, bad, rev)
+        # pylint: disable=protected-access
+        utilities = strategy.NoisyBinarySearch._calculate_utilities(
+            0.0, 1.0, prob, cost_table=cost_table
+        )
+
         agent.update_stats(
             {
                 'refs/heads/main@{#%d}'
                 % (x): {
-                    'prob': (
-                        1.0 / (now_bad - now_good)
-                        if now_good < x <= now_bad
-                        else 0
-                    ),
+                    'prob': prob[x - good],
                     'status': {
                         'PASS': stat[x].count('PASS'),
                         'FAIL': stat[x].count('FAIL'),
                     },
+                    'info_gain': utilities[x - good][0],
+                    'info_gain_per_cost': utilities[x - good][1],
                 }
                 for x in range(good, bad + 1)
             }

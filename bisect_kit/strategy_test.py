@@ -7,6 +7,7 @@
 import collections
 import random
 import unittest
+from unittest import mock
 
 from bisect_kit import core
 from bisect_kit import errors
@@ -1094,6 +1095,83 @@ class TestStates(unittest.TestCase):
         self.assertFalse(saved_bsearch.check_reproduced())
         # Make sure get_range() doesn't raise.
         self.assertEqual(saved_bsearch.get_range(), (0, 99))
+
+
+class TestGeminiFusionStrategy(unittest.TestCase):
+    """Test GeminiFusionStrategy class."""
+
+    def setUp(self):
+        self.rev_info = []
+        for i in range(10):
+            self.rev_info.append(core.RevInfo(str(i)))
+
+    def test_update_stats_provides_info_gain(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.next.return_value = None
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ):
+
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                oracle=(0.1, 0.9),
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            # Before bisection starts, state is INITED. Prob is None, utilities are None.
+            bsearch.add_sample(0, 'old')
+            bsearch.add_sample(9, 'new')
+
+            # We transition to STARTED, and self.prob is populated.
+            self.assertEqual(bsearch.state, bsearch.STARTED)
+
+            # Let's call next_idx to trigger _update_gemini_stats with cost_table
+            cost_table = [(1, 10)] * len(bsearch.rev_info)
+            bsearch.next_idx(cost_table=cost_table)
+
+            # Check that update_stats was called
+            self.assertTrue(mock_agent.update_stats.called)
+
+            # Retrieve the last call arguments
+            last_stats = mock_agent.update_stats.call_args[0][0]
+
+            # Check that 'info_gain' and 'info_gain_per_cost' are present in the stats
+            for rev in bsearch.rev_info:
+                rev_stats = last_stats[rev.rev]
+                self.assertIn('info_gain', rev_stats)
+                self.assertIn('info_gain_per_cost', rev_stats)
+                # Since prob is valid, info_gain and info_gain_per_cost should be floats
+                self.assertIsInstance(rev_stats['info_gain'], float)
+                self.assertIsInstance(rev_stats['info_gain_per_cost'], float)
+
+    def test_update_stats_with_gemini_suggestion(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.next.return_value = '5'
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ):
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                oracle=(0.1, 0.9),
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            bsearch.add_sample(0, 'old')
+            bsearch.add_sample(9, 'new')
+
+            # We transition to STARTED, and self.prob is populated.
+            self.assertEqual(bsearch.state, bsearch.STARTED)
+
+            idx = bsearch.next_idx()
+            self.assertEqual(idx, 5)
 
 
 if __name__ == '__main__':
