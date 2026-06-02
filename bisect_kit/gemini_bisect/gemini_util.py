@@ -27,7 +27,8 @@ GEMINI_API_KEY_SECRET_LOCATION = (
     'https://secretmanager.googleapis.com/'
     'v1/projects/43146777051/secrets/gemini-api-key/versions/latest'
 )
-MODEL = 'gemini-3-pro-preview'
+MODEL_GEMINI_3_5_FLASH = 'gemini-3.5-flash'
+MODEL_DEFAULT = MODEL_GEMINI_3_5_FLASH
 
 PROMPT = (
     "You're a Software Engineer investigating test regressions.\n"
@@ -218,7 +219,7 @@ class GeminiAgent:
         functions: functions that gemini can call.
         """
         self._prompt = prompt
-        self._model = model or MODEL
+        self._model = model or MODEL_DEFAULT
         try:
             credentials = self._get_credentials()
             session = google.auth.transport.requests.AuthorizedSession(
@@ -693,6 +694,7 @@ def demo(testname, good, bad, culprit):
         testname,
         os.path.join(os.getenv('HOME'), 'bisect-workdir/test/chrome/src'),
         ['refs/heads/main@{#%d}' % (x) for x in range(good, bad + 1)],
+        model=MODEL_GEMINI_3_5_FLASH,
     )
     agent.add_sample('refs/heads/main@{#%d}' % good, 'PASS')
     agent.add_sample('refs/heads/main@{#%d}' % bad, 'FAIL', reason=get_reason())
@@ -795,7 +797,6 @@ def demo(testname, good, bad, culprit):
 
 if __name__ == '__main__':
     # PoC purporse only (should replace with unittest)
-    MODEL = 'gemini-3.5-flash'
     logger.setLevel(logging.DEBUG)
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.DEBUG)
