@@ -1112,7 +1112,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
         with mock.patch(
             'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
             return_value=mock_agent,
-        ):
+        ) as mock_agent_class:
 
             bsearch = strategy.GeminiFusionStrategy(
                 self.rev_info,
@@ -1122,6 +1122,11 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 test_name='my_test',
                 source_root='my_root',
                 endpoint_verification=False,
+            )
+            mock_agent_class.assert_called_once_with(
+                'my_test',
+                'my_root',
+                [str(i) for i in range(10)],
             )
             # Before bisection starts, state is INITED. Prob is None, utilities are None.
             bsearch.add_sample(0, 'old')

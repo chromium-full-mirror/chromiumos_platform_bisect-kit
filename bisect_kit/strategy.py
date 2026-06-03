@@ -1550,7 +1550,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             self.gemini = gemini_util.BisectAgent(
                 test_name,
                 source_root,
-                [x.rev for x in self.rev_info[self.old_idx : self.new_idx]],
+                [x.rev for x in self.rev_info[self.old_idx : self.new_idx + 1]],
             )
 
     def _update_gemini_stats(self, cost_table=None):
