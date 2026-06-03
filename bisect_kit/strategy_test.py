@@ -1127,6 +1127,8 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 'my_test',
                 'my_root',
                 [str(i) for i in range(10)],
+                chromeos_mirror=None,
+                board=None,
             )
             # Before bisection starts, state is INITED. Prob is None, utilities are None.
             bsearch.add_sample(0, 'old')
@@ -1272,6 +1274,90 @@ class TestBisectAgent(unittest.TestCase):
                         'reason': 'Crashed with NullPointer',
                     }
                 ],
+            )
+
+    @mock.patch('google.auth.transport.requests.AuthorizedSession')
+    @mock.patch(
+        'google.oauth2.service_account.Credentials.from_service_account_file'
+    )
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    @mock.patch('bisect_kit.cros_util.build_revlist')
+    @mock.patch('bisect_kit.git_util.get_commit_metadata')
+    @mock.patch('bisect_kit.git_util.CommitMeta.get_summary')
+    @mock.patch('bisect_kit.git_util.git_show')
+    @mock.patch('os.path.exists')
+    def test_chromeos_streamlined_commits(
+        self,
+        mock_exists,
+        mock_git_show,
+        mock_get_summary,
+        _mock_get_metadata,
+        mock_build_revlist,
+        _mock_gemini_agent,
+        _mock_creds,
+        _mock_session,
+    ):
+        mock_exists.side_effect = (
+            lambda path: path.endswith('.git')
+            and 'my_cros_root/.git' not in path
+        )
+        mock_git_show.side_effect = (
+            lambda repo, commit: f"git show {commit} in {repo}"
+        )
+
+        details = {
+            'R149-16656.0.0-118296~R149-16656.0.0-118297/110': {
+                'actions': [
+                    {
+                        'action_type': 'commit',
+                        'commit_summary': 'fix: first bug in platform',
+                        'path': 'src/platform/bisect-kit',
+                        'repo_url': 'url1',
+                        'rev': 'commit_sha1',
+                    },
+                    {
+                        'action_type': 'commit',
+                        'commit_summary': 'fix: second bug in chromite',
+                        'path': 'src/chromite',
+                        'repo_url': 'url2',
+                        'rev': 'commit_sha256',
+                    },
+                ]
+            }
+        }
+        mock_build_revlist.return_value = (None, details)
+        mock_get_summary.return_value = 'fix: first bug in platform'
+
+        with mock.patch.dict(
+            'os.environ', {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'}
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='my_test',
+                repo='my_cros_root',
+                revlist=['R149-16656.0.0-118296~R149-16656.0.0-118297/110'],
+            )
+
+            # Test _get_revisions
+            revs = agent._get_revisions()
+            self.assertEqual(
+                revs[0]['rev_id'],
+                'R149-16656.0.0-118296~R149-16656.0.0-118297/110',
+            )
+            self.assertEqual(
+                revs[0]['repo'], 'my_cros_root/src/platform/bisect-kit'
+            )
+            self.assertEqual(revs[0]['subject'], 'fix: first bug in platform')
+
+            # Test _get_revision_detail
+            detail = agent._get_revision_detail(
+                'R149-16656.0.0-118296~R149-16656.0.0-118297/110'
+            )
+            self.assertEqual(
+                detail['repo'], 'my_cros_root/src/platform/bisect-kit'
+            )
+            self.assertEqual(
+                detail['git show'],
+                'git show commit_sha1 in my_cros_root/src/platform/bisect-kit',
             )
 
 

@@ -348,6 +348,8 @@ class BisectConfig(typing.TypedDict, total=False):
     clear: str
     future_build: list[str]
     chrome_root: str
+    chromeos_root: str
+    chromeos_mirror: str
 
 
 class DiagnoserConfig(typing.TypedDict, total=False):

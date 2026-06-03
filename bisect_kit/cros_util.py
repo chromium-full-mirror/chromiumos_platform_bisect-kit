@@ -39,6 +39,7 @@ import bisect_kit
 from bisect_kit import buildbucket_util
 from bisect_kit import chromite_util
 from bisect_kit import codechange
+from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import errors
 from bisect_kit import git_util
@@ -3960,3 +3961,47 @@ def assert_dut_cros_version(expected_version: str, dut: str):
         raise errors.DutLeaseException(
             'Someone else reflashed the DUT. DUT locking is not respected?'
         )
+
+
+def build_revlist(
+    chromeos_root: str,
+    old: str,
+    new: str,
+    chromeos_mirror: str | None = None,
+    board: str | None = None,
+):
+    """Build revlist for ChromeOS.
+
+    Args:
+      chromeos_root: root path of ChromeOS tree
+      old: old version
+      new: new version
+      chromeos_mirror: optional mirror path
+      board: optional board name
+
+    Returns:
+      (revlist, details):
+        revlist: list of rev string
+        details: dict of rev to rev detail
+    """
+    if chromeos_mirror is None:
+        chromeos_mirror = os.environ.get('CHROMEOS_MIRROR', '')
+
+    config = {
+        'chromeos_root': chromeos_root,
+        'chromeos_mirror': chromeos_mirror,
+        'board': board,
+    }
+    spec_manager = ChromeOSSpecManager(config)
+    cache = repo_util.RepoMirror(config['chromeos_mirror'])
+
+    session = os.environ.get('BISECT_SESSION', 'dummy_session')
+    session_cache_dir = common.get_session_cache_dir(session)
+
+    code_manager = codechange.CodeManager(
+        chromeos_root,
+        spec_manager,
+        cache,
+        session_cache_dir,
+    )
+    return code_manager.build_revlist(old, new)

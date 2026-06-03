@@ -10,11 +10,11 @@ import base64
 from collections import defaultdict
 import logging
 import os
-import re
 import sys
 from typing import Any, TypedDict, Union
 
 from bisect_kit import cr_util
+from bisect_kit import cros_util
 from bisect_kit import git_util
 from google import genai
 from google.api_core import retry
@@ -311,6 +311,12 @@ class GeminiAgent:
         return response
 
 
+def _get_git_repo_path(root: str, action_path: str) -> str:
+    if os.path.exists(os.path.join(root, '.git')):
+        return root
+    return os.path.join(root, action_path)
+
+
 class BisectAgent:
     """The agent that allows Gemini to analyze commit messages, diffs for
     smarter bisection."""
@@ -321,6 +327,8 @@ class BisectAgent:
         repo: str,
         revlist: list[str],
         model: str | None = None,
+        chromeos_mirror: str | None = None,
+        board: str | None = None,
     ):
         """Initializes BisectAgent.
 
@@ -338,21 +346,52 @@ class BisectAgent:
         self._pending_parts: list[genai.types.Part] = []
         self._pending_run_at_call: Any = None
 
-        # TODO(fqj): add support for ChromeOS CLs.
+        is_chrome = (
+            '@' in revlist[0]
+            or revlist[0].startswith('refs/')
+            or revlist[0].isdigit()
+        )
         rev2commit = {}
-        # Use build_revlist to generate revlist and commits fast.
-        _, details = cr_util.build_revlist(self._repo, revlist[0], revlist[-1])
-        for x in revlist:
-            rev2commit[x] = {
-                'repo': self._repo,
-                'commit': (
-                    details[x]['actions'][0]['rev']
-                    if x in details
-                    # In case of any bug, try to recover commit individually
-                    # build_revlist doesn't have this item
-                    else cr_util.query_git_rev_by_commit_position(self._repo, x)
-                ),
-            }
+        if is_chrome:
+            _, details = cr_util.build_revlist(
+                self._repo, revlist[0], revlist[-1]
+            )
+            for x in revlist:
+                rev2commit[x] = {
+                    'repo': self._repo,
+                    'commit': (
+                        details[x]['actions'][0]['rev']
+                        if x in details
+                        # In case of any bug, try to recover commit individually
+                        # build_revlist doesn't have this item
+                        else cr_util.query_git_rev_by_commit_position(
+                            self._repo, x
+                        )
+                    ),
+                }
+        else:
+            _, details = cros_util.build_revlist(
+                self._repo,
+                revlist[0],
+                revlist[-1],
+                chromeos_mirror=chromeos_mirror,
+                board=board,
+            )
+            for x in revlist:
+                rev2commit[x] = {
+                    'repo': (
+                        _get_git_repo_path(
+                            self._repo, details[x]['actions'][0]['path']
+                        )
+                        if x in details and details[x]['actions']
+                        else self._repo
+                    ),
+                    'commit': (
+                        details[x]['actions'][0]['rev']
+                        if x in details and details[x]['actions']
+                        else x
+                    ),
+                }
         self._rev2commit = rev2commit
 
     def _get_revisions(self, include_reason: bool = False) -> list[dict]:
@@ -366,15 +405,27 @@ class BisectAgent:
                 run_results = [
                     sample['status'] for sample in self._rev_samples[x]
                 ]
+            if self._rev2commit[x]['commit'] == x:
+                subject = f"Endpoint revision: {x}"
+            else:
+                try:
+                    subject = git_util.CommitMeta.get_summary(
+                        git_util.get_commit_metadata(
+                            self._rev2commit[x]['repo'],
+                            self._rev2commit[x]['commit'],
+                        )
+                    )
+                except Exception as e:
+                    logger.warning(
+                        'Failed to get commit metadata for %s: %s',
+                        self._rev2commit[x]['commit'],
+                        e,
+                    )
+                    subject = f"Revision {x}"
             rev_dict = {
                 'rev_id': x,
                 'repo': self._rev2commit[x]['repo'],
-                'subject': git_util.CommitMeta.get_summary(
-                    git_util.get_commit_metadata(
-                        self._rev2commit[x]['repo'],
-                        self._rev2commit[x]['commit'],
-                    )
-                ),
+                'subject': subject,
                 'run_results': run_results,
                 'stats': self._rev_stats.get(x),
             }
@@ -387,13 +438,28 @@ class BisectAgent:
         rev_id: the revision id.
 
         Returns the dict of revision detail."""
+        if self._rev2commit[rev_id]['commit'] == rev_id:
+            return {
+                'rev_id': rev_id,
+                'repo': self._rev2commit[rev_id]['repo'],
+                'git show': f"Endpoint revision {rev_id}",
+            }
+        try:
+            git_show_content = git_util.git_show(
+                self._rev2commit[rev_id]['repo'],
+                self._rev2commit[rev_id]['commit'],
+            )
+        except Exception as e:
+            logger.warning(
+                'Failed to git show for %s: %s',
+                self._rev2commit[rev_id]['commit'],
+                e,
+            )
+            git_show_content = f"Failed to git show: {e}"
         return {
             'rev_id': rev_id,
             'repo': self._rev2commit[rev_id]['repo'],
-            'git show': git_util.git_show(
-                self._rev2commit[rev_id]['repo'],
-                self._rev2commit[rev_id]['commit'],
-            ),
+            'git show': git_show_content,
         }
 
     def _short(self, d: Any) -> Any:
@@ -416,10 +482,13 @@ class BisectAgent:
                     ret[k] = self._short(v)
             return ret
         if isinstance(d, list):
-            if len(d) > 3:
+            if len(d) > 5:
+                mid = len(d) // 2
                 return [
                     self._short(d[0]),
-                    f'... and {len(d) - 2} more items ...',
+                    f'... and {mid - 1} more items ...',
+                    self._short(d[mid]),
+                    f'... and {len(d) - mid - 2} more items ...',
                     self._short(d[-1]),
                 ]
             return [self._short(x) for x in d]
@@ -653,7 +722,17 @@ def _get_simulated_cost_table(good, bad, prev_rev):
     return cost_table
 
 
-def demo(testname, good, bad, culprit):
+def demo(
+    testname,
+    good: str,
+    bad: str,
+    culprit: str,
+    disabled: bool = False,
+    board: str | None = None,
+):
+    if disabled:
+        return
+
     # pylint: disable=import-outside-toplevel
     import uuid
 
@@ -688,26 +767,53 @@ def demo(testname, good, bad, culprit):
                 'ancestor: {name: /^Files/, className: '
                 '/\\\\bBrowserWidget\\\\b/, role: window, first: true}}"'
             )
+        if testname == 'tast.video.CDMOEMCrypto.ce_cdm':
+            return (
+                'widevine_ce_cdm_hw_tests failed: signal: aborted (core dumped)'
+            )
         return None
+
+    is_chrome = '@' in good or good.startswith('refs/') or good.isdigit()
+    chromeos_mirror = os.path.join(
+        os.getenv('HOME'), 'git-mirrors-ext4/chromeos'
+    )
+    if is_chrome:
+        repo = os.path.join(os.getenv('HOME'), 'bisect-workdir/test/chrome/src')
+        revlist, _ = cr_util.build_revlist(repo, good, bad)
+    else:
+        repo = os.path.join(os.getenv('HOME'), 'bisect-workdir/test/chromeos')
+        revlist, _ = cros_util.build_revlist(
+            repo,
+            good,
+            bad,
+            chromeos_mirror=chromeos_mirror,
+            board=board,
+        )
+
+    culprit_idx = revlist.index(culprit)
 
     agent = BisectAgent(
         testname,
-        os.path.join(os.getenv('HOME'), 'bisect-workdir/test/chrome/src'),
-        ['refs/heads/main@{#%d}' % (x) for x in range(good, bad + 1)],
+        repo,
+        revlist,
         model=MODEL_GEMINI_3_5_FLASH,
+        chromeos_mirror=chromeos_mirror if not is_chrome else None,
+        board=board if not is_chrome else None,
     )
-    agent.add_sample('refs/heads/main@{#%d}' % good, 'PASS')
-    agent.add_sample('refs/heads/main@{#%d}' % bad, 'FAIL', reason=get_reason())
+    agent.add_sample(good, 'PASS')
+    agent.add_sample(bad, 'FAIL', reason=get_reason())
     stat = defaultdict(list)
     stat[good].append('PASS')
     stat[bad].append('FAIL')
 
     prob = [
-        1.0 / (bad - good) if good < x <= bad else 0.0
-        for x in range(good, bad + 1)
+        1.0 / (len(revlist) - 1) if 0 < x <= len(revlist) - 1 else 0.0
+        for x in range(len(revlist))
     ]
-    # The last run revision was 'bad'
-    cost_table = _get_simulated_cost_table(good, bad, bad)
+    # The last run revision was 'bad' (index len(revlist) - 1)
+    cost_table = _get_simulated_cost_table(
+        0, len(revlist) - 1, len(revlist) - 1
+    )
     # pylint: disable=protected-access
     utilities = strategy.NoisyBinarySearch._calculate_utilities(
         0.0, 1.0, prob, cost_table=cost_table
@@ -715,44 +821,45 @@ def demo(testname, good, bad, culprit):
 
     agent.update_stats(
         {
-            'refs/heads/main@{#%d}'
-            % (x): {
-                'prob': prob[x - good],
+            revlist[x]: {
+                'prob': prob[x],
                 'status': {
-                    'PASS': stat[x].count('PASS'),
-                    'FAIL': stat[x].count('FAIL'),
+                    'PASS': stat[revlist[x]].count('PASS'),
+                    'FAIL': stat[revlist[x]].count('FAIL'),
                 },
-                'info_gain': utilities[x - good][0],
-                'info_gain_per_cost': utilities[x - good][1],
+                'info_gain': utilities[x][0],
+                'info_gain_per_cost': utilities[x][1],
             }
-            for x in range(good, bad + 1)
+            for x in range(len(revlist))
         }
     )
     attempt = agent.next()
     runs_llm = 0
-    now_good, now_bad = good, bad
+    now_good_idx, now_bad_idx = 0, len(revlist) - 1
     while attempt:
-        rev = int(re.search(r'#(\d+)', attempt).group(1))
+        attempt_idx = revlist.index(attempt)
         runs_llm += 1
         run_reason = None
-        if rev >= culprit:
+        if attempt_idx >= culprit_idx:
             status = 'FAIL'
             run_reason = get_reason()
-            now_bad = min(bad, now_bad)
+            now_bad_idx = min(attempt_idx, now_bad_idx)
         else:
             status = 'PASS'
-            now_good = max(good, now_good)
-        stat[rev].append(status)
-        agent.add_sample(
-            'refs/heads/main@{#%d}' % rev, status, reason=run_reason
-        )
+            now_good_idx = max(attempt_idx, now_good_idx)
+        stat[attempt].append(status)
+        agent.add_sample(attempt, status, reason=run_reason)
 
         prob = [
-            1.0 / (now_bad - now_good) if now_good < x <= now_bad else 0.0
-            for x in range(good, bad + 1)
+            (
+                1.0 / (now_bad_idx - now_good_idx)
+                if now_good_idx < x <= now_bad_idx
+                else 0.0
+            )
+            for x in range(len(revlist))
         ]
-        # Current revision is 'rev'
-        cost_table = _get_simulated_cost_table(good, bad, rev)
+        # Current revision is 'attempt_idx'
+        cost_table = _get_simulated_cost_table(0, len(revlist) - 1, attempt_idx)
         # pylint: disable=protected-access
         utilities = strategy.NoisyBinarySearch._calculate_utilities(
             0.0, 1.0, prob, cost_table=cost_table
@@ -760,26 +867,25 @@ def demo(testname, good, bad, culprit):
 
         agent.update_stats(
             {
-                'refs/heads/main@{#%d}'
-                % (x): {
-                    'prob': prob[x - good],
+                revlist[x]: {
+                    'prob': prob[x],
                     'status': {
-                        'PASS': stat[x].count('PASS'),
-                        'FAIL': stat[x].count('FAIL'),
+                        'PASS': stat[revlist[x]].count('PASS'),
+                        'FAIL': stat[revlist[x]].count('FAIL'),
                     },
-                    'info_gain': utilities[x - good][0],
-                    'info_gain_per_cost': utilities[x - good][1],
+                    'info_gain': utilities[x][0],
+                    'info_gain_per_cost': utilities[x][1],
                 }
-                for x in range(good, bad + 1)
+                for x in range(len(revlist))
             }
         )
         attempt = agent.next({'status': status, 'reason': run_reason})
     runs_bisect = 0
-    low, high = good, bad
+    low, high = 0, len(revlist) - 1
     while high - low > 1:
         runs_bisect += 1
         mid = (low + high) // 2
-        if mid < culprit:
+        if mid < culprit_idx:
             low = mid
         else:
             high = mid
@@ -801,6 +907,28 @@ if __name__ == '__main__':
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.DEBUG)
     logger.addHandler(handler)
-    demo('tast.ui.WebUIJSErrors', 1416515, 1416531, 1416520)
-    demo('tast.a11y.Smoke', 1513012, 1513038, 1513018)
-    demo('tast.arc.RemovableMedia.vm', 1634593, 1634613, 1634610)
+    demo(
+        'tast.ui.WebUIJSErrors',
+        'refs/heads/main@{#1416515}',
+        'refs/heads/main@{#1416531}',
+        'refs/heads/main@{#1416520}',
+    )
+    demo(
+        'tast.a11y.Smoke',
+        'refs/heads/main@{#1513012}',
+        'refs/heads/main@{#1513038}',
+        'refs/heads/main@{#1513018}',
+    )
+    demo(
+        'tast.arc.RemovableMedia.vm',
+        'refs/heads/main@{#1634593}',
+        'refs/heads/main@{#1634613}',
+        'refs/heads/main@{#1634610}',
+    )
+    demo(
+        'tast.video.CDMOEMCrypto.ce_cdm',
+        'R149-16656.0.0-118296',
+        'R149-16656.0.0-118297',
+        'R149-16656.0.0-118296~R149-16656.0.0-118297/111',
+        board='volteer',
+    )

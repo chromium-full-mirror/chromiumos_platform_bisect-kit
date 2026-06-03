@@ -1531,6 +1531,8 @@ class GeminiFusionStrategy(NoisyBinarySearch):
         enable_gemini=False,
         test_name=None,
         source_root=None,
+        chromeos_mirror=None,
+        board=None,
         **kwargs,
     ):
         """
@@ -1540,6 +1542,8 @@ class GeminiFusionStrategy(NoisyBinarySearch):
           enable_gemini: should use gemini to analyze commit message and diffs.
           test_name: test name of the bisected test.
           source_root: root of the source tree bisected.
+          chromeos_mirror: optional ChromeOS mirror path.
+          board: optional board name.
         """
         super().__init__(*args, **kwargs)
 
@@ -1551,6 +1555,8 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 test_name,
                 source_root,
                 [x.rev for x in self.rev_info[self.old_idx : self.new_idx + 1]],
+                chromeos_mirror=chromeos_mirror,
+                board=board,
             )
 
     def _update_gemini_stats(self, cost_table=None):

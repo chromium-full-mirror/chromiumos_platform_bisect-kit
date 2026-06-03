@@ -26,6 +26,7 @@ import typing
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import core
+from bisect_kit import cros_util
 from bisect_kit import dut_manager
 from bisect_kit import errors
 from bisect_kit import math_util
@@ -1620,6 +1621,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
             ignore_history=ignore_history,
         )
         assert rev_info
+
         enable_gemini = bool(
             # Only enable gemini under experiments.
             # If experiment flag is ON,
@@ -1627,8 +1629,11 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 self.config.get('experiments', []),
                 experiment.ID.GEMINI_ASSIT,
             )
-            # and is bisecting Chrome
-            and self.config.get('new').startswith('refs/heads/main@')
+            # and is bisecting Chrome or ChromeOS
+            and (
+                self.config.get('new').startswith('refs/heads/main@')
+                or cros_util.is_cros_or_snapshot_version(self.config.get('new'))
+            )
             # and is regression from pass to fail
             and self.config.get('term_old') == 'PASS'
             and self.config.get('term_new') == 'FAIL'
@@ -1636,6 +1641,16 @@ class BisectorCommandLine(typing.Generic[T_co]):
             and self.config.get('noisy') == 'old=0/30,new=30/30'
         )
         if enable_gemini:
+            is_chrome = self.config.get('new').startswith('refs/heads/main@')
+            if is_chrome:
+                source_root = (
+                    os.path.join(self.config.get('chrome_root'), 'src')
+                    if self.config.get('chrome_root')
+                    else None
+                )
+            else:
+                source_root = self.config.get('chromeos_root')
+
             return strategy.GeminiFusionStrategy(
                 rev_info,
                 self.states.rev2idx(self.config.get('old')),
@@ -1652,14 +1667,9 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 ),
                 enable_gemini=enable_gemini,
                 test_name=self.config.get('test_name'),
-                source_root=(
-                    os.path.join(self.config.get('chrome_root'), 'src')
-                    if (
-                        self.config.get('new').startswith('refs/heads/main@')
-                        and self.config.get('chrome_root')
-                    )
-                    else None
-                ),
+                source_root=source_root,
+                chromeos_mirror=self.config.get('chromeos_mirror'),
+                board=self.config.get('board'),
             )
 
         return strategy.NoisyBinarySearch(
