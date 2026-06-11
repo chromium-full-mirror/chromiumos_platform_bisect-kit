@@ -168,6 +168,14 @@ def patch_cls(chrome_src: str, chromium_patch_cls: list[str]):
 
         git_util.fetch(chrome_src, gerrit_repo_url, gerrit_revision_ref)
 
+        if git_util.is_ancestor_commit(chrome_src, "FETCH_HEAD", "HEAD"):
+            logger.info(
+                'The chromium CL (%s) is already merged to HEAD. '
+                'Skipping the cherry-pick.',
+                cl,
+            )
+            continue
+
         try:
             git_util.cherry_pick(chrome_src, "FETCH_HEAD")
         except subprocess.CalledProcessError as exc:

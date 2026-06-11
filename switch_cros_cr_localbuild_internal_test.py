@@ -36,9 +36,10 @@ class TestPatchCls(unittest.TestCase):
 
     @mock.patch.object(gerrit_util, 'get_gerrit_cl_info')
     @mock.patch.object(git_util, 'fetch')
+    @mock.patch.object(git_util, 'is_ancestor_commit')
     @mock.patch.object(git_util, 'cherry_pick')
     def test_patch_single_cl_success(
-        self, mock_cherry_pick, mock_fetch, mock_get_info
+        self, mock_cherry_pick, mock_is_ancestor, mock_fetch, mock_get_info
     ):
         """Tests successful application of a single CL."""
         cl_number = "12345"
@@ -57,6 +58,7 @@ class TestPatchCls(unittest.TestCase):
                 }
             },
         }
+        mock_is_ancestor.return_value = False
 
         switch_cros_cr_localbuild_internal.patch_cls(
             self.chrome_src_path, chromium_patch_cls
@@ -68,20 +70,25 @@ class TestPatchCls(unittest.TestCase):
             "https://chromium.googlesource.com/chromium/src.git",
             "refs/changes/45/12345/1",
         )
+        mock_is_ancestor.assert_called_once_with(
+            self.chrome_src_path, "FETCH_HEAD", "HEAD"
+        )
         mock_cherry_pick.assert_called_once_with(
             self.chrome_src_path, "FETCH_HEAD"
         )
 
     @mock.patch.object(gerrit_util, 'get_gerrit_cl_info')
     @mock.patch.object(git_util, 'fetch')
+    @mock.patch.object(git_util, 'is_ancestor_commit')
     @mock.patch.object(git_util, 'cherry_pick')
     def test_patch_multiple_cls_success(
-        self, mock_cherry_pick, mock_fetch, mock_get_info
+        self, mock_cherry_pick, mock_is_ancestor, mock_fetch, mock_get_info
     ):
         """Tests successful application of multiple CLs."""
         cl1 = "123"
         cl2 = "456"
         chromium_patch_cls = [cl1, cl2]
+        mock_is_ancestor.return_value = False
 
         def get_info_side_effect(cl_num):
             if cl_num == cl1:
@@ -120,8 +127,54 @@ class TestPatchCls(unittest.TestCase):
         mock_fetch.assert_any_call(self.chrome_src_path, "url1", "ref1")
         mock_fetch.assert_any_call(self.chrome_src_path, "url2", "ref2")
 
+        self.assertEqual(mock_is_ancestor.call_count, 2)
+        mock_is_ancestor.assert_any_call(
+            self.chrome_src_path, "FETCH_HEAD", "HEAD"
+        )
+
         self.assertEqual(mock_cherry_pick.call_count, 2)
         mock_cherry_pick.assert_any_call(self.chrome_src_path, "FETCH_HEAD")
+
+    @mock.patch.object(gerrit_util, 'get_gerrit_cl_info')
+    @mock.patch.object(git_util, 'fetch')
+    @mock.patch.object(git_util, 'is_ancestor_commit')
+    @mock.patch.object(git_util, 'cherry_pick')
+    def test_patch_cl_already_merged(
+        self, mock_cherry_pick, mock_is_ancestor, mock_fetch, mock_get_info
+    ):
+        """Tests that cherry-pick is skipped if CL is already merged."""
+        cl_number = "12345"
+        chromium_patch_cls = [cl_number]
+        mock_get_info.return_value = {
+            "project": "chromium/src",
+            "current_revision": "deadbeef",
+            "revisions": {
+                "deadbeef": {
+                    "fetch": {
+                        "http": {
+                            "url": "https://chromium.googlesource.com/chromium/src.git",
+                            "ref": "refs/changes/45/12345/1",
+                        }
+                    }
+                }
+            },
+        }
+        mock_is_ancestor.return_value = True
+
+        switch_cros_cr_localbuild_internal.patch_cls(
+            self.chrome_src_path, chromium_patch_cls
+        )
+
+        mock_get_info.assert_called_once_with(cl_number)
+        mock_fetch.assert_called_once_with(
+            self.chrome_src_path,
+            "https://chromium.googlesource.com/chromium/src.git",
+            "refs/changes/45/12345/1",
+        )
+        mock_is_ancestor.assert_called_once_with(
+            self.chrome_src_path, "FETCH_HEAD", "HEAD"
+        )
+        mock_cherry_pick.assert_not_called()
 
     @mock.patch.object(gerrit_util, 'get_gerrit_cl_info')
     def test_patch_cl_fetch_info_fails(self, mock_get_info):
@@ -141,9 +194,10 @@ class TestPatchCls(unittest.TestCase):
 
     @mock.patch.object(gerrit_util, 'get_gerrit_cl_info')
     @mock.patch.object(git_util, 'fetch')
+    @mock.patch.object(git_util, 'is_ancestor_commit')
     @mock.patch.object(git_util, 'cherry_pick')
     def test_patch_cl_cherry_pick_fails(
-        self, mock_cherry_pick, mock_fetch, mock_get_info
+        self, mock_cherry_pick, mock_is_ancestor, mock_fetch, mock_get_info
     ):
         """Tests failure during cherry-pick."""
         cl_number = "12345"
@@ -155,6 +209,7 @@ class TestPatchCls(unittest.TestCase):
                 "deadbeef": {"fetch": {"http": {"url": "url", "ref": "ref"}}}
             },
         }
+        mock_is_ancestor.return_value = False
         mock_cherry_pick.side_effect = subprocess.CalledProcessError(
             1, "git cherry-pick"
         )
@@ -169,6 +224,9 @@ class TestPatchCls(unittest.TestCase):
 
         mock_get_info.assert_called_once_with(cl_number)
         mock_fetch.assert_called_once_with(self.chrome_src_path, "url", "ref")
+        mock_is_ancestor.assert_called_once_with(
+            self.chrome_src_path, "FETCH_HEAD", "HEAD"
+        )
         mock_cherry_pick.assert_called_once_with(
             self.chrome_src_path, "FETCH_HEAD"
         )
