@@ -239,6 +239,8 @@ def switch_main(args: tuple[str] | None):
         if opts.chromium_patch_cl:
             logger.info('patching the custom CLs: %s', opts.chromium_patch_cl)
             patch_cls(opts.chrome_src, opts.chromium_patch_cl)
+            logger.info('sync dependencies for the patched DEPS')
+            gclient_util.sync(opts.chrome_root)
 
     if not opts.no_build:
         if opts.deploy_method == 'chrome_deploy':

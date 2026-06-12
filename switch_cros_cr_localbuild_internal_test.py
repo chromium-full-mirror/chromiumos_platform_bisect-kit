@@ -307,7 +307,13 @@ class TestSwitchMain(unittest.TestCase):
 
         switch_cros_cr_localbuild_internal.switch_main(args)
 
-        mock_sync.assert_called_once()
+        self.assertEqual(mock_sync.call_count, 2)
+        mock_sync.assert_has_calls(
+            [
+                mock.call(self.chrome_root, revision=self.CHROME_REVISION),
+                mock.call(self.chrome_root),
+            ]
+        )
         mock_patch_cls.assert_called_once_with(self.chrome_src, [CL_NUMBER])
 
     @mock.patch(
