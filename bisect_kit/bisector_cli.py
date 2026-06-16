@@ -1637,8 +1637,6 @@ class BisectorCommandLine(typing.Generic[T_co]):
             # and is regression from pass to fail
             and self.config.get('term_old') == 'PASS'
             and self.config.get('term_new') == 'FAIL'
-            # without flakiness
-            and self.config.get('noisy') == 'old=0/30,new=30/30'
         )
         if enable_gemini:
             is_chrome = self.config.get('new').startswith('refs/heads/main@')
