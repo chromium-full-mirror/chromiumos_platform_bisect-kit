@@ -441,6 +441,62 @@ class TestCrosDiagnoser(unittest.TestCase):
         self.assertIn('--gn-extra-args', cmd)
         self.assertIn('dcheck_always_on=true', cmd)
 
+    @mock.patch('bisect_kit.diagnoser_cros.buildbucket_util.BuildbucketApi')
+    @mock.patch('bisect_kit.diagnoser_cros.cros_util.is_buildbucket_buildable')
+    @mock.patch.object(
+        diagnoser_cros.CrosDiagnoser, 'narrow_down_chromeos_localbuild'
+    )
+    @mock.patch('bisect_kit.diagnoser_cros.cros_util.version_to_short')
+    def test_diagnose_fallback_to_localbuild_when_no_builder(
+        self,
+        mock_version_to_short,
+        mock_narrow_down_chromeos_localbuild,
+        mock_is_buildbucket_buildable,
+        mock_buildbucket_api_cls,
+    ):
+        # Setup
+        self.config['enable_buildbucket_chrome'] = True
+        self.config['disable_buildbucket_chromeos'] = False
+        mock_version_to_short.return_value = '1.2.3'
+        mock_is_buildbucket_buildable.return_value = True
+
+        # Mock BuildbucketApi singleton instance
+        mock_api_instance = mock_buildbucket_api_cls.return_value
+        mock_api_instance.has_builder.return_value = False
+
+        # Mock other steps to avoid running them
+        with mock.patch.object(
+            self.diagnoser, 'narrow_down_chromeos_prebuilt'
+        ), mock.patch.object(
+            self.diagnoser, 'narrow_down_android'
+        ) as mock_narrow_down_android, mock.patch.object(
+            self.diagnoser, 'narrow_down_dlc_prebuilt'
+        ) as mock_narrow_down_dlc, mock.patch(
+            'bisect_kit.diagnoser_cros.run_switch_or_eval_cmd'
+        ):
+            mock_narrow_down_android.return_value = False
+            mock_narrow_down_dlc.return_value = False
+
+            # pylint: disable=protected-access
+            self.diagnoser._diagnose(
+                is_autotest=False,
+                switch_test_harness_cmd=None,
+                cros_prebuilt_eval_cmd=[],
+                android_prebuilt_eval_cmd=[],
+                chrome_localbuild_eval_cmd=[],
+                should_build_chrome_localbuild_with_tests=True,
+                cros_localbuild_eval_cmd=['eval_cros'],
+            )
+
+        # Verify BuildbucketApi().has_builder was called with the board
+        mock_api_instance.has_builder.assert_called_with('eve')
+
+        # Verify ChromeOS bisection was called with buildbucket_build=False (3rd arg)
+        mock_narrow_down_chromeos_localbuild.assert_called_once()
+        args, _ = mock_narrow_down_chromeos_localbuild.call_args
+        # args[0] is dut_manager, args[1] is eval_cmd, args[2] is buildbucket_build
+        self.assertFalse(args[2])
+
 
 if __name__ == '__main__':
     unittest.main()

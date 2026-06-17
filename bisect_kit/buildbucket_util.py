@@ -30,6 +30,8 @@ from google.protobuf.message import DecodeError
 from google.protobuf.timestamp_pb2 import Timestamp
 from infra_libs.buildbucket.proto.build_pb2 import Build
 from infra_libs.buildbucket.proto.builder_pb2 import BuilderID
+from infra_libs.buildbucket.proto.builder_pb2 import BuilderItem
+from infra_libs.buildbucket.proto.builder_service_pb2 import GetBuilderRequest
 from infra_libs.buildbucket.proto.builds_service_pb2 import BuildPredicate
 from infra_libs.buildbucket.proto.builds_service_pb2 import CancelBuildRequest
 from infra_libs.buildbucket.proto.builds_service_pb2 import GetBuildRequest
@@ -86,7 +88,6 @@ class BuildbucketApi:
     ]
     buildbucket_domain = 'cr-buildbucket.appspot.com'
     buildbucket_domain_url = 'https://cr-buildbucket.appspot.com/'
-    buildbucket_api_path = '/prpc/buildbucket.v2.Builds/'
     cas_instance = 'chromeos-swarming'
     token_cache = os.path.expanduser('~/.isolated_oauth')
 
@@ -187,7 +188,7 @@ class BuildbucketApi:
             'Authorization': 'Bearer %s' % self._get_token(),
         }
 
-    def _post(self, api, request, return_class, timeout=10):
+    def _post(self, api, request, return_class, timeout=10, service='Builds'):
         """Post a rpc request to buildbucket server.
 
         Args:
@@ -195,6 +196,7 @@ class BuildbucketApi:
           request: A protobuf object.
           return_class: A protobuf class that catches api's return.
           timeout: connection timeout in seconds, default to 10.
+          service: The buildbucket service to call ("Builds" or "Builders").
 
         Returns:
           A `return_class` object.
@@ -202,6 +204,8 @@ class BuildbucketApi:
         Raises:
           errors.ExternalError: api request fail
         """
+        assert service in ("Builds", "Builders")
+
         max_retries = 5
         response_content = None
         while max_retries > 0:
@@ -212,7 +216,7 @@ class BuildbucketApi:
                 )
                 conn.request(
                     'POST',
-                    self.buildbucket_api_path + api,
+                    f'/prpc/buildbucket.v2.{service}/{api}',
                     request.SerializeToString(),
                     self._get_header(),
                 )
@@ -272,6 +276,32 @@ class BuildbucketApi:
         field_mask = FieldMask(paths=self._build_fields)
         request = GetBuildRequest(id=buildbucket_id, fields=field_mask)
         return self._post('GetBuild', request, Build)
+
+    def has_builder(self, board: str, bucket: str = 'bisector') -> bool:
+        """Check if a builder exists.
+
+        Args:
+          board: ChromeOS board name.
+          bucket: Bucket name.
+
+        Returns:
+          True if the builder exists, False otherwise.
+        """
+        builder_name = f'{board}-{bucket}'
+        req = GetBuilderRequest(
+            id=BuilderID(
+                project='chromeos',
+                bucket=bucket,
+                builder=builder_name,
+            )
+        )
+        try:
+            self._post('GetBuilder', req, BuilderItem, service='Builders')
+            return True
+        except errors.BuildError as e:
+            if 'requested resource not found' in str(e):
+                return False
+            raise
 
     def search_and_schedule_build(
         self,

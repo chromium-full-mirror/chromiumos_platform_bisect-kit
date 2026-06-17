@@ -18,6 +18,7 @@ from typing import Optional
 
 from bisect_kit import android_util
 from bisect_kit import bisector_cli
+from bisect_kit import buildbucket_util
 from bisect_kit import cli
 from bisect_kit import common
 from bisect_kit import core
@@ -584,6 +585,9 @@ class CrosDiagnoser:
         use_buildbucket_build_for_cros = (
             buildbucket_buildable
             and not self.config.get('disable_buildbucket_chromeos')
+            and buildbucket_util.BuildbucketApi().has_builder(
+                self.config.get('board')
+            )
         )
         if not self.is_vm_board:
             vm_image_type = None
