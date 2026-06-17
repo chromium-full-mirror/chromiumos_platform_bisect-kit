@@ -752,6 +752,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
                     'status': status,
                 }
                 states_copy = copy.deepcopy(states)
+                # TODO(b/516650420): Let Gemini predict future builds during lookahead
+                # instead of falling back to standard NoisyBinarySearch.
                 strategy_copy = copy.deepcopy(bisector_strategy)
 
                 try:
@@ -1621,7 +1623,6 @@ class BisectorCommandLine(typing.Generic[T_co]):
             ignore_history=ignore_history,
         )
         assert rev_info
-
         enable_gemini = bool(
             # Only enable gemini under experiments.
             # If experiment flag is ON,

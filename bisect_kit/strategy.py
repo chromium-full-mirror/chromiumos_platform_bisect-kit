@@ -4,6 +4,7 @@
 
 """The binary search algorithm."""
 
+import copy
 import logging
 import math
 import re
@@ -1558,6 +1559,21 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 chromeos_mirror=chromeos_mirror,
                 board=board,
             )
+
+    def __deepcopy__(self, memo):
+        # TODO(b/516650420): Let Gemini predict future builds during lookahead
+        # instead of falling back to standard NoisyBinarySearch.
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k == 'gemini':
+                setattr(result, k, None)
+            elif k == '_gemini_waiting_result':
+                setattr(result, k, {})
+            else:
+                setattr(result, k, copy.deepcopy(v, memo))
+        return result
 
     def _update_gemini_stats(self, cost_table=None):
         if not self.gemini:

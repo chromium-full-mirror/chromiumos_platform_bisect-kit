@@ -5,6 +5,7 @@
 """Test strategy module."""
 
 import collections
+import copy
 import random
 import unittest
 from unittest import mock
@@ -1208,6 +1209,25 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             mock_agent.add_sample.assert_any_call(
                 '5', 'new', reason='Test crashed with null pointer'
             )
+
+    def test_deepcopy(self):
+        mock_agent = mock.MagicMock()
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ):
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                oracle=(0.1, 0.9),
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            bsearch_copy = copy.deepcopy(bsearch)
+            self.assertIsNone(bsearch_copy.gemini)
+            self.assertEqual(bsearch_copy._gemini_waiting_result, {})
 
 
 class TestBisectAgent(unittest.TestCase):
