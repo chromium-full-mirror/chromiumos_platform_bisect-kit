@@ -2435,11 +2435,21 @@ def cros_sdk(
     # This is the hack to run dummy command once, so we can get clean output for
     # the command we are interested.
     cmd = prefix + ['true']
+    stderr_lines: list[str] = []
     try:
-        chromite_util.check_call(*cmd, cwd=chromeos_root)
-    except subprocess.CalledProcessError:
-        logger.exception('cros_sdk init/update failed')
-        raise
+        chromite_util.check_output(
+            *cmd,
+            cwd=chromeos_root,
+            stderr_callback=stderr_lines.append,
+        )
+    except subprocess.CalledProcessError as e:
+        # Extract the last line of stderr if any, since it normally contains
+        # the error message from `cros_sdk` command.
+        error_message = stderr_lines[-1] if stderr_lines else ""
+        logger.exception('cros_sdk init/update failed: %s', error_message)
+        raise errors.InternalError(
+            f'cros_sdk init/update failed: {error_message}'
+        ) from e
 
     if not args:
         return ''
