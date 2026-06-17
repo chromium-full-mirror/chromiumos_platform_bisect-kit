@@ -4,7 +4,7 @@
 
 """Utility functions to get lease info from Scheduke."""
 
-import urllib
+import urllib.request
 
 from bisect_kit import util
 from chromiumos.config.proto.chromiumos.test.scheduling import task_state_pb2
