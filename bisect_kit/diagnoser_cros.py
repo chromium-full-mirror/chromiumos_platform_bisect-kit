@@ -1473,6 +1473,7 @@ class CrosDiagnoser:
             recompute_init_values=self.config.get('recompute_init_values'),
             noisy=self.noisy,
             endpoint_verification=self.config.get('endpoint_verification'),
+            experiments=self.config.get('experiments'),
         )
 
         try:
