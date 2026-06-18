@@ -1575,6 +1575,12 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 setattr(result, k, copy.deepcopy(v, memo))
         return result
 
+    def _rev_to_idx(self, rev: str) -> int:
+        for idx, r in enumerate(self.rev_info):
+            if r.rev == rev:
+                return idx
+        raise ValueError(f"Revision {rev} not found in rev_info")
+
     def _update_gemini_stats(self, cost_table=None):
         if not self.gemini:
             return
@@ -1664,7 +1670,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             # We should always return previous reasoning until run result is
             # provided. next_idx may be called multiple times by different
             # callers in one iteration.
-            return list(self._gemini_waiting_result.keys())[0]
+            return self._rev_to_idx(list(self._gemini_waiting_result.keys())[0])
 
         if self.gemini and not self.is_done():
             self._update_gemini_stats(cost_table=cost_table)
@@ -1675,11 +1681,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             if gemini_reasoning:
                 self._gemini_waiting_result = {gemini_reasoning: None}
                 logger.info('Gemini suggested %s', gemini_reasoning)
-                return list(
-                    idx
-                    for idx, rev in enumerate(self.rev_info)
-                    if rev.rev == gemini_reasoning
-                )[0]
+                return self._rev_to_idx(gemini_reasoning)
 
         return self._next_idx_by_utility(
             self.old_p, self.new_p, self.prob, cost_table

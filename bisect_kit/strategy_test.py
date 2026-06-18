@@ -1181,6 +1181,8 @@ class TestGeminiFusionStrategy(unittest.TestCase):
 
             idx = bsearch.next_idx()
             self.assertEqual(idx, 5)
+            idx2 = bsearch.next_idx()
+            self.assertEqual(idx2, 5)
 
     def test_failure_reason_handling(self):
         mock_agent = mock.MagicMock()
