@@ -10,9 +10,11 @@ import base64
 from collections import defaultdict
 import logging
 import os
+import random
 import sys
 from typing import Any, TypedDict, Union
 
+from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_util
 from bisect_kit import git_util
@@ -38,6 +40,23 @@ PROMPT = (
     'by reading changes, commits, and diffs within the culprit range to '
     'find better bisection point than midpoint at each step.\n'
     '\n'
+    'Tests may be flaky. The get_range call returns flaky rates "old_p" (the '
+    'probability of observing FAIL/new behavior on a good/old commit) and '
+    '"new_p" (the probability of observing FAIL/new behavior on a bad/new '
+    'commit). Because tests can be flaky, you may choose to run a single commit '
+    'multiple times (calling run_at on the same revision again) or test the same '
+    'commit later to gain higher statistical confidence. Note that when "old_p" '
+    'is non-zero, a good commit can hit an unlucky streak of FAILs, causing '
+    '"likelihood_new" to climb high (e.g. 80-90%). Conversely, a single PASS '
+    'is strong proof that the commit is good/old. Therefore, do not blindly '
+    'trust a high likelihood_new after a few FAILs; if you suspect a boundary '
+    'commit might be a flaky good commit, re-test it on the device (zero build/deploy '
+    'cost!) to see if it can produce a PASS.\n'
+    '\n'
+    'Be aware of execution cost: switching to a different commit requires '
+    'rebuilding and deploying code, which takes significantly more time '
+    'than re-running the test on the currently deployed commit.\n'
+    '\n'
     'Each revision returned by get_range has an associated "stats" field '
     'containing parameters from the underlying probability model. These '
     'statistics are dynamic and will change after every test run. You '
@@ -47,6 +66,13 @@ PROMPT = (
     'run_results with dictionaries containing the status and the test '
     'failure reason (representing the error logs or timeout output from the '
     'test execution if it failed).\n'
+    '\n'
+    'The run_at function returns a dictionary containing the test run "status", '
+    'optional "reason", and "likelihood_new" (a float between 0.0 and 1.0 '
+    'representing the likelihood of this commit having the "new/FAIL" '
+    'behavior based on all past test run history; note that this is NOT the '
+    'probability of this commit being the culprit, but rather the cumulative '
+    'probability that the regression was introduced at or before this commit).\n'
     '\n'
     'You must balance your code diff knowledge with the probability '
     'model:\n'
@@ -76,8 +102,10 @@ FUNCTIONS = [
         "description": (
             "Get all revisions and first line of commit message (aka subject) "
             "for these revisions from known bad to known good (aka newest to "
-            "oldest), inclusive on both end. Returns list of dicts.\n"
-            "Each dict contains:\n"
+            "oldest), inclusive on both end. Returns a dictionary containing "
+            "'revisions' (list of dicts), 'old_p' (flaky failure probability on "
+            "good commits), and 'new_p' (failure probability on bad commits).\n"
+            "Each revision dict contains:\n"
             "- 'rev_id': unique string to identify a revision.\n"
             "- 'subject': first line of commit message.\n"
             "- 'run_results': history of past test runs on this revision. "
@@ -137,9 +165,13 @@ FUNCTIONS = [
         "name": "run_at",
         "description": (
             "Run the test at given commit. Returns a dictionary containing "
-            "the status (e.g., 'PASS', 'FAIL') and optionally a 'reason' "
+            "the status (e.g., 'PASS', 'FAIL'), optionally a 'reason' "
             "key containing the test failure output or error log if the "
-            "run failed."
+            "run failed, and 'likelihood_new' (a float between 0.0 and 1.0) "
+            "representing the likelihood of this commit having the 'new/FAIL' "
+            "behavior based on all past test run history (the cumulative "
+            "probability that the culprit is at or before this commit; this is "
+            "NOT the probability of this commit itself being the culprit)."
         ),
         "parameters": {
             "type": "object",
@@ -190,11 +222,12 @@ def _is_retriable_gemini_error(e) -> bool:
     return False
 
 
-class TrialResult(TypedDict):
+class TrialResult(TypedDict, total=False):
     """Type annotation for a single run trial result."""
 
     status: str
     reason: str | None
+    likelihood_new: float | None
 
 
 NestedDict = dict[str, Union[str, int, 'NestedDict']]
@@ -329,6 +362,8 @@ class BisectAgent:
         model: str | None = None,
         chromeos_mirror: str | None = None,
         board: str | None = None,
+        old_p: float = 0.0,
+        new_p: float = 1.0,
     ):
         """Initializes BisectAgent.
 
@@ -342,6 +377,8 @@ class BisectAgent:
         self._revlist = revlist
         self._rev_samples: dict[str, list[TrialResult]] = defaultdict(list)
         self._rev_stats: dict[str, ProbModelResultType] = {}
+        self._old_p = old_p
+        self._new_p = new_p
         self._conclusion: str | None = None
         self._pending_parts: list[genai.types.Part] = []
         self._pending_run_at_call: Any = None
@@ -567,7 +604,9 @@ class BisectAgent:
                                 response={
                                     'revisions': self._get_revisions(
                                         include_reason
-                                    )
+                                    ),
+                                    'old_p': self._old_p,
+                                    'new_p': self._new_p,
                                 },
                             )
                         )
@@ -681,11 +720,20 @@ class BisectAgent:
         status: status of a run."""
         self._rev_samples[rev].append({'status': status, 'reason': reason})
 
-    def update_stats(self, stats: dict[str, ProbModelResultType]):
+    def update_stats(
+        self,
+        stats: dict[str, ProbModelResultType],
+        old_p: float | None = None,
+        new_p: float | None = None,
+    ):
         """Updates prob model stats
 
         stats: new stats."""
         self._rev_stats = stats
+        if old_p is not None:
+            self._old_p = old_p
+        if new_p is not None:
+            self._new_p = new_p
 
     def next(self, status: TrialResult | None = None) -> str | None:
         """Returns the next target revision for bisector to run."""
@@ -729,6 +777,8 @@ def demo(
     culprit: str,
     disabled: bool = False,
     board: str | None = None,
+    sim_old_p: float = 0.0,
+    sim_new_p: float = 1.0,
 ):
     if disabled:
         return
@@ -799,6 +849,8 @@ def demo(
         model=MODEL_GEMINI_3_5_FLASH,
         chromeos_mirror=chromeos_mirror if not is_chrome else None,
         board=board if not is_chrome else None,
+        old_p=sim_old_p,
+        new_p=sim_new_p,
     )
     agent.add_sample(good, 'PASS')
     agent.add_sample(bad, 'FAIL', reason=get_reason())
@@ -806,17 +858,23 @@ def demo(
     stat[good].append('PASS')
     stat[bad].append('FAIL')
 
-    prob = [
-        1.0 / (len(revlist) - 1) if 0 < x <= len(revlist) - 1 else 0.0
-        for x in range(len(revlist))
-    ]
+    bsearch = strategy.NoisyBinarySearch(
+        [core.RevInfo(x) for x in revlist],
+        old_idx=0,
+        new_idx=len(revlist) - 1,
+        oracle=(sim_old_p, sim_new_p),
+    )
+    bsearch.add_sample(0, 'old')
+    bsearch.add_sample(len(revlist) - 1, 'new')
+    prob = bsearch.prob
+
     # The last run revision was 'bad' (index len(revlist) - 1)
     cost_table = _get_simulated_cost_table(
         0, len(revlist) - 1, len(revlist) - 1
     )
     # pylint: disable=protected-access
     utilities = strategy.NoisyBinarySearch._calculate_utilities(
-        0.0, 1.0, prob, cost_table=cost_table
+        sim_old_p, sim_new_p, prob, cost_table=cost_table
     )
 
     agent.update_stats(
@@ -831,38 +889,36 @@ def demo(
                 'info_gain_per_cost': utilities[x][1],
             }
             for x in range(len(revlist))
-        }
+        },
+        old_p=sim_old_p,
+        new_p=sim_new_p,
     )
     attempt = agent.next()
     runs_llm = 0
-    now_good_idx, now_bad_idx = 0, len(revlist) - 1
     while attempt:
         attempt_idx = revlist.index(attempt)
         runs_llm += 1
         run_reason = None
-        if attempt_idx >= culprit_idx:
+        is_fail = (
+            random.random() < sim_new_p
+            if attempt_idx >= culprit_idx
+            else random.random() < sim_old_p
+        )
+        if is_fail:
             status = 'FAIL'
             run_reason = get_reason()
-            now_bad_idx = min(attempt_idx, now_bad_idx)
         else:
             status = 'PASS'
-            now_good_idx = max(attempt_idx, now_good_idx)
         stat[attempt].append(status)
         agent.add_sample(attempt, status, reason=run_reason)
 
-        prob = [
-            (
-                1.0 / (now_bad_idx - now_good_idx)
-                if now_good_idx < x <= now_bad_idx
-                else 0.0
-            )
-            for x in range(len(revlist))
-        ]
+        bsearch.add_sample(attempt_idx, 'old' if status == 'PASS' else 'new')
+        prob = bsearch.prob
         # Current revision is 'attempt_idx'
         cost_table = _get_simulated_cost_table(0, len(revlist) - 1, attempt_idx)
         # pylint: disable=protected-access
         utilities = strategy.NoisyBinarySearch._calculate_utilities(
-            0.0, 1.0, prob, cost_table=cost_table
+            sim_old_p, sim_new_p, prob, cost_table=cost_table
         )
 
         agent.update_stats(
@@ -877,18 +933,33 @@ def demo(
                     'info_gain_per_cost': utilities[x][1],
                 }
                 for x in range(len(revlist))
+            },
+            old_p=sim_old_p,
+            new_p=sim_new_p,
+        )
+        likelihood_new = float(sum(prob[: attempt_idx + 1]))
+        attempt = agent.next(
+            {
+                'status': status,
+                'reason': run_reason,
+                'likelihood_new': likelihood_new,
             }
         )
-        attempt = agent.next({'status': status, 'reason': run_reason})
+    agent_confidence = float(max(bsearch.prob))
+    bsearch_std = strategy.NoisyBinarySearch(
+        [core.RevInfo(x) for x in revlist],
+        old_idx=0,
+        new_idx=len(revlist) - 1,
+        oracle=(sim_old_p, sim_new_p),
+        confidence=min(agent_confidence - 1e-5, 0.999),
+    )
+    bsearch_std.add_sample(0, 'old')
+    bsearch_std.add_sample(len(revlist) - 1, 'new')
     runs_bisect = 0
-    low, high = 0, len(revlist) - 1
-    while high - low > 1:
+    while not bsearch_std.is_done():
         runs_bisect += 1
-        mid = (low + high) // 2
-        if mid < culprit_idx:
-            low = mid
-        else:
-            high = mid
+        idx = bsearch_std.next_idx()
+        bsearch_std.add_sample(idx, 'new' if idx >= culprit_idx else 'old')
 
     print(
         'Concluded culprit',
@@ -897,7 +968,7 @@ def demo(
         runs_llm,
         'runs instead of',
         runs_bisect,
-        'runs.',
+        f'runs by bisect (confidence: {agent_confidence:.2%}).',
     )
 
 
@@ -931,4 +1002,6 @@ if __name__ == '__main__':
         'R149-16656.0.0-118297',
         'R149-16656.0.0-118296~R149-16656.0.0-118297/111',
         board='volteer',
+        sim_old_p=0.5,
+        sim_new_p=1.0,
     )

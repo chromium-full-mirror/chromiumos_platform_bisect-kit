@@ -1130,6 +1130,8 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 [str(i) for i in range(10)],
                 chromeos_mirror=None,
                 board=None,
+                old_p=0.1,
+                new_p=0.9,
             )
             # Before bisection starts, state is INITED. Prob is None, utilities are None.
             bsearch.add_sample(0, 'old')
@@ -1142,8 +1144,14 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             cost_table = [(1, 10)] * len(bsearch.rev_info)
             bsearch.next_idx(cost_table=cost_table)
 
-            # Check that update_stats was called
+            # Check that update_stats was called with old_p and new_p
             self.assertTrue(mock_agent.update_stats.called)
+            self.assertEqual(
+                mock_agent.update_stats.call_args[1].get('old_p'), 0.1
+            )
+            self.assertEqual(
+                mock_agent.update_stats.call_args[1].get('new_p'), 0.9
+            )
 
             # Retrieve the last call arguments
             last_stats = mock_agent.update_stats.call_args[0][0]
@@ -1211,6 +1219,80 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             mock_agent.add_sample.assert_any_call(
                 '5', 'new', reason='Test crashed with null pointer'
             )
+
+    def test_likelihood_new_handling(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.next.return_value = '5'
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ) as mock_agent_class:
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                oracle=(0.1, 0.9),
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            mock_agent_class.assert_called_once_with(
+                'my_test',
+                'my_root',
+                [str(i) for i in range(10)],
+                chromeos_mirror=None,
+                board=None,
+                old_p=0.1,
+                new_p=0.9,
+            )
+            bsearch.add_sample(0, 'old')
+            bsearch.add_sample(9, 'new')
+
+            bsearch.next_idx()
+            bsearch.add_sample(5, 'new', reason='Flaky failure')
+
+            self.assertIn('5', bsearch._gemini_waiting_result)
+            waiting_res = bsearch._gemini_waiting_result['5']
+            self.assertIn('likelihood_new', waiting_res)
+            self.assertIsInstance(waiting_res['likelihood_new'], float)
+            self.assertGreaterEqual(waiting_res['likelihood_new'], 0.0)
+            self.assertLessEqual(waiting_res['likelihood_new'], 1.0)
+
+    def test_likelihood_new_handling_deterministic(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.next.return_value = '5'
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ) as mock_agent_class:
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            mock_agent_class.assert_called_once_with(
+                'my_test',
+                'my_root',
+                [str(i) for i in range(10)],
+                chromeos_mirror=None,
+                board=None,
+                old_p=0,
+                new_p=1,
+            )
+            bsearch.add_sample(0, 'old')
+            bsearch.add_sample(9, 'new')
+
+            bsearch.next_idx()
+            bsearch.add_sample(5, 'new', reason='Deterministic failure')
+
+            self.assertIn('5', bsearch._gemini_waiting_result)
+            waiting_res = bsearch._gemini_waiting_result['5']
+            self.assertIn('likelihood_new', waiting_res)
+            self.assertIsInstance(waiting_res['likelihood_new'], float)
+            self.assertAlmostEqual(waiting_res['likelihood_new'], 1.0)
 
     def test_deepcopy(self):
         mock_agent = mock.MagicMock()
@@ -1381,6 +1463,43 @@ class TestBisectAgent(unittest.TestCase):
                 detail['git show'],
                 'git show commit_sha1 in my_cros_root/src/platform/bisect-kit',
             )
+
+    @mock.patch('google.auth.transport.requests.AuthorizedSession')
+    @mock.patch(
+        'google.oauth2.service_account.Credentials.from_service_account_file'
+    )
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    def test_bisect_agent_flaky_rates(
+        self,
+        mock_build_revlist,
+        _mock_gemini_agent,
+        _mock_creds,
+        _mock_session,
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'commit1'}]},
+                '2': {'actions': [{'rev': 'commit2'}]},
+            },
+        )
+        with mock.patch.dict(
+            'os.environ', {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'}
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='my_test',
+                repo='my_repo',
+                revlist=['1', '2'],
+                old_p=0.2,
+                new_p=0.8,
+            )
+            self.assertEqual(agent._old_p, 0.2)
+            self.assertEqual(agent._new_p, 0.8)
+
+            agent.update_stats({}, old_p=0.15, new_p=0.85)
+            self.assertEqual(agent._old_p, 0.15)
+            self.assertEqual(agent._new_p, 0.85)
 
 
 if __name__ == '__main__':

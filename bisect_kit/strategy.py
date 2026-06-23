@@ -1558,6 +1558,8 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 [x.rev for x in self.rev_info[self.old_idx : self.new_idx + 1]],
                 chromeos_mirror=chromeos_mirror,
                 board=board,
+                old_p=self.old_p,
+                new_p=self.new_p,
             )
 
     def __deepcopy__(self, memo):
@@ -1617,7 +1619,9 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                     'info_gain_per_cost': utilities[i][1],
                 }
                 for i in range(len(self.rev_info))
-            }
+            },
+            old_p=self.old_p,
+            new_p=self.new_p,
         )
 
     def add_sample(self, idx, status=None, **kwargs):
@@ -1636,9 +1640,16 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 status_str = self.term_map.get(
                     sample['status'], sample['status']
                 )
+                prob = self.prob
+                if not prob:
+                    prob = [0.0] + [1.0 / (len(self.rev_info) - 1)] * (
+                        len(self.rev_info) - 1
+                    )
+                likelihood_new = float(sum(prob[: idx + 1]))
                 self._gemini_waiting_result[self.rev_info[idx].rev] = {
                     'status': status_str,
                     'reason': reason,
+                    'likelihood_new': likelihood_new,
                 }
 
     def next_idx(self, cost_table=None):
