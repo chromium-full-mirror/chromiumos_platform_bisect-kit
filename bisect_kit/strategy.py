@@ -1533,6 +1533,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
         source_root=None,
         chromeos_mirror=None,
         board=None,
+        session=None,
         **kwargs,
     ):
         """
@@ -1559,6 +1560,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 board=board,
                 old_p=self.old_p,
                 new_p=self.new_p,
+                session=session,
             )
 
     def _rev_to_idx(self, rev: str) -> int:
@@ -1614,10 +1616,12 @@ class GeminiFusionStrategy(NoisyBinarySearch):
 
         if self.gemini:
             reason = kwargs.get('reason')
+            eval_log = kwargs.get('eval_log')
             self.gemini.add_sample(
                 self.rev_info[idx].rev,
                 self.term_map.get(sample['status'], sample['status']),
                 reason=reason,
+                eval_log=eval_log,
             )
 
             if self.rev_info[idx].rev in self._gemini_waiting_result:
@@ -1634,6 +1638,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                     'status': status_str,
                     'reason': reason,
                     'likelihood_new': likelihood_new,
+                    'eval_log': eval_log,
                 }
 
     def next_idx(self, cost_table=None):

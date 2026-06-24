@@ -6,7 +6,9 @@
 
 import collections
 import copy
+import os
 import random
+import tempfile
 import unittest
 from unittest import mock
 
@@ -1132,6 +1134,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 board=None,
                 old_p=0.1,
                 new_p=0.9,
+                session=None,
             )
             # Before bisection starts, state is INITED. Prob is None, utilities are None.
             bsearch.add_sample(0, 'old')
@@ -1217,7 +1220,10 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             )
 
             mock_agent.add_sample.assert_any_call(
-                '5', 'new', reason='Test crashed with null pointer'
+                '5',
+                'new',
+                reason='Test crashed with null pointer',
+                eval_log=None,
             )
 
     def test_likelihood_new_handling(self):
@@ -1244,6 +1250,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 board=None,
                 old_p=0.1,
                 new_p=0.9,
+                session=None,
             )
             bsearch.add_sample(0, 'old')
             bsearch.add_sample(9, 'new')
@@ -1281,6 +1288,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 board=None,
                 old_p=0,
                 new_p=1,
+                session=None,
             )
             bsearch.add_sample(0, 'old')
             bsearch.add_sample(9, 'new')
@@ -1388,6 +1396,95 @@ class TestBisectAgent(unittest.TestCase):
             self.assertEqual(
                 dict(agent_copy._rev_samples), dict(agent._rev_samples)
             )
+
+    @mock.patch('google.auth.transport.requests.AuthorizedSession')
+    @mock.patch(
+        'google.oauth2.service_account.Credentials.from_service_account_file'
+    )
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    def test_read_log_adhoc(
+        self,
+        mock_build_revlist,
+        _mock_gemini_agent,
+        _mock_creds,
+        _mock_session,
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'commit1'}]},
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_repo:
+            tast_dir = os.path.join(
+                tmp_repo, 'tmp/tast_results_tmp/system_logs'
+            )
+            os.makedirs(tast_dir)
+            syslog_file = os.path.join(tast_dir, 'syslog')
+            with open(syslog_file, 'w', encoding='utf-8') as f:
+                f.write('system log content\n')
+
+            with tempfile.NamedTemporaryFile('w+', encoding='utf-8') as tmp:
+                tmp.write('ssh to DUT\nrunning test\ntest completed PASS\n')
+                tmp.flush()
+
+                with mock.patch.dict(
+                    'os.environ',
+                    {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'},
+                ):
+                    agent = gemini_util.BisectAgent(
+                        test_name='my_test',
+                        repo=tmp_repo,
+                        revlist=['1'],
+                    )
+
+                    # Test log reading when no sample added yet
+                    resp = agent._read_log_file(agent._last_run_eval_log)
+                    self.assertIn('error', resp)
+
+                    # Add sample with eval_log
+                    agent.add_sample('1', 'PASS', eval_log=tmp.name)
+                    agent._pending_run_at_call = mock.MagicMock(id='dummy_id')
+                    with mock.patch.object(agent, '_run', return_value=None):
+                        agent.next(
+                            {
+                                'status': 'PASS',
+                                'reason': None,
+                                'eval_log': tmp.name,
+                            }
+                        )
+
+                    # Test read_last_log helper
+                    resp = agent._read_log_file(agent._last_run_eval_log)
+                    self.assertEqual(
+                        resp,
+                        {
+                            'log': 'ssh to DUT\nrunning test\ntest completed PASS\n'
+                        },
+                    )
+
+                    # Test read_last_log with file_name parameter
+                    resp = agent._read_log_file(
+                        agent._last_run_eval_log, file_name='system_logs/syslog'
+                    )
+                    self.assertEqual(resp, {'log': 'system log content\n'})
+                    self.assertEqual(
+                        agent._list_collected_files(), ['system_logs/syslog']
+                    )
+                    resp_missing = agent._read_log_file(
+                        agent._last_run_eval_log, file_name='nonexistent.txt'
+                    )
+                    self.assertIn('error', resp_missing)
+
+                # Test read_log out of bounds run_index
+                eval_log = agent._rev_samples['1'][0].get('eval_log')
+                resp = agent._read_log_file(eval_log)
+                self.assertEqual(
+                    resp,
+                    {'log': 'ssh to DUT\nrunning test\ntest completed PASS\n'},
+                )
 
     @mock.patch('google.auth.transport.requests.AuthorizedSession')
     @mock.patch(

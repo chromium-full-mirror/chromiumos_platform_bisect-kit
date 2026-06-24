@@ -1683,6 +1683,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 source_root=source_root,
                 chromeos_mirror=self.config.get('chromeos_mirror'),
                 board=self.config.get('board'),
+                session=self.session,
             )
 
         return strategy.NoisyBinarySearch(

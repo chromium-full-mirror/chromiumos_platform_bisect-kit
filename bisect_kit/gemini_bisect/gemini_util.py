@@ -15,6 +15,7 @@ import random
 import sys
 from typing import Any, TypedDict, Union
 
+from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_util
@@ -74,6 +75,13 @@ PROMPT = (
     'behavior based on all past test run history; note that this is NOT the '
     'probability of this commit being the culprit, but rather the cumulative '
     'probability that the regression was introduced at or before this commit).\n'
+    'Log contains the full log from ssh to DUT until test completes. But '
+    'does not contain any system log like chrome log or syslog grabbed on DUT. '
+    'You can call read_last_log to read the execution log of the last run_at. '
+    'read_last_log can also take a file_name parameter (e.g., "system_logs/syslog" '
+    'or "results.json") to read other files collected in the test results directory. '
+    'You can call read_log to read the execution log of a particular run of a particular '
+    'revision.\n'
     '\n'
     'You must balance your code diff knowledge with the probability '
     'model:\n'
@@ -88,7 +96,7 @@ PROMPT = (
     'You have external functions available to use. '
     'You can call multiple independent query functions in parallel in a '
     'single turn (e.g., get_revision_detail, get_test_name, '
-    'get_range). However, run_at and conclude are blocking, final '
+    'get_range, read_last_log, read_log). However, run_at and conclude are blocking, final '
     'actions that MUST only be called individually and cannot be called '
     'in parallel with any other function calls.'
 )
@@ -163,6 +171,53 @@ FUNCTIONS = [
         },
     },
     {
+        "name": "read_last_log",
+        "description": (
+            "Read logs from the last test run. "
+            "If file_name is empty or not set, reads the default test execution log "
+            "and includes 'available_files' listing all files collected in the test results directory. "
+            "Otherwise, reads the specified file (e.g. 'system_logs/syslog', 'results.json')."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_name": {
+                    "type": "string",
+                    "description": (
+                        "Optional file name or relative path to read from the "
+                        "collected test results (e.g. 'system_logs/syslog', "
+                        "'results.json'). Leave empty or omit for default test log."
+                    ),
+                },
+            },
+        },
+    },
+    {
+        "name": "read_log",
+        "description": (
+            "Read the test execution log of a particular run of a particular "
+            "revision. Log contains the full log from ssh to DUT until test completes, "
+            "excluding system logs. Returns a dictionary containing 'log'."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "rev_id": {
+                    "type": "string",
+                    "description": "Rev_id of the revision to inspect log for.",
+                },
+                "run_index": {
+                    "type": "integer",
+                    "description": (
+                        "0-based index of the test run for this revision "
+                        "(e.g., 0 for the first run, 1 for the second run)."
+                    ),
+                },
+            },
+            "required": ["rev_id", "run_index"],
+        },
+    },
+    {
         "name": "run_at",
         "description": (
             "Run the test at given commit. Returns a dictionary containing "
@@ -229,6 +284,7 @@ class TrialResult(TypedDict, total=False):
     status: str
     reason: str | None
     likelihood_new: float | None
+    eval_log: str | None
 
 
 NestedDict = dict[str, Union[str, int, 'NestedDict']]
@@ -376,6 +432,7 @@ class BisectAgent:
         board: str | None = None,
         old_p: float = 0.0,
         new_p: float = 1.0,
+        session: str | None = None,
     ):
         """Initializes BisectAgent.
 
@@ -394,6 +451,8 @@ class BisectAgent:
         self._conclusion: str | None = None
         self._pending_parts: list[genai.types.Part] = []
         self._pending_run_at_call: Any = None
+        self._session = session
+        self._last_run_eval_log: str | None = None
 
         is_chrome = (
             '@' in revlist[0]
@@ -449,7 +508,12 @@ class BisectAgent:
         for x in self._revlist:
             run_results: list[str] | list[TrialResult]
             if include_reason:
-                run_results = self._rev_samples[x]
+                run_results = [
+                    TrialResult(
+                        status=sample['status'], reason=sample['reason']
+                    )
+                    for sample in self._rev_samples[x]
+                ]
             else:
                 run_results = [
                     sample['status'] for sample in self._rev_samples[x]
@@ -510,6 +574,69 @@ class BisectAgent:
             'repo': self._rev2commit[rev_id]['repo'],
             'git show': git_show_content,
         }
+
+    def _list_collected_files(self) -> list[str]:
+        """Lists relative paths of all files in the last run test results directory."""
+        files: list[str] = []
+        if not self._repo:
+            return files
+        for target_dir in ['tmp/tast_results_tmp', 'tmp/autotest_results_tmp']:
+            full_dir = os.path.join(self._repo, target_dir)
+            if os.path.exists(full_dir) and os.path.isdir(full_dir):
+                for root, _, filenames in os.walk(full_dir):
+                    for fname in filenames:
+                        full_path = os.path.join(root, fname)
+                        rel_path = os.path.relpath(full_path, full_dir)
+                        files.append(rel_path)
+        return sorted(list(set(files)))
+
+    def _read_log_file(
+        self, eval_log: str | None, file_name: str | None = None
+    ) -> dict:
+        """Reads the evaluation log file or a specific collected file adhoc from disk."""
+        if file_name and file_name.strip():
+            file_name = file_name.strip()
+            if not self._repo:
+                return {
+                    'error': 'Repository root not available to locate test results.'
+                }
+            candidate_paths = [
+                os.path.join(self._repo, 'tmp/tast_results_tmp', file_name),
+                os.path.join(self._repo, 'tmp/autotest_results_tmp', file_name),
+            ]
+
+            log_full_path = None
+            for path in candidate_paths:
+                if os.path.exists(path) and os.path.isfile(path):
+                    log_full_path = path
+                    break
+
+            if not log_full_path:
+                return {
+                    'error': (
+                        f'File {file_name} not found in collected test results.'
+                    )
+                }
+        else:
+            if not eval_log:
+                return {'error': 'Log not available for this run.'}
+            if self._session:
+                log_full_path = common.get_session_log_path(
+                    self._session, eval_log
+                )
+            else:
+                log_full_path = eval_log
+            if not os.path.exists(log_full_path):
+                return {'error': f'Log file {eval_log} does not exist.'}
+
+        try:
+            with open(
+                log_full_path, 'r', encoding='utf-8', errors='replace'
+            ) as f:
+                content = f.read()
+            return {'log': content}
+        except Exception as e:
+            return {'error': f'Failed to read log file: {e}'}
 
     def _short(self, d: Any) -> Any:
         """Create a shorter object for logging purpose.
@@ -655,6 +782,61 @@ class BisectAgent:
                                 )
                             )
                         )
+                elif call.name == 'read_last_log':
+                    file_name = call.args.get('file_name')
+                    resp = self._read_log_file(
+                        self._last_run_eval_log,
+                        file_name=file_name,
+                    )
+                    if not file_name or not file_name.strip():
+                        resp['available_files'] = self._list_collected_files()
+                    self._pending_parts.append(
+                        genai.types.Part(
+                            function_response=genai.types.FunctionResponse(
+                                id=call.id,
+                                name='read_last_log',
+                                response=resp,
+                            )
+                        )
+                    )
+                elif call.name == 'read_log':
+                    rev_id = call.args.get('rev_id')
+                    run_index = call.args.get('run_index')
+                    if not rev_id or rev_id not in self._rev2commit:
+                        resp = {'error': f'Invalid rev_id {rev_id}.'}
+                    elif (
+                        run_index is None
+                        or not isinstance(run_index, int)
+                        or run_index < 0
+                    ):
+                        resp = {
+                            'error': (
+                                f'Invalid run_index {run_index}. Must be a'
+                                ' non-negative integer.'
+                            )
+                        }
+                    elif run_index >= len(self._rev_samples[rev_id]):
+                        resp = {
+                            'error': (
+                                f'run_index {run_index} out of range for'
+                                f' revision {rev_id}. Total runs:'
+                                f' {len(self._rev_samples[rev_id])}.'
+                            )
+                        }
+                    else:
+                        eval_log = self._rev_samples[rev_id][run_index].get(
+                            'eval_log'
+                        )
+                        resp = self._read_log_file(eval_log)
+                    self._pending_parts.append(
+                        genai.types.Part(
+                            function_response=genai.types.FunctionResponse(
+                                id=call.id,
+                                name='read_log',
+                                response=resp,
+                            )
+                        )
+                    )
                 elif call.name == 'run_at':
                     rev_id = call.args.get('rev_id')
                     if not rev_id or rev_id not in self._rev2commit:
@@ -725,12 +907,20 @@ class BisectAgent:
                 self._pending_run_at_call = run_at_call
                 return run_at_call.args['rev_id']
 
-    def add_sample(self, rev: str, status: str, reason: str | None = None):
+    def add_sample(
+        self,
+        rev: str,
+        status: str,
+        reason: str | None = None,
+        eval_log: str | None = None,
+    ):
         """Add run result
 
         rev: revision
         status: status of a run."""
-        self._rev_samples[rev].append({'status': status, 'reason': reason})
+        self._rev_samples[rev].append(
+            {'status': status, 'reason': reason, 'eval_log': eval_log}
+        )
 
     def update_stats(
         self,
@@ -753,12 +943,16 @@ class BisectAgent:
             return None
         if status is not None:
             assert self._pending_run_at_call is not None
+            self._last_run_eval_log = status.get('eval_log')
             self._pending_parts.append(
                 genai.types.Part(
                     function_response=genai.types.FunctionResponse(
                         id=self._pending_run_at_call.id,
                         name='run_at',
-                        response=status,
+                        response={
+                            'status': status['status'],
+                            'reason': status.get('reason'),
+                        },
                     )
                 )
             )
