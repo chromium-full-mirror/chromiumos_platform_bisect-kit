@@ -742,7 +742,17 @@ class BisectorCommandLine(typing.Generic[T_co]):
             rev = states.idx2rev(idx)
             yield idx
 
-            for status in possible_status:
+            # When Gemini is enabled, sample candidate statuses twice during lookahead
+            # to account for LLM non-determinism. Unlike traditional math models which
+            # are strictly deterministic, Gemini may suggest different candidate commits
+            # across trials even with identical input histories, allowing lookahead to
+            # explore multiple potential pathways. Duplicate predictions are naturally
+            # deduplicated downstream by the strategy sample collection.
+            statuses_to_try = possible_status
+            if getattr(bisector_strategy, 'gemini', None):
+                statuses_to_try = possible_status * 2
+
+            for status in statuses_to_try:
                 # Dummy switch and eval time could be ignored here because the strategy
                 # algorithm will ignore empty time sample and calculate the average of
                 # other samples automatically.
@@ -750,10 +760,14 @@ class BisectorCommandLine(typing.Generic[T_co]):
                     'rev': rev,
                     'index': states.rev2idx(rev),
                     'status': status,
+                    'reason': (
+                        'Simulated result to predict the next revision for'
+                        ' early build kickoff. There are no test logs or'
+                        ' failure details available, so no failure analysis'
+                        ' can be performed on this sample.'
+                    ),
                 }
                 states_copy = copy.deepcopy(states)
-                # TODO(b/516650420): Let Gemini predict future builds during lookahead
-                # instead of falling back to standard NoisyBinarySearch.
                 strategy_copy = copy.deepcopy(bisector_strategy)
 
                 try:

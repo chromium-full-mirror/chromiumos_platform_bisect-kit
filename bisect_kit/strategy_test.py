@@ -1310,8 +1310,8 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 endpoint_verification=False,
             )
             bsearch_copy = copy.deepcopy(bsearch)
-            self.assertIsNone(bsearch_copy.gemini)
-            self.assertEqual(bsearch_copy._gemini_waiting_result, {})
+            self.assertIsNotNone(bsearch_copy.gemini)
+            self.assertIsNot(bsearch_copy.gemini, bsearch.gemini)
 
 
 class TestBisectAgent(unittest.TestCase):
@@ -1378,6 +1378,15 @@ class TestBisectAgent(unittest.TestCase):
                         'reason': 'Crashed with NullPointer',
                     }
                 ],
+            )
+
+            agent_copy = copy.deepcopy(agent)
+            self.assertIsNot(agent_copy, agent)
+            self.assertIsNot(agent_copy._agent, agent._agent)
+            self.assertEqual(agent_copy._test_name, agent._test_name)
+            self.assertEqual(agent_copy._revlist, agent._revlist)
+            self.assertEqual(
+                dict(agent_copy._rev_samples), dict(agent._rev_samples)
             )
 
     @mock.patch('google.auth.transport.requests.AuthorizedSession')

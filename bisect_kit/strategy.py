@@ -4,7 +4,6 @@
 
 """The binary search algorithm."""
 
-import copy
 import logging
 import math
 import re
@@ -1561,21 +1560,6 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 old_p=self.old_p,
                 new_p=self.new_p,
             )
-
-    def __deepcopy__(self, memo):
-        # TODO(b/516650420): Let Gemini predict future builds during lookahead
-        # instead of falling back to standard NoisyBinarySearch.
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k == 'gemini':
-                setattr(result, k, None)
-            elif k == '_gemini_waiting_result':
-                setattr(result, k, {})
-            else:
-                setattr(result, k, copy.deepcopy(v, memo))
-        return result
 
     def _rev_to_idx(self, rev: str) -> int:
         for idx, r in enumerate(self.rev_info):

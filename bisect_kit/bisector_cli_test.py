@@ -18,6 +18,7 @@ from bisect_kit import cli
 from bisect_kit import core
 from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
+from bisect_kit import strategy
 from bisect_kit import testing
 
 
@@ -581,6 +582,35 @@ class TestBisectorCommandLine(unittest.TestCase):
             bisector.states.add_history('sample', **sample2)
             bisector.strategy.add_sample(0, **sample2)
             self.assertEqual(bisector.future_switch_versions('0', 0), [])
+
+    def test_future_switch_versions_gemini(self):
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
+        bisector.main('init', '--num=5', '--old=0', '--new=4')
+        bisector.main('view')
+
+        sample_old = {'rev': '0', 'index': 0, 'status': 'old'}
+        sample_new = {'rev': '4', 'index': 4, 'status': 'new'}
+        bisector.states.add_history('sample', **sample_old)
+        bisector.strategy.add_sample(0, **sample_old)
+        bisector.states.add_history('sample', **sample_new)
+        bisector.strategy.add_sample(4, **sample_new)
+
+        recorder = mock.MagicMock()
+        mock_strategy = mock.MagicMock(spec=strategy.GeminiFusionStrategy)
+        mock_strategy.is_done.return_value = False
+        mock_strategy.gemini = mock.MagicMock()
+        mock_strategy.next_idx.side_effect = lambda *a, **kw: (
+            recorder(*a, **kw),
+            [1, 2, 1, 3, 2][recorder.call_count - 1],
+        )[1]
+        bisector.strategy = mock_strategy
+
+        # Depth 1 returns next revision and child predictions. With possible_status duplicated (4 trials), next_idx is called 5 times
+        versions = bisector.future_switch_versions('0', 1)
+        self.assertEqual(recorder.call_count, 5)
+        self.assertEqual(sorted(versions), ['1', '2', '3'])
 
 
 # Shorthand for testing.

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 from collections import defaultdict
+import copy
 import logging
 import os
 import random
@@ -282,6 +283,17 @@ class GeminiAgent:
             ),
         )
         self._contents: list[genai.types.Content] = []
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k in ('_client', '_config'):
+                setattr(result, k, v)
+            else:
+                setattr(result, k, copy.deepcopy(v, memo))
+        return result
 
     def _get_credentials(self) -> google.oauth2.service_account.Credentials:
         """Get credentials to Cloud Secret Manager.
