@@ -6,6 +6,7 @@
 
 import collections
 import copy
+import logging
 import os
 import random
 import tempfile
@@ -1320,6 +1321,63 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             bsearch_copy = copy.deepcopy(bsearch)
             self.assertIsNotNone(bsearch_copy.gemini)
             self.assertIsNot(bsearch_copy.gemini, bsearch.gemini)
+
+    def test_noisy_binary_search_set_logger_prefix(self):
+        bsearch = strategy.NoisyBinarySearch(self.rev_info)
+        bsearch.set_logger_prefix('[Simulation] ')
+        self.assertEqual(bsearch.logger.extra['prefix'], '[Simulation] ')
+
+    def test_gemini_fusion_strategy_set_logger_prefix(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.logger = mock.MagicMock()
+        mock_agent.logger.extra = {'prefix': ''}
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ):
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                oracle=(0.1, 0.9),
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            bsearch.set_logger_prefix('[Simulation] ')
+            self.assertEqual(bsearch.logger.extra['prefix'], '[Simulation] ')
+            self.assertEqual(mock_agent.logger.extra['prefix'], '[Simulation] ')
+
+    def test_prefix_logger_adapter_formatting(self):
+        test_logger = logging.getLogger('test_prefix_logger')
+        adapter = strategy.PrefixLoggerAdapter(test_logger, {'prefix': ''})
+        with self.assertLogs(
+            logger='test_prefix_logger', level='INFO'
+        ) as log_capture:
+            adapter.info('Without prefix')
+            adapter.extra['prefix'] = '[Simulation] '
+            adapter.info('With prefix')
+
+        self.assertEqual(
+            log_capture.output,
+            [
+                'INFO:test_prefix_logger:Without prefix',
+                'INFO:test_prefix_logger:[Simulation] With prefix',
+            ],
+        )
+
+    def test_logger_prefix_in_logs(self):
+        with self.assertLogs(
+            logger='bisect_kit.strategy', level='INFO'
+        ) as log_capture:
+            bsearch = strategy.NoisyBinarySearch(self.rev_info)
+            bsearch.set_logger_prefix('[Simulation] ')
+            bsearch.logger.info('Hello World')
+
+        self.assertEqual(
+            log_capture.output,
+            ['INFO:bisect_kit.strategy:[Simulation] Hello World'],
+        )
 
 
 class TestBisectAgent(unittest.TestCase):

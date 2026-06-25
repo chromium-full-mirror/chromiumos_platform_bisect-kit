@@ -769,6 +769,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 }
                 states_copy = copy.deepcopy(states)
                 strategy_copy = copy.deepcopy(bisector_strategy)
+                if hasattr(strategy_copy, 'set_logger_prefix'):
+                    strategy_copy.set_logger_prefix('[Simulation] ')
 
                 try:
                     states_copy.add_history('sample', **sample)

@@ -267,7 +267,13 @@ FUNCTIONS = [
     },
 ]
 
-logger = logging.getLogger(__name__)
+
+class PrefixLoggerAdapter(logging.LoggerAdapter):
+    """LoggerAdapter that prepends prefix to log messages."""
+
+    def process(self, msg, kwargs):
+        prefix = self.extra.get('prefix', '')
+        return f'{prefix}{msg}', kwargs
 
 
 def _is_retriable_gemini_error(e) -> bool:
@@ -433,12 +439,16 @@ class BisectAgent:
         old_p: float = 0.0,
         new_p: float = 1.0,
         session: str | None = None,
+        custom_logger: logging.Logger | logging.LoggerAdapter | None = None,
     ):
         """Initializes BisectAgent.
 
         test_name: Name of the regressed test."""
         self._agent = GeminiAgent(
             prompt=PROMPT, functions=FUNCTIONS, model=model
+        )
+        self.logger = custom_logger or PrefixLoggerAdapter(
+            logging.getLogger(__name__), {'prefix': ''}
         )
         self._test_name = test_name
         self._started = False
@@ -529,7 +539,7 @@ class BisectAgent:
                         )
                     )
                 except Exception as e:
-                    logger.warning(
+                    self.logger.warning(
                         'Failed to get commit metadata for %s: %s',
                         self._rev2commit[x]['commit'],
                         e,
@@ -563,7 +573,7 @@ class BisectAgent:
                 self._rev2commit[rev_id]['commit'],
             )
         except Exception as e:
-            logger.warning(
+            self.logger.warning(
                 'Failed to git show for %s: %s',
                 self._rev2commit[rev_id]['commit'],
                 e,
@@ -684,7 +694,7 @@ class BisectAgent:
                 self._started = True
             else:
                 for part in self._pending_parts:
-                    logger.info(
+                    self.logger.info(
                         'Sending response to Gemini: %s',
                         self._short(part.function_response.response),
                     )
@@ -708,7 +718,7 @@ class BisectAgent:
                     f"Gemini failed to return any function calls. "
                     f"Response text: {text}. Response: {ret}"
                 )
-            logger.info(
+            self.logger.info(
                 'Gemini replied %s, calling %s',
                 self._short(text),
                 ', '.join(
@@ -753,7 +763,7 @@ class BisectAgent:
                 elif call.name == 'get_revision_detail':
                     rev_id = call.args.get('rev_id')
                     if not rev_id or rev_id not in self._rev2commit:
-                        logger.warning(
+                        self.logger.warning(
                             'Gemini requested detail for invalid rev_id: %s',
                             rev_id,
                         )
@@ -840,7 +850,7 @@ class BisectAgent:
                 elif call.name == 'run_at':
                     rev_id = call.args.get('rev_id')
                     if not rev_id or rev_id not in self._rev2commit:
-                        logger.warning(
+                        self.logger.warning(
                             'Gemini requested run_at for invalid rev_id: %s',
                             rev_id,
                         )
@@ -864,7 +874,7 @@ class BisectAgent:
                 elif call.name == 'conclude':
                     rev_id = call.args.get('rev_id')
                     if not rev_id or rev_id not in self._rev2commit:
-                        logger.warning(
+                        self.logger.warning(
                             'Gemini requested conclude for invalid rev_id: %s',
                             rev_id,
                         )
@@ -1180,10 +1190,11 @@ def demo(
 
 if __name__ == '__main__':
     # PoC purporse only (should replace with unittest)
-    logger.setLevel(logging.DEBUG)
+    test_logger = logging.getLogger(__name__)
+    test_logger.setLevel(logging.DEBUG)
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.DEBUG)
-    logger.addHandler(handler)
+    test_logger.addHandler(handler)
     demo(
         'tast.ui.WebUIJSErrors',
         'refs/heads/main@{#1416515}',

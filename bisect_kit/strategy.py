@@ -16,7 +16,13 @@ from bisect_kit.gemini_bisect import gemini_util
 from scipy.stats import boschloo_exact
 
 
-logger = logging.getLogger(__name__)
+class PrefixLoggerAdapter(logging.LoggerAdapter):
+    """LoggerAdapter that prepends prefix to log messages."""
+
+    def process(self, msg, kwargs):
+        prefix = self.extra.get('prefix', '')
+        return f'{prefix}{msg}', kwargs
+
 
 # If a given version got equal to or more than SKIP_FOREVER times of 'skip'
 # evaluation result, ignores the said version forever.
@@ -303,6 +309,9 @@ class NoisyBinarySearch:
         self.passed_noise_rate = False
 
         # Reads in saved states from previuos execution, if any.
+        self.logger = PrefixLoggerAdapter(
+            logging.getLogger(__name__), {'prefix': ''}
+        )
         self._import_states(saved_states)
 
     def export_states(self) -> strategy_states.States:
@@ -319,7 +328,7 @@ class NoisyBinarySearch:
         )
 
     def _import_states(self, states: strategy_states.States):
-        logger.debug('_import_states: %s', states)
+        self.logger.debug('_import_states: %s', states)
         if not states:
             return
 
@@ -590,7 +599,7 @@ class NoisyBinarySearch:
                 and self.endpoint_verification
                 and not self.is_value_bisection()
             ):
-                logger.info(
+                self.logger.info(
                     'Failure rate is recalculated: old=%d/%d (%f%%), new=%d/%d (%f%%)',
                     self.observation[0][0],
                     self.observation[0][1],
@@ -616,21 +625,21 @@ class NoisyBinarySearch:
             self.old_p, self.new_p = self.oracle
         elif self.prior_observation:
             self._estimate_model_from_observation()
-            logger.debug(
+            self.logger.debug(
                 'estimated model: old_p=%s, new_p=%s', self.old_p, self.new_p
             )
         else:
             self.old_p, self.new_p = 0, 1
 
         if 0 < self.old_p < 1.0 - self.confidence:
-            logger.warning(
+            self.logger.warning(
                 'Confidence value (%r) is too low to detect '
                 'old candidates with new behavior (p=%r)',
                 self.confidence,
                 self.old_p,
             )
         if self.confidence < self.new_p < 1.0:
-            logger.warning(
+            self.logger.warning(
                 'Confidence value (%r) is too low to detect '
                 'new candidates with old behavior (p=%r)',
                 self.confidence,
@@ -1099,6 +1108,11 @@ class NoisyBinarySearch:
                 % (self.rev_info[idx].rev, self.rev_info[idx]['skip'], reason)
             )
 
+    def set_logger_prefix(self, prefix: str):
+        """Sets the prefix for logging."""
+        if hasattr(self.logger, 'extra'):
+            self.logger.extra['prefix'] = prefix
+
     def show_summary(self, more=False):
         """Shows top ranked candidates.
 
@@ -1108,7 +1122,7 @@ class NoisyBinarySearch:
 
         def show_candidate(idx):
             if self.state == self.STARTED and self.is_noisy():
-                logger.info(
+                self.logger.info(
                     '[%d] %s %.4f%%; %s',
                     idx,
                     self.rev_info[idx].rev,
@@ -1116,7 +1130,7 @@ class NoisyBinarySearch:
                     self.rev_info[idx].summary(),
                 )
             else:
-                logger.info(
+                self.logger.info(
                     '[%d] %s; %s',
                     idx,
                     self.rev_info[idx].rev,
@@ -1124,7 +1138,7 @@ class NoisyBinarySearch:
                 )
 
         if self.state == self.INITED:
-            logger.info('Verifying initial range:')
+            self.logger.info('Verifying initial range:')
             for i in (self.old_idx, self.new_idx):
                 show_candidate(i)
             return
@@ -1153,7 +1167,7 @@ class NoisyBinarySearch:
         size = right - left
         if size > 1 and not self.is_noisy():
             steps = math.ceil(math.log(size) / math.log(2))
-            logger.info(
+            self.logger.info(
                 'Range: (%s, %s], %d revs left (roughly %.0f steps)',
                 self.rev_info[left].rev,
                 self.rev_info[right].rev,
@@ -1161,7 +1175,7 @@ class NoisyBinarySearch:
                 steps,
             )
         else:
-            logger.info(
+            self.logger.info(
                 'Range: (%s, %s], %d revs left',
                 self.rev_info[left].rev,
                 self.rev_info[right].rev,
@@ -1431,11 +1445,11 @@ class NoisyBinarySearch:
                 )
 
         if not is_one_side_enough(self.rev_info[self.new_idx]):
-            logger.debug('%s not enough', self.rev_info[self.new_idx].rev)
+            self.logger.debug('%s not enough', self.rev_info[self.new_idx].rev)
             return self.new_idx
 
         if not is_one_side_enough(self.rev_info[self.old_idx]):
-            logger.debug('%s not enough', self.rev_info[self.old_idx].rev)
+            self.logger.debug('%s not enough', self.rev_info[self.old_idx].rev)
             return self.old_idx
 
         old_avg = math_util.average(self.rev_info[self.old_idx].averages())
@@ -1447,7 +1461,7 @@ class NoisyBinarySearch:
         # stop collect more samples.
         if trend_score(self.old_value, self.new_value, old_avg, new_avg) > 0.5:
             return None
-        logger.debug('not distinguishable')
+        self.logger.debug('not distinguishable')
 
         # If the best case values do not help, it probably has no hope.
         if user_diff > 0:
@@ -1680,9 +1694,14 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             self._gemini_waiting_result = {}
             if gemini_reasoning:
                 self._gemini_waiting_result = {gemini_reasoning: None}
-                logger.info('Gemini suggested %s', gemini_reasoning)
+                self.logger.info('Gemini suggested %s', gemini_reasoning)
                 return self._rev_to_idx(gemini_reasoning)
 
         return self._next_idx_by_utility(
             self.old_p, self.new_p, self.prob, cost_table
         )
+
+    def set_logger_prefix(self, prefix: str):
+        super().set_logger_prefix(prefix)
+        if self.gemini and hasattr(self.gemini.logger, 'extra'):
+            self.gemini.logger.extra['prefix'] = prefix
