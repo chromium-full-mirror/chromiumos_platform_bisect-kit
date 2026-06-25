@@ -58,17 +58,15 @@ def create_argument_parser():
         default=os.environ.get('BOARD_CPU_ARCH', ''),
     )
     parser.add_argument(
-        'rev',
-        nargs='?',
+        '--chrome-rev',
         type=cli.argtype_notempty,
         metavar='REV',
-        default=os.environ.get('REV', ''),
         help='Version string',
     )
     parser.add_argument(
         '--board',
         type=cli.argtype_notempty,
-        default=os.environ.get('BOARD', ''),
+        required=True,
         help='ChromeOS board name',
     )
     parser.add_argument(
@@ -86,7 +84,7 @@ def create_argument_parser():
         '--chrome-root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROME_ROOT', ''),
+        required=True,
         help='Root of Chrome source tree, like ~/chromium',
     )
 
@@ -152,7 +150,7 @@ def switch_main(args: tuple[str] | None):
     assert os.path.exists(opts.chrome_src)
 
     assert bisect_cr_localbuild_master.verify_gclient_dep(opts.chrome_root)
-    rev = bisect_cr_localbuild_master.guess_git_rev(opts, opts.rev)
+    rev = bisect_cr_localbuild_master.guess_git_rev(opts, opts.chrome_rev)
 
     if not opts.no_sync_code:
         git_util.checkout_version(opts.chrome_src, rev)

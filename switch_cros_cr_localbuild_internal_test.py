@@ -250,7 +250,7 @@ class TestSwitchMain(unittest.TestCase):
         git_util.commit_file(self.chrome_src, "TESTFILE", "MESSAGE", "CONTENT")
 
         self.common_args = [
-            # revision
+            '--chrome-rev',
             self.CHROME_REVISION,
             '--target',
             'eve',

@@ -58,18 +58,16 @@ def create_argument_parser():
         help='Instead of mere exit code, output detailed information in json',
     )
     parser.add_argument(
-        'rev',
-        nargs='?',
+        '--chrome-rev',
         type=git_util.argtype_git_rev,
         metavar='REV',
-        default=os.environ.get('REV', ''),
         help='Chrome src git hash.',
     )
     parser.add_argument(
         '--board',
         type=cli.argtype_notempty,
         metavar='BOARD',
-        default=os.environ.get('BOARD', ''),
+        required=True,
         help='ChromeOS board name',
     )
     parser.add_argument(
@@ -82,14 +80,14 @@ def create_argument_parser():
         '--chrome-root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROME_ROOT', ''),
+        required=True,
         help='Root of Chrome source tree, like ~/chromium',
     )
     parser.add_argument(
         '--chrome-mirror',
         metavar='CHROME_MIRROR',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROME_MIRROR', ''),
+        required=True,
         help='gclient cache dir',
     )
     parser.add_argument(
@@ -212,8 +210,8 @@ def switch_main(args: tuple[str] | None):
     if opts.dut:
         dut_os_version = cros_util.query_dut_short_version(opts.dut)
 
-    opts.rev = bisect_cr_localbuild_internal.guess_chrome_version(
-        opts, opts.rev
+    opts.chrome_rev = bisect_cr_localbuild_internal.guess_chrome_version(
+        opts, opts.chrome_rev
     )
 
     chrome_cache = None
@@ -227,7 +225,7 @@ def switch_main(args: tuple[str] | None):
         chrome_cache = cache_util.BuildArtifactsCache(
             cache_util.BuildArtifactsCache.BuildType.CHROME,
             opts.board,
-            opts.rev,
+            opts.chrome_rev,
             opts.target,
         )
 
@@ -240,8 +238,8 @@ def switch_main(args: tuple[str] | None):
     # If chrome_src is not a git root, force sync code to have a chrome
     # checkout even if no_sync_code is set.
     if not opts.no_sync_code or not git_util.is_git_root(opts.chrome_src):
-        logger.info('switch source code to %s', opts.rev)
-        gclient_util.sync(opts.chrome_root, revision=opts.rev)
+        logger.info('switch source code to %s', opts.chrome_rev)
+        gclient_util.sync(opts.chrome_root, revision=opts.chrome_rev)
         bisect_cr_localbuild_internal.workaround_b378019087(opts.chrome_src)
 
         if opts.chromium_patch_cl:

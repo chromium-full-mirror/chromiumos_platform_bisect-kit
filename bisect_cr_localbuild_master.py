@@ -211,13 +211,21 @@ class ChromeSrcMasterDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        env['CHROME_ROOT'] = self.config.get('chrome_root')
-        env['CHROME_BRANCH'] = gclient_util.DEFAULT_BRANCH_NAME
-        env['GIT_REPO'] = self.config.get('chrome_src')
-        env['REV'] = rev
+        pass
 
-        if self.config.get('board'):
-            env['BOARD'] = self.config.get('board')
+    def get_extra_args(
+        self, phase: core.Phase, rev: str, _rev_details=None
+    ) -> list[str]:
+        if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
+            args = [
+                '--chrome-root',
+                self.config.get('chrome_root'),
+            ]
+            if self.config.get('board'):
+                args += ['--board', self.config.get('board')]
+            args += ['--chrome-rev', rev]
+            return args
+        return []
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:

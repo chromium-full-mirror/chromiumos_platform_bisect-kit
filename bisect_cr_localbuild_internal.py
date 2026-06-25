@@ -229,12 +229,24 @@ class ChromeSrcDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        env['CHROME_ROOT'] = self.config.get('chrome_root')
-        env['CHROME_MIRROR'] = self.config.get('chrome_mirror')
-        env['REV'] = cr_util.get_chrome_commit_hash(rev_details)
+        pass
 
-        if self.config.get('board'):
-            env['BOARD'] = self.config.get('board')
+    def get_extra_args(
+        self, phase: core.Phase, _rev: str, rev_details=None
+    ) -> list[str]:
+        if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
+            args = [
+                '--chrome-root',
+                self.config.get('chrome_root'),
+                '--chrome-mirror',
+                self.config.get('chrome_mirror'),
+            ]
+            if self.config.get('board'):
+                args += ['--board', self.config.get('board')]
+            git_hash = cr_util.get_chrome_commit_hash(rev_details)
+            args += ['--chrome-rev', git_hash]
+            return args
+        return []
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:

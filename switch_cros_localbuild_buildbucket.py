@@ -169,13 +169,10 @@ def create_argument_parser():
         'Assign a Chrome DEPS instead of deriving from rev',
     )
     parser_chrome.add_argument(
-        'chrome_rev',
-        nargs='?',
+        '--chrome-rev',
         type=cli.argtype_notempty,
         metavar='REV',
-        default=os.environ.get('REV', ''),
-        help='Chrome version, local build intra version (in format "%s").'
-        % codechange.make_intra_rev('X', 'Y', 3),
+        help='Chrome revision',
     )
 
     return parser

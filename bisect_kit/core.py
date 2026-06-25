@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import enum
 import importlib
 import json
 import logging
@@ -642,6 +643,14 @@ class BisectStates(States):
         self.data['history'].append(entry)
 
 
+class Phase(enum.StrEnum):
+    """Phases of bisection steps where extra arguments might be needed."""
+
+    SWITCH = 'switch'
+    EVAL = 'eval'
+    FUTURE_BUILD = 'future_build'
+
+
 class BisectDomain:
     """Base class of bisection domain.
 
@@ -737,6 +746,24 @@ class BisectDomain:
           rev: Current bisecting version.
           rev_details: Details of the current version.
         """
+
+    def get_extra_args(
+        self,
+        _phase: Phase,
+        _rev: str,
+        _rev_details=None,
+    ) -> list[str]:
+        """Gets extra command line arguments needed by switchers and evaluators.
+
+        Args:
+          phase: Phase enum (SWITCH, EVAL, or FUTURE_BUILD).
+          rev: Current bisecting version.
+          rev_details: Details of the current version.
+
+        Returns:
+          A list of command line arguments.
+        """
+        return []
 
     def fill_candidate_summary(self, summary):
         """Fill detail of candidates.

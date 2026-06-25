@@ -64,7 +64,6 @@ class DummyDomain(core.BisectDomain):
         env['ANS'] = str(self.config.get('ans'))
         env['OLD_P'] = str(self.config.get('old_p'))
         env['NEW_P'] = str(self.config.get('new_p'))
-        env['REV'] = rev
 
 
 class TestBisectorCli(unittest.TestCase):

@@ -308,7 +308,8 @@ def do_evaluate(
         logger.info('eval log file = %s', log_file)
         env['LOG_FILE'] = log_file
 
-    exec_opts = step_command_parser.parse_args(evaluate_cmd)
+    extra_args = domain.get_extra_args(core.Phase.EVAL, rev, rev_details)
+    exec_opts = step_command_parser.parse_args(evaluate_cmd + extra_args)
     if exec_opts.mode == 'git':
         result = _execute_git_step_command(
             exec_opts.command, env=env, capture_values=capture_values
@@ -434,7 +435,8 @@ def do_switch(
         logger.info('switch log file = %s', log_file)
         env['LOG_FILE'] = log_file
 
-    exec_opts = step_command_parser.parse_args(switch_cmd)
+    extra_args = domain.get_extra_args(core.Phase.SWITCH, rev, rev_details)
+    exec_opts = step_command_parser.parse_args(switch_cmd + extra_args)
     if exec_opts.mode == 'git':
         result = _execute_git_step_command(exec_opts.command, env=env)
     else:
@@ -482,7 +484,10 @@ def do_future_build(
         logger.debug('future_build log file = %s', log_file)
         env['LOG_FILE'] = log_file
 
-    exec_opts = step_command_parser.parse_args(future_build_cmd)
+    extra_args = domain.get_extra_args(
+        core.Phase.FUTURE_BUILD, rev, rev_details
+    )
+    exec_opts = step_command_parser.parse_args(future_build_cmd + extra_args)
     if exec_opts.mode != 'bisectkit':
         raise errors.InternalError('Unsupported mode %s' % exec_opts.mode)
 
