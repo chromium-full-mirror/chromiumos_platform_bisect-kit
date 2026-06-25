@@ -1303,6 +1303,29 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             self.assertIsInstance(waiting_res['likelihood_new'], float)
             self.assertAlmostEqual(waiting_res['likelihood_new'], 1.0)
 
+    def test_next_idx_exception_fallback(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.next.side_effect = Exception('Gemini Internal Error')
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ):
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                oracle=(0.1, 0.9),
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            bsearch.add_sample(0, 'old')
+            bsearch.add_sample(9, 'new')
+
+            idx = bsearch.next_idx()
+            self.assertIsNone(bsearch.gemini)
+            self.assertIsNotNone(idx)
+
     def test_deepcopy(self):
         mock_agent = mock.MagicMock()
         with mock.patch(

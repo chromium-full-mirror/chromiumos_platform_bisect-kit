@@ -1061,7 +1061,9 @@ class BisectorCommandLine(typing.Generic[T_co]):
             revisions = self.future_switch_versions(
                 prev_rev, self.future_build_depth
             )
+            logger.info('Future builds: %s', revisions)
             for r in revisions:
+                logger.info('Kicking off future build for %s', r)
                 future_build_log = self._step_log_path(r, 'future_build')
                 future_build_log_full_path = common.get_session_log_path(
                     self.session, future_build_log

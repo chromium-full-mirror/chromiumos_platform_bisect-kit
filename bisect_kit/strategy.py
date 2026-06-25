@@ -1688,9 +1688,20 @@ class GeminiFusionStrategy(NoisyBinarySearch):
 
         if self.gemini and not self.is_done():
             self._update_gemini_stats(cost_table=cost_table)
-            gemini_reasoning = self.gemini.next(
-                list(self._gemini_waiting_result.values() or [None])[0]
-            )
+            try:
+                gemini_reasoning = self.gemini.next(
+                    list(self._gemini_waiting_result.values() or [None])[0]
+                )
+            except Exception as e:  # pylint: disable=broad-except
+                self.logger.warning(
+                    'Gemini agent failed in next(), fallback to math model: %s',
+                    e,
+                    exc_info=True,
+                )
+                # TODO(b/527740259): support agent recovery
+                self.gemini = None
+                gemini_reasoning = None
+
             self._gemini_waiting_result = {}
             if gemini_reasoning:
                 self._gemini_waiting_result = {gemini_reasoning: None}
