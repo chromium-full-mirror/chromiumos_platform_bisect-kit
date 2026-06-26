@@ -52,12 +52,13 @@ PROMPT = (
     '"likelihood_new" to climb high (e.g. 80-90%). Conversely, a single PASS '
     'is strong proof that the commit is good/old. Therefore, do not blindly '
     'trust a high likelihood_new after a few FAILs; if you suspect a boundary '
-    'commit might be a flaky good commit, re-test it on the device (zero build/deploy '
-    'cost!) to see if it can produce a PASS.\n'
+    'commit might be a flaky good commit, re-test it on the device (skips '
+    'rebuild, though still reflashes!) to see if it can produce a PASS.\n'
     '\n'
     'Be aware of execution cost: switching to a different commit requires '
     'rebuilding and deploying code, which takes significantly more time '
-    'than re-running the test on the currently deployed commit.\n'
+    'than re-running the test on the same revision (which skips rebuild, '
+    'though still reflashes).\n'
     '\n'
     'Each revision returned by get_range has an associated "stats" field '
     'containing parameters from the underlying probability model. These '
@@ -110,8 +111,8 @@ FUNCTIONS = [
         "name": "get_range",
         "description": (
             "Get all revisions and first line of commit message (aka subject) "
-            "for these revisions from known bad to known good (aka newest to "
-            "oldest), inclusive on both end. Returns a dictionary containing "
+            "for these revisions from known good to known bad (aka oldest to "
+            "newest), inclusive on both ends. Returns a dictionary containing "
             "'revisions' (list of dicts), 'old_p' (flaky failure probability on "
             "good commits), and 'new_p' (failure probability on bad commits).\n"
             "Each revision dict contains:\n"
@@ -978,7 +979,7 @@ def _get_simulated_cost_table(good, bad, prev_rev):
     cost_table = []
     for x in range(good, bad + 1):
         if x == prev_rev:
-            # No build/deploy, only Tast run (PASS: 60s, FAIL: 30s)
+            # Skips rebuild (still reflashes & runs test)
             cost_table.append((60.0, 30.0))
         else:
             # Incremental build & deploy (240s) + Tast run (PASS: 60s, FAIL: 30s)
