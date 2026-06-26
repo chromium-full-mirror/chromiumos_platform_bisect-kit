@@ -3754,7 +3754,8 @@ class ChromeOSSpecManager(codechange.SpecManager):
             # TODO(yoshiki): Confirm 'all' works and replace it.
             # b/150753074: moblab is in non-default group and causes mark_as_stable
             # fail
-            groups = 'default,moblab,platform-linux'
+            # b/264611730: satlab is also necessary for mark_as_stable
+            groups = 'default,moblab,satlab,platform-linux'
 
         # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
         # manifest. 'repo sync -m' is not enough
