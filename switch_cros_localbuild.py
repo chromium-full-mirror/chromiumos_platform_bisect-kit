@@ -69,18 +69,17 @@ def create_argument_parser():
         help='Instead of mere exit code, output detailed information in json',
     )
     parser.add_argument(
-        'rev',
-        nargs='?',
+        '--chromeos-version',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
-        default=os.environ.get('CROS_VERSION', ''),
+        required=True,
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
     )
     parser.add_argument(
         '--board',
         metavar='BOARD',
-        default=os.environ.get('BOARD', ''),
+        required=True,
         help='ChromeOS board name',
     )
     parser.add_argument(
@@ -92,13 +91,13 @@ def create_argument_parser():
         '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
-        default=os.environ.get('CHROMEOS_ROOT', ''),
-        help='ChromeOS tree root (default: %(default)s)',
+        required=True,
+        help='ChromeOS tree root',
     )
     parser.add_argument(
         '--chromeos-mirror',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROMEOS_MIRROR', ''),
+        required=True,
         help='ChromeOS repo mirror path',
     )
 
@@ -184,7 +183,7 @@ def _build_packages(opts):
 
 
 def _get_image_folder(opts):
-    cached_name = 'bisect-%s' % util.escape_rev(opts.rev)
+    cached_name = 'bisect-%s' % util.escape_rev(opts.chromeos_version)
     image_folder = os.path.join(
         cros_util.cached_images_dir, opts.board, cached_name
     )
@@ -261,7 +260,7 @@ def _do_build(opts, do_mark_as_stable=True):
             gs_path = os.path.join(
                 'gs://crosperf-chromeos-builds/',
                 opts.board,
-                util.escape_rev(opts.rev),
+                util.escape_rev(opts.chromeos_version),
                 cros_util.disk_vm_image_bundle_filename,
             )
             logger.info('uploading %s to %s', tmp_archive_file_path, gs_path)
@@ -319,7 +318,7 @@ def switch(opts):
             cache,
             common.get_session_cache_dir(opts.session),
         )
-        code_manager.switch(opts.rev)
+        code_manager.switch(opts.chromeos_version)
 
     if not opts.no_build:
         build(opts)
@@ -344,8 +343,10 @@ def inner_main(opts):
                     '%r is not a good DUT' % opts.dut
                 )
 
-    if cros_util.is_cros_short_version(opts.rev):
-        opts.rev = cros_util.version_to_full(opts.board, opts.rev)
+    if cros_util.is_cros_short_version(opts.chromeos_version):
+        opts.chromeos_version = cros_util.version_to_full(
+            opts.board, opts.chromeos_version
+        )
 
     cros_util.prepare_chroot(opts.chromeos_root)
 

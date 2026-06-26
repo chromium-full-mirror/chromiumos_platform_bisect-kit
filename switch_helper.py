@@ -5,7 +5,6 @@
 
 import argparse
 import logging
-import os
 
 from bisect_kit import cli
 from bisect_kit import errors
@@ -37,44 +36,37 @@ def common_local_build_flags() -> cli.ArgumentParser:
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=os.environ.get('DUT'),
         help='DUT address',
     )
     parser.add_argument(
         '--no-sync-code',
         action='store_true',
-        default=os.environ.get('NO_SYNC_CODE') == 'true',
         help='Do no sync source code',
     )
     parser.add_argument(
         '--no-build',
         action='store_true',
-        default=os.environ.get('NO_BUILD') == 'true',
         help='Do no build',
     )
     parser.add_argument(
         '--no-deploy',
         action='store_true',
-        default=os.environ.get('NO_DEPLOY') == 'true',
         help='Do no deploy to DUT',
     )
     shortcut_group = parser.add_mutually_exclusive_group()
     shortcut_group.add_argument(
         '--sync-code-only',
         action='store_true',
-        default=os.environ.get('SYNC_CODE_ONLY') == 'true',
         help='sync code only. Shorthand for --no-build and --no-deploy',
     )
     shortcut_group.add_argument(
         '--build-only',
         action='store_true',
-        default=os.environ.get('BUILD_ONLY') == 'true',
         help='build only. Shorthand for --no-sync-code and --no-deploy',
     )
     shortcut_group.add_argument(
         '--deploy-only',
         action='store_true',
-        default=os.environ.get('DEPLOY_ONLY') == 'true',
         help='deploy only. Shorthand for --no-sync-code and --no-build',
     )
     # Allow no operation without raising an exception. It's for testing.

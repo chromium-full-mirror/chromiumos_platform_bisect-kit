@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 
 from bisect_kit import bisector_cli
@@ -36,20 +35,19 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=os.environ.get('DUT', ''),
+        required=True,
     )
     parser.add_argument(
-        'version',
-        nargs='?',
+        '--chromeos-version',
         type=cros_util.argtype_cros_version,
         metavar='CROS_VERSION',
-        default=os.environ.get('CROS_VERSION', ''),
+        required=True,
         help='ChromeOS version number, short (10162.0.0) or full (R64-10162.0.0)',
     )
     parser.add_argument(
         '--board',
         metavar='BOARD',
-        default=os.environ.get('BOARD', ''),
+        default='',
         help='ChromeOS board name',
     )
     parser.add_argument(
@@ -87,11 +85,12 @@ def switch(opts):
             cros_util.SnapshotStore.init_with_state(states)
     # TODO(kcwu): clear cache of cros flash
     image_info = cros_util.search_image(
-        opts.board, opts.version, is_public_build=opts.public_build
+        opts.board, opts.chromeos_version, is_public_build=opts.public_build
     )
     if not image_info:
         raise errors.ExecutionFatalError(
-            'no images available for %s %s' % (opts.board, opts.version)
+            'no images available for %s %s'
+            % (opts.board, opts.chromeos_version)
         )
 
     cros_util.provision_image_with_retry(
@@ -100,7 +99,7 @@ def switch(opts):
         opts.board,
         image_info,
         is_public_build=opts.public_build,
-        version=opts.version,
+        version=opts.chromeos_version,
         clobber_stateful=opts.clobber_stateful,
         disable_rootfs_verification=opts.disable_rootfs_verification,
         repair_callback=cros_lab_util.repair,

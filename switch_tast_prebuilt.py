@@ -46,28 +46,27 @@ def create_argument_parser():
     parser.add_argument(
         '--chromeos-root',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROMEOS_ROOT', ''),
+        required=True,
         help='ChromeOS tree root',
     )
     parser.add_argument(
         '--board',
         metavar='BOARD',
-        default=os.environ.get('BOARD', ''),
+        default='',
         help='ChromeOS board name',
     )
     parser.add_argument(
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=os.environ.get('DUT', ''),
+        required=True,
         help='Address of DUT',
     )
     parser.add_argument(
-        'version',
-        nargs='?',
+        '--chromeos-version',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
-        default=os.environ.get('CROS_VERSION', ''),
+        required=True,
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
     )
@@ -75,6 +74,12 @@ def create_argument_parser():
         '--public-build',
         action='store_true',
         help='Use public build artifacts instead of internal ones.',
+    )
+    parser.add_argument(
+        '--chromeos-mirror',
+        type=cli.argtype_dir_path,
+        required=True,
+        help='Dummy argument for compatibility',
     )
 
     return parser
@@ -126,7 +131,7 @@ def switch_main(args: tuple[str] | None):
     if cros_lab_util.is_satlab_dut(opts.dut):
         cros_lab_util.write_satlab_ssh_config(opts.dut)
 
-    switch(opts, opts.board, opts.version, opts.dut)
+    switch(opts, opts.board, opts.chromeos_version, opts.dut)
 
 
 def action() -> bisector_cli.SwitchAction:

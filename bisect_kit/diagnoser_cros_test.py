@@ -222,6 +222,8 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
                 '--rich-result',
                 '--chromeos-root',
                 self.config.get('chromeos_root'),
+                '--chromeos-mirror',
+                self.config.get('chromeos_mirror'),
             ]
             common_eval_cmd = [
                 './eval_cros_tast.py',

@@ -260,6 +260,7 @@ class CrosDiagnoser:
             run_switch_or_eval_cmd(
                 cmd
                 + [
+                    '--chromeos-version',
                     self.cros_old,
                     '--session',
                     self.config.get('session'),
@@ -414,6 +415,7 @@ class CrosDiagnoser:
                     '--board',
                     self.config.get('board'),
                     '--sync-code-only',
+                    '--chromeos-version',
                     self.cros_old,
                     '--session',
                     self.config.get('session'),
@@ -789,6 +791,7 @@ class CrosDiagnoser:
             self.config.get('board'),
             '--dut',
             dut,
+            '--chromeos-version',
             self.cros_old,
         ]
         if self.config.get('disable_rootfs_verification'):
@@ -1261,7 +1264,7 @@ class CrosDiagnoser:
                 self.config.get('chromeos_root'),
                 '--chromeos-mirror',
                 self.config.get('chromeos_mirror'),
-                '--chromeos-rev',
+                '--chromeos-version',
                 self.cros_old,
                 '--board',
                 self.config.get('board'),

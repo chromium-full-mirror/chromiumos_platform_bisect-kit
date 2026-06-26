@@ -59,7 +59,7 @@ def create_argument_parser():
     parser.add_argument(
         '--chromeos-root',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROMEOS_ROOT', ''),
+        required=True,
         help='ChromeOS tree root',
     )
     parser.add_argument(
@@ -69,7 +69,7 @@ def create_argument_parser():
     parser.add_argument(
         '--board',
         metavar='BOARD',
-        default=os.environ.get('BOARD', ''),
+        required=True,
         help='ChromeOS board name',
     )
     parser.add_argument(
@@ -81,17 +81,21 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=os.environ.get('DUT'),
+        required=True,
         help='Address of DUT',
     )
     parser.add_argument(
-        'version',
-        nargs='?',
+        '--chromeos-version',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
-        default=os.environ.get('CROS_VERSION', ''),
+        required=True,
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
+    )
+    parser.add_argument(
+        '--chromeos-mirror',
+        type=cli.argtype_dir_path,
+        help='Dummy argument for compatibility',
     )
 
     return parser
@@ -211,7 +215,7 @@ def switch_main(args: tuple[str] | None):
     _switch(
         autotest_dir,
         opts.board,
-        opts.version,
+        opts.chromeos_version,
         opts.test_name,
         opts.dut,
         opts.public_build,

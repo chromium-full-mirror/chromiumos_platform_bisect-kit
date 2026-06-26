@@ -60,7 +60,7 @@ def create_common_argument_parser():
         '--board',
         type=cli.argtype_notempty,
         metavar='BOARD',
-        default=os.environ.get('BOARD', ''),
+        required=True,
         help='ChromeOS board name',
     )
     parser.add_argument(
@@ -72,13 +72,13 @@ def create_common_argument_parser():
         '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
-        default=os.environ.get('CHROMEOS_ROOT', ''),
-        help='ChromeOS tree root (default: %(default)s)',
+        required=True,
+        help='ChromeOS tree root',
     )
     parser.add_argument(
         '--chromeos-mirror',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROMEOS_MIRROR', ''),
+        required=True,
         help='ChromeOS repo mirror path',
     )
     parser.add_argument(
@@ -128,11 +128,10 @@ def create_argument_parser():
         'bisect_chromeos', help='Bisect on ChromeOS versions', parents=parents
     )
     parser_cros.add_argument(
-        'chromeos_rev',
-        nargs='?',
+        '--chromeos-version',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
-        default=os.environ.get('CROS_VERSION', ''),
+        required=True,
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
     )
@@ -145,21 +144,21 @@ def create_argument_parser():
         '--chrome-root',
         metavar='CHROME_ROOT',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROME_ROOT', ''),
+        required=True,
         help='Root of Chrome source tree, like ~/chromium',
     )
     parser_chrome.add_argument(
         '--chrome-mirror',
         metavar='CHROME_MIRROR',
         type=cli.argtype_dir_path,
-        default=os.environ.get('CHROME_MIRROR', ''),
+        required=True,
         help='gclient cache dir',
     )
     parser_chrome.add_argument(
-        '--chromeos-rev',
+        '--chromeos-version',
         type=cli.argtype_notempty,
         metavar='CROS_VERSION',
-        default=os.environ.get('CROS_VERSION', ''),
+        required=True,
         help='ChromeOS local build version string, in format short version, '
         'full version, or "full,full+N"',
     )
@@ -291,7 +290,7 @@ def get_release_manifest(opts):
     if opts.manifest:
         return read_file(opts.manifest)
     spec_manager = get_chromeos_spec_manager(opts)
-    return spec_manager.get_manifest(opts.chromeos_rev)
+    return spec_manager.get_manifest(opts.chromeos_version)
 
 
 def get_manifest(opts):
@@ -309,9 +308,11 @@ def get_manifest(opts):
         common.get_session_cache_dir(opts.session),
     )
 
-    old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
-    intra_revision, diff = code_manager.get_intra_and_diff(opts.chromeos_rev)
-    if intra_revision == opts.chromeos_rev:
+    old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_version)
+    intra_revision, diff = code_manager.get_intra_and_diff(
+        opts.chromeos_version
+    )
+    if intra_revision == opts.chromeos_version:
         return spec_manager.get_manifest(intra_revision)
 
     # get specs
@@ -380,7 +381,7 @@ def search_closest_snapshot_image(opts) -> typing.Optional[str]:
         The first CrOS snapshot version equal to or after the CrOS built, or
         None if not found.
     """
-    _, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
+    _, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_version)
     if cros_util.is_cros_snapshot_version(new_rev):
         return new_rev
     # Searches an earliest snapshot build in +10 major versions. Reasons:
@@ -451,14 +452,14 @@ def is_sysroot_archive_compatible(opts) -> bool:
         True if the version has sysroot archive API call.
     """
     # Sysroot archive API in chromite is avaliable from 15742.0.0.
-    old_rev, _, _ = codechange.parse_intra_rev(opts.chromeos_rev)
+    old_rev, _, _ = codechange.parse_intra_rev(opts.chromeos_version)
     old_cros_major_version = int(cros_util.extract_major_version(old_rev))
     return old_cros_major_version >= 15742
 
 
 def search_and_schedule_build(opts) -> int | None:
     build_tags = {
-        'bisector_chromeos_version': opts.chromeos_rev,
+        'bisector_chromeos_version': opts.chromeos_version,
         'bisector_session': opts.session,
         'bisector_host': socket.gethostname(),
     }
@@ -489,7 +490,7 @@ def search_and_schedule_build(opts) -> int | None:
         deps=deps,
         git_auth=git_auth,
         search_only=opts.no_build,
-        chromeos_version=opts.chromeos_rev,
+        chromeos_version=opts.chromeos_version,
         # The snapshot commit hash used to search prebuilt cache, if specified
         # buildbucket will incrementally build from old snapshot build.
         snapshot_commmit_id=search_closest_snapshot_commit(opts),
@@ -557,7 +558,7 @@ def wait_for_build_completion(opts, build_id: int):
 
 
 def build_revlist(opts):
-    old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_rev)
+    old_rev, new_rev, _ = codechange.parse_intra_rev(opts.chromeos_version)
     config = get_config_for_chromeos_spec_manager(opts)
     spec_manager = get_chromeos_spec_manager(opts)
     cache = repo_util.RepoMirror(opts.chromeos_mirror)
@@ -649,9 +650,9 @@ def switch_main(args: tuple[str] | None) -> core.StepResult:
                     '%r is not a good DUT' % opts.dut
                 )
 
-    if cros_util.is_cros_short_version(opts.chromeos_rev):
-        opts.chromeos_rev = cros_util.version_to_full(
-            opts.board, opts.chromeos_rev
+    if cros_util.is_cros_short_version(opts.chromeos_version):
+        opts.chromeos_version = cros_util.version_to_full(
+            opts.board, opts.chromeos_version
         )
 
     if opts.build_revlist:

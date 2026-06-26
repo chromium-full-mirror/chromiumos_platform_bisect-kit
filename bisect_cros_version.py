@@ -168,20 +168,18 @@ class ChromeOSVersionDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        env['BOARD'] = self.config.get('board')
+        pass
 
-        assert cros_util.is_cros_full_version(
-            rev
-        ) or cros_util.is_cros_snapshot_version(rev)
-        if cros_util.is_cros_snapshot_version(rev):
-            milestone, short_version, _ = cros_util.snapshot_version_split(rev)
-        else:
-            milestone, short_version = cros_util.version_split(rev)
-
-        env['MILESTONE'] = milestone
-        env['CROS_SHORT_VERSION'] = short_version
-        env['CROS_FULL_VERSION'] = rev
-        env['CROS_VERSION'] = rev
+    def get_extra_args(
+        self, phase: core.Phase, rev: str, _rev_details=None
+    ) -> list[str]:
+        if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
+            args = []
+            if self.config.get('board'):
+                args += ['--board', self.config.get('board')]
+            args += ['--chromeos-version', rev]
+            return args
+        return []
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:
