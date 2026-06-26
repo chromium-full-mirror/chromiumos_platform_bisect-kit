@@ -207,17 +207,31 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertEqual(result.get('verified'), False)
 
     def do_evaluate(
-        self, _cmd, _domain, rev, _rev_details, _log_file, capture_values=False
+        self,
+        _cmd,
+        _domain,
+        rev,
+        _rev_details,
+        _log_file,
+        capture_values=False,
+        session_name=None,
     ):
-        del capture_values  # unused
+        del capture_values, session_name  # unused
         if int(rev) < 42:
             return core.StepResult('old')
         return core.StepResult('new')
 
     def do_noisy_evaluate(
-        self, _cmd, _domain, rev, _rev_details, _log_file, capture_values=False
+        self,
+        _cmd,
+        _domain,
+        rev,
+        _rev_details,
+        _log_file,
+        capture_values=False,
+        session_name=None,
     ):
-        del capture_values
+        del capture_values, session_name
         ans = self.random_list.get_random_num()
 
         if int(rev) < 42:
@@ -753,7 +767,13 @@ class TestSwitchAndEval(unittest.TestCase):
             ['switch_cmd'], bisector.domain, '3', mock.ANY, mock.ANY
         )
         self.mock_do_evaluate.assert_called_once_with(
-            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY, mock.ANY
+            ['eval_cmd'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+            mock.ANY,
+            mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_preset_dut_switch_with_dut_eval_with_dut(self):
@@ -804,6 +824,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_preset_dut_multiple_switch_eval_with_dut(self):
@@ -891,6 +912,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_preset_dut_multiple_switch_eval_without_dut(self):
@@ -978,6 +1000,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_preset_dut_switch_without_dut_eval_with_dut(self):
@@ -1024,6 +1047,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_preset_dut_same_as_prev_rev(self):
@@ -1079,6 +1103,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_dut_manager_switch_with_dut_eval_with_dut(self):
@@ -1130,6 +1155,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_dut_manager_multiple_switch_eval_with_dut(self):
@@ -1218,6 +1244,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_dut_manager_multiple_switch_eval_without_dut(self):
@@ -1300,7 +1327,13 @@ class TestSwitchAndEval(unittest.TestCase):
             ]
         )
         self.mock_do_evaluate.assert_called_once_with(
-            ['eval_cmd'], bisector.domain, '3', mock.ANY, mock.ANY, mock.ANY
+            ['eval_cmd'],
+            bisector.domain,
+            '3',
+            mock.ANY,
+            mock.ANY,
+            mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_dut_manager_switch_without_dut_eval_with_dut(self):
@@ -1348,6 +1381,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_dut_manager_same_as_prev_rev_is_previous_dut(self):
@@ -1406,6 +1440,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_dut_manager_same_as_prev_rev_not_previous_dut(self):
@@ -1489,6 +1524,7 @@ class TestSwitchAndEval(unittest.TestCase):
             mock.ANY,
             mock.ANY,
             mock.ANY,
+            session_name=mock.ANY,
         )
 
     def test_no_dut_anager_switch_without_dut_eval_with_dut(self):

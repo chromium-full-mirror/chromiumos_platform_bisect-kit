@@ -54,6 +54,11 @@ def create_argument_parser():
         help='Instead of mere exit code, output detailed information in json',
     )
     parser.add_argument(
+        '--bisect-results-dir',
+        metavar='BISECT_RESULTS_DIR',
+        help='Directory to save system logs / test results for bisect',
+    )
+    parser.add_argument(
         'dut',
         nargs='?',
         type=cli.argtype_notempty,
@@ -328,6 +333,12 @@ def run_test(opts: argparse.Namespace, test_name: str, bundle: str) -> str:
 
     cmd = tast_cmd(opts, 'run', *flags, opts.dut, test_name)
     cros_util.cros_sdk(opts.chromeos_root, *cmd)
+    if opts.bisect_results_dir and os.path.exists(results_dir_output_chroot):
+        shutil.copytree(
+            results_dir_output_chroot,
+            opts.bisect_results_dir,
+            dirs_exist_ok=True,
+        )
 
     return results_dir_output_chroot
 

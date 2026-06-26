@@ -53,6 +53,30 @@ class TestUtilFunctions(unittest.TestCase):
             util.is_valid_ip('2001:0db8:75a2:0000:0000:8a2e:0340'), False
         )
 
+    def test_extract_step_id_from_eval_log_path(self):
+        self.assertEqual(
+            util.extract_step_id_from_eval_log_path('/path/to/log_file.eval'),
+            'log_file',
+        )
+        self.assertEqual(
+            util.extract_step_id_from_eval_log_path('eval_step_123.log'),
+            'eval_step_123',
+        )
+
+    def test_get_eval_results_dir(self):
+        with mock.patch(
+            'bisect_kit.common.get_session_log_path',
+            return_value='/tmp/session_1/eval_results',
+        ):
+            self.assertEqual(
+                util.get_eval_results_dir('session_1'),
+                '/tmp/session_1/eval_results',
+            )
+            self.assertEqual(
+                util.get_eval_results_dir('session_1', eval_step_id='step_123'),
+                '/tmp/session_1/eval_results/step_123',
+            )
+
 
 class TestPopen(unittest.TestCase):
     """Test util.Popen."""

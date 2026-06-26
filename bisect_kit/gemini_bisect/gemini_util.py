@@ -20,6 +20,7 @@ from bisect_kit import core
 from bisect_kit import cr_util
 from bisect_kit import cros_util
 from bisect_kit import git_util
+from bisect_kit import util
 from google import genai
 from google.api_core import retry
 import google.auth
@@ -196,9 +197,9 @@ FUNCTIONS = [
     {
         "name": "read_log",
         "description": (
-            "Read the test execution log of a particular run of a particular "
-            "revision. Log contains the full log from ssh to DUT until test completes, "
-            "excluding system logs. Returns a dictionary containing 'log'."
+            "Read the test execution log or a specific collected system log "
+            "(e.g. 'system_logs/syslog', 'results.json') of a particular run of a particular "
+            "revision. If file_name is empty or omitted, reads default execution log and includes 'available_files'."
         ),
         "parameters": {
             "type": "object",
@@ -212,6 +213,14 @@ FUNCTIONS = [
                     "description": (
                         "0-based index of the test run for this revision "
                         "(e.g., 0 for the first run, 1 for the second run)."
+                    ),
+                },
+                "file_name": {
+                    "type": "string",
+                    "description": (
+                        "Optional file name or relative path to read from the "
+                        "collected test results for this run (e.g. 'system_logs/syslog', "
+                        "'results.json'). Leave empty or omit for default test log."
                     ),
                 },
             },
@@ -586,19 +595,21 @@ class BisectAgent:
             'git show': git_show_content,
         }
 
-    def _list_collected_files(self) -> list[str]:
-        """Lists relative paths of all files in the last run test results directory."""
+    def _list_collected_files(self, eval_log: str | None) -> list[str]:
+        """Lists relative paths of all files in the test results directory for a run."""
+        if not eval_log:
+            return []
+        eval_step_id = util.extract_step_id_from_eval_log_path(eval_log)
+        full_dir = util.get_eval_results_dir(
+            self._session, eval_step_id=eval_step_id
+        )
         files: list[str] = []
-        if not self._repo:
-            return files
-        for target_dir in ['tmp/tast_results_tmp', 'tmp/autotest_results_tmp']:
-            full_dir = os.path.join(self._repo, target_dir)
-            if os.path.exists(full_dir) and os.path.isdir(full_dir):
-                for root, _, filenames in os.walk(full_dir):
-                    for fname in filenames:
-                        full_path = os.path.join(root, fname)
-                        rel_path = os.path.relpath(full_path, full_dir)
-                        files.append(rel_path)
+        if os.path.exists(full_dir) and os.path.isdir(full_dir):
+            for root, _, filenames in os.walk(full_dir):
+                for fname in filenames:
+                    full_path = os.path.join(root, fname)
+                    rel_path = os.path.relpath(full_path, full_dir)
+                    files.append(rel_path)
         return sorted(list(set(files)))
 
     def _read_log_file(
@@ -607,22 +618,29 @@ class BisectAgent:
         """Reads the evaluation log file or a specific collected file adhoc from disk."""
         if file_name and file_name.strip():
             file_name = file_name.strip()
-            if not self._repo:
-                return {
-                    'error': 'Repository root not available to locate test results.'
-                }
-            candidate_paths = [
-                os.path.join(self._repo, 'tmp/tast_results_tmp', file_name),
-                os.path.join(self._repo, 'tmp/autotest_results_tmp', file_name),
-            ]
+            if not eval_log:
+                return {'error': 'Log not available for this run.'}
+            eval_step_id = util.extract_step_id_from_eval_log_path(eval_log)
+            sys_dir = util.get_eval_results_dir(
+                self._session, eval_step_id=eval_step_id
+            )
+            log_full_path = os.path.abspath(os.path.join(sys_dir, file_name))
+            sys_dir_abs = os.path.abspath(sys_dir)
+            if os.path.commonpath([sys_dir_abs, log_full_path]) != sys_dir_abs:
+                return {'error': f'Invalid file name {file_name}.'}
 
-            log_full_path = None
-            for path in candidate_paths:
-                if os.path.exists(path) and os.path.isfile(path):
-                    log_full_path = path
-                    break
+            if os.path.exists(log_full_path):
+                log_real_path = os.path.realpath(log_full_path)
+                sys_dir_real = os.path.realpath(sys_dir)
+                if (
+                    os.path.commonpath([sys_dir_real, log_real_path])
+                    != sys_dir_real
+                ):
+                    return {'error': f'Invalid file name {file_name}.'}
 
-            if not log_full_path:
+            if not os.path.exists(log_full_path) or not os.path.isfile(
+                log_full_path
+            ):
                 return {
                     'error': (
                         f'File {file_name} not found in collected test results.'
@@ -648,6 +666,34 @@ class BisectAgent:
             return {'log': content}
         except Exception as e:
             return {'error': f'Failed to read log file: {e}'}
+
+    def _handle_read_log(
+        self, rev_id: str | None, run_index: Any, file_name: str | None = None
+    ) -> dict:
+        """Helper to handle read_log tool execution."""
+        if not rev_id or rev_id not in self._rev2commit:
+            return {'error': f'Invalid rev_id {rev_id}.'}
+        if run_index is None or not isinstance(run_index, int) or run_index < 0:
+            return {
+                'error': (
+                    f'Invalid run_index {run_index}. Must be a'
+                    ' non-negative integer.'
+                )
+            }
+        if run_index >= len(self._rev_samples[rev_id]):
+            return {
+                'error': (
+                    f'run_index {run_index} out of range for'
+                    f' revision {rev_id}. Total runs:'
+                    f' {len(self._rev_samples[rev_id])}.'
+                )
+            }
+
+        eval_log = self._rev_samples[rev_id][run_index].get('eval_log')
+        resp = self._read_log_file(eval_log, file_name=file_name)
+        if not file_name or not file_name.strip():
+            resp['available_files'] = self._list_collected_files(eval_log)
+        return resp
 
     def _short(self, d: Any) -> Any:
         """Create a shorter object for logging purpose.
@@ -800,7 +846,9 @@ class BisectAgent:
                         file_name=file_name,
                     )
                     if not file_name or not file_name.strip():
-                        resp['available_files'] = self._list_collected_files()
+                        resp['available_files'] = self._list_collected_files(
+                            self._last_run_eval_log
+                        )
                     self._pending_parts.append(
                         genai.types.Part(
                             function_response=genai.types.FunctionResponse(
@@ -811,34 +859,11 @@ class BisectAgent:
                         )
                     )
                 elif call.name == 'read_log':
-                    rev_id = call.args.get('rev_id')
-                    run_index = call.args.get('run_index')
-                    if not rev_id or rev_id not in self._rev2commit:
-                        resp = {'error': f'Invalid rev_id {rev_id}.'}
-                    elif (
-                        run_index is None
-                        or not isinstance(run_index, int)
-                        or run_index < 0
-                    ):
-                        resp = {
-                            'error': (
-                                f'Invalid run_index {run_index}. Must be a'
-                                ' non-negative integer.'
-                            )
-                        }
-                    elif run_index >= len(self._rev_samples[rev_id]):
-                        resp = {
-                            'error': (
-                                f'run_index {run_index} out of range for'
-                                f' revision {rev_id}. Total runs:'
-                                f' {len(self._rev_samples[rev_id])}.'
-                            )
-                        }
-                    else:
-                        eval_log = self._rev_samples[rev_id][run_index].get(
-                            'eval_log'
-                        )
-                        resp = self._read_log_file(eval_log)
+                    resp = self._handle_read_log(
+                        call.args.get('rev_id'),
+                        call.args.get('run_index'),
+                        file_name=call.args.get('file_name'),
+                    )
                     self._pending_parts.append(
                         genai.types.Part(
                             function_response=genai.types.FunctionResponse(

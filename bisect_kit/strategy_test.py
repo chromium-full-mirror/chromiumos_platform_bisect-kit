@@ -18,6 +18,7 @@ from bisect_kit import errors
 from bisect_kit import math_util
 from bisect_kit import strategy
 from bisect_kit import testing
+from bisect_kit import util
 from bisect_kit.gemini_bisect import gemini_util
 
 
@@ -1509,14 +1510,6 @@ class TestBisectAgent(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as tmp_repo:
-            tast_dir = os.path.join(
-                tmp_repo, 'tmp/tast_results_tmp/system_logs'
-            )
-            os.makedirs(tast_dir)
-            syslog_file = os.path.join(tast_dir, 'syslog')
-            with open(syslog_file, 'w', encoding='utf-8') as f:
-                f.write('system log content\n')
-
             with tempfile.NamedTemporaryFile('w+', encoding='utf-8') as tmp:
                 tmp.write('ssh to DUT\nrunning test\ntest completed PASS\n')
                 tmp.flush()
@@ -1547,6 +1540,18 @@ class TestBisectAgent(unittest.TestCase):
                             }
                         )
 
+                    # Set up mock system log in the session's eval_results directory
+                    sys_dir = util.get_eval_results_dir(
+                        agent._session,
+                        eval_step_id=util.extract_step_id_from_eval_log_path(
+                            tmp.name
+                        ),
+                    )
+                    syslog_file = os.path.join(sys_dir, 'system_logs/syslog')
+                    os.makedirs(os.path.dirname(syslog_file), exist_ok=True)
+                    with open(syslog_file, 'w', encoding='utf-8') as f:
+                        f.write('system log content\n')
+
                     # Test read_last_log helper
                     resp = agent._read_log_file(agent._last_run_eval_log)
                     self.assertEqual(
@@ -1562,12 +1567,29 @@ class TestBisectAgent(unittest.TestCase):
                     )
                     self.assertEqual(resp, {'log': 'system log content\n'})
                     self.assertEqual(
-                        agent._list_collected_files(), ['system_logs/syslog']
+                        agent._list_collected_files(agent._last_run_eval_log),
+                        ['system_logs/syslog'],
                     )
                     resp_missing = agent._read_log_file(
                         agent._last_run_eval_log, file_name='nonexistent.txt'
                     )
                     self.assertIn('error', resp_missing)
+
+                    # Test invalid file_name (path traversal attempt)
+                    resp_invalid = agent._read_log_file(
+                        agent._last_run_eval_log, file_name='../secret.txt'
+                    )
+                    self.assertEqual(
+                        resp_invalid,
+                        {'error': 'Invalid file name ../secret.txt.'},
+                    )
+                    resp_invalid_abs = agent._read_log_file(
+                        agent._last_run_eval_log, file_name='/etc/passwd'
+                    )
+                    self.assertEqual(
+                        resp_invalid_abs,
+                        {'error': 'Invalid file name /etc/passwd.'},
+                    )
 
                 # Test read_log out of bounds run_index
                 eval_log = agent._rev_samples['1'][0].get('eval_log')

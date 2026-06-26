@@ -21,6 +21,7 @@ import threading
 import time
 import typing
 
+from bisect_kit import common
 from bisect_kit import core
 from bisect_kit import errors
 import psutil
@@ -759,3 +760,62 @@ class InitOnce:
         self._init_func()
         logger.info('init once func "%s" completed', self._name)
         self._initialized = True
+
+
+def extract_step_id_from_eval_log_path(eval_log: str) -> str:
+    """Extracts step ID from eval log path (e.g. filename stem)."""
+    return pathlib.Path(eval_log).stem
+
+
+def get_eval_results_dir(
+    session_name: str | None, eval_step_id: str | None = None
+) -> str:
+    """Gets the evaluation results directory for a session or a specific eval step."""
+    base_dir = common.get_session_log_path(session_name, 'eval_results')
+    if eval_step_id:
+        return str(pathlib.Path(base_dir) / eval_step_id)
+    return base_dir
+
+
+def manage_eval_results_quota(
+    session_name: str | None,
+    max_quota_mb: int = 2000,
+    min_store_count: int = 10,
+) -> None:
+    """Manages eval_results quota by pruning oldest runs when exceeding quota."""
+    if not session_name:
+        return
+    eval_results_base = pathlib.Path(get_eval_results_dir(session_name))
+    if not eval_results_base.exists() or not eval_results_base.is_dir():
+        return
+
+    dirs = [d for d in eval_results_base.iterdir() if d.is_dir()]
+    if len(dirs) <= min_store_count:
+        return
+
+    # Sort directories by modification time (oldest first)
+    dirs.sort(key=lambda d: d.stat().st_mtime)
+
+    def calc_total_size_mb() -> float:
+        total = 0
+        for root, _, files in os.walk(eval_results_base):
+            for f in files:
+                total += os.path.getsize(os.path.join(root, f))
+        return total / (1024 * 1024)
+
+    while len(dirs) > min_store_count and calc_total_size_mb() > max_quota_mb:
+        oldest = dirs.pop(0)
+        logger.info(
+            'Pruning old eval results directory due to quota: %s', oldest
+        )
+        shutil.rmtree(oldest, ignore_errors=True)
+
+
+def cleanup_eval_results(session_name: str | None) -> None:
+    """Removes the temporary eval_results directory for a session."""
+    if not session_name:
+        return
+    eval_results_base = pathlib.Path(get_eval_results_dir(session_name))
+    if eval_results_base.exists():
+        logger.info('Cleaning up eval results directory: %s', eval_results_base)
+        shutil.rmtree(eval_results_base, ignore_errors=True)

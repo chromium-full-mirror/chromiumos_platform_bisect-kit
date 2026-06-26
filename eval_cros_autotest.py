@@ -17,6 +17,7 @@ import glob
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree
@@ -57,6 +58,11 @@ def create_argument_parser():
         '--rich-result',
         action='store_true',
         help='Instead of mere exit code, output detailed information in json',
+    )
+    parser.add_argument(
+        '--bisect-results-dir',
+        metavar='BISECT_RESULTS_DIR',
+        help='Directory to save system logs / test results for bisect',
     )
     parser.add_argument(
         'dut',
@@ -286,9 +292,20 @@ def run_test(opts) -> str:
     if not m:
         raise errors.ExternalError('result dir is unknown')
     assert m.group(1) == results_dir
-    return results_dir.replace(
+    results_dir_output_chroot = results_dir.replace(
         cros_util.chromeos_root_inside_chroot, opts.chromeos_root
     )
+    if opts.bisect_results_dir and os.path.exists(results_dir_output_chroot):
+        sys_logs_dir = os.path.join(results_dir_output_chroot, 'system_logs')
+        if not os.path.exists(sys_logs_dir):
+            sys_logs_dir = os.path.join(results_dir_output_chroot, 'sysinfo')
+        if os.path.exists(sys_logs_dir):
+            shutil.copytree(
+                sys_logs_dir,
+                os.path.join(opts.bisect_results_dir, 'system_logs'),
+                dirs_exist_ok=True,
+            )
+    return results_dir_output_chroot
 
 
 # Although tauto will generate results.json, its content may be empty and
