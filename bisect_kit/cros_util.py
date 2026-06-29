@@ -3746,16 +3746,7 @@ class ChromeOSSpecManager(codechange.SpecManager):
             if self.is_public_build
             else INTERNAL_MANIFEST_REPO_URL
         )
-
-        if self.is_public_build:
-            groups = 'all'
-        else:
-            # Probably we can use "all" even for the internal builds.
-            # TODO(yoshiki): Confirm 'all' works and replace it.
-            # b/150753074: moblab is in non-default group and causes mark_as_stable
-            # fail
-            # b/264611730: satlab is also necessary for mark_as_stable
-            groups = 'default,moblab,satlab,platform-linux'
+        groups = 'all'
 
         # For ChromeOS, mark_as_stable step requires 'repo init -m', which sticks
         # manifest. 'repo sync -m' is not enough
