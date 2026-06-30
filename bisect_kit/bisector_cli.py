@@ -1649,9 +1649,20 @@ class BisectorCommandLine(typing.Generic[T_co]):
         enable_gemini = bool(
             # Only enable gemini under experiments.
             # If experiment flag is ON,
-            experiment.is_in_experiment(
-                self.config.get('experiments', []),
-                experiment.ID.GEMINI_ASSIT,
+            (
+                experiment.is_in_experiment(
+                    self.config.get('experiments', []),
+                    experiment.ID.GEMINI_ASSIST,
+                )
+                or (
+                    experiment.is_in_experiment(
+                        self.config.get('experiments', []),
+                        experiment.ID.GEMINI_ASSIST_BASIC,
+                    )
+                    and not strategy.NoisyBinarySearch.is_noisy_observation(
+                        self.config.get('noisy')
+                    )
+                )
             )
             # and is bisecting Chrome or ChromeOS
             and (

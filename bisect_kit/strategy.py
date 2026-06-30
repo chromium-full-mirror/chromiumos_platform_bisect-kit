@@ -482,6 +482,25 @@ class NoisyBinarySearch:
 
         return old_f, new_t
 
+    @staticmethod
+    def is_noisy_observation(observation: str | None) -> bool:
+        """Returns whether an observation string indicates noisy (non-deterministic) results."""
+        if not observation:
+            return False
+        (old_new, _old_trial), (
+            new_new,
+            new_trial,
+        ) = NoisyBinarySearch._parse_observation(observation)
+        if old_new is not None and old_new > 0:
+            return True
+        if (
+            new_new is not None
+            and new_trial is not None
+            and new_new < new_trial
+        ):
+            return True
+        return False
+
     def _gather_noise_count(self):
         """Gathers noise count from current run results.
 

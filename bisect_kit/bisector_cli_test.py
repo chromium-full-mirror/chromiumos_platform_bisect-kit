@@ -20,6 +20,7 @@ from bisect_kit import dut_manager as dut_manager_module
 from bisect_kit import errors
 from bisect_kit import strategy
 from bisect_kit import testing
+import experiment
 
 
 class NoisyTestCaseType(typing.TypedDict):
@@ -610,6 +611,55 @@ class TestBisectorCommandLine(unittest.TestCase):
         versions = bisector.future_switch_versions('0', 1)
         self.assertEqual(recorder.call_count, 5)
         self.assertEqual(sorted(versions), ['1', '2', '3'])
+
+    @mock.patch(
+        'bisect_kit.gemini_bisect.gemini_util.BisectAgent', mock.MagicMock()
+    )
+    @mock.patch.object(
+        bisector_cli.cros_util, 'is_cros_or_snapshot_version', return_value=True
+    )
+    def test_make_strategy_gemini_flags(self, _mock_is_cros):
+        # pylint: disable=protected-access
+        bisector = bisector_cli.BisectorCommandLine(
+            DummyDomain, self.dut_manager
+        )
+        bisector.main(
+            'init',
+            '--num=5',
+            '--old=0',
+            '--new=4',
+            '--term-old=PASS',
+            '--term-new=FAIL',
+        )
+
+        # 1. Default (no experiment flags): NoisyBinarySearch
+        s = bisector._strategy_factory()
+        self.assertNotIsInstance(s, strategy.GeminiFusionStrategy)
+
+        # 2. gemini_assist flag: GeminiFusionStrategy
+        bisector.config['experiments'] = [experiment.ID.GEMINI_ASSIST]
+        s = bisector._strategy_factory()
+        self.assertIsInstance(s, strategy.GeminiFusionStrategy)
+
+        # 3. gemini_assist_basic flag + no noisy config: GeminiFusionStrategy
+        bisector.config['experiments'] = [experiment.ID.GEMINI_ASSIST_BASIC]
+        s = bisector._strategy_factory()
+        self.assertIsInstance(s, strategy.GeminiFusionStrategy)
+
+        # 4. gemini_assist_basic flag + deterministic observation ('old=0/1,new=1/1'): GeminiFusionStrategy
+        bisector.config['noisy'] = 'old=0/1,new=1/1'
+        s = bisector._strategy_factory()
+        self.assertIsInstance(s, strategy.GeminiFusionStrategy)
+
+        # 5. gemini_assist_basic flag + non-deterministic observation ('new=9/10'): NoisyBinarySearch
+        bisector.config['noisy'] = 'new=9/10'
+        s = bisector._strategy_factory()
+        self.assertNotIsInstance(s, strategy.GeminiFusionStrategy)
+
+        # 6. gemini_assist (not basic) + non-deterministic observation ('new=9/10'): GeminiFusionStrategy
+        bisector.config['experiments'] = [experiment.ID.GEMINI_ASSIST]
+        s = bisector._strategy_factory()
+        self.assertIsInstance(s, strategy.GeminiFusionStrategy)
 
 
 # Shorthand for testing.

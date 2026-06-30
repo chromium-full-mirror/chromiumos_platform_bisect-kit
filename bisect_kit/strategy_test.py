@@ -57,6 +57,16 @@ class TestNoisyBinarySearch(unittest.TestCase):
             Strategy._parse_observation('old=1/10,new=9/10'), ((1, 10), (9, 10))
         )
 
+    def test_is_noisy_observation(self):
+        Strategy = strategy.NoisyBinarySearch
+        self.assertFalse(Strategy.is_noisy_observation(None))
+        self.assertFalse(Strategy.is_noisy_observation(''))
+        self.assertFalse(Strategy.is_noisy_observation('old=0/1,new=1/1'))
+        self.assertFalse(Strategy.is_noisy_observation('old=0/5,new=5/5'))
+        self.assertTrue(Strategy.is_noisy_observation('new=9/10'))
+        self.assertTrue(Strategy.is_noisy_observation('old=1/10'))
+        self.assertTrue(Strategy.is_noisy_observation('old=1/10,new=9/10'))
+
     def test_calculate_probs_0_1(self):
         prob = strategy.NoisyBinarySearch._calculate_probs(
             0.0, 1.0, self.rev_info, self.init_prob

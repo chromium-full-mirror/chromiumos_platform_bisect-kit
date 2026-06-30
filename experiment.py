@@ -30,7 +30,8 @@ class ID(StrEnum):
     VM = 'vm'
     SHARED_DUT_POOL = 'shared_dut_pool'
     EXT4_CHROME_CHECKOUT = 'ext4_chrome_checkout'
-    GEMINI_ASSIT = 'gemini_assist'
+    GEMINI_ASSIST = 'gemini_assist'
+    GEMINI_ASSIST_BASIC = 'gemini_assist_basic'
 
 
 def is_in_experiment(experiments: list[IDType], exp_in_query: IDType) -> bool:
