@@ -111,11 +111,11 @@ class TestDutManagerAllocation(unittest.TestCase):
     def dummy_mock_states(self):
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
-            config={
-                'session': 'stateless',
-                'experiments': [],
-                'chromeos_root': 'PATH_TO_CHROMEOS_ROOT',
-            },
+            config=core.DiagnoserConfig(
+                session='stateless',
+                experiments=[],
+                chromeos_root='PATH_TO_CHROMEOS_ROOT',
+            ),
         )
         return mock_states
 
@@ -1008,11 +1008,11 @@ class TestDutManagerLocalBuild(unittest.TestCase):
         super().setUp()
         self.mock_states = core.DiagnoseStates('dummy_session_file')
         self.mock_states.init_states(
-            config={
-                'session': 'stateless',
-                'experiments': [],
-                'chromeos_root': 'PATH_TO_CHROMEOS_ROOT',
-            },
+            config=core.DiagnoserConfig(
+                session='stateless',
+                experiments=[],
+                chromeos_root='PATH_TO_CHROMEOS_ROOT',
+            ),
         )
         self.mock_dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
             boards=['test_board']
@@ -1252,11 +1252,11 @@ class TestAddDutLeasesRecord(unittest.TestCase):
     def dummy_mock_states(self):
         mock_states = core.DiagnoseStates('dummy_session_file')
         mock_states.init_states(
-            config={
-                'session': 'stateless',
-                'experiments': [],
-                'chromeos_root': 'PATH_TO_CHROMEOS_ROOT',
-            },
+            config=core.DiagnoserConfig(
+                session='stateless',
+                experiments=[],
+                chromeos_root='PATH_TO_CHROMEOS_ROOT',
+            ),
         )
         return mock_states
 
@@ -1434,11 +1434,11 @@ class TestConfigUpdated(unittest.TestCase):
         }
         self.mock_allocate_dut.return_value = 'host', 'board1'
 
-        config = {
-            'session': 'stateless',
-            'experiments': [],
-            'sync_dut_allocate_spec_with_db': False,
-        }
+        config = core.DiagnoserConfig(
+            session='stateless',
+            experiments=[],
+            sync_dut_allocate_spec_with_db=False,
+        )
         dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
             boards=['board1']
         )
@@ -1462,10 +1462,13 @@ class TestConfigUpdated(unittest.TestCase):
                 dut_manager.dut_allocate_spec, expected_dut_allocate_spec
             )
 
-            expected_config = config | {
-                'board': 'board1',
-                'allocated_dut': 'host.cros',
-            }
+            expected_config = core.DiagnoserConfig(
+                session='stateless',
+                experiments=[],
+                sync_dut_allocate_spec_with_db=False,
+                board='board1',
+                allocated_dut='host.cros',
+            )
             self.assertEqual(states.config, expected_config)
 
         self.mock_save_dut_allocate_spec.assert_called_once_with(
@@ -1490,12 +1493,12 @@ class TestConfigUpdated(unittest.TestCase):
         }
         self.mock_allocate_dut.return_value = 'host', 'board1'
 
-        config = {
-            'session': 'stateless',
-            'experiments': [],
-            'metric': 'some_metric',
-            'sync_dut_allocate_spec_with_db': False,
-        }
+        config = core.DiagnoserConfig(
+            session='stateless',
+            experiments=[],
+            metric='some_metric',
+            sync_dut_allocate_spec_with_db=False,
+        )
         dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
             models=['model1']
         )
@@ -1519,10 +1522,14 @@ class TestConfigUpdated(unittest.TestCase):
                 dut_manager.dut_allocate_spec, expected_dut_allocate_spec
             )
 
-            expected_config = config | {
-                'board': 'board1',
-                'allocated_dut': 'host.cros',
-            }
+            expected_config = core.DiagnoserConfig(
+                session='stateless',
+                experiments=[],
+                metric='some_metric',
+                sync_dut_allocate_spec_with_db=False,
+                board='board1',
+                allocated_dut='host.cros',
+            )
             self.assertEqual(states.config, expected_config)
 
         self.mock_save_dut_allocate_spec.assert_called_once_with(
@@ -1536,11 +1543,11 @@ class TestConfigUpdated(unittest.TestCase):
     def testDutNameSpecified(self):
         self.mock_allocate_dut.return_value = 'dut_name', 'board1'
 
-        config = {
-            'session': 'stateless',
-            'experiments': [],
-            'sync_dut_allocate_spec_with_db': False,
-        }
+        config = core.DiagnoserConfig(
+            session='stateless',
+            experiments=[],
+            sync_dut_allocate_spec_with_db=False,
+        )
         dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
             dut_name='dut_name',
         )
@@ -1564,10 +1571,13 @@ class TestConfigUpdated(unittest.TestCase):
                 dut_manager.dut_allocate_spec, expected_dut_allocate_spec
             )
 
-            expected_config = config | {
-                'board': 'board1',
-                'allocated_dut': 'dut_name.cros',
-            }
+            expected_config = core.DiagnoserConfig(
+                session='stateless',
+                experiments=[],
+                sync_dut_allocate_spec_with_db=False,
+                board='board1',
+                allocated_dut='dut_name.cros',
+            )
             self.assertEqual(states.config, expected_config)
 
         self.mock_save_dut_allocate_spec.assert_called_once_with(
@@ -1579,12 +1589,12 @@ class TestConfigUpdated(unittest.TestCase):
         self.mock_swarming_bot_info.assert_not_called()
 
     def testNoAutoAllocate(self):
-        config = {
-            'session': 'stateless',
-            'experiments': [],
-            'board': 'board1',
-            'sync_dut_allocate_spec_with_db': False,
-        }
+        config = core.DiagnoserConfig(
+            session='stateless',
+            experiments=[],
+            board='board1',
+            sync_dut_allocate_spec_with_db=False,
+        )
         dut_allocate_spec = dut_allocate_spec_module.DutAllocateSpec(
             boards=['board1']
         )

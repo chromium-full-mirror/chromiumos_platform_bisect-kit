@@ -88,14 +88,18 @@ class TestDiagnose(unittest.TestCase):
         self.maxDiff = None
 
     def test_shared_dut_pool_disalbed_is_stateless(self):
-        self.init(config={'experiments': []}, is_stateless=True)
+        self.init(
+            config=core.DiagnoserConfig(experiments=[]), is_stateless=True
+        )
         self.diagnose()
 
         self._mock_clean_up_duts_by_owner.assert_not_called()
         self._mock_dut_manager_reset.assert_called_once()
 
     def test_shared_dut_pool_disalbed_is_not_stateless(self):
-        self.init(config={'experiments': []}, is_stateless=False)
+        self.init(
+            config=core.DiagnoserConfig(experiments=[]), is_stateless=False
+        )
         self.diagnose()
 
         self._mock_dut_manager_reset.assert_called_once()
@@ -103,12 +107,12 @@ class TestDiagnose(unittest.TestCase):
 
     def test_no_exception_raises(self):
         self.init(
-            config={
-                'experiments': [
+            config=core.DiagnoserConfig(
+                experiments=[
                     'shared_dut_pool',
                 ],
-                'session': 'session1',
-            },
+                session='session1',
+            ),
             is_stateless=True,
         )
         self.diagnose()
@@ -118,11 +122,11 @@ class TestDiagnose(unittest.TestCase):
 
     def test_retraible_error(self):
         self.init(
-            config={
-                'experiments': [
+            config=core.DiagnoserConfig(
+                experiments=[
                     'shared_dut_pool',
                 ]
-            },
+            ),
             is_stateless=True,
         )
         self._mock_diagnose.side_effect = errors.BisectRetriableError(
@@ -137,13 +141,13 @@ class TestDiagnose(unittest.TestCase):
 
     def test_fatal_error(self):
         self.init(
-            config={
-                'experiments': [
+            config=core.DiagnoserConfig(
+                experiments=[
                     'shared_dut_pool',
                     'stateless',
                 ],
-                'session': 'session1',
-            },
+                session='session1',
+            ),
             is_stateless=True,
         )
         self._mock_diagnose.side_effect = errors.ExecutionFatalError('fatal')
@@ -156,13 +160,13 @@ class TestDiagnose(unittest.TestCase):
 
     def test_dut_manager_reset_raises(self):
         self.init(
-            config={
-                'experiments': [
+            config=core.DiagnoserConfig(
+                experiments=[
                     'shared_dut_pool',
                     'stateless',
                 ],
-                'session': 'session1',
-            },
+                session='session1',
+            ),
             is_stateless=True,
         )
         self._mock_diagnose.side_effect = errors.ExecutionFatalError('fatal')
@@ -177,13 +181,13 @@ class TestDiagnose(unittest.TestCase):
 
     def test_clean_up_duts_by_owner_raises(self):
         self.init(
-            config={
-                'experiments': [
+            config=core.DiagnoserConfig(
+                experiments=[
                     'shared_dut_pool',
                     'stateless',
                 ],
-                'session': 'session1',
-            },
+                session='session1',
+            ),
             is_stateless=True,
         )
 
@@ -221,21 +225,21 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
                 './switch_tast_prebuilt.py',
                 '--rich-result',
                 '--chromeos-root',
-                self.config.get('chromeos_root'),
+                self.config.chromeos_root,
                 '--chromeos-mirror',
-                self.config.get('chromeos_mirror'),
+                self.config.chromeos_mirror,
             ]
             common_eval_cmd = [
                 './eval_cros_tast.py',
                 '--rich-result',
                 '--with-private-bundles',
                 '--chromeos-root',
-                self.config.get('chromeos_root'),
+                self.config.chromeos_root,
                 '--test-name',
-                self.config.get('test_name'),
+                self.config.test_name,
             ]
-            if self.config.get('tast_patch_cls'):
-                for patch_cl in self.config.get('tast_patch_cls'):
+            if self.config.tast_patch_cls:
+                for patch_cl in self.config.tast_patch_cls:
                     common_eval_cmd += ['--tast-patch-cl', patch_cl]
                 switch_test_harness_cmd = None
 
@@ -272,11 +276,11 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
         self, MockCrosDiagnoser, mock_is_buildbucket_buildable
     ):
         """Tests that --tast-patch-cl correctly modifies eval commands."""
-        test_config = {
-            'chromeos_root': '/path/to/chromeos',
-            'test_name': 'tast.awesome.test',
-            'tast_patch_cls': ['12345', '67890'],
-        }
+        test_config = core.DiagnoserConfig(
+            chromeos_root='/path/to/chromeos',
+            test_name='tast.awesome.test',
+            tast_patch_cls=['12345', '67890'],
+        )
         mock_states = mock.Mock(spec=core.DiagnoseStates, config=test_config)
         # mock_states.config = test_config
 
@@ -357,7 +361,7 @@ class TestCrosDiagnoser(unittest.TestCase):
             self.new_info = mock.Mock()
             self.noisy: str | None = None
             self.is_stateless = True
-            self.cros_old: str | None = '1.2.3'
+            self.cros_old: str = '1.2.3'
             self.is_vm_board = False
             self.dut_allocate_spec = mock.Mock()
             self.dut_allocate_spec.boards = []
@@ -365,12 +369,12 @@ class TestCrosDiagnoser(unittest.TestCase):
             self._dut_manager = mock.Mock()
 
     def setUp(self):
-        self.config: core.DiagnoserConfig = {
-            'chrome_root': '/path/to/chrome',
-            'chrome_mirror': '/path/to/mirror',
-            'board': 'eve',
-            'board_cpu_arch': 'amd64',
-        }
+        self.config: core.DiagnoserConfig = core.DiagnoserConfig(
+            chrome_root='/path/to/chrome',
+            chrome_mirror='/path/to/mirror',
+            board='eve',
+            board_cpu_arch='amd64',
+        )
         self.diagnoser = self.FakeDiagnoser(self.config)
 
     @mock.patch('bisect_kit.diagnoser_cros.cros_util.is_buildbucket_buildable')
@@ -383,7 +387,7 @@ class TestCrosDiagnoser(unittest.TestCase):
         mock_is_buildbucket_buildable,
     ):
         # pylint: disable=protected-access
-        self.config['chrome_cfi_thinlto_build'] = True
+        self.config.chrome_cfi_thinlto_build = True
         mock_version_to_short.return_value = '1.2.3'
         mock_is_buildbucket_buildable.return_value = False
 
@@ -457,8 +461,8 @@ class TestCrosDiagnoser(unittest.TestCase):
         mock_buildbucket_api_cls,
     ):
         # Setup
-        self.config['enable_buildbucket_chrome'] = True
-        self.config['disable_buildbucket_chromeos'] = False
+        self.config.enable_buildbucket_chrome = True
+        self.config.disable_buildbucket_chromeos = False
         mock_version_to_short.return_value = '1.2.3'
         mock_is_buildbucket_buildable.return_value = True
 

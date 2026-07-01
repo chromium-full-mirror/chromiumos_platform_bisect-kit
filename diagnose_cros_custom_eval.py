@@ -54,7 +54,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
     def _build_cmds(self):
         switch_test_harness_cmd = None
-        eval_script = self.config.get('eval_script')
+        eval_script = self.config.eval_script
         eval_script_filename = self._get_eval_script_file_name(eval_script)
         common_eval_cmd = [
             f'./{eval_script_filename}',
@@ -88,7 +88,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         self.states.load_states()
 
         try:
-            logger.info('experiments: %s', self.config.get('experiments'))
+            logger.info('experiments: %s', self.config.experiments)
             self.do_run()
             logger.info('%s done', __file__)
         except Exception as e:

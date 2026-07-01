@@ -584,8 +584,10 @@ def is_ancestor_version(ver1, ver2):
     return True
 
 
-def is_buildbucket_buildable(version):
+def is_buildbucket_buildable(version: str) -> bool:
     """Determines if a version is buildable on buildbucket."""
+    if not version:
+        return False
     short_version = version_to_short(version)
     # If given version is child of any cutover, then it's buildable
     return any(

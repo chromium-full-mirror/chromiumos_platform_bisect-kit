@@ -41,56 +41,56 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             './switch_tast_prebuilt.py',
             '--rich-result',
             '--chromeos-root',
-            self.config.get('chromeos_root'),
+            self.config.chromeos_root,
             '--chromeos-mirror',
-            self.config.get('chromeos_mirror'),
+            self.config.chromeos_mirror,
         ]
         common_eval_cmd = [
             './eval_cros_tast.py',
             '--rich-result',
             '--chromeos-root',
-            self.config.get('chromeos_root'),
+            self.config.chromeos_root,
             '--test-name',
-            self.config.get('test_name'),
+            self.config.test_name,
         ]
-        if not self.config.get('is_public_build'):
+        if not self.config.is_public_build:
             common_eval_cmd.append('--with-private-bundles')
-        if self.config.get('metric'):
+        if self.config.metric:
             common_eval_cmd += [
                 '--metric',
-                self.config.get('metric'),
+                self.config.metric,
             ]
-        if self.config.get('tast_patch_cls'):
-            for patch_cl in self.config.get('tast_patch_cls'):
+        if self.config.tast_patch_cls:
+            for patch_cl in self.config.tast_patch_cls:
                 common_eval_cmd += ['--tast-patch-cl', patch_cl]
             # With tast_patch_cls switch tast harness cmd is redundant
             switch_test_harness_cmd = None
-        if self.config.get('tast_revision'):
+        if self.config.tast_revision:
             common_eval_cmd += [
                 '--tast-revision',
-                self.config.get('tast_revision'),
+                self.config.tast_revision,
             ]
             switch_test_harness_cmd = None
-        if self.config.get('tast_private_revision'):
+        if self.config.tast_private_revision:
             common_eval_cmd += [
                 '--tast-private-revision',
-                self.config.get('tast_private_revision'),
+                self.config.tast_private_revision,
             ]
             switch_test_harness_cmd = None
-        if self.config.get('tast_runtime_revision'):
+        if self.config.tast_runtime_revision:
             common_eval_cmd += [
                 '--tast-runtime-revision',
-                self.config.get('tast_runtime_revision'),
+                self.config.tast_runtime_revision,
             ]
             switch_test_harness_cmd = None
-        if self.config.get('fail_to_pass'):
+        if self.config.fail_to_pass:
             common_eval_cmd.append('--fail-to-pass')
-        if self.config.get('reboot_before_test'):
+        if self.config.reboot_before_test:
             common_eval_cmd.append('--reboot-before-test')
-        for var in self.config.get('extra_test_variables'):
+        for var in self.config.extra_test_variables:
             common_eval_cmd.append('--args')
             common_eval_cmd.append(var)
-        if self.config.get('consider_test_crash_as_failure'):
+        if self.config.consider_test_crash_as_failure:
             common_eval_cmd.append('--consider-test-crash-as-failure')
 
         return switch_test_harness_cmd, common_eval_cmd
@@ -102,14 +102,15 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         cros_prebuilt_eval_cmd = common_eval_cmd[:]
         android_prebuilt_eval_cmd = common_eval_cmd
-        if self.config.get('chrome_deploy_image'):
+        if self.config.chrome_deploy_image:
             chrome_localbuild_eval_cmd = common_eval_cmd + ['--tast-build']
         else:
             chrome_localbuild_eval_cmd = common_eval_cmd + ['--prebuilt']
 
-        cros_buildbucket_build = cros_util.is_buildbucket_buildable(
-            self.config.get('cros_prebuilt_old')
-        ) and not self.config.get('disable_buildbucket_chromeos')
+        cros_buildbucket_build = (
+            cros_util.is_buildbucket_buildable(self.config.cros_prebuilt_old)
+            and not self.config.disable_buildbucket_chromeos
+        )
         if not cros_buildbucket_build:
             cros_localbuild_eval_cmd = common_eval_cmd + ['--tast-build']
         else:
@@ -134,7 +135,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         self.states.load_states()
 
         try:
-            logger.info('experiments: %s', self.config.get('experiments'))
+            logger.info('experiments: %s', self.config.experiments)
             self.do_run()
             logger.info('%s done', __file__)
         except Exception as e:

@@ -380,69 +380,77 @@ class BisectConfig:
     branch: str | None = None
 
 
-class DiagnoserConfig(typing.TypedDict, total=False):
+@dataclasses.dataclass(kw_only=True, slots=True)
+class DiagnoserConfig:
     """Configuration for CrosDiagnoser."""
 
-    session: str
-    mirror_base: str
-    work_base: str
-    chrome_work_base: str
-    chromeos_root: str
-    chromeos_mirror: str
-    chrome_root: str
-    chrome_mirror: str
-    android_root: str
-    android_mirror: str
-    dut: str
-    board: str | None
-    old: str
-    new: str
-    is_public_build: bool
-    bisect_chrome: bool
-    bisect_android: bool
-    base_cros_version: str
-    cros_prebuilt_old: str | None
-    cros_prebuilt_new: str | None
-    chrome_localbuild_old: str | None
-    chrome_localbuild_new: str | None
-    chrome_dcheck_build: bool
-    chrome_cfi_thinlto_build: bool
-    chromium_patch_cls: list[str] | None
-    android_prebuilt_old: str | None
-    android_prebuilt_new: str | None
-    term_old: str | None
-    term_new: str | None
-    test_name: str | None
-    tast_patch_cls: list[str] | None
-    tast_revision: str | None
-    tast_private_revision: str | None
-    tast_runtime_revision: str | None
-    fail_to_pass: bool
-    metric: str | None
-    old_value: float | None
-    new_value: float | None
-    recompute_init_values: bool
-    noisy: str | None
-    always_reflash: bool
-    reboot_before_test: bool
-    bypass_chromeos_prebuilt: bool
-    bypass_chromeos_build: bool
-    bypass_chrome_build: bool
-    bypass_android_prebuilt: bool
-    bypass_android_build: bool
-    bypass_dlc_prebuilt: bool
-    disable_rootfs_verification: bool
-    chrome_deploy_image: bool
-    disable_snapshot: bool
-    disable_buildbucket_chromeos: bool
-    enable_buildbucket_chrome: bool
-    extra_test_variables: list[str]
-    endpoint_verification: bool
-    consider_test_crash_as_failure: bool
-    experiments: list[experiment.ID] | None
-    sync_dut_allocate_spec_with_db: bool
-    board_cpu_arch: str | None
-    allocated_dut: str | None
+    session: str = ''
+    mirror_base: str = ''
+    work_base: str = ''
+    chrome_work_base: str = ''
+    chromeos_root: str = ''
+    chromeos_mirror: str = ''
+    chrome_root: str = ''
+    chrome_mirror: str = ''
+    android_root: str = ''
+    android_mirror: str = ''
+    dut: str = ''
+    board: str | None = None
+    old: str = ''
+    new: str = ''
+    is_public_build: bool = False
+    bisect_chrome: bool = False
+    bisect_android: bool = False
+    base_cros_version: str = ''
+    cros_prebuilt_old: str = ''
+    cros_prebuilt_new: str = ''
+    chrome_localbuild_old: str | None = None
+    chrome_localbuild_new: str | None = None
+    chrome_dcheck_build: bool = False
+    chrome_cfi_thinlto_build: bool = False
+    chromium_patch_cls: list[str] | None = None
+    android_prebuilt_old: str | None = None
+    android_prebuilt_new: str | None = None
+    term_old: str | None = None
+    term_new: str | None = None
+    test_name: str | None = None
+    tast_patch_cls: list[str] | None = None
+    tast_revision: str | None = None
+    tast_private_revision: str | None = None
+    tast_runtime_revision: str | None = None
+    fail_to_pass: bool = False
+    metric: str | None = None
+    old_value: float | None = None
+    new_value: float | None = None
+    recompute_init_values: bool = False
+    noisy: str | None = None
+    always_reflash: bool = False
+    reboot_before_test: bool = False
+    bypass_chromeos_prebuilt: bool = False
+    bypass_chromeos_build: bool = False
+    bypass_chrome_build: bool = False
+    bypass_android_prebuilt: bool = False
+    bypass_android_build: bool = False
+    bypass_dlc_prebuilt: bool = False
+    disable_rootfs_verification: bool = False
+    chrome_deploy_image: bool = False
+    disable_snapshot: bool = False
+    disable_buildbucket_chromeos: bool = False
+    enable_buildbucket_chrome: bool = False
+    extra_test_variables: list[str] = dataclasses.field(default_factory=list)
+    endpoint_verification: bool = False
+    cts_test: str | None = None
+    cts_revision: str | None = None
+    cts_abi: str | None = None
+    cts_prefix: str | None = None
+    cts_module: str | None = None
+    cts_timeout: str | None = None
+    eval_script: str | None = None
+    consider_test_crash_as_failure: bool = False
+    experiments: list[experiment.ID] | None = None
+    sync_dut_allocate_spec_with_db: bool = False
+    board_cpu_arch: str | None = None
+    allocated_dut: str | None = None
 
 
 class _BisectStatesData(typing.TypedDict, total=False):
@@ -479,6 +487,8 @@ class DiagnoseStates(States):
             and 'history' in self._data
             and 'statistics' in self._data
         ):
+            if isinstance(self._data['config'], dict):
+                self._data['config'] = DiagnoserConfig(**self._data['config'])
             self._init_done()
             return True
         return False

@@ -401,7 +401,7 @@ class DutManager:
             images = cros_util.search_image(
                 self.dut_allocate_spec.boards[0],
                 self._vm_cros_version,
-                is_public_build=self.config.get('is_public_build', False),
+                is_public_build=self.config.is_public_build,
             )
 
             if cros_util.ImageType.VM_IMAGE not in images:
@@ -410,7 +410,7 @@ class DutManager:
                     % (
                         self.dut_allocate_spec.boards[0],
                         self._vm_cros_version,
-                        self.config.get('is_public_build', False),
+                        self.config.is_public_build,
                     )
                 )
             return images[cros_util.ImageType.VM_IMAGE]
@@ -491,12 +491,12 @@ class DutManager:
             )
         else:
             enable_shared_dut_pool = experiment.is_in_experiment(
-                self.config.get('experiments'),
+                self.config.experiments,
                 experiment.ID.SHARED_DUT_POOL,
             )
             host, builder = dut_allocator.allocate_dut(
                 self.dut_allocate_spec,
-                self.config.get('chromeos_root'),
+                self.config.chromeos_root,
                 enable_shared_dut_pool=enable_shared_dut_pool,
             )
             if not host:
@@ -630,7 +630,7 @@ class DutManager:
             self._auto_allocated_dut,
             dut_is_broken,
             experiment.is_in_experiment(
-                self.config.get('experiments'),
+                self.config.experiments,
                 experiment.ID.SHARED_DUT_POOL,
             ),
             functools.partial(add_dut_lease_record, self._auto_allocated_time),
@@ -730,7 +730,7 @@ class DutManager:
                     or self._should_force_monitoring
                 ):
                     logger.info('monitoring DUT lease status for %s', dut)
-                    session_id = self.config.get('session')
+                    session_id = self.config.session
                     reason = cros_lab_util.make_lease_reason(session_id)
                     with cros_lab_util.dut_lease_status_monitor(
                         dut, reason, session_id
@@ -787,7 +787,7 @@ class DutManager:
                 )
             return d[k][0]
 
-        if self.config.get('metric'):
+        if self.config.metric:
             self.dut_allocate_spec.boards = []
             self.dut_allocate_spec.models = []
             self.dut_allocate_spec.skus = [
@@ -828,17 +828,17 @@ class DutManager:
         if not self.is_vm:
             self._update_states_from_swarming(dut)
 
-        # If DUT is pre-alllocated, config['board'] would have been populated
+        # If DUT is pre-alllocated, config.board would have been populated
         # with the corresponding builder and this code path should not be
         # executed. On the other hand, if DUT is auto-allocated, this code path
-        # is executed and we should update config['board'] accordingly.
-        self.config['board'] = self._builder_of_auto_allocated_dut
+        # is executed and we should update config.board accordingly.
+        self.config.board = self._builder_of_auto_allocated_dut
         # TODO(cylee): Not sure if this is needed. Remove if not used.
-        self.config['allocated_dut'] = dut
+        self.config.allocated_dut = dut
         self._states.save()
         dut_allocate_spec_module.save(
             self.dut_allocate_spec,
-            self.config.get('sync_dut_allocate_spec_with_db'),
+            self.config.sync_dut_allocate_spec_with_db,
         )
 
     def dut_leases_log_path(self):
@@ -850,7 +850,7 @@ class DutManager:
             timestamp=time.strftime('%Y%m%d-%H%M%S'),
         )
         log_path = common.get_session_log_path(
-            self.config.get('session'), f'log/{log_file}'
+            self.config.session, f'log/{log_file}'
         )
 
         statistics.dut_leases_log_path = log_path

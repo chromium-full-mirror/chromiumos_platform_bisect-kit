@@ -63,11 +63,11 @@ class TestDiagnoseStates(unittest.TestCase):
 
     def setUp(self):
         self.session_file = tempfile.mktemp()
-        self._fake_config = {
-            'session': 'session1',
-            'old_value': 'version_old',
-            'new_value': 'version_new',
-        }
+        self._fake_config = core.DiagnoserConfig(
+            session='session1',
+            old_value='version_old',
+            new_value='version_new',
+        )
 
     def tearDown(self):
         if os.path.exists(self.session_file):
@@ -86,7 +86,7 @@ class TestDiagnoseStates(unittest.TestCase):
         states = core.DiagnoseStates(self.session_file)
         states.init_states(self._fake_config)
 
-        states.config['board'] = 'board1'
+        states.config.board = "board1"
         states.statistics.dut_leases_log_path = (
             '/some/other/path/to/dut_leases_log'
         )
@@ -98,12 +98,12 @@ class TestDiagnoseStates(unittest.TestCase):
         self.assertTrue(loaded_states.inited)
         self.assertEqual(
             loaded_states.config,
-            {
-                'session': 'session1',
-                'old_value': 'version_old',
-                'new_value': 'version_new',
-                'board': 'board1',
-            },
+            core.DiagnoserConfig(
+                session='session1',
+                old_value='version_old',
+                new_value='version_new',
+                board='board1',
+            ),
         )
         self.assertEqual(loaded_states.history, [])
         self.assertEqual(
@@ -152,6 +152,26 @@ class TestDiagnoseStates(unittest.TestCase):
         # failed because the file doesn't exist.
         self.assertFalse(states.load_states())
         self.assertFalse(states.inited)
+
+    def test_init_from_dict_converts_config(self):
+        states = core.DiagnoseStates(self.session_file)
+        fake_data = {
+            'config': {
+                'session': 'session1',
+                'old_value': 'version_old',
+                'new_value': 'version_new',
+            },
+            'history': [],
+            'statistics': {},
+        }
+        with open(self.session_file, 'w') as f:
+            json.dump(fake_data, f)
+        self.assertTrue(states.load_states())
+        self.assertTrue(states.inited)
+        self.assertIsInstance(states.config, core.DiagnoserConfig)
+        self.assertEqual(states.config.session, 'session1')
+        self.assertEqual(states.config.old_value, 'version_old')
+        self.assertEqual(states.config.new_value, 'version_new')
 
 
 class TestBisectStates(unittest.TestCase):
