@@ -214,15 +214,15 @@ class ChromeSrcDomain(core.BisectDomain):
             for action in detail.get('actions', []):
                 generate_action_link(action)
 
-        config = {
-            "chrome_root": opts.chrome_root,
-            "old": old_commit_position,
-            "new": new_commit_position,
-            "board": opts.board,
-            "dut": opts.dut,
-            "chrome_mirror": opts.chrome_mirror,
-            "is_public_build": opts.public_build,
-        }
+        config = core.BisectConfig(
+            chrome_root=opts.chrome_root,
+            old=old_commit_position,
+            new=new_commit_position,
+            board=opts.board,
+            dut=opts.dut,
+            chrome_mirror=opts.chrome_mirror,
+            is_public_build=opts.public_build,
+        )
         return config, {'revlist': revlist, 'details': details}
 
     def __init__(self, config: core.BisectConfig):
@@ -237,12 +237,12 @@ class ChromeSrcDomain(core.BisectDomain):
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
             args = [
                 '--chrome-root',
-                self.config.get('chrome_root'),
+                self.config.chrome_root,
                 '--chrome-mirror',
-                self.config.get('chrome_mirror'),
+                self.config.chrome_mirror,
             ]
-            if self.config.get('board'):
-                args += ['--board', self.config.get('board')]
+            if self.config.board:
+                args += ['--board', self.config.board]
             git_hash = cr_util.get_chrome_commit_hash(rev_details)
             args += ['--chrome-rev', git_hash]
             return args
@@ -251,7 +251,7 @@ class ChromeSrcDomain(core.BisectDomain):
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:
             old, new = summary['current_range']
-            chrome_src = os.path.join(self.config.get('chrome_root'), 'src')
+            chrome_src = os.path.join(self.config.chrome_root, 'src')
             old_rev = cr_util.query_git_rev_by_commit_position(chrome_src, old)
             new_rev = cr_util.query_git_rev_by_commit_position(chrome_src, new)
             log_url = (

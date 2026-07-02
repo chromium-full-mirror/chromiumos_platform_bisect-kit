@@ -150,13 +150,13 @@ class ChromeOSVersionDomain(core.BisectDomain):
             is_public_build=opts.public_build,
             use_snapshot=not opts.disable_snapshot,
         )
-        config = {
-            "dut": opts.dut,
-            "board": opts.board,
-            "old": old,
-            "new": new,
-            "is_public_build": opts.public_build,
-        }
+        config = core.BisectConfig(
+            dut=opts.dut,
+            board=opts.board,
+            old=old,
+            new=new,
+            is_public_build=opts.public_build,
+        )
 
         for i in range(1, len(revlist)):
             link = cros_util.get_crosland_link(revlist[i - 1], revlist[i])
@@ -175,8 +175,8 @@ class ChromeOSVersionDomain(core.BisectDomain):
     ) -> list[str]:
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
             args = []
-            if self.config.get('board'):
-                args += ['--board', self.config.get('board')]
+            if self.config.board:
+                args += ['--board', self.config.board]
             args += ['--chromeos-version', rev]
             return args
         return []

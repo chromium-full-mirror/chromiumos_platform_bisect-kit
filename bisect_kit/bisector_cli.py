@@ -722,8 +722,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
 
     def _get_term_map(self):
         return {
-            'old': self.config.get('term_old'),
-            'new': self.config.get('term_new'),
+            'old': self.config.term_old,
+            'new': self.config.term_new,
         }
 
     def _format_result_counter(self, result_counter):
@@ -861,35 +861,33 @@ class BisectorCommandLine(typing.Generic[T_co]):
             revlist = candidates['revlist']
             logger.info('found %d candidates to bisect', len(revlist))
             logger.debug('revlist %r', revlist)
-            if 'new' not in config:
-                config['new'] = opts.new
-            if 'old' not in config:
-                config['old'] = opts.old
+            if config.new is None:
+                config.new = opts.new
+            if config.old is None:
+                config.old = opts.old
             if len(revlist) < 2:
                 raise errors.TooFewRevisionsError(
                     f'Too few revisions: {revlist}'
                 )
-            assert config['new'] in revlist
-            assert config['old'] in revlist
-            old_idx = revlist.index(config['old'])
-            new_idx = revlist.index(config['new'])
+            assert config.new in revlist
+            assert config.old in revlist
+            old_idx = revlist.index(config.old)
+            new_idx = revlist.index(config.new)
             assert old_idx < new_idx
 
             if opts.test_name:
-                config['test_name'] = opts.test_name
+                config.test_name = opts.test_name
             if opts.experiments:
-                config['experiments'] = opts.experiments
+                config.experiments = opts.experiments
 
-            config.update(
-                confidence=opts.confidence,
-                noisy=opts.noisy,
-                term_old=opts.term_old,
-                term_new=opts.term_new,
-                old_value=opts.old_value,
-                new_value=opts.new_value,
-                recompute_init_values=opts.recompute_init_values,
-                endpoint_verification=opts.endpoint_verification,
-            )
+            config.confidence = opts.confidence
+            config.noisy = opts.noisy
+            config.term_old = opts.term_old
+            config.term_new = opts.term_new
+            config.old_value = opts.old_value
+            config.new_value = opts.new_value
+            config.recompute_init_values = opts.recompute_init_values
+            config.endpoint_verification = opts.endpoint_verification
             rev_details = candidates.get('details', {})
             self.states.init_states(config, revlist, rev_details)
         except Exception as e:
@@ -1083,7 +1081,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
               eval_time: How much time in eval step
         """
         # pre-build future revisions.
-        if self.config.get('future_build'):
+        if self.config.future_build:
             revisions = self.future_switch_versions(
                 prev_rev, self.future_build_depth
             )
@@ -1095,7 +1093,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                     self.session, future_build_log
                 )
                 do_future_build(
-                    self.config.get('future_build'),
+                    self.config.future_build,
                     self.domain,
                     r,
                     self.states.details.get(r, {}),
@@ -1112,7 +1110,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
         switch_build_deploy_cmds = []
         switch_with_dut_cmds = []
         switch_without_dut_cmds = []
-        for cmd in self.config.get('switch'):
+        for cmd in self.config.switch:
             action = switch_eval_script_action(cmd, SwitchAction.WITHOUT_DUT)
             if action == SwitchAction.BUILD_AND_DEPLOY:
                 switch_build_deploy_cmds.append(cmd)
@@ -1134,7 +1132,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
 
         eval_with_dut_cmd = None
         eval_without_dut_cmd = None
-        cmd = self.config.get('eval')
+        cmd = self.config.eval
         assert cmd, 'no eval script set'
         action = switch_eval_script_action(cmd, EvalAction.WITHOUT_DUT)
         if action == EvalAction.WITH_DUT:
@@ -1215,7 +1213,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
         # through wrapper.py. If the config presents, it takes precedence over
         # dut_manager. In the way the domain_cls scripts can be executed alone
         # from the command line (b/299388823).
-        pre_configured_dut = self.config.get('dut')
+        pre_configured_dut = self.config.dut
         logger.debug('pre-configured DUT: %s', pre_configured_dut)
         assert (
             pre_configured_dut or self.dut_manager
@@ -1334,7 +1332,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
     def _show_step_summary(self):
         """Show current status after each bisect step."""
         current_state = self.strategy.state
-        if self.config.get('recompute_init_values'):
+        if self.config.recompute_init_values:
             if (
                 self.previous_strategy_state == self.strategy.INITED
                 and current_state == self.strategy.STARTED
@@ -1394,13 +1392,13 @@ class BisectorCommandLine(typing.Generic[T_co]):
         # Set dummy values in case exception raised before loop.
         idx, rev = -1, None
         try:
-            assert self.config.get('switch')
-            assert self.config.get('eval')
+            assert self.config.switch
+            assert self.config.eval
 
             self.states.add_history(
                 'start_range',
-                old=self.config.get('old'),
-                new=self.config.get('new'),
+                old=self.config.old,
+                new=self.config.new,
             )
             term_map = self._get_term_map()
             prev_rev: str | None = opts.current_rev
@@ -1659,8 +1657,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
         if not self.states.inited:
             return None
         term_map = {
-            'old': self.config.get('term_old'),
-            'new': self.config.get('term_new'),
+            'old': self.config.term_old,
+            'new': self.config.term_new,
         }
         rev_info = self.states.get_rev_info(
             term_map,
@@ -1673,72 +1671,71 @@ class BisectorCommandLine(typing.Generic[T_co]):
             # If experiment flag is ON,
             (
                 experiment.is_in_experiment(
-                    self.config.get('experiments', []),
+                    self.config.experiments,
                     experiment.ID.GEMINI_ASSIST,
                 )
                 or (
                     experiment.is_in_experiment(
-                        self.config.get('experiments', []),
+                        self.config.experiments,
                         experiment.ID.GEMINI_ASSIST_BASIC,
                     )
                     and not strategy.NoisyBinarySearch.is_noisy_observation(
-                        self.config.get('noisy')
+                        self.config.noisy
                     )
                 )
             )
             # and is bisecting Chrome or ChromeOS
             and (
-                self.config.get('new').startswith('refs/heads/main@')
-                or cros_util.is_cros_or_snapshot_version(self.config.get('new'))
+                self.config.new.startswith('refs/heads/main@')
+                or cros_util.is_cros_or_snapshot_version(self.config.new)
             )
             # and is regression from pass to fail
-            and self.config.get('term_old') == 'PASS'
-            and self.config.get('term_new') == 'FAIL'
+            and self.config.term_old == 'PASS'
+            and self.config.term_new == 'FAIL'
         )
         if enable_gemini:
-            is_chrome = self.config.get('new').startswith('refs/heads/main@')
+            is_chrome = self.config.new.startswith('refs/heads/main@')
             if is_chrome:
                 source_root = (
-                    os.path.join(self.config.get('chrome_root'), 'src')
-                    if self.config.get('chrome_root')
+                    os.path.join(self.config.chrome_root, 'src')
+                    if self.config.chrome_root
                     else None
                 )
             else:
-                source_root = self.config.get('chromeos_root')
+                source_root = self.config.chromeos_root
 
             return strategy.GeminiFusionStrategy(
                 rev_info,
-                self.states.rev2idx(self.config.get('old')),
-                self.states.rev2idx(self.config.get('new')),
-                old_value=self.config.get('old_value'),
-                new_value=self.config.get('new_value'),
-                term_map=term_map,
-                recompute_init_values=self.config.get('recompute_init_values'),
-                confidence=self.config.get('confidence'),
-                observation=self.config.get('noisy'),
-                endpoint_verification=self.config.get('endpoint_verification'),
+                self.states.rev2idx(self.config.old),
+                self.states.rev2idx(self.config.new),
+                old_value=self.config.old_value,
+                new_value=self.config.new_value,
+                recompute_init_values=self.config.recompute_init_values,
+                confidence=self.config.confidence,
+                observation=self.config.noisy,
+                endpoint_verification=self.config.endpoint_verification,
                 saved_states=(
                     None if ignore_history else self.states.strategy_states
                 ),
                 enable_gemini=enable_gemini,
-                test_name=self.config.get('test_name'),
+                test_name=self.config.test_name,
                 source_root=source_root,
-                chromeos_mirror=self.config.get('chromeos_mirror'),
-                board=self.config.get('board'),
+                chromeos_mirror=self.config.chromeos_mirror,
+                board=self.config.board,
                 session=self.session,
             )
 
         return strategy.NoisyBinarySearch(
             rev_info,
-            self.states.rev2idx(self.config.get('old')),
-            self.states.rev2idx(self.config.get('new')),
-            old_value=self.config.get('old_value'),
-            new_value=self.config.get('new_value'),
+            self.states.rev2idx(self.config.old),
+            self.states.rev2idx(self.config.new),
+            old_value=self.config.old_value,
+            new_value=self.config.new_value,
             term_map=term_map,
-            recompute_init_values=self.config.get('recompute_init_values'),
-            confidence=self.config.get('confidence'),
-            observation=self.config.get('noisy'),
-            endpoint_verification=self.config.get('endpoint_verification'),
+            recompute_init_values=self.config.recompute_init_values,
+            confidence=self.config.confidence,
+            observation=self.config.noisy,
+            endpoint_verification=self.config.endpoint_verification,
             saved_states=(
                 None if ignore_history else self.states.strategy_states
             ),
@@ -1875,12 +1872,12 @@ class BisectorCommandLine(typing.Generic[T_co]):
 
     def cmd_new(self, opts: OldNewSkipOptions):
         """Tells bisect engine the said revs have "new" behavior."""
-        logger.info('set [%s] as %s', opts.revs, self.config.get('term_new'))
+        logger.info('set [%s] as %s', opts.revs, self.config.term_new)
         self._add_revs_status_helper(opts.revs, 'new')
 
     def cmd_old(self, opts: OldNewSkipOptions):
         """Tells bisect engine the said revs have "old" behavior."""
-        logger.info('set [%s] as %s', opts.revs, self.config.get('term_old'))
+        logger.info('set [%s] as %s', opts.revs, self.config.term_old)
         self._add_revs_status_helper(opts.revs, 'old')
 
     def cmd_skip(self, opts: OldNewSkipOptions):
@@ -1911,8 +1908,9 @@ class BisectorCommandLine(typing.Generic[T_co]):
         self.domain = self.domain_cls(self.states.config)
 
         if opts.key != 'clear' and not opts.value:
-            print(self.states.config[opts.key])
-            return
+            raise errors.ArgumentError(
+                opts.key, 'expected some values, no values given'
+            )
 
         if opts.key in [
             'switch',
@@ -1925,14 +1923,21 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 raise errors.ArgumentError('%s command' % opts.key, result)
 
             if opts.key == 'switch':
-                self.states.config.setdefault('switch', [])
-                self.states.config['switch'].append(opts.value)
+                self.states.config.switch.append(opts.value)
+            elif opts.key == 'eval':
+                self.states.config.eval = opts.value
             else:
-                self.states.config[opts.key] = opts.value
+                assert opts.key == 'future_build'
+                self.states.config.future_build = opts.value
 
         elif opts.key == 'clear':
+            default_config = core.BisectConfig()
             for value in opts.value:
-                self.states.config.pop(value, None)  # type: ignore[misc]
+                if value in ['switch', 'eval', 'future_build']:
+                    default_value = getattr(default_config, value)
+                    setattr(self.states.config, value, default_value)
+                else:
+                    print(f'Clearing {value} is not supported.')
 
         elif opts.key == 'confidence':
             if len(opts.value) != 1:
@@ -1941,7 +1946,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                     'expected 1 value, %d values given' % len(opts.value),
                 )
             try:
-                self.states.config[opts.key] = float(opts.value[0])
+                self.states.config.confidence = float(opts.value[0])
             except ValueError as e:
                 raise errors.ArgumentError(
                     'confidence value',
@@ -1954,7 +1959,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                     'noisy value',
                     'expected 1 value, %d values given' % len(opts.value),
                 )
-            self.states.config[opts.key] = opts.value[0]
+            self.states.config.noisy = opts.value[0]
 
         elif opts.key in ('term_old', 'term_new'):
             if len(opts.value) != 1:
@@ -1962,7 +1967,11 @@ class BisectorCommandLine(typing.Generic[T_co]):
                     opts.key,
                     'expected 1 value, %d values given' % len(opts.value),
                 )
-            self.states.config[opts.key] = opts.value[0]
+            if opts.key == 'term_old':
+                self.states.config.term_old = opts.value[0]
+            else:
+                assert opts.key == 'term_new'
+                self.states.config.term_new = opts.value[0]
 
         else:
             # unreachable

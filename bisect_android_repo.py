@@ -144,15 +144,15 @@ class AndroidRepoDomain(core.BisectDomain):
                 '--old and --new', 'bad bisect range (%s, %s)' % (old, new)
             )
 
-        config = {
-            "dut": opts.dut,
-            "android_root": opts.android_root,
-            "android_mirror": opts.android_mirror,
-            "branch": opts.branch,
-            "flavor": opts.flavor,
-            "old": old,
-            "new": new,
-        }
+        config = core.BisectConfig(
+            dut=opts.dut,
+            android_root=opts.android_root,
+            android_mirror=opts.android_mirror,
+            branch=opts.branch,
+            flavor=opts.flavor,
+            old=old,
+            new=new,
+        )
 
         spec_manager = android_util.AndroidSpecManager(config)
         cache = repo_util.RepoMirror(opts.android_mirror)
@@ -173,10 +173,10 @@ class AndroidRepoDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev=None, rev_details=None):
-        env['ANDROID_ROOT'] = self.config.get('android_root')
-        env['ANDROID_FLAVOR'] = self.config.get('flavor')
-        env['ANDROID_BRANCH'] = self.config.get('branch')
-        env['ANDROID_MIRROR'] = self.config.get('android_mirror')
+        env['ANDROID_ROOT'] = self.config.android_root
+        env['ANDROID_FLAVOR'] = self.config.flavor
+        env['ANDROID_BRANCH'] = self.config.branch
+        env['ANDROID_MIRROR'] = self.config.android_mirror
         env['INTRA_REV'] = rev
 
     def fill_candidate_summary(self, summary):
@@ -187,7 +187,7 @@ class AndroidRepoDomain(core.BisectDomain):
             url_template = (
                 'https://android-build.googleplex.com/'
                 'builds/{new}/branches/%s/targets/%s/cls?end={old}'
-            ) % (self.config.get('branch'), self.config.get('flavor'))
+            ) % (self.config.branch, self.config.flavor)
 
             summary['links'] = [
                 {

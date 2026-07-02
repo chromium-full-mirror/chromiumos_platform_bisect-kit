@@ -149,18 +149,17 @@ class BorealisVersionDomain(core.BisectDomain):
             )
 
         logger.info('borealis rev list: %s', revlist)
-        config = {
-            "dut": opts.dut,
-            "board": opts.board,
-            "chromeos_root": opts.chromeos_root,
-            "chromeos_mirror": opts.chromeos_mirror,
-        }
-
-        if revlist:
-            config['old'] = revlist[0]
-            config['new'] = revlist[-1]
-        else:
+        if not revlist:
             raise errors.TooFewRevisionsError(f'Too few revisions: {revlist}')
+
+        config = core.BisectConfig(
+            dut=opts.dut,
+            board=opts.board,
+            chromeos_root=opts.chromeos_root,
+            chromeos_mirror=opts.chromeos_mirror,
+            old=revlist[0],
+            new=revlist[-1],
+        )
 
         for detail in details.values():
             for action in detail.get('actions', []):
@@ -172,12 +171,12 @@ class BorealisVersionDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        if self.config.get('dut'):
-            env['DUT'] = self.config.get('dut')
-        if self.config.get('board'):
-            env['BOARD'] = self.config.get('board')
-        env['CHROMEOS_ROOT'] = self.config.get('chromeos_root')
-        env['CHROMEOS_MIRROR'] = self.config.get('chromeos_mirror')
+        if self.config.dut:
+            env['DUT'] = self.config.dut
+        if self.config.board:
+            env['BOARD'] = self.config.board
+        env['CHROMEOS_ROOT'] = self.config.chromeos_root
+        env['CHROMEOS_MIRROR'] = self.config.chromeos_mirror
         env['BOREALIS_DLC_VERSION'] = rev
 
 

@@ -189,15 +189,15 @@ class ChromeSrcMasterDomain(core.BisectDomain):
         # `old`.
         old = revlist[0]
 
-        config = {
-            "chrome_root": opts.chrome_root,
-            "chrome_src": chrome_src,
-            "old": old,
-            "new": new,
-            "board": opts.board,
-            "dut": opts.dut,
-            "is_public_build": opts.public_build,
-        }
+        config = core.BisectConfig(
+            chrome_root=opts.chrome_root,
+            chrome_src=chrome_src,
+            old=old,
+            new=new,
+            board=opts.board,
+            dut=opts.dut,
+            is_public_build=opts.public_build,
+        )
 
         details = {}
         for rev in revlist:
@@ -219,10 +219,10 @@ class ChromeSrcMasterDomain(core.BisectDomain):
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
             args = [
                 '--chrome-root',
-                self.config.get('chrome_root'),
+                self.config.chrome_root,
             ]
-            if self.config.get('board'):
-                args += ['--board', self.config.get('board')]
+            if self.config.board:
+                args += ['--board', self.config.board]
             args += ['--chrome-rev', rev]
             return args
         return []

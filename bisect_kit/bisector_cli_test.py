@@ -46,14 +46,14 @@ class DummyDomain(core.BisectDomain):
 
     @staticmethod
     def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
-        config = {
-            "ans": opts.ans,
-            "old_p": opts.old_p,
-            "new_p": opts.new_p,
-            "old": opts.old,
-            "new": opts.new,
-            "dut": opts.dut,
-        }
+        config = core.BisectConfig(
+            ans=opts.ans,
+            old_p=opts.old_p,
+            new_p=opts.new_p,
+            old=opts.old,
+            new=opts.new,
+            dut=opts.dut,
+        )
 
         revlist = [str(i) for i in range(opts.num)]
         return config, {'revlist': revlist}
@@ -62,9 +62,9 @@ class DummyDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        env['ANS'] = str(self.config.get('ans'))
-        env['OLD_P'] = str(self.config.get('old_p'))
-        env['NEW_P'] = str(self.config.get('new_p'))
+        env['ANS'] = str(self.config.ans)
+        env['OLD_P'] = str(self.config.old_p)
+        env['NEW_P'] = str(self.config.new_p)
 
 
 class TestBisectorCli(unittest.TestCase):
@@ -494,17 +494,17 @@ class TestBisectorCommandLine(unittest.TestCase):
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'false')
 
-        self.assertEqual(bisector.states.config['switch'], [['true'], ['true']])
-        self.assertEqual(bisector.states.config['eval'], ['false'])
+        self.assertEqual(bisector.states.config.switch, [['true'], ['true']])
+        self.assertEqual(bisector.states.config.eval, ['false'])
 
         # 'future_build' was not set previously. Make sure it doesn' break.
         bisector.main('config', 'clear', 'switch', 'eval', 'future_build')
-        self.assertFalse('switch' in bisector.states.config)
-        self.assertFalse('eval' in bisector.states.config)
+        self.assertEqual(bisector.states.config.switch, [])
+        self.assertEqual(bisector.states.config.eval, [])
 
         bisector.main('config', 'switch', 'true')
-        self.assertEqual(bisector.states.config['switch'], [['true']])
-        self.assertFalse('eval' in bisector.states.config)
+        self.assertEqual(bisector.states.config.switch, [['true']])
+        self.assertEqual(bisector.states.config.eval, [])
 
     def test_cmd_config_confidence(self):
         bisector = bisector_cli.BisectorCommandLine(
@@ -519,9 +519,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         with self.assertRaises(errors.ArgumentError):
             bisector.main('config', 'confidence', '0.9', '0.8')
 
-        self.assertEqual(bisector.states.config['confidence'], 0.75)
+        self.assertEqual(bisector.states.config.confidence, 0.75)
         bisector.main('config', 'confidence', '0.875')
-        self.assertEqual(bisector.states.config['confidence'], 0.875)
+        self.assertEqual(bisector.states.config.confidence, 0.875)
 
     def test_cmd_config_noisy(self):
         bisector = bisector_cli.BisectorCommandLine(
@@ -534,9 +534,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         with self.assertRaises(errors.ArgumentError):
             bisector.main('config', 'noisy', 'hello', 'world')
 
-        self.assertEqual(bisector.states.config['noisy'], 'new=9/10')
+        self.assertEqual(bisector.states.config.noisy, 'new=9/10')
         bisector.main('config', 'noisy', 'old=1/10,new=8/9')
-        self.assertEqual(bisector.states.config['noisy'], 'old=1/10,new=8/9')
+        self.assertEqual(bisector.states.config.noisy, 'old=1/10,new=8/9')
 
         with contextlib.redirect_stdout(io.StringIO()):
             # Only make sure no exceptions. No output verification.
@@ -651,27 +651,27 @@ class TestBisectorCommandLine(unittest.TestCase):
         self.assertNotIsInstance(s, strategy.GeminiFusionStrategy)
 
         # 2. gemini_assist flag: GeminiFusionStrategy
-        bisector.config['experiments'] = [experiment.ID.GEMINI_ASSIST]
+        bisector.config.experiments = [experiment.ID.GEMINI_ASSIST]
         s = bisector._strategy_factory()
         self.assertIsInstance(s, strategy.GeminiFusionStrategy)
 
         # 3. gemini_assist_basic flag + no noisy config: GeminiFusionStrategy
-        bisector.config['experiments'] = [experiment.ID.GEMINI_ASSIST_BASIC]
+        bisector.config.experiments = [experiment.ID.GEMINI_ASSIST_BASIC]
         s = bisector._strategy_factory()
         self.assertIsInstance(s, strategy.GeminiFusionStrategy)
 
         # 4. gemini_assist_basic flag + deterministic observation ('old=0/1,new=1/1'): GeminiFusionStrategy
-        bisector.config['noisy'] = 'old=0/1,new=1/1'
+        bisector.config.noisy = 'old=0/1,new=1/1'
         s = bisector._strategy_factory()
         self.assertIsInstance(s, strategy.GeminiFusionStrategy)
 
         # 5. gemini_assist_basic flag + non-deterministic observation ('new=9/10'): NoisyBinarySearch
-        bisector.config['noisy'] = 'new=9/10'
+        bisector.config.noisy = 'new=9/10'
         s = bisector._strategy_factory()
         self.assertNotIsInstance(s, strategy.GeminiFusionStrategy)
 
         # 6. gemini_assist (not basic) + non-deterministic observation ('new=9/10'): GeminiFusionStrategy
-        bisector.config['experiments'] = [experiment.ID.GEMINI_ASSIST]
+        bisector.config.experiments = [experiment.ID.GEMINI_ASSIST]
         s = bisector._strategy_factory()
         self.assertIsInstance(s, strategy.GeminiFusionStrategy)
 

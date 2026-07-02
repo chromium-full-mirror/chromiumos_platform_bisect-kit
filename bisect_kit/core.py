@@ -332,25 +332,52 @@ class DiagnoseStatistics:
     duration_secs: float | None = None
 
 
-class BisectConfig(typing.TypedDict, total=False):
+@dataclasses.dataclass(kw_only=True, slots=True)
+class BisectConfig:
     """Configuration for BisectDomain."""
 
-    board: str | None
-    term_old: str | None
-    term_new: str | None
-    noisy: str | None
-    old: str
-    new: str
-    test_name: str | None
-    experiments: list[experiment.ID] | None
-    confidence: float
-    switch: list[list[str]]
-    eval: list[str]
-    clear: str
-    future_build: list[str]
-    chrome_root: str
-    chromeos_root: str
-    chromeos_mirror: str
+    switch: list[list[str]] = dataclasses.field(default_factory=list)
+    eval: list[str] = dataclasses.field(default_factory=list)
+    future_build: list[str] = dataclasses.field(default_factory=list)
+
+    test_name: str | None = None
+    dut: str | None = None
+    allocated_dut: str | None = None
+    experiments: list[experiment.ID] = dataclasses.field(default_factory=list)
+    board: str | None = None
+    is_public_build: bool = False
+
+    term_old: str | None = None
+    term_new: str | None = None
+    noisy: str | None = None
+    old: str | None = None
+    new: str | None = None
+    confidence: float | None = None
+    ans: int | None = None
+    old_p: int | None = None
+    new_p: int | None = None
+    old_value: float | None = None
+    new_value: float | None = None
+    recompute_init_values: bool = False
+    endpoint_verification: bool = False
+
+    # Git-bisection
+    git_repo: str | None = None
+
+    # CrOS-bisection
+    chromeos_root: str | None = None
+    chromeos_mirror: str | None = None
+
+    # Chrome-bisection
+    chrome_root: str | None = None
+    chrome_mirror: str | None = None
+    chrome_src: str | None = None
+
+    # Android-bisection
+    android_root: str | None = None
+    android_mirror: str | None = None
+    flavor: str | None = None
+    branch: str | None = None
 
 
 class DiagnoserConfig(typing.TypedDict, total=False):
@@ -422,7 +449,7 @@ class _BisectStatesData(typing.TypedDict, total=False):
     """Data for BisectStates."""
 
     history: typing.Required[list[typing.Any]]
-    config: DiagnoserConfig
+    config: BisectConfig
     revlist: list[str]
     details: dict[str, typing.Any]
     strategy_states: strategy_states.States | None
@@ -487,7 +514,7 @@ class BisectStates(States):
     access state values.
     """
 
-    def __init__(self, session_file):
+    def __init__(self, session_file: str):
         """Initializes BisectStates.
 
         Args:
@@ -502,7 +529,7 @@ class BisectStates(States):
         }
 
         # Mapping of rev to idx; constructed from data['revlist'].
-        self.rev_index = {}
+        self.rev_index: dict[str, int] = {}
 
     @classmethod
     def from_bisector_class(
@@ -523,7 +550,7 @@ class BisectStates(States):
         return self.data.get('details', {})
 
     @property
-    def history(self) -> dict[str, typing.Any]:
+    def history(self) -> list[typing.Any]:
         assert self.inited
         return self.data.get('history', {})
 

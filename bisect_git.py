@@ -51,7 +51,9 @@ class GitDomain(core.BisectDomain):
         except ValueError as e:
             raise errors.ArgumentError('--new', str(e))
 
-        config = {"git_repo": opts.git_repo}
+        config = core.BisectConfig(
+            git_repo=opts.git_repo,
+        )
         revlist = git_util.get_revlist(opts.git_repo, opts.old, opts.new)
 
         details = {}
@@ -68,7 +70,7 @@ class GitDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        env['GIT_REPO'] = self.config.get('git_repo')
+        env['GIT_REPO'] = self.config.git_repo
         env['GIT_REV'] = rev
 
     def fill_candidate_summary(self, summary):

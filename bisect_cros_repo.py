@@ -118,7 +118,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
         logger.info('Clean up previous result of "mark as stable"')
         repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
 
-        config = {
+        cros_spec_config = {
             "dut": opts.dut,
             "board": opts.board,
             "chromeos_root": opts.chromeos_root,
@@ -126,7 +126,7 @@ class ChromeOSRepoDomain(core.BisectDomain):
             "is_public_build": opts.public_build,
         }
 
-        spec_manager = cros_util.ChromeOSSpecManager(config)
+        spec_manager = cros_util.ChromeOSSpecManager(cros_spec_config)
         cache = repo_util.RepoMirror(opts.chromeos_mirror)
         code_manager = codechange.CodeManager(
             opts.chromeos_root,
@@ -145,6 +145,13 @@ class ChromeOSRepoDomain(core.BisectDomain):
             for action in detail.get('actions', []):
                 generate_action_link(action)
 
+        config = core.BisectConfig(
+            dut=opts.dut,
+            board=opts.board,
+            chromeos_root=opts.chromeos_root,
+            chromeos_mirror=opts.chromeos_mirror,
+            is_public_build=opts.public_build,
+        )
         return config, {'revlist': revlist, 'details': details}
 
     def __init__(self, config: core.BisectConfig):
@@ -156,12 +163,12 @@ class ChromeOSRepoDomain(core.BisectDomain):
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
             args = [
                 '--chromeos-root',
-                self.config.get('chromeos_root'),
+                self.config.chromeos_root,
                 '--chromeos-mirror',
-                self.config.get('chromeos_mirror'),
+                self.config.chromeos_mirror,
             ]
-            if self.config.get('board'):
-                args += ['--board', self.config.get('board')]
+            if self.config.board:
+                args += ['--board', self.config.board]
             args += ['--chromeos-version', rev]
             return args
         return []

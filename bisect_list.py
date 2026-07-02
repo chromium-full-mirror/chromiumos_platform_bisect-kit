@@ -29,7 +29,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-import typing
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -51,7 +50,7 @@ class ListDomain(core.BisectDomain):
 
     @staticmethod
     def init(opts: argparse.Namespace) -> tuple[core.BisectConfig, dict]:
-        config: dict[str, typing.Any] = {}
+        config = core.BisectConfig()
         revlist = [line.strip() for line in sys.stdin.readlines()]
         return config, {'revlist': revlist}
 
