@@ -160,7 +160,9 @@ class TestBisectStates(unittest.TestCase):
     def setUp(self):
         self.session_file = tempfile.mktemp()
 
-        self.fake_config = {'a': 'b', 'c': 'd'}
+        self.fake_config = core.BisectConfig(
+            dut='fake_dut', test_name='fake_test'
+        )
         self.fake_details = {'x': 'y'}
 
     def tearDown(self):
@@ -203,8 +205,8 @@ class TestBisectStates(unittest.TestCase):
     def test_save_and_load(self):
         states = core.BisectStates(self.session_file)
         revlist = [str(i) for i in range(10)]
-        states.init_states({}, revlist, self.fake_details)
-        states.config['board'] = 'bar'
+        states.init_states(core.BisectConfig(), revlist, self.fake_details)
+        states.config.board = 'bar'
         strategy_states_to_save = strategy_states.States(
             state='blah',
         )
@@ -215,7 +217,7 @@ class TestBisectStates(unittest.TestCase):
         loaded_states.load_states()
 
         self.assertTrue(loaded_states.inited)
-        self.assertEqual(loaded_states.config, {'board': 'bar'})
+        self.assertEqual(loaded_states.config.board, 'bar')
         self.assertEqual(loaded_states.details, self.fake_details)
         self.assertEqual(loaded_states.rev2idx('5'), 5)
         self.assertEqual(loaded_states.strategy_states, strategy_states_to_save)
@@ -229,11 +231,28 @@ class TestBisectStates(unittest.TestCase):
         self.assertFalse(loaded_states.load_states())
         self.assertFalse(loaded_states.inited)
 
+    def test_load_dict_config(self):
+        session_file_content = {
+            'config': {'term_old': 'bad', 'term_new': 'good'},
+            'revlist': ['a', 'b'],
+            'details': {},
+            'history': [],
+        }
+        with open(self.session_file, 'w') as f:
+            f.write(json.dumps(session_file_content, indent=4, sort_keys=True))
+
+        states = core.BisectStates(self.session_file)
+        states.load_states()
+
+        self.assertTrue(states.inited)
+        self.assertEqual(states.config.term_old, 'bad')
+        self.assertEqual(states.config.term_new, 'good')
+
     def test_reset(self):
         states = core.BisectStates(self.session_file)
         revlist = [str(i) for i in range(10)]
-        states.init_states({}, revlist)
-        states.config['board'] = 'bar'
+        states.init_states(core.BisectConfig(), revlist)
+        states.config.board = 'bar'
         states.save()
 
         states = core.BisectStates(self.session_file)
@@ -373,6 +392,38 @@ class TestBisectStates(unittest.TestCase):
             expected_rev_info, states.get_rev_info(ignore_history=True)
         ):
             self.assertEqual(want.to_dict(), got.to_dict())
+
+
+class TestSerialization(unittest.TestCase):
+    """Test serialization of dataclasses."""
+
+    def test_bisect_config_serialization(self):
+        config = core.BisectConfig(board='foo', term_old='bad')
+
+        # (1) Convert BisectConfig with StatesEncoder then with rebuild_from_json
+        serialized_json = json.dumps(config, cls=core.StatesEncoder)
+        loaded_dict = json.loads(serialized_json)
+        rebuilt_config = core.rebuild_from_json(loaded_dict)
+
+        self.assertIsInstance(rebuilt_config, core.BisectConfig)
+        self.assertEqual(rebuilt_config.board, 'foo')
+        self.assertEqual(rebuilt_config.term_old, 'bad')
+
+    def test_rebuild_from_json(self):
+        # (2) Convert the json with rebuild_from_json and confirm it back to BisectConfig
+        json_data = {
+            '__class__': {
+                '__module__': 'bisect_kit.core',
+                '__name__': 'BisectConfig',
+            },
+            'board': 'bar',
+            'term_old': 'old_term',
+        }
+        rebuilt_config = core.rebuild_from_json(json_data)
+
+        self.assertIsInstance(rebuilt_config, core.BisectConfig)
+        self.assertEqual(rebuilt_config.board, 'bar')
+        self.assertEqual(rebuilt_config.term_old, 'old_term')
 
 
 if __name__ == '__main__':

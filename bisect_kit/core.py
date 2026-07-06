@@ -542,17 +542,20 @@ class BisectStates(States):
     @property
     def config(self) -> BisectConfig:
         assert self.inited
-        return self.data.get('config', {})
+        self.data.setdefault('config', BisectConfig())
+        return self.data['config']
 
     @property
     def details(self) -> dict[str, typing.Any]:
         assert self.inited
-        return self.data.get('details', {})
+        self.data.setdefault('details', {})
+        return self.data['details']
 
     @property
     def history(self) -> list[typing.Any]:
         assert self.inited
-        return self.data.get('history', {})
+        self.data.setdefault('history', [])
+        return self.data['history']
 
     @property
     def strategy_states(self) -> strategy_states.States | None:
@@ -600,6 +603,9 @@ class BisectStates(States):
     def _init_from_dict(self, data: dict) -> bool:
         """Inherit from States."""
         self.data = rebuild_from_json(data)
+
+        if 'config' in self.data and isinstance(self.data['config'], dict):
+            self.data['config'] = BisectConfig(**self.data['config'])
 
         # reset variables
         self.rev_index = {}
