@@ -34,9 +34,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             self.argument_parser.error('argument --eval-script is required')
 
     def init_hook(self, opts):
-        self.states.config.update(
-            eval_script=opts.eval_script,
-        )
+        self.states.config.eval_script = opts.eval_script
 
     def create_argument_parser_hook(self, parser_init: ArgumentParser):
         group = parser_init.add_argument_group(title='Options for Custom eval')

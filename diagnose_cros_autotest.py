@@ -81,14 +81,12 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             )
 
     def init_hook(self, opts):
-        self.states.config.update(
-            cts_revision=opts.cts_revision,
-            cts_abi=opts.cts_abi,
-            cts_prefix=opts.cts_prefix,
-            cts_module=opts.cts_module,
-            cts_test=opts.cts_test,
-            cts_timeout=opts.cts_timeout,
-        )
+        self.states.config.cts_revision = opts.cts_revision
+        self.states.config.cts_abi = opts.cts_abi
+        self.states.config.cts_prefix = opts.cts_prefix
+        self.states.config.cts_module = opts.cts_module
+        self.states.config.cts_test = opts.cts_test
+        self.states.config.cts_timeout = opts.cts_timeout
 
     def _build_cmds(self):
         # prebuilt version will be specified later.
