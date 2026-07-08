@@ -118,13 +118,12 @@ class ChromeOSRepoDomain(core.BisectDomain):
         logger.info('Clean up previous result of "mark as stable"')
         repo_util.abandon(opts.chromeos_root, 'stabilizing_branch')
 
-        cros_spec_config = {
-            "dut": opts.dut,
-            "board": opts.board,
-            "chromeos_root": opts.chromeos_root,
-            "chromeos_mirror": opts.chromeos_mirror,
-            "is_public_build": opts.public_build,
-        }
+        cros_spec_config = cros_util.ChromeOSSpecManagerConfig(
+            board=opts.board,
+            chromeos_root=opts.chromeos_root,
+            chromeos_mirror=opts.chromeos_mirror,
+            is_public_build=opts.public_build,
+        )
 
         spec_manager = cros_util.ChromeOSSpecManager(cros_spec_config)
         cache = repo_util.RepoMirror(opts.chromeos_mirror)

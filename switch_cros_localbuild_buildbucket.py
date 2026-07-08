@@ -245,14 +245,14 @@ def get_chrome_buildspec_by_time(opts, timestamp, old_rev, new_rev):
 
 
 def get_config_for_chromeos_spec_manager(opts):
-    return {
-        "board": opts.board,
-        "chromeos_root": opts.chromeos_root,
-        "chromeos_mirror": opts.chromeos_mirror,
+    return cros_util.ChromeOSSpecManagerConfig(
+        board=opts.board,
+        chromeos_root=opts.chromeos_root,
+        chromeos_mirror=opts.chromeos_mirror,
         # TODO(b/441146529): Currently cros localbuild doesn't support a public
         # build.
-        "is_public_build": False,
-    }
+        is_public_build=False,
+    )
 
 
 def get_chromeos_spec_manager(opts):

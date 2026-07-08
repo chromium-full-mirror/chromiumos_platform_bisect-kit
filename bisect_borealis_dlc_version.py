@@ -122,13 +122,13 @@ class BorealisVersionDomain(core.BisectDomain):
                     'Board must be specified.',
                 )
             spec_manager = cros_util.ChromeOSSpecManager(
-                {
-                    "board": opts.board,
-                    "chromeos_root": opts.chromeos_root,
-                    "chromeos_mirror": opts.chromeos_mirror,
+                cros_util.ChromeOSSpecManagerConfig(
+                    board=opts.board,
+                    chromeos_root=opts.chromeos_root,
+                    chromeos_mirror=opts.chromeos_mirror,
                     # DLC is only with internal builds.
-                    "is_public_build": False,
-                }
+                    is_public_build=False,
+                )
             )
             fixed_specs = spec_manager.collect_fixed_spec(opts.old, opts.new)
             old_timestamp = fixed_specs[0].timestamp

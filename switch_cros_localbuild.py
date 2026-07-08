@@ -304,12 +304,12 @@ def switch(opts):
 
     if not opts.no_sync_code:
         logger.info('switch source code')
-        config = {
-            "board": opts.board,
-            "chromeos_root": opts.chromeos_root,
-            "chromeos_mirror": opts.chromeos_mirror,
-            "is_public_build": opts.public_build,
-        }
+        config = cros_util.ChromeOSSpecManagerConfig(
+            board=opts.board,
+            chromeos_root=opts.chromeos_root,
+            chromeos_mirror=opts.chromeos_mirror,
+            is_public_build=opts.public_build,
+        )
         spec_manager = cros_util.ChromeOSSpecManager(config)
         cache = repo_util.RepoMirror(opts.chromeos_mirror)
         code_manager = codechange.CodeManager(
