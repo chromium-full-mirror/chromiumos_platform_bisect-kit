@@ -42,22 +42,28 @@ def create_argument_parser():
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=os.environ.get('DUT', ''),
+        default='',
         help='DUT address',
     )
     parser.add_argument(
-        'build_id',
-        nargs='?',
+        '--android-build-id',
         type=android_util.argtype_android_build_id,
         metavar='ANDROID_BUILD_ID',
-        default=os.environ.get('ANDROID_BUILD_ID', ''),
+        required=True,
     )
     parser.add_argument(
         '--flavor',
         type=cli.argtype_notempty,
         metavar='ANDROID_FLAVOR',
-        default=os.environ.get('ANDROID_FLAVOR', ''),
+        required=True,
         help='example: cheets_x86-user',
+    )
+    parser.add_argument(
+        '--branch',
+        type=cli.argtype_notempty,
+        metavar='ANDROID_BRANCH',
+        default='',
+        help='Ignored. Supplied by generic AndroidBuildIDDomain.',
     )
     return parser
 
@@ -76,15 +82,15 @@ def switch_main(args: tuple[str] | None):
             raise errors.BrokenDutException('%r is not a good DUT' % opts.dut)
 
     logger.info('use flavor=%s', opts.flavor)
-    arc_util.push_prebuilt_to_device(opts.dut, opts.flavor, opts.build_id)
+    arc_util.push_prebuilt_to_device(opts.dut, opts.flavor, opts.android_build_id)
 
     arc_version = cros_util.query_dut_lsb_release(opts.dut).get(
         'CHROMEOS_ARC_VERSION'
     )
-    if not arc_version or str(opts.build_id) not in arc_version:
+    if not arc_version or str(opts.android_build_id) not in arc_version:
         raise errors.ExecutionFatalError(
             'arc version is expected matching "%s" but actual "%s"'
-            % (opts.build_id, arc_version)
+            % (opts.android_build_id, arc_version)
         )
 
     logger.info('updated to "%s", done', arc_version)
