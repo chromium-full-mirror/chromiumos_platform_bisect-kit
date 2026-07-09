@@ -171,13 +171,24 @@ class BorealisVersionDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        if self.config.dut:
-            env['DUT'] = self.config.dut
-        if self.config.board:
-            env['BOARD'] = self.config.board
-        env['CHROMEOS_ROOT'] = self.config.chromeos_root
-        env['CHROMEOS_MIRROR'] = self.config.chromeos_mirror
-        env['BOREALIS_DLC_VERSION'] = rev
+        pass
+
+    def get_extra_args(
+        self, phase: core.Phase, rev: str, _rev_details=None
+    ) -> list[str]:
+        if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
+            args = [
+                '--chromeos-root',
+                self.config.chromeos_root,
+                '--borealis-dlc-version',
+                rev,
+            ]
+            if self.config.board:
+                args += ['--board', self.config.board]
+            if self.config.dut:
+                args += ['--dut', self.config.dut]
+            return args
+        return []
 
 
 if __name__ == '__main__':

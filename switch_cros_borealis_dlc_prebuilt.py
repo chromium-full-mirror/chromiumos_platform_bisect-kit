@@ -6,7 +6,6 @@
 """Switcher for ChromeOS Borealis DLC bisecting."""
 
 import logging
-import os
 import sys
 
 from bisect_kit import bisector_cli
@@ -36,27 +35,26 @@ def create_argument_parser() -> cli.ArgumentParser:
         '--dut',
         type=cli.argtype_notempty,
         metavar='DUT',
-        default=os.environ.get('DUT', ''),
+        default='',
     )
     parser.add_argument(
         '--board',
         metavar='BOARD',
-        default=os.environ.get('BOARD', ''),
+        default='',
         help='ChromeOS board name',
     )
     parser.add_argument(
         '--chromeos-root',
         type=cli.argtype_dir_path,
         metavar='CHROMEOS_ROOT',
-        default=os.environ.get('CHROMEOS_ROOT', ''),
-        help='ChromeOS tree root (default: %(default)s)',
+        required=True,
+        help='ChromeOS tree root',
     )
     parser.add_argument(
-        'version',
-        nargs='?',
+        '--borealis-dlc-version',
         type=borealis_util.argtype_borealis_version,
         metavar='BOREALIS_DLC_VERSION',
-        default=os.environ.get('BOREALIS_DLC_VERSION', ''),
+        required=True,
         help=f'Borealis DLC version number, e.g {borealis_util.VERSION_EXAMPLES}',
     )
 
@@ -100,7 +98,9 @@ def switch_main(args) -> None:
     opts = parser.parse_args(args)
     common.config_logging(opts)
 
-    inner_main(opts.chromeos_root, opts.board, opts.dut, opts.version)
+    inner_main(
+        opts.chromeos_root, opts.board, opts.dut, opts.borealis_dlc_version
+    )
 
 
 def action() -> bisector_cli.SwitchAction:
