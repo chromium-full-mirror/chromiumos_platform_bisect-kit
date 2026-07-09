@@ -154,15 +154,31 @@ def retry_transaction_conflict(func):
         while True:
             try:
                 return func(*args, **kwargs)
-            except google.cloud.exceptions.Conflict as e:
+            except (google.cloud.exceptions.Conflict, ValueError) as e:
+                # b/532384134: Under heavy entity-group contention, the Google frontend
+                # loadbalancer occasionally translates Datastore ABORTED responses into
+                # RESOURCE_EXHAUSTED transport errors. The Python grpc library fails to
+                # parse this mismatch (StatusCode.ABORTED vs StatusCode.RESOURCE_EXHAUSTED)
+                # and throws a ValueError. We intercept it here and treat it as a Conflict.
+                is_value_error = isinstance(e, ValueError)
+                if is_value_error and "StatusCode.ABORTED" not in str(e):
+                    raise
                 retry_count += 1
+
+                error_type_msg = (
+                    "RESOURCE_EXHAUSTED wrapper bug"
+                    if is_value_error
+                    else "Transaction conflict"
+                )
+
                 if retry_count > _TRANSACTION_RETRY_LIMIT:
                     raise errors.DatastoreTransactionConflict(
-                        'Transaction conflict retry limit %s exceeded'
-                        % _TRANSACTION_RETRY_LIMIT
+                        '%s retry limit %s exceeded'
+                        % (error_type_msg, _TRANSACTION_RETRY_LIMIT)
                     ) from e
                 logger.warning(
-                    'Transaction conflict, retry %s in %s seconds',
+                    '%s, retry %s in %s seconds',
+                    error_type_msg,
                     retry_count,
                     _TRANSACTION_RETRY_INTERVAL_SECONDS,
                 )
