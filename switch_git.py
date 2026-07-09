@@ -15,7 +15,6 @@ be expanded at switch time, not now.)
 """
 
 import logging
-import os
 
 from bisect_kit import bisector_cli
 from bisect_kit import cli
@@ -30,18 +29,17 @@ def create_argument_parser():
     parents = [cli.create_session_optional_parser()]
     parser = cli.ArgumentParser(parents=parents)
     parser.add_argument(
-        'git_rev',
-        nargs='?',
+        '--git-rev',
         type=git_util.argtype_git_rev,
         metavar='GIT_REV',
-        default=os.environ.get('GIT_REV', ''),
+        required=True,
         help='Git revision id',
     )
     parser.add_argument(
         '--git-repo',
         type=cli.argtype_dir_path,
         metavar='GIT_REPO',
-        default=os.environ.get('GIT_REPO'),
+        required=True,
         help='Git repository path',
     )
 

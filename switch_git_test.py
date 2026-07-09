@@ -21,7 +21,7 @@ class TestSwitchGit(unittest.TestCase):
             ) as mock_func:
                 git_repo = '/path/to/git/repo'
                 rev = '123456789'
-                switch_git.main(['--git-repo', git_repo, rev])
+                switch_git.main(['--git-repo', git_repo, '--git-rev', rev])
 
                 mock_func.assert_called_with(git_repo, rev)
 

@@ -70,8 +70,15 @@ class GitDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        env['GIT_REPO'] = self.config.git_repo
-        env['GIT_REV'] = rev
+        pass
+
+    def get_extra_args(
+        self, phase: core.Phase, rev: str, _rev_details=None
+    ) -> list[str]:
+        if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
+            args = ['--git-repo', self.config.git_repo, '--git-rev', rev]
+            return args
+        return []
 
     def fill_candidate_summary(self, summary):
         # Do nothing.

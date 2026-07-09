@@ -62,13 +62,12 @@ class TestGitDomain(unittest.TestCase):
             mock_popen.side_effect = run_mocks
             bisector.main('run', old)
 
-            switch_env = mock_popen.call_args_list[0][1]['env']
-            self.assertEqual(switch_env.get('GIT_REV'), old)
-            self.assertEqual(switch_env.get('GIT_REPO'), self.git_repo)
+            switch_cmd = mock_popen.call_args_list[0][0][0]
+            self.assertIn('--git-repo', switch_cmd)
+            self.assertIn(self.git_repo, switch_cmd)
+            self.assertIn(old, switch_cmd)
 
-            eval_env = mock_popen.call_args_list[1][1]['env']
-            self.assertEqual(eval_env.get('GIT_REV'), old)
-            self.assertEqual(eval_env.get('GIT_REPO'), self.git_repo)
+            # eval_cmd does not receive get_extra_args in this configuration
         bisector.main('view')
 
 
