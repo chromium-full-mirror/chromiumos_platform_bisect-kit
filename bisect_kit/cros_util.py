@@ -3220,6 +3220,7 @@ class ChromeOSSpecManagerConfig:
       board: The board name for the ChromeOS build.
       is_public_build: Whether it is a public build.
     """
+
     chromeos_root: str
     chromeos_mirror: str
     board: str | None = None
@@ -4007,13 +4008,13 @@ def build_revlist(
     if chromeos_mirror is None:
         chromeos_mirror = os.environ.get('CHROMEOS_MIRROR', '')
 
-    config = {
-        'chromeos_root': chromeos_root,
-        'chromeos_mirror': chromeos_mirror,
-        'board': board,
-    }
+    config = ChromeOSSpecManagerConfig(
+        chromeos_root=chromeos_root,
+        chromeos_mirror=chromeos_mirror,
+        board=board,
+    )
     spec_manager = ChromeOSSpecManager(config)
-    cache = repo_util.RepoMirror(config['chromeos_mirror'])
+    cache = repo_util.RepoMirror(config.chromeos_mirror)
 
     session = os.environ.get('BISECT_SESSION', 'dummy_session')
     session_cache_dir = common.get_session_cache_dir(session)
