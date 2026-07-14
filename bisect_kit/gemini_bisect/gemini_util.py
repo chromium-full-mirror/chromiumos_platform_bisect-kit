@@ -980,15 +980,18 @@ class BisectAgent:
         if status is not None:
             assert self._pending_run_at_call is not None
             self._last_run_eval_log = status.get('eval_log')
+            response: dict[str, Any] = {
+                'status': status['status'],
+                'reason': status.get('reason'),
+            }
+            if 'likelihood_new' in status:
+                response['likelihood_new'] = status['likelihood_new']
             self._pending_parts.append(
                 genai.types.Part(
                     function_response=genai.types.FunctionResponse(
                         id=self._pending_run_at_call.id,
                         name='run_at',
-                        response={
-                            'status': status['status'],
-                            'reason': status.get('reason'),
-                        },
+                        response=response,
                     )
                 )
             )
@@ -1019,11 +1022,15 @@ def demo(
     culprit: str,
     disabled: bool = False,
     board: str | None = None,
-    sim_old_p: float = 0.0,
-    sim_new_p: float = 1.0,
+    old_p: tuple[float, float] = (0.05, 0.0),
+    new_p: tuple[float, float] = (0.95, 1.0),
+    target_confidence: float = 0.999,
 ):
     if disabled:
         return
+
+    model_old_p, sim_old_p = old_p
+    model_new_p, sim_new_p = new_p
 
     # pylint: disable=import-outside-toplevel
     import uuid
@@ -1059,6 +1066,13 @@ def demo(
                 'ancestor: {name: /^Files/, className: '
                 '/\\\\bBrowserWidget\\\\b/, role: window, first: true}}"'
             )
+        if testname == 'tast.camera.CCAUISmoke.fake_hal':
+            return (
+                'Failed to start app: failed to open CCA: Video is not active within '
+                'given time: failed to wait for the video state to be true within 5s: '
+                'context deadline exceeded during a poll with no set timeout; last '
+                'error follows: "!!(CcaTest.isVideoActive() === true)" is false'
+            )
         if testname == 'tast.video.CDMOEMCrypto.ce_cdm':
             return (
                 'widevine_ce_cdm_hw_tests failed: signal: aborted (core dumped)'
@@ -1091,8 +1105,8 @@ def demo(
         model=MODEL_GEMINI_3_5_FLASH,
         chromeos_mirror=chromeos_mirror if not is_chrome else None,
         board=board if not is_chrome else None,
-        old_p=sim_old_p,
-        new_p=sim_new_p,
+        old_p=model_old_p,
+        new_p=model_new_p,
     )
     agent.add_sample(good, 'PASS')
     agent.add_sample(bad, 'FAIL', reason=get_reason())
@@ -1104,10 +1118,12 @@ def demo(
         [core.RevInfo(x) for x in revlist],
         old_idx=0,
         new_idx=len(revlist) - 1,
-        oracle=(sim_old_p, sim_new_p),
+        oracle=(model_old_p, model_new_p),
+        confidence=target_confidence,
     )
     bsearch.add_sample(0, 'old')
     bsearch.add_sample(len(revlist) - 1, 'new')
+    assert bsearch.state == bsearch.STARTED
     prob = bsearch.prob
 
     # The last run revision was 'bad' (index len(revlist) - 1)
@@ -1116,7 +1132,7 @@ def demo(
     )
     # pylint: disable=protected-access
     utilities = strategy.NoisyBinarySearch._calculate_utilities(
-        sim_old_p, sim_new_p, prob, cost_table=cost_table
+        model_old_p, model_new_p, prob, cost_table=cost_table
     )
 
     agent.update_stats(
@@ -1132,8 +1148,8 @@ def demo(
             }
             for x in range(len(revlist))
         },
-        old_p=sim_old_p,
-        new_p=sim_new_p,
+        old_p=model_old_p,
+        new_p=model_new_p,
     )
     attempt = agent.next()
     runs_llm = 0
@@ -1160,7 +1176,7 @@ def demo(
         cost_table = _get_simulated_cost_table(0, len(revlist) - 1, attempt_idx)
         # pylint: disable=protected-access
         utilities = strategy.NoisyBinarySearch._calculate_utilities(
-            sim_old_p, sim_new_p, prob, cost_table=cost_table
+            model_old_p, model_new_p, prob, cost_table=cost_table
         )
 
         agent.update_stats(
@@ -1176,8 +1192,8 @@ def demo(
                 }
                 for x in range(len(revlist))
             },
-            old_p=sim_old_p,
-            new_p=sim_new_p,
+            old_p=model_old_p,
+            new_p=model_new_p,
         )
         likelihood_new = float(sum(prob[: attempt_idx + 1]))
         attempt = agent.next(
@@ -1187,30 +1203,68 @@ def demo(
                 'likelihood_new': likelihood_new,
             }
         )
-    agent_confidence = float(max(bsearch.prob))
+    concluded_culprit = agent.get_result()
+    concluded_prob_on_stop = (
+        bsearch.prob[revlist.index(concluded_culprit)]
+        if concluded_culprit in revlist
+        else 0.0
+    )
+    real_prob_on_stop = bsearch.prob[culprit_idx]
+
+    runs_additional_math = 0
+    while not bsearch.is_done():
+        runs_additional_math += 1
+        idx = bsearch.next_idx()
+        is_fail = (
+            random.random() < sim_new_p
+            if idx >= culprit_idx
+            else random.random() < sim_old_p
+        )
+        bsearch.add_sample(idx, 'new' if is_fail else 'old')
+
     bsearch_std = strategy.NoisyBinarySearch(
         [core.RevInfo(x) for x in revlist],
         old_idx=0,
         new_idx=len(revlist) - 1,
-        oracle=(sim_old_p, sim_new_p),
-        confidence=min(agent_confidence - 1e-5, 0.999),
+        oracle=(model_old_p, model_new_p),
+        confidence=target_confidence,
     )
     bsearch_std.add_sample(0, 'old')
     bsearch_std.add_sample(len(revlist) - 1, 'new')
+    assert bsearch_std.state == bsearch_std.STARTED
     runs_bisect = 0
     while not bsearch_std.is_done():
         runs_bisect += 1
         idx = bsearch_std.next_idx()
-        bsearch_std.add_sample(idx, 'new' if idx >= culprit_idx else 'old')
+        is_fail = (
+            random.random() < sim_new_p
+            if idx >= culprit_idx
+            else random.random() < sim_old_p
+        )
+        bsearch_std.add_sample(idx, 'new' if is_fail else 'old')
 
+    assert (
+        agent.get_result() == culprit
+    ), f'Agent result {agent.get_result()} does not match expected culprit {culprit}'
+    bsearch_culprit = revlist[bsearch.get_best_guess()]
+    assert (
+        bsearch_culprit == culprit
+    ), f'Math result {bsearch_culprit} does not match expected culprit {culprit}'
+    bsearch_std_culprit = revlist[bsearch_std.get_best_guess()]
+    assert (
+        bsearch_std_culprit == culprit
+    ), f'Pure math result {bsearch_std_culprit} does not match expected culprit {culprit}'
+
+    # ANSI color formatting:
+    # \033[1;32m = bold green (text)
+    # \033[1;36m = bold cyan (culprit)
+    # \033[1;33m = bold yellow (run counts)
+    # \033[0m    = reset
     print(
-        'Concluded culprit',
-        agent.get_result(),
-        'in',
-        runs_llm,
-        'runs instead of',
-        runs_bisect,
-        f'runs by bisect (confidence: {agent_confidence:.2%}).',
+        f'\033[1;32mConcluded culprit \033[1;36m{concluded_culprit}\033[1;32m '
+        f'in \033[1;33m{runs_llm}+{runs_additional_math}\033[1;32m runs instead of '
+        f'\033[1;33m{runs_bisect}\033[1;32m runs by bisect (confidence: {target_confidence:.2%}, '
+        f'likelihood when agent stopped: concluded={concluded_prob_on_stop:.2%}, real={real_prob_on_stop:.2%}).\033[0m'
     )
 
 
@@ -1240,11 +1294,17 @@ if __name__ == '__main__':
         'refs/heads/main@{#1634610}',
     )
     demo(
+        'tast.camera.CCAUISmoke.fake_hal',
+        'refs/heads/main@{#1661095}',
+        'refs/heads/main@{#1661333}',
+        'refs/heads/main@{#1661260}',
+    )
+    demo(
         'tast.video.CDMOEMCrypto.ce_cdm',
         'R149-16656.0.0-118296',
         'R149-16656.0.0-118297',
         'R149-16656.0.0-118296~R149-16656.0.0-118297/111',
         board='volteer',
-        sim_old_p=0.5,
-        sim_new_p=1.0,
+        old_p=(0.5, 0.5),
+        new_p=(0.95, 1.0),
     )
