@@ -955,27 +955,36 @@ class AsyncDutLeaser:
             )
             return None
         finally:
-            if proc.returncode is None:
-                # We call asyncio.run() frequently. In other words, the event loop is
-                # short lived. Although asyncio.subprocess will cancel and terminate the
-                # process during event loop shutdown, the exit handler may be invoked
-                # after event loop is closed (too late and bounce exception).
-                # https://bugs.python.org/issue41320
-                try:
+            try:
+                if proc.returncode is None:
+                    # We call asyncio.run() frequently. In other words, the event loop is
+                    # short lived. Although asyncio.subprocess will cancel and terminate the
+                    # process during event loop shutdown, the exit handler may be invoked
+                    # after event loop is closed (too late and bounce exception).
+                    # https://bugs.python.org/issue41320
+                    try:
+                        logger.debug(
+                            'killing unfinished proc which is trying to lease %s',
+                            dimensions,
+                        )
+                        proc.kill()
+                        await proc.wait()
+                    except ProcessLookupError:
+                        # The process may be already dead; ignore this error silently.
+                        # Especially, our code and the process got ctrl-c at the same time and
+                        # race.
+                        pass
+            finally:
+                if pending_lease:
                     logger.debug(
-                        'killing unfinished proc which is trying to lease %s',
+                        'cleaning up pending lease %s: %s',
                         dimensions,
+                        pending_lease,
                     )
-                    proc.kill()
-                    await proc.wait()
-                except ProcessLookupError:
-                    # The process may be already dead; ignore this error silently.
-                    # Especially, our code and the process got ctrl-c at the same time and
-                    # race.
-                    pass
-            if pending_lease:
-                logger.debug('cleaning up pending lease %s', dimensions)
-                cancel_pending_lease(pending_lease)
+                    try:
+                        cancel_pending_lease(pending_lease)
+                    except Exception:
+                        logger.exception('failed to cancel pending lease')
 
     async def _lease_with_retry(self, dimensions):
         # Retry until we hit the timeout set in lease_parallelly().

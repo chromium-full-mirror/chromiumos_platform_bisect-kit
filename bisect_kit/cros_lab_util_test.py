@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import queue
 import subprocess
 import threading
@@ -473,6 +474,33 @@ class QueryLeaseStatusTest(unittest.TestCase):
         status = cros_lab_util.query_lease_status('dut1')
 
         self.assertFalse(status.is_leased)
+
+    @mock.patch('bisect_kit.cros_lab_util.cancel_pending_lease')
+    @mock.patch('bisect_kit.cros_lab_util.create_async_crosfleet_proc')
+    def test_async_dut_leaser_cancellation(
+        self, mock_create_proc, mock_cancel_pending_lease
+    ):
+        async def run_test():
+            mock_proc = mock.AsyncMock()
+            mock_proc.stdout.readline.side_effect = [
+                b'Internal Scheduke lease ID (can be used for cancellation): 12345\n',
+                asyncio.CancelledError(),
+            ]
+            mock_proc.returncode = None
+            mock_proc.wait = mock.AsyncMock()
+            mock_create_proc.return_value = mock_proc
+
+            leaser = cros_lab_util.AsyncDutLeaser(
+                ['dut_state:ready'], ['label-model:navi'], None, None, 'reason'
+            )
+            with self.assertRaises(asyncio.CancelledError):
+                await leaser._lease(['dut_state:ready', 'label-model:navi'])
+
+            mock_cancel_pending_lease.assert_called_once_with(
+                {'scheduke_lease_id': '12345'}
+            )
+
+        asyncio.run(run_test())
 
 
 if __name__ == '__main__':
