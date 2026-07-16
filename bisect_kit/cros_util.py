@@ -72,6 +72,9 @@ SNAPSHOT_BUCKET = 'snapshot'
 PUBLIC_BUCKET = 'public'
 PUBLIC_SNAPSHOT_BUCKET = 'public-snapshot'
 
+TIMEOUT_CROSFLEET_LEASE_CMD = 2 * 60 * 60  # 2 hour (see b/303564174)
+TIMEOUT_DUT_LEASE = TIMEOUT_CROSFLEET_LEASE_CMD
+
 # only fetches manifest from gs when milestone >= 92
 gs_manifest_cutoff_milestone = 92
 gs_manifest_base = 'gs://chromeos-manifest-versions/'

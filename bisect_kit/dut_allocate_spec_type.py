@@ -7,6 +7,8 @@
 
 import dataclasses
 
+from bisect_kit import cros_util
+
 
 @dataclasses.dataclass
 class DutAllocateSpec:
@@ -22,7 +24,7 @@ class DutAllocateSpec:
     satlab_ip: str | None = None
     version_hints: list[str] = dataclasses.field(default_factory=list)
     builder_hints: list[str] = dataclasses.field(default_factory=list)
-    time_limit_seconds: int = 3600  # 1 hour (see b/303564174)
+    time_limit_seconds: int = cros_util.TIMEOUT_DUT_LEASE
     lease_duration_seconds: float | None = None
     parallel: int = 3
     session: str | None = None
