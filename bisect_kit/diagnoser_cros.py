@@ -1581,9 +1581,9 @@ class DiagnoseCommandLineBase:
         assert self.states
         return self.states.config
 
-    def check_cros_image_exists(
-        self, argument_key: str, board: str, cros_version: str
-    ) -> str:
+    def check_cros_image_exists(self, argument_key: str, board: str | None,
+                                builder_hints: list[str],
+                                cros_version: str) -> str:
         """Raises error if an image could not be found.
 
         If board does not present, the check always passes.
@@ -1599,9 +1599,18 @@ class DiagnoseCommandLineBase:
         """
         cros_util.argtype_cros_version(cros_version)
         if cros_util.is_cros_short_version(cros_version):
-            cros_version = cros_util.version_to_full(board, cros_version)
-
-        if not board:
+            candidates = ([board] if board else []) + builder_hints
+            for candidate in candidates:
+                try:
+                    cros_version = cros_util.version_to_full(
+                        candidate, cros_version)
+                    board = candidate
+                except errors.ExternalError:
+                    continue
+            else:
+                raise errors.ExternalError(
+                    'incorrect board=%s or version=%s ?' % (board, version))
+        elif not board:
             return cros_version
 
         if not cros_util.has_test_image(
@@ -1739,23 +1748,21 @@ class DiagnoseCommandLineBase:
             )
         elif opts.bisect_chrome:
             opts.base_cros_version = self.check_cros_image_exists(
-                '--base-cros-version', opts.board, opts.base_cros_version
-            )
+                '--base-cros-version', opts.board,
+                opts.allocate_dut_builder_hint, opts.base_cros_version)
             self.check_chrome_version('--old', opts.old)
             self.check_chrome_version('--new', opts.new)
         elif opts.bisect_android:
             opts.base_cros_version = self.check_cros_image_exists(
-                '--base-cros-version', opts.board, opts.base_cros_version
-            )
+                '--base-cros-version', opts.board,
+                opts.allocate_dut_builder_hint, opts.base_cros_version)
             self.check_android_version('--old', opts.old)
             self.check_android_version('--new', opts.new)
         else:
             opts.old = self.check_cros_image_exists(
-                '--old', opts.board, opts.old
-            )
+                '--old', opts.board, opts.allocate_dut_builder_hint, opts.old)
             opts.new = self.check_cros_image_exists(
-                '--new', opts.board, opts.new
-            )
+                '--new', opts.board, opts.allocate_dut_builder_hint, opts.new)
 
         if opts.metric:
             if opts.old_value is None:
