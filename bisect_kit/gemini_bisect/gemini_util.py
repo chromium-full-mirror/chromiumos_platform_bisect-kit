@@ -490,6 +490,7 @@ class PrefixLoggerAdapter(logging.LoggerAdapter):
     """LoggerAdapter that prepends prefix to log messages."""
 
     def process(self, msg, kwargs):
+        assert self.extra is not None
         prefix = self.extra.get('prefix', '')
         return f'{prefix}{msg}', kwargs
 

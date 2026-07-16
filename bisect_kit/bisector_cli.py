@@ -395,6 +395,7 @@ def import_module_from_path(full_path: str):
         return None
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
+    assert spec.loader is not None
     spec.loader.exec_module(module)
 
     return module
@@ -706,13 +707,40 @@ class BisectorCommandLine(typing.Generic[T_co]):
         self.domain_cls = domain_cls
         self.dut_manager = dut_manager
 
-        self.domain: T_co | None = None
+        self._domain: T_co | None = None
         self.session: str | None = None
-        self.states: core.BisectStates | None = None
-        self.strategy: strategy.NoisyBinarySearch | None = None
+        self._states: core.BisectStates | None = None
+        self._search_strategy: strategy.NoisyBinarySearch | None = None
         self.future_build_depth: int = 1
 
         self.previous_strategy_state: str | None = None
+
+    @property
+    def domain(self) -> T_co:
+        assert self._domain is not None
+        return self._domain
+
+    @domain.setter
+    def domain(self, val):
+        self._domain = val
+
+    @property
+    def states(self) -> core.BisectStates:
+        assert self._states is not None
+        return self._states
+
+    @states.setter
+    def states(self, val: core.BisectStates):
+        self._states = val
+
+    @property
+    def search_strategy(self) -> strategy.NoisyBinarySearch:
+        assert self._search_strategy is not None
+        return self._search_strategy
+
+    @search_strategy.setter
+    def search_strategy(self, val: strategy.NoisyBinarySearch):
+        self._search_strategy = val
 
     @property
     def config(self) -> core.BisectConfig:
@@ -740,7 +768,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
         ],
     ) -> list[str]:
         """Returns a list of versions that may need to switch in the future."""
-        if not self.strategy:
+        if not self._search_strategy:
             return []
 
         def cost_func(idx: int | None):
@@ -748,7 +776,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
             return self.estimate_cost(rev)
 
         prev_idx = self.states.rev2idx(prev_rev) if prev_rev else None
-        indexes = self.strategy.future_switch_indexes(
+        indexes = self.search_strategy.future_switch_indexes(
             cost_func=cost_func,
             depth=depth,
             prev_idx=prev_idx,
@@ -786,9 +814,9 @@ class BisectorCommandLine(typing.Generic[T_co]):
             revlist = candidates['revlist']
             logger.info('found %d candidates to bisect', len(revlist))
             logger.debug('revlist %r', revlist)
-            if config.new is None:
+            if not config.new:
                 config.new = opts.new
-            if config.old is None:
+            if not config.old:
                 config.old = opts.old
             if len(revlist) < 2:
                 raise errors.TooFewRevisionsError(
@@ -857,7 +885,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
         Returns:
           Whether the eval is successful.
         """
-        assert self.strategy
+        assert self.search_strategy
 
         if action == EvalAction.WITH_DUT:
             assert dut, 'dut must be present with action %s' % action
@@ -875,7 +903,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
             rev,
             self.states.details.get(rev, {}),
             eval_log_full_path,
-            capture_values=self.strategy.is_value_bisection(),
+            capture_values=self.search_strategy.is_value_bisection(),
             session_name=self.session,
         )
         t1 = time.time()
@@ -897,14 +925,14 @@ class BisectorCommandLine(typing.Generic[T_co]):
             logger.debug('eval failed => %s', status)
             return False
 
-        if self.strategy.is_value_bisection():
+        if self.search_strategy.is_value_bisection():
             if status != 'value':
                 raise errors.ExecutionFatalError(
                     'eval command (%s) terminated normally but did not output values'
                     % eval_cmd
                 )
             sample['values'] = result.data['values']
-            sample['status'] = self.strategy.classify_result_from_values(
+            sample['status'] = self.search_strategy.classify_result_from_values(
                 result.data['values']
             )
 
@@ -1158,6 +1186,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 )
                 return 'eval', sample
         else:
+            assert self.dut_manager is not None
             with self.dut_manager.provision(
                 vm_cros_version=vm_cros_version
             ) as dut:
@@ -1204,7 +1233,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
             return None
 
         cost_table = []
-        for info in self.strategy.rev_info:
+        for info in self.search_strategy.rev_info:
             if info.rev == prev_rev:
                 switch_time = 0
             else:
@@ -1238,8 +1267,10 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 if opts.once:
                     break
         else:
-            while force or not self.strategy.is_done():
-                idx = self.strategy.next_idx(self.estimate_cost(prev_rev))
+            while force or not self.search_strategy.is_done():
+                idx = self.search_strategy.next_idx(
+                    self.estimate_cost(prev_rev)
+                )
                 rev = self.states.idx2rev(idx)
                 logger.info('try idx=%d rev=%s', idx, rev)
                 prev_rev = yield idx, rev
@@ -1256,21 +1287,22 @@ class BisectorCommandLine(typing.Generic[T_co]):
 
     def _show_step_summary(self):
         """Show current status after each bisect step."""
-        current_state = self.strategy.state
+        current_state = self.search_strategy.state
         if self.config.recompute_init_values:
             if (
-                self.previous_strategy_state == self.strategy.INITED
-                and current_state == self.strategy.STARTED
+                self.previous_strategy_state == self.search_strategy.INITED
+                and current_state == self.search_strategy.STARTED
             ):
-                assert self.strategy.threshold is not None
+                assert self.search_strategy.threshold is not None
                 self._make_decision(
                     'After verifying with the initial revisions, '
-                    'use %f as the bisect threshold.' % self.strategy.threshold
+                    'use %f as the bisect threshold.'
+                    % self.search_strategy.threshold
                 )
 
         self.previous_strategy_state = current_state
 
-        self.strategy.show_summary()
+        self.search_strategy.show_summary()
 
     def save_progress_with_sample(self, sample: dict):
         """Add sample to history and save internal states.
@@ -1286,10 +1318,10 @@ class BisectorCommandLine(typing.Generic[T_co]):
         try:
             # Call add_sample() to update strategy internal states
             # before saving it to the session file.
-            # add_sample() calls self.strategy.check_verification_range()
+            # add_sample() calls self.search_strategy.check_verification_range()
             # internally, so it bails out if bisection range is unlikely
             # true.
-            self.strategy.add_sample(sample['index'], **sample)
+            self.search_strategy.add_sample(sample['index'], **sample)
         finally:
             # add_sample() may throw exception, but we want to save
             # strategy internal states nevertheless. For example when
@@ -1298,7 +1330,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
             # Also the states are saved after the observation is
             # recorded (e.g., add_history() is called), so we don't loss
             # observations unexpectedly across executions.
-            self.states.strategy_states = self.strategy.export_states()
+            self.states.strategy_states = self.search_strategy.export_states()
             self.states.save()
 
     def cmd_run(self, opts: RunOptions):
@@ -1339,7 +1371,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                     # wasting time. This is necessary because some configurations (say,
                     # confidence) may be changed before cmd_run() and thus the bisection
                     # range becomes not acceptable.
-                    self.strategy.check_verification_range()
+                    self.search_strategy.check_verification_range()
 
                 step, sample = self._switch_and_eval(rev, prev_rev=prev_rev)
                 status = term_map.get(sample['status'], sample['status'])
@@ -1378,7 +1410,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                     prev_rev = rev
 
             logger.info('done')
-            old_idx, new_idx = self.strategy.get_range()
+            old_idx, new_idx = self.search_strategy.get_range()
             self.states.add_history('done')
             self.states.save()
         except Exception as e:
@@ -1393,15 +1425,18 @@ class BisectorCommandLine(typing.Generic[T_co]):
             self.states.save()
             raise
         finally:
-            if rev and self.strategy.state == self.strategy.STARTED:
+            if (
+                rev
+                and self.search_strategy.state == self.search_strategy.STARTED
+            ):
                 # progress so far
-                old_idx, new_idx = self.strategy.get_range()
+                old_idx, new_idx = self.search_strategy.get_range()
                 self.states.add_history(
                     'range',
                     old=self.states.idx2rev(old_idx),
                     new=self.states.idx2rev(new_idx),
                 )
-                init_range_verified = self.strategy.init_range_verified
+                init_range_verified = self.search_strategy.init_range_verified
                 self.states.add_history(
                     'verified', verified_status=init_range_verified
                 )
@@ -1428,7 +1463,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 if t is not None and t >= opts.timestamp:
                     continue
             try:
-                self.strategy.add_sample(sample['index'], **sample)
+                self.search_strategy.add_sample(sample['index'], **sample)
             except (
                 errors.WrongAssumption,
                 errors.VerificationFailed,
@@ -1436,16 +1471,18 @@ class BisectorCommandLine(typing.Generic[T_co]):
             ):
                 pass
 
-        for info in self.strategy.rev_info:
+        for info in self.search_strategy.rev_info:
             info_dict = info.to_dict()
             detail = self.states.details.get(info.rev, {})
             info_dict.update(detail)
             summary['rev_info'].append(info_dict)
 
         try:
-            old_idx, new_idx = self.strategy.get_range()
-            highlight_old_idx, highlight_new_idx = self.strategy.get_range(
-                self.strategy.confidence / 10.0
+            old_idx, new_idx = self.search_strategy.get_range()
+            highlight_old_idx, highlight_new_idx = (
+                self.search_strategy.get_range(
+                    self.search_strategy.confidence / 10.0
+                )
             )
         except errors.WrongAssumption:
             pass
@@ -1459,8 +1496,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
                         self.states.idx2rev(highlight_old_idx),
                         self.states.idx2rev(highlight_new_idx),
                     ],
-                    'prob': self.strategy.get_prob(),
-                    'remaining_steps': self.strategy.remaining_steps(),
+                    'prob': self.search_strategy.get_prob(),
+                    'remaining_steps': self.search_strategy.remaining_steps(),
                 }
             )
 
@@ -1470,8 +1507,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
             interesting_indexes = set()
         else:
             interesting_indexes = set([old_idx, new_idx])
-            if self.strategy.prob:
-                for i, p in enumerate(self.strategy.prob):
+            if self.search_strategy.prob:
+                for i, p in enumerate(self.search_strategy.prob):
                     if p > 0.05:
                         interesting_indexes.add(i)
 
@@ -1481,7 +1518,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
         # bisection.
         summary.update(
             {
-                'reproduced': self.strategy.check_reproduced(),
+                'reproduced': self.search_strategy.check_reproduced(),
             }
         )
 
@@ -1525,7 +1562,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 continue
 
             detail = []
-            if self.strategy.is_noisy() and summary.get('prob'):
+            if self.search_strategy.is_noisy() and summary.get('prob'):
                 detail.append('%.4f%%' % (summary['prob'][i] * 100))
             if rev_info['result_counter']:
                 detail.append(
@@ -1699,8 +1736,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
             )
             return False
 
-        self.strategy = self._strategy_factory()
-        if self.strategy.is_done():
+        self.search_strategy = self._strategy_factory()
+        if self.search_strategy.is_done():
             logger.debug('%s done', self.domain_cls.__name__)
             return True
         # Try to get the next rev idx in order to know whether the bisection is
@@ -1709,7 +1746,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
         # failed in the past.
         # Since the cost_table is irrelevant to whether the bisection is
         # completed or not (i.e., whether idx = None or not), pass None to it.
-        idx = self.strategy.next_idx(cost_table=None)
+        idx = self.search_strategy.next_idx(cost_table=None)
         logger.debug('idx for %s: %s', self.domain_cls.__name__, idx)
         # None means no more work to do.
         return idx is None
@@ -1733,17 +1770,17 @@ class BisectorCommandLine(typing.Generic[T_co]):
             # initialization is unsuccessful.
             return {"inited": False}
 
-        self.strategy = self._strategy_factory()
-        left, right = self.strategy.get_range()
-        estimated_noise = self.strategy.get_noise_observation()
+        self.search_strategy = self._strategy_factory()
+        left, right = self.search_strategy.get_range()
+        estimated_noise = self.search_strategy.get_noise_observation()
 
         result = {
             "inited": True,
             "old": self.states.idx2rev(left),
             "new": self.states.idx2rev(right),
-            "verified": self.strategy.check_reproduced(),
+            "verified": self.search_strategy.check_reproduced(),
             "estimated_noise": estimated_noise,
-            "done": self.strategy.is_done(),
+            "done": self.search_strategy.is_done(),
         }
         return result
 
@@ -1784,16 +1821,18 @@ class BisectorCommandLine(typing.Generic[T_co]):
 
     def cmd_next(self, opts: NextOptions):
         """Prints next suggested rev to bisect."""
-        if self.strategy.is_done():
+        if self.search_strategy.is_done():
             print('done')
             return
 
-        idx = self.strategy.next_idx(self.estimate_cost(opts.current_rev))
+        idx = self.search_strategy.next_idx(
+            self.estimate_cost(opts.current_rev)
+        )
         rev = self.states.idx2rev(idx)
         print(rev)
 
     def _add_revs_status_helper(self, revs, status):
-        if self.strategy.is_value_bisection():
+        if self.search_strategy.is_value_bisection():
             assert status not in ('old', 'new')
         for rev, times in revs:
             idx = self.states.rev2idx(rev)
@@ -1825,7 +1864,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
             session, self.domain_cls.__name__
         )
 
-        if self.states:
+        if self._states:
             assert self.states.session_file == session_file
         else:
             self.states = core.BisectStates(session_file)
@@ -2190,7 +2229,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
             # likely to be temporary errors and we want to give it a chance of
             # retry.
             # For other operations like cmd_view, we keep the full history.
-            self.strategy = self._strategy_factory(
+            self.search_strategy = self._strategy_factory(
                 ignore_skip=opts.command == 'run',
                 ignore_history=opts.command == 'view',
             )

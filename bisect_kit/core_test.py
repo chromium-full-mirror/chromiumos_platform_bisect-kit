@@ -217,7 +217,9 @@ class TestBisectStates(unittest.TestCase):
 
         # Modification on the returned value doesn't affect the internal
         # value.
-        states.strategy_states.state = 'foo'
+        st = states.strategy_states
+        assert st is not None
+        st.state = 'foo'
         self.assertEqual(
             states.strategy_states, strategy_states.States(state='blah')
         )

@@ -6,6 +6,7 @@
 
 from collections import namedtuple
 import copy
+import logging
 import unittest
 from unittest import mock
 
@@ -693,6 +694,7 @@ class TestBisectAgentInteractions(unittest.TestCase):
                 repo='test_repo',
                 revlist=['1', '2'],
             )
+            assert isinstance(agent.logger, logging.LoggerAdapter)
             with self.assertLogs(agent.logger.logger, level='INFO') as log_ctx:
                 next_rev = agent.next()
                 self.assertEqual(next_rev, '1')

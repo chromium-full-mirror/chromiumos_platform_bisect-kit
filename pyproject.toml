@@ -167,5 +167,4 @@ disable_error_code = [
     "arg-type",
 
     "return-value",
-    "union-attr",
 ]

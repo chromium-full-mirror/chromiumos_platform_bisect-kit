@@ -470,7 +470,9 @@ class QueryLeaseStatusTest(unittest.TestCase):
         response = (
             self.SAMPLE_GET_TASK_STATES_FROM_DEVICE_LEASE_SERVICE_RESPONSE
         )
-        response['userPayload'].pop('cros_bisect')
+        user_payload = response['userPayload']
+        assert isinstance(user_payload, dict)
+        user_payload.pop('cros_bisect')
         self.mock_get_task_states_from_device_lease_service.return_value = (
             response
         )

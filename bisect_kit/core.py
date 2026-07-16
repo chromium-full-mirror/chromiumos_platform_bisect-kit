@@ -350,8 +350,8 @@ class BisectConfig:
     term_old: str | None = None
     term_new: str | None = None
     noisy: str | None = None
-    old: str | None = None
-    new: str | None = None
+    old: str = ''
+    new: str = ''
     confidence: float | None = None
     ans: int | None = None
     old_p: int | None = None

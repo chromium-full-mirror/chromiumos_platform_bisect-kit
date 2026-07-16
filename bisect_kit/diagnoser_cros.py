@@ -158,6 +158,7 @@ class CrosDiagnoser:
           can_be_retried: Whether the bisection fails due to retriable error.
         """
         # Release any owned DUT before cleaning up the Shared DUT pool records.
+        assert self._dut_manager is not None
         self._dut_manager.reset(None)
 
         enable_shared_dut_pool = experiment.is_in_experiment(
@@ -1832,6 +1833,7 @@ class DiagnoseCommandLineBase:
         pass  # implemented by subclass if necessary
 
     def write_total_execution_time(self, start_timestamp, end_timestamp):
+        assert self.states is not None
         statistics = self.states.statistics
         statistics.start_timestamp = start_timestamp
         statistics.end_timestamp = end_timestamp
@@ -1941,11 +1943,13 @@ class DiagnoseCommandLineBase:
         raise NotImplementedError  # implemented by subclass
 
     def cmd_log(self, opts):
+        assert self.states is not None
         self.states.load_states()
         diagnoser = CrosDiagnoser(self.states, self.config)
         diagnoser.cmd_log(opts.json)
 
     def cmd_view(self, opts):
+        assert self.states is not None
         self.states.load_states()
         diagnoser = CrosDiagnoser(self.states, self.config)
         diagnoser.cmd_view(

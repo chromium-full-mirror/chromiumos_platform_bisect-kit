@@ -137,6 +137,7 @@ class DelayedDutReleaser:
         with self._lock:
             if self._has_released:
                 return False
+            assert self._timer
             self._timer.cancel()
             self._has_canceled = True
         return True
@@ -527,6 +528,7 @@ class DutManager:
         if not self._auto_allocated_dut:
             logger.warning('No allocated DUT, skip')
             return
+        assert self._allocated_vm is not None
         vm_leaser.release_vm(self._allocated_vm)
         vm_leaser.delete_image(
             self._allocated_vm.gce_image_name,
@@ -836,6 +838,7 @@ class DutManager:
         self.config.board = self._builder_of_auto_allocated_dut
         # TODO(cylee): Not sure if this is needed. Remove if not used.
         self.config.allocated_dut = dut
+        assert self._states is not None
         self._states.save()
         dut_allocate_spec_module.save(
             self.dut_allocate_spec,
@@ -843,6 +846,7 @@ class DutManager:
         )
 
     def dut_leases_log_path(self):
+        assert self._states is not None
         statistics = self._states.statistics
         if statistics.dut_leases_log_path:
             return statistics.dut_leases_log_path

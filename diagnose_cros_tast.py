@@ -135,6 +135,7 @@ class DiagnoseTastCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     def cmd_run(self, opts):
         del opts  # unused
 
+        assert self.states is not None
         self.states.load_states()
 
         try:

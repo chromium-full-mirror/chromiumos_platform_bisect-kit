@@ -470,6 +470,7 @@ class Dep:
             # self.url.format(vars.variables).
             # Pass unpacked self.variables temporarily due to a bad entry in
             # DEPS.
+            assert self.url is not None
             self.url = self.url.format(vars=self.variables, **self.variables)
 
     def __eq__(self, rhs):
@@ -908,6 +909,7 @@ class TimeSeriesTree:
 
         add_snapshot() should not be invoked after no_more_snapshot().
         """
+        assert self.alive_children is not None
         for child_entry, (timestamp, deps) in self.alive_children.items():
             if timestamp == self.end_time and timestamp != self.start_time:
                 continue

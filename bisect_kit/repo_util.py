@@ -752,6 +752,7 @@ class Manifest:
           A boolean, True if every project has a revision.
         """
         count = 0
+        assert self.xml is not None
         for project in self.xml.findall('.//project'):
             # check argument directly instead of getting value from default tag
             if not project.get('revision'):
@@ -762,6 +763,7 @@ class Manifest:
 
     def remove_project_revision(self):
         """Remove revision argument from all projects"""
+        assert self.xml is not None
         for project in self.xml.findall('.//project'):
             if 'revision' in project:
                 del project['revision']
@@ -773,6 +775,7 @@ class Manifest:
           An integer, indicates the number of projects.
         """
         result = 0
+        assert self.xml is not None
         for project in self.xml.findall('.//project'):
             if project.get('path') == path:
                 result += 1
@@ -792,6 +795,7 @@ class Manifest:
         self.modified.add(path)
 
         count = 0
+        assert self.xml is not None
         for project in self.xml.findall('.//project'):
             if self.parser.get_project_path(project) == path:
                 count += 1
@@ -807,6 +811,7 @@ class Manifest:
           path: A project's path.
           upstream: A git upstream.
         """
+        assert self.xml is not None
         for project in self.xml.findall('.//project'):
             if self.parser.get_project_path(project) == path:
                 project.set('upstream', upstream)

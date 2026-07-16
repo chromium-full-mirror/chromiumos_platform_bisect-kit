@@ -37,6 +37,7 @@ class TestDiagnose(unittest.TestCase):
         )
 
     def diagnose(self):
+        assert self._diagnoser is not None
         self._diagnoser.diagnose(
             is_autotest=False,
             switch_test_harness_cmd=[],

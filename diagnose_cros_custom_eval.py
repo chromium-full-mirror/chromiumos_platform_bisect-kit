@@ -34,6 +34,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             self.argument_parser.error('argument --eval-script is required')
 
     def init_hook(self, opts):
+        assert self.states is not None
         self.states.config.eval_script = opts.eval_script
 
     def create_argument_parser_hook(self, parser_init: ArgumentParser):
@@ -83,6 +84,7 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     def cmd_run(self, opts):
         del opts  # unused
 
+        assert self.states is not None
         self.states.load_states()
 
         try:

@@ -81,6 +81,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             )
 
     def init_hook(self, opts):
+        assert self.states is not None
         self.states.config.cts_revision = opts.cts_revision
         self.states.config.cts_abi = opts.cts_abi
         self.states.config.cts_prefix = opts.cts_prefix
@@ -126,7 +127,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
             common_eval_cmd.append('--args')
             common_eval_cmd.append(var)
 
-        if self.config.test_name.startswith('telemetry_'):
+        if self.config.test_name and self.config.test_name.startswith(
+            'telemetry_'
+        ):
             common_eval_cmd += [
                 '--chrome-root',
                 self.config.chrome_root,
@@ -192,6 +195,7 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     def cmd_run(self, opts):
         del opts  # unused
 
+        assert self.states is not None
         self.states.load_states()
 
         try:

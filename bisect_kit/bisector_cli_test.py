@@ -186,7 +186,7 @@ class TestBisectorCommandLine(unittest.TestCase):
         bisector.main('config', 'switch', 'true')
         bisector.main('config', 'eval', 'sh', '-c', '[ "$BISECT_REV" -lt 7 ]')
         bisector.main('run')
-        self.assertEqual(bisector.strategy.get_best_guess(), 7)
+        self.assertEqual(bisector.search_strategy.get_best_guess(), 7)
 
         with contextlib.redirect_stdout(io.StringIO()):
             # Only make sure no exceptions. No output verification.
@@ -265,12 +265,14 @@ class TestBisectorCommandLine(unittest.TestCase):
                 self.assertEqual(mock_stdout.getvalue(), '0\n')
 
             bisector.main('run', '-1')
-            self.assertEqual(bisector.strategy.get_range(), (0, 99))
+            self.assertEqual(bisector.search_strategy.get_range(), (0, 99))
             bisector.main('run', '-1')
-            self.assertIn(bisector.strategy.get_range(), {(0, 49), (0, 50)})
+            self.assertIn(
+                bisector.search_strategy.get_range(), {(0, 49), (0, 50)}
+            )
 
             bisector.main('run')
-            self.assertEqual(bisector.strategy.get_best_guess(), 42)
+            self.assertEqual(bisector.search_strategy.get_best_guess(), 42)
         with contextlib.redirect_stdout(io.StringIO()) as mock_stdout:
             bisector.main('next')
             self.assertEqual(mock_stdout.getvalue(), 'done\n')
@@ -300,10 +302,10 @@ class TestBisectorCommandLine(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()) as mock_stdout:
                 bisector.main('next')
                 self.assertEqual(mock_stdout.getvalue(), '99\n')
-            self.assertEqual(bisector.strategy.get_range(), (0, 99))
+            self.assertEqual(bisector.search_strategy.get_range(), (0, 99))
 
             bisector.main('run')
-            self.assertEqual(bisector.strategy.get_best_guess(), 42)
+            self.assertEqual(bisector.search_strategy.get_best_guess(), 42)
         with contextlib.redirect_stdout(io.StringIO()) as mock_stdout:
             bisector.main('next')
             self.assertEqual(mock_stdout.getvalue(), 'done\n')
@@ -329,7 +331,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             'bisect_kit.bisector_cli.do_evaluate', self.do_noisy_evaluate
         ):
             bisector.main('run')
-            self.assertEqual(bisector.strategy.get_best_guess(), 42)
+            self.assertEqual(bisector.search_strategy.get_best_guess(), 42)
 
         with contextlib.redirect_stdout(io.StringIO()) as mock_stdout:
             bisector.main('next')
@@ -358,7 +360,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             'bisect_kit.bisector_cli.do_evaluate', self.do_noisy_evaluate
         ):
             bisector.main('run')
-            self.assertEqual(bisector.strategy.get_best_guess(), 42)
+            self.assertEqual(bisector.search_strategy.get_best_guess(), 42)
 
         with contextlib.redirect_stdout(io.StringIO()) as mock_stdout:
             bisector.main('next')
@@ -375,18 +377,18 @@ class TestBisectorCommandLine(unittest.TestCase):
         bisector.main('old', '0')
         bisector.main('new', '99')
         bisector.main('run', '-1')
-        self.assertEqual(bisector.strategy.get_range(), (0, 49))
+        self.assertEqual(bisector.search_strategy.get_range(), (0, 49))
 
         bisector.main('old', '20')
         bisector.main('new', '40')
         bisector.main('run', '-1')
-        self.assertEqual(bisector.strategy.get_range(), (20, 30))
+        self.assertEqual(bisector.search_strategy.get_range(), (20, 30))
 
         with self.assertRaises(errors.TooManyTemporaryErrors):
             bisector.main('skip', '20*10')
         with self.assertRaises(errors.TooManyTemporaryErrors):
             bisector.main('skip', '30*10')
-        self.assertEqual(bisector.strategy.get_range(), (20, 30))
+        self.assertEqual(bisector.search_strategy.get_range(), (20, 30))
 
     def test_run_very_noisy(self):
         bisector = bisector_cli.BisectorCommandLine(
@@ -410,7 +412,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             'bisect_kit.bisector_cli.do_evaluate', self.do_noisy_evaluate
         ):
             bisector.main('run')
-            self.assertEqual(bisector.strategy.get_best_guess(), 42)
+            self.assertEqual(bisector.search_strategy.get_best_guess(), 42)
 
     def test_run_noisy_many_times(self):
         """Test noisy cases with different ratio"""
@@ -453,7 +455,9 @@ class TestBisectorCommandLine(unittest.TestCase):
                         bisector.main('config', 'eval', 'false')
                         bisector.main('run')
 
-                        self.assertEqual(bisector.strategy.get_best_guess(), 42)
+                        self.assertEqual(
+                            bisector.search_strategy.get_best_guess(), 42
+                        )
                         correct_count += 1
 
                     except errors.VerifyInitialRangeFailed:
@@ -560,7 +564,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             DummyDomain, self.dut_manager
         )
         bisector.main('init', '--num=100', '--old=0', '--new=99')
-        bisector.main('view')  # init bisector.strategy
+        bisector.main('view')  # init bisector.search_strategy
 
         self.assertEqual(bisector.future_switch_versions(None, 0), ['99'])
         self.assertEqual(bisector.future_switch_versions(None, 1), ['0', '99'])
@@ -579,7 +583,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             'status': 'new',
         }
         bisector.states.add_history('sample', **sample1)
-        bisector.strategy.add_sample(99, **sample1)
+        bisector.search_strategy.add_sample(99, **sample1)
         self.assertEqual(bisector.future_switch_versions('99', 0), ['0'])
         self.assertEqual(bisector.future_switch_versions('99', 1), ['0', '49'])
         self.assertEqual(
@@ -594,7 +598,7 @@ class TestBisectorCommandLine(unittest.TestCase):
         }
         with self.assertRaises(errors.VerifyOldBehaviorFailed):
             bisector.states.add_history('sample', **sample2)
-            bisector.strategy.add_sample(0, **sample2)
+            bisector.search_strategy.add_sample(0, **sample2)
             self.assertEqual(bisector.future_switch_versions('0', 0), [])
 
     def test_future_switch_versions_gemini(self):
@@ -607,9 +611,9 @@ class TestBisectorCommandLine(unittest.TestCase):
         sample_old = {'rev': '0', 'index': 0, 'status': 'old'}
         sample_new = {'rev': '4', 'index': 4, 'status': 'new'}
         bisector.states.add_history('sample', **sample_old)
-        bisector.strategy.add_sample(0, **sample_old)
+        bisector.search_strategy.add_sample(0, **sample_old)
         bisector.states.add_history('sample', **sample_new)
-        bisector.strategy.add_sample(4, **sample_new)
+        bisector.search_strategy.add_sample(4, **sample_new)
 
         mock_gemini = mock.MagicMock()
         mock_gemini.future_build_tree = {
@@ -632,7 +636,7 @@ class TestBisectorCommandLine(unittest.TestCase):
             },
         }
         gemini_strat = strategy.GeminiFusionStrategy(
-            rev_info=bisector.strategy.rev_info,
+            rev_info=bisector.search_strategy.rev_info,
             old_idx=0,
             new_idx=4,
             enable_gemini=False,
@@ -640,7 +644,7 @@ class TestBisectorCommandLine(unittest.TestCase):
         gemini_strat.gemini = mock_gemini
         # pylint: disable=protected-access
         gemini_strat._gemini_waiting_result = {'1': None}
-        bisector.strategy = gemini_strat
+        bisector.search_strategy = gemini_strat
 
         # Depth 0 returns primary suggestion '1'
         self.assertEqual(bisector.future_switch_versions('0', 0), ['1'])
@@ -760,7 +764,7 @@ class TestSwitchAndEval(unittest.TestCase):
         # can be run.
         bisector.domain = bisector.domain_cls(bisector.states.config)
         # pylint: disable=protected-access
-        bisector.strategy = bisector._strategy_factory()
+        bisector.search_strategy = bisector._strategy_factory()
         # pylint: disable=protected-access
         return bisector._switch_and_eval('3', '3' if same_as_prev_rev else None)
 

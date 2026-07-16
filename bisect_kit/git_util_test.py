@@ -228,8 +228,12 @@ class TestGitOperationReadOnly(unittest.TestCase):
         result = git_util.get_batch_commit_metadata(
             self.git_repo, self.revs + [bad_obj]
         )
-        self.assertEqual(result[self.revs[1]].parent, [self.revs[0]])
-        self.assertEqual(result[self.revs[3]].parent, [self.revs[2]])
+        meta_1 = result[self.revs[1]]
+        assert meta_1 is not None
+        self.assertEqual(meta_1.parent, [self.revs[0]])
+        meta_3 = result[self.revs[3]]
+        assert meta_3 is not None
+        self.assertEqual(meta_3.parent, [self.revs[2]])
         self.assertIsNone(result[bad_obj])
 
     def test_get_revlist(self):
