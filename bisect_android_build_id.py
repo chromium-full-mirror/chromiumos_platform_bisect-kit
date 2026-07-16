@@ -111,19 +111,9 @@ class AndroidBuildIDDomain(core.BisectDomain):
         self.config = config
 
     def setenv(self, env, rev, rev_details=None):
-        pass
-
-    def get_extra_args(self, phase: core.Phase, rev: str, rev_details=None) -> list[str]:
-        if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
-            args = [
-                '--android-build-id', rev,
-                '--flavor', self.config.flavor,
-                '--branch', self.config.branch,
-            ]
-            if self.config.dut:
-                args += ['--dut', self.config.dut]
-            return args
-        return []
+        env['ANDROID_BRANCH'] = self.config.branch
+        env['ANDROID_FLAVOR'] = self.config.flavor
+        env['ANDROID_BUILD_ID'] = rev
 
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:
