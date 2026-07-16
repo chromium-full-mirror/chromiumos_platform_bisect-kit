@@ -832,6 +832,7 @@ class DutManager:
         # with the corresponding builder and this code path should not be
         # executed. On the other hand, if DUT is auto-allocated, this code path
         # is executed and we should update config.board accordingly.
+        assert self._builder_of_auto_allocated_dut
         self.config.board = self._builder_of_auto_allocated_dut
         # TODO(cylee): Not sure if this is needed. Remove if not used.
         self.config.allocated_dut = dut

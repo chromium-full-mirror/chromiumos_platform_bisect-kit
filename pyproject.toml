@@ -122,7 +122,6 @@ disable_error_code = [
     "arg-type",
     "call-arg",
     "index",
-    "list-item",
     "return-value",
     "union-attr",
 ]

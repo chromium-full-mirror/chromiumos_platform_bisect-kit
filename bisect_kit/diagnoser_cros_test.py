@@ -13,6 +13,7 @@ from bisect_kit import diagnoser_cros
 from bisect_kit import dut_allocate_spec as dut_allocate_spec_module
 from bisect_kit import errors
 from bisect_kit import shared_dut_pool
+import experiment
 
 
 logger = logging.getLogger(__name__)
@@ -109,7 +110,7 @@ class TestDiagnose(unittest.TestCase):
         self.init(
             config=core.DiagnoserConfig(
                 experiments=[
-                    'shared_dut_pool',
+                    experiment.ID.SHARED_DUT_POOL,
                 ],
                 session='session1',
             ),
@@ -124,7 +125,7 @@ class TestDiagnose(unittest.TestCase):
         self.init(
             config=core.DiagnoserConfig(
                 experiments=[
-                    'shared_dut_pool',
+                    experiment.ID.SHARED_DUT_POOL,
                 ]
             ),
             is_stateless=True,
@@ -143,8 +144,8 @@ class TestDiagnose(unittest.TestCase):
         self.init(
             config=core.DiagnoserConfig(
                 experiments=[
-                    'shared_dut_pool',
-                    'stateless',
+                    experiment.ID.SHARED_DUT_POOL,
+                    experiment.ID.STATELESS,
                 ],
                 session='session1',
             ),
@@ -162,8 +163,8 @@ class TestDiagnose(unittest.TestCase):
         self.init(
             config=core.DiagnoserConfig(
                 experiments=[
-                    'shared_dut_pool',
-                    'stateless',
+                    experiment.ID.SHARED_DUT_POOL,
+                    experiment.ID.STATELESS,
                 ],
                 session='session1',
             ),
@@ -183,8 +184,8 @@ class TestDiagnose(unittest.TestCase):
         self.init(
             config=core.DiagnoserConfig(
                 experiments=[
-                    'shared_dut_pool',
-                    'stateless',
+                    experiment.ID.SHARED_DUT_POOL,
+                    experiment.ID.STATELESS,
                 ],
                 session='session1',
             ),

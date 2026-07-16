@@ -395,7 +395,7 @@ class DiagnoserConfig:
     android_root: str = ''
     android_mirror: str = ''
     dut: str = ''
-    board: str | None = None
+    board: str = ''
     old: str = ''
     new: str = ''
     is_public_build: bool = False
@@ -449,7 +449,7 @@ class DiagnoserConfig:
     consider_test_crash_as_failure: bool = False
     experiments: list[experiment.ID] | None = None
     sync_dut_allocate_spec_with_db: bool = False
-    board_cpu_arch: str | None = None
+    board_cpu_arch: str = ''
     allocated_dut: str | None = None
 
 

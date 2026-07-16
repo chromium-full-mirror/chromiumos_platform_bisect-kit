@@ -331,14 +331,15 @@ class CrosDiagnoser:
             # DutManager.provision().
             with self._dut_manager.get().provision() as dut:
                 # Query DUT dependent properties.
-                self.config.board_cpu_arch = cros_util.query_dut_cpu_arch(
+                board_cpu_arch = cros_util.query_dut_cpu_arch(
                     dut, self.config.board
                 )
+                assert board_cpu_arch, 'Failed to query DUT CPU arch'
+                self.config.board_cpu_arch = board_cpu_arch
                 logger.info('board_cpu_arch = %s', self.config.board_cpu_arch)
                 self.states.save()
 
         assert self.config.board, '"board" is undetermined'
-        assert self.config.board_cpu_arch, '"board_cpu_arch" is undetermined'
 
         # Fix commands which depend on "board".
         if switch_test_harness_cmd:
@@ -912,6 +913,7 @@ class CrosDiagnoser:
                 dut_manager,
                 self.is_stateless,
             )
+            assert self.old_info.android_branch is not None
             try:
                 bisector.init_if_necessary(
                     self.old_info.android_build_id,
@@ -1008,6 +1010,7 @@ class CrosDiagnoser:
             dut_manager,
             self.is_stateless,
         )
+        assert self.old_info.android_branch is not None
         try:
             bisector.init_if_necessary(
                 android_old,
@@ -1018,7 +1021,7 @@ class CrosDiagnoser:
                     '--android-mirror',
                     android_mirror,
                     '--branch',
-                    self.old_info['android_branch'],
+                    self.old_info.android_branch,
                     '--flavor',
                     android_flavor,
                     '--board',
@@ -1931,7 +1934,7 @@ class DiagnoseCommandLineBase:
         pass  # implemented by subclass if necessary
 
     def create_argument_parser(self):
-        parents = [
+        parents: list[argparse.ArgumentParser] = [
             cli.create_session_optional_parser(),
         ]
         parser = cli.ArgumentParser(raise_bad_status=False)

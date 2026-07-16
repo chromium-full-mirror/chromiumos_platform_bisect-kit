@@ -1991,7 +1991,9 @@ class BisectorCommandLine(typing.Generic[T_co]):
     """
         )
 
-        parents = [cli.create_session_optional_parser()]
+        parents: list[argparse.ArgumentParser] = [
+            cli.create_session_optional_parser()
+        ]
         parser = cli.ArgumentParser(
             prog=prog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
