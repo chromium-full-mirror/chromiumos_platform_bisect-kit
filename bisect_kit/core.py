@@ -453,16 +453,6 @@ class DiagnoserConfig:
     allocated_dut: str | None = None
 
 
-class _BisectStatesData(typing.TypedDict, total=False):
-    """Data for BisectStates."""
-
-    history: typing.Required[list[typing.Any]]
-    config: BisectConfig
-    revlist: list[str]
-    details: dict[str, typing.Any]
-    strategy_states: strategy_states.States | None
-
-
 class DiagnoseStates(States):
     """Diagnose states."""
 
@@ -532,11 +522,13 @@ class BisectStates(States):
         """
         super().__init__(session_file)
 
-        self.data: _BisectStatesData = {
-            # What have been done so far. Each entry contains at least
-            # timestamp, rev, and result.
-            "history": []
-        }
+        # What have been done so far. Each entry contains at least
+        # timestamp, rev, and result.
+        self._history: list[typing.Any] = []
+        self._config: BisectConfig | None = None
+        self._revlist: list[str] = []
+        self._details: dict[str, typing.Any] = {}
+        self._strategy_states: strategy_states.States | None = None
 
         # Mapping of rev to idx; constructed from data['revlist'].
         self.rev_index: dict[str, int] = {}
@@ -552,25 +544,29 @@ class BisectStates(States):
     @property
     def config(self) -> BisectConfig:
         assert self.inited
-        self.data.setdefault('config', BisectConfig())
-        return self.data['config']
+        if self._config is None:
+            self._config = BisectConfig()
+        return self._config
 
     @property
     def details(self) -> dict[str, typing.Any]:
         assert self.inited
-        self.data.setdefault('details', {})
-        return self.data['details']
+        return self._details
 
     @property
     def history(self) -> list[typing.Any]:
         assert self.inited
-        self.data.setdefault('history', [])
-        return self.data['history']
+        return self._history
+
+    @property
+    def revlist(self) -> list[str]:
+        assert self.inited
+        return self._revlist
 
     @property
     def strategy_states(self) -> strategy_states.States | None:
         assert self.inited
-        states = self.data.get('strategy_states')
+        states = self._strategy_states
         if states:
             # Returns a copy so the internal states is not modified
             # accidentally.
@@ -584,7 +580,7 @@ class BisectStates(States):
     def strategy_states(self, states: strategy_states.States):
         # Make a copy so the modification of the argument at the caller site
         # doesn't propogate.
-        self.data['strategy_states'] = dataclasses.replace(states)
+        self._strategy_states = dataclasses.replace(states)
 
     def init_states(
         self,
@@ -599,32 +595,42 @@ class BisectStates(States):
           revlist: version list.
           details: dict of rev details.
         """
-        self.data.update(
-            # Bisection configurations (dict), values are determined by cmd_init
-            # and each domain's init functions. There will be 'old' and 'new' at
-            # least.
-            config=config,
-            # List of bisect candidates (version numbers).
-            revlist=revlist,
-            details=details or {},
-        )
-        self._init_from_dict(self.data)
-
-    def _init_from_dict(self, data: dict) -> bool:
-        """Inherit from States."""
-        self.data = rebuild_from_json(data)
-
-        if 'config' in self.data and isinstance(self.data['config'], dict):
-            self.data['config'] = BisectConfig(**self.data['config'])
+        self._config = config
+        self._revlist = revlist
+        self._details = details or {}
 
         # reset variables
         self.rev_index = {}
 
-        if 'revlist' not in self.data:
+        for i, rev in enumerate(self._revlist):
+            self.rev_index[rev] = i
+
+        self._init_done()
+
+    def _init_from_dict(self, data: dict) -> bool:
+        """Inherit from States."""
+        rebuilt = rebuild_from_json(data)
+
+        if isinstance(rebuilt, dict):
+            self._history = rebuilt.get('history', [])
+            config = rebuilt.get('config')
+            if isinstance(config, dict):
+                config = BisectConfig(**config)
+            self._config = config
+            self._revlist = rebuilt.get('revlist', [])
+            self._details = rebuilt.get('details', {})
+            self._strategy_states = rebuilt.get('strategy_states')
+        else:
+            return False
+
+        # reset variables
+        self.rev_index = {}
+
+        if not self._revlist:
             # The session is not fully initialized.
             return False
 
-        for i, rev in enumerate(self.data['revlist']):
+        for i, rev in enumerate(self._revlist):
             self.rev_index[rev] = i
 
         self._init_done()
@@ -632,7 +638,13 @@ class BisectStates(States):
 
     def _pack_to_dict(self) -> dict:
         """Inherit from States."""
-        return self.data
+        return {
+            'history': self._history,
+            'config': self._config,
+            'revlist': self._revlist,
+            'details': self._details,
+            'strategy_states': self._strategy_states,
+        }
 
     def get_rev_info(
         self, term_map=None, ignore_skip=False, ignore_history=False
@@ -649,12 +661,12 @@ class BisectStates(States):
         """
         assert self.inited
         rev_info = []
-        for rev in self.data['revlist']:
+        for rev in self._revlist:
             rev_info.append(RevInfo(rev, term_map=term_map))
         if ignore_history:
             return rev_info
 
-        for entry in self.data['history']:
+        for entry in self._history:
             if entry.get('event', 'sample') != 'sample':
                 continue
             if ignore_skip and entry.get('status') == 'skip':
@@ -665,7 +677,7 @@ class BisectStates(States):
 
     def get_init_range_verified(self) -> bool:
         assert self.inited
-        for entry in self.data['history']:
+        for entry in self._history:
             if entry.get('event') != 'verified':
                 continue
             return entry['verified_status']
@@ -673,7 +685,7 @@ class BisectStates(States):
 
     def idx2rev(self, idx: int) -> str:
         assert self.inited
-        return self.data['revlist'][idx]
+        return self._revlist[idx]
 
     def rev2idx(self, rev: str) -> int:
         assert self.inited
@@ -683,7 +695,7 @@ class BisectStates(States):
         # This function is allowed to be called before fully initialized
         # (self.inited=False) in order to record error events.
         entry = {"event": event, "timestamp": time.time(), **kwargs}
-        self.data['history'].append(entry)
+        self._history.append(entry)
 
 
 class Phase(enum.StrEnum):

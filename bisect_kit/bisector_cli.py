@@ -1264,7 +1264,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
         avg_eval_time_by_status: collections.defaultdict[
             str, math_util.Averager
         ] = collections.defaultdict(math_util.Averager)
-        for entry in self.states.data['history']:
+        for entry in self.states.history:
             if entry['event'] != 'sample':
                 continue
             if 'switch_time' in entry:
@@ -1576,8 +1576,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
 
         if 'current_range' in summary:
             old, new = summary['current_range']
-            old_idx = self.states.data['revlist'].index(old)
-            new_idx = self.states.data['revlist'].index(new)
+            old_idx = self.states.revlist.index(old)
+            new_idx = self.states.revlist.index(new)
             print(
                 'Range: (%s, %s], %s revs left'
                 % (old, new, (new_idx - old_idx))
@@ -1816,7 +1816,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
     def cmd_log(self, opts: LogOptions):
         """Prints what has been done so far."""
         history = []
-        for entry in self.states.data['history']:
+        for entry in self.states.history:
             if opts.before and entry['timestamp'] >= opts.before:
                 continue
             if opts.after and entry['timestamp'] <= opts.after:

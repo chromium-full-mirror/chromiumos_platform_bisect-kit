@@ -279,7 +279,7 @@ class SnapshotStore:
         Args:
           states: A ChromeOSVersionDomain state.
         """
-        if not states.data:
+        if not states.inited:
             raise errors.InternalError('BisectStates should be loaded')
 
         for version, detail in states.details.items():
