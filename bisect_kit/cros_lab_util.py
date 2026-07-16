@@ -85,17 +85,23 @@ LEASE_DURATION_SECONDS = 1439 * 60
 LEASE_ATTEMPT_TIME = 600
 
 
-class CrosfleetDutLease(typing.TypedDict, total=False):
+@dataclasses.dataclass(kw_only=True, slots=True)
+class CrosfleetDutLease:
     """A data represents the DUT lease status fetched from crosfleet command."""
 
     dut_hostname: str
     model: str
     board: str
-    servo_hostname: str
-    servo_port: str
-    servo_serial: str
-    mins_remaining: str
-    lease_id: str
+    servo_hostname: str | None = None
+    servo_port: str | None = None
+    servo_serial: str | None = None
+    mins_remaining: str | None = None
+    lease_id: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str]) -> 'CrosfleetDutLease':
+        valid_keys = {f.name for f in dataclasses.fields(cls)}
+        return cls(**{k: v for k, v in data.items() if k in valid_keys})
 
 
 @dataclasses.dataclass(eq=True)
@@ -266,7 +272,7 @@ def crosfleet_dut_info(dut_name) -> CrosfleetDutLease:
         m = re.fullmatch(r'(\S+)=(\S+)', line)
         if m:
             info[m.group(1).lower()] = m.group(2)
-    return info
+    return CrosfleetDutLease.from_dict(info)
 
 
 def crosfleet_dut_leases() -> dict[str, CrosfleetDutLease]:
@@ -304,8 +310,8 @@ def crosfleet_dut_leases() -> dict[str, CrosfleetDutLease]:
         if not line and current_section_info:
             dut_name = current_section_info.get('dut_hostname', '')
             if dut_name:
-                info[dut_name] = typing.cast(
-                    CrosfleetDutLease, current_section_info
+                info[dut_name] = CrosfleetDutLease.from_dict(
+                    current_section_info
                 )
             else:
                 error = True
@@ -321,9 +327,7 @@ def crosfleet_dut_leases() -> dict[str, CrosfleetDutLease]:
     if not error and current_section_info:
         dut_name = current_section_info.get('dut_hostname', '')
         if dut_name:
-            info[dut_name] = typing.cast(
-                CrosfleetDutLease, current_section_info
-            )
+            info[dut_name] = CrosfleetDutLease.from_dict(current_section_info)
         else:
             error = True
             logger.error(
@@ -1089,8 +1093,8 @@ def crosfleet_release_dut(dut_name: str):
         )
 
     leases = crosfleet_dut_leases()
-    lease_info: CrosfleetDutLease = leases.get(dut_name, {})
-    lease_id = lease_info.get('lease_id', '')
+    lease_info = leases.get(dut_name)
+    lease_id = lease_info.lease_id if lease_info else None
     if lease_id:
         try:
             crosfleet_cmd('dut abandon', '-lease-ids', lease_id)
@@ -1461,8 +1465,8 @@ def reboot_via_servo(dut: str) -> bool:
         return False
 
     dut_info = crosfleet_dut_info(dut_host_name(dut))
-    servo_host = dut_info.get('servo_hostname', None)
-    servo_port = dut_info.get('servo_port', None)
+    servo_host = dut_info.servo_hostname
+    servo_port = dut_info.servo_port
     if not servo_host or not servo_port:
         logger.debug('this DUT has no servo?')
         return False

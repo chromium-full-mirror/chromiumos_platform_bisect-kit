@@ -112,14 +112,14 @@ LEASE_ID=73967320
         self.assertIn('chromeos8-row13-rack17-host2', info)
         self.assertIn('chromeos8-row13-rack17-host3', info)
         self.assertEqual(
-            info['chromeos8-row13-rack17-host2']['dut_hostname'],
+            info['chromeos8-row13-rack17-host2'].dut_hostname,
             'chromeos8-row13-rack17-host2',
         )
         self.assertEqual(
-            info['chromeos8-row13-rack17-host2']['lease_id'], '73967319'
+            info['chromeos8-row13-rack17-host2'].lease_id, '73967319'
         )
         self.assertEqual(
-            info['chromeos8-row13-rack17-host3']['lease_id'], '73967320'
+            info['chromeos8-row13-rack17-host3'].lease_id, '73967320'
         )
 
     def test_extract_lease_info(self):
@@ -494,6 +494,7 @@ class QueryLeaseStatusTest(unittest.TestCase):
                 ['dut_state:ready'], ['label-model:navi'], None, None, 'reason'
             )
             with self.assertRaises(asyncio.CancelledError):
+                # pylint: disable=protected-access
                 await leaser._lease(['dut_state:ready', 'label-model:navi'])
 
             mock_cancel_pending_lease.assert_called_once_with(
