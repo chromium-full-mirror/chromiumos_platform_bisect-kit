@@ -121,7 +121,6 @@ strict = false
 disable_error_code = [
     "arg-type",
     "call-arg",
-    "index",
     "return-value",
     "union-attr",
 ]

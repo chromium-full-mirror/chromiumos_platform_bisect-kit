@@ -753,6 +753,7 @@ class BisectAgent:
                 )
                 self._pending_parts = []
 
+            assert ret.candidates
             text = '\n'.join(
                 [
                     v.text
@@ -927,6 +928,7 @@ class BisectAgent:
                     )
 
             if conclude_call is not None:
+                assert conclude_call.args is not None
                 self._conclusion = conclude_call.args['rev_id']
                 self._pending_parts.append(
                     genai.types.Part(
@@ -940,6 +942,7 @@ class BisectAgent:
                 return None
 
             if run_at_call is not None:
+                assert run_at_call.args is not None
                 self._pending_run_at_call = run_at_call
                 return run_at_call.args['rev_id']
 
@@ -1125,6 +1128,7 @@ def demo(
     bsearch.add_sample(len(revlist) - 1, 'new')
     assert bsearch.state == bsearch.STARTED
     prob = bsearch.prob
+    assert prob is not None
 
     # The last run revision was 'bad' (index len(revlist) - 1)
     cost_table = _get_simulated_cost_table(
@@ -1172,6 +1176,7 @@ def demo(
 
         bsearch.add_sample(attempt_idx, 'old' if status == 'PASS' else 'new')
         prob = bsearch.prob
+        assert prob is not None
         # Current revision is 'attempt_idx'
         cost_table = _get_simulated_cost_table(0, len(revlist) - 1, attempt_idx)
         # pylint: disable=protected-access
@@ -1204,6 +1209,7 @@ def demo(
             }
         )
     concluded_culprit = agent.get_result()
+    assert bsearch.prob is not None
     concluded_prob_on_stop = (
         bsearch.prob[revlist.index(concluded_culprit)]
         if concluded_culprit in revlist

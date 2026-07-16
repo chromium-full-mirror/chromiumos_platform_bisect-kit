@@ -35,6 +35,7 @@ class TestEvalCrosAutotest(unittest.TestCase):
             'network_WiFi_Perf.vht80',
         )
         self.assertEqual(passed, False)
+        assert reason is not None
         self.assertEqual(
             reason[:50], 'FAIL: Throughput performance too low for test type'
         )
@@ -71,6 +72,7 @@ class TestEvalCrosAutotest(unittest.TestCase):
             'cheets_GTS.tradefed-run-test',
         )
         self.assertEqual(passed, False)
+        assert reason is not None
         self.assertEqual(reason[:20], 'java.lang.Exception:')
 
         with self.assertRaisesRegex(

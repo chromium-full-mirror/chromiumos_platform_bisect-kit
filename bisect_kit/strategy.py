@@ -8,6 +8,7 @@ import logging
 import math
 import re
 import sys
+import typing
 
 from bisect_kit import errors
 from bisect_kit import math_util
@@ -127,7 +128,7 @@ class NoisyBinarySearch:
     INIT_DO_TWO = 'init_do_two'
     INIT_CHECK_TWO = 'init_check_two'
 
-    INIT_STATUS_MAP = {
+    INIT_STATUS_MAP: typing.ClassVar[dict[str, dict[str, typing.Any]]] = {
         INIT_DO_ONE: {
             'next_state': INIT_CHECK_ONE,
             'action': 'counting',
@@ -898,6 +899,7 @@ class NoisyBinarySearch:
         assert self.rev_info[idx][result] == 1
         # For the first non-skip result, skip_weight is affected if itself or its
         # neighbor's skip_weight != 1.
+        assert self.skip_weight is not None
         for i in [idx - 1, idx, idx + 1]:
             if 0 <= i < len(self.rev_info) and self.skip_weight[i] != 1:
                 return True
@@ -1130,6 +1132,7 @@ class NoisyBinarySearch:
     def set_logger_prefix(self, prefix: str):
         """Sets the prefix for logging."""
         if hasattr(self.logger, 'extra'):
+            assert isinstance(self.logger.extra, dict)
             self.logger.extra['prefix'] = prefix
 
     def show_summary(self, more=False):
@@ -1141,6 +1144,7 @@ class NoisyBinarySearch:
 
         def show_candidate(idx):
             if self.state == self.STARTED and self.is_noisy():
+                assert self.prob is not None
                 self.logger.info(
                     '[%d] %s %.4f%%; %s',
                     idx,
@@ -1162,6 +1166,7 @@ class NoisyBinarySearch:
                 show_candidate(i)
             return
 
+        assert self.prob is not None
         prob_rank = sorted(
             ((p, i) for i, p in enumerate(self.prob) if p > 0), reverse=True
         )
@@ -1734,4 +1739,5 @@ class GeminiFusionStrategy(NoisyBinarySearch):
     def set_logger_prefix(self, prefix: str):
         super().set_logger_prefix(prefix)
         if self.gemini and hasattr(self.gemini.logger, 'extra'):
+            assert isinstance(self.gemini.logger.extra, dict)
             self.gemini.logger.extra['prefix'] = prefix

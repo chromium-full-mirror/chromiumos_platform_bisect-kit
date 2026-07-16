@@ -59,6 +59,7 @@ import os
 import re
 import subprocess
 import sys
+import typing
 
 from bisect_kit import bisect_db
 from bisect_kit import common
@@ -91,7 +92,7 @@ _MAIN_SCRIPT_MAP = {
 
 
 def output_view_json(
-    records: dict[str, str],
+    records: list[dict[str, typing.Any]],
     bisect_id: str,
     main_script: str,
     bisect_dir: str,

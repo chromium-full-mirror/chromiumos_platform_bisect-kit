@@ -975,6 +975,7 @@ class CrosDiagnoser:
             return verified
 
         # TODO(kcwu): what if the branch name does not have 'git_' prefix
+        assert self.old_info.android_branch is not None
         assert self.old_info.android_branch.startswith('git_')
         git_branch = self.old_info.android_branch[4:]
         android_mirror = self.config.android_mirror

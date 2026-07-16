@@ -150,6 +150,7 @@ def build_revlist_from_overlay_history(
 
     for commit in build_history:
         rev = extract_version_from_commit_summary(commit.subject)
+        assert rev is not None
 
         action = {}
         if rev in details:

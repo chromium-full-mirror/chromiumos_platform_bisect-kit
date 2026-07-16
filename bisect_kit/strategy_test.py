@@ -1359,6 +1359,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
     def test_noisy_binary_search_set_logger_prefix(self):
         bsearch = strategy.NoisyBinarySearch(self.rev_info)
         bsearch.set_logger_prefix('[Simulation] ')
+        assert isinstance(bsearch.logger.extra, dict)
         self.assertEqual(bsearch.logger.extra['prefix'], '[Simulation] ')
 
     def test_gemini_fusion_strategy_set_logger_prefix(self):
@@ -1379,7 +1380,9 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 endpoint_verification=False,
             )
             bsearch.set_logger_prefix('[Simulation] ')
+            assert isinstance(bsearch.logger.extra, dict)
             self.assertEqual(bsearch.logger.extra['prefix'], '[Simulation] ')
+            assert isinstance(mock_agent.logger.extra, dict)
             self.assertEqual(mock_agent.logger.extra['prefix'], '[Simulation] ')
 
     def test_prefix_logger_adapter_formatting(self):
@@ -1389,6 +1392,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             logger='test_prefix_logger', level='INFO'
         ) as log_capture:
             adapter.info('Without prefix')
+            assert isinstance(adapter.extra, dict)
             adapter.extra['prefix'] = '[Simulation] '
             adapter.info('With prefix')
 
