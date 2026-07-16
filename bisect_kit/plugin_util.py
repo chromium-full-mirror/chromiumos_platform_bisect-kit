@@ -7,7 +7,7 @@
 import typing
 
 
-_mapping = {}
+_mapping: dict[str, typing.Callable] = {}
 
 
 def register(key: str, *, should_apply: bool = True) -> typing.Callable:

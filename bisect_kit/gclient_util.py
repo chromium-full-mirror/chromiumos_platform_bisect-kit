@@ -33,7 +33,7 @@ from depot_tools import gclient_eval
 
 
 logger = logging.getLogger(__name__)
-emitted_warnings = set()
+emitted_warnings: set[str] = set()
 
 # If the dependency is not pinned in DEPS file, the default branch.
 # ref: gclient_scm.py GitWrapper.update default_rev
