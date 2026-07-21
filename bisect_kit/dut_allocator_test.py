@@ -7,6 +7,7 @@
 import unittest
 from unittest import mock
 
+from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import dut_allocator
 from bisect_kit import errors
@@ -116,6 +117,29 @@ class DutAllocatorTest(unittest.TestCase):
 
         self.assertEqual(host, 'host')
         self.assertEqual(board, 'board1')
+
+
+class InvalidConstraintsTest(unittest.TestCase):
+    """Test invalid constraints in DutAllocator."""
+
+    @mock.patch.object(cros_lab_util, 'swarming_bots_dimensions')
+    def test_invalid_sku_raises_fatal_error(
+        self, mock_swarming_bots_dimensions
+    ):
+        mock_swarming_bots_dimensions.return_value = {
+            'dut_state': ['ready'],
+            'label-pool': ['some_pool'],
+            'label-hwid_sku': ['screebo_16GB'],
+        }
+        spec = DutAllocateSpec(
+            skus=['nonexistent_sku'],
+            pools=['some_pool'],
+        )
+        with self.assertRaises(errors.DutAllocateSpecError) as cm:
+            dut_allocator.DutAllocator(spec, '/path/to/chromeos')
+        self.assertEqual(
+            errors.error_type(cm.exception), errors.ErrorType.Fatal
+        )
 
 
 if __name__ == '__main__':

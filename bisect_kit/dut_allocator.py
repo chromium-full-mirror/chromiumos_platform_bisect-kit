@@ -193,7 +193,7 @@ class DutAllocator:
             pools = ['label-pool:%s' % p for p in spec.pools]
             pools = _filter_dimensions_by_lab(pools, raise_unknown=False)
             if not pools:
-                raise errors.NoDutAvailable(
+                raise errors.DutAllocateSpecError(
                     'none of the specified pools "%s" are available in lab'
                     % spec.pools
                 )
@@ -209,7 +209,7 @@ class DutAllocator:
                 )
             variants = _filter_dimensions_by_lab(variants)
             if not variants:
-                raise errors.NoDutAvailable(
+                raise errors.DutAllocateSpecError(
                     'Invalid constraints: no board=%s in the lab' % spec.boards
                 )
 
@@ -222,7 +222,7 @@ class DutAllocator:
                 )
             variants = _filter_dimensions_by_lab(variants)
             if not variants:
-                raise errors.NoDutAvailable(
+                raise errors.DutAllocateSpecError(
                     'Invalid constraints: no model=%s in the lab' % spec.models
                 )
 
@@ -233,7 +233,7 @@ class DutAllocator:
                 )
             variants = _filter_dimensions_by_lab(variants)
             if not variants:
-                raise errors.NoDutAvailable(
+                raise errors.DutAllocateSpecError(
                     'Invalid constraints: no sku=%s in the lab' % spec.skus
                 )
 
@@ -241,7 +241,7 @@ class DutAllocator:
             variants.append('dut_name:' + spec.dut_name)
             variants = _filter_dimensions_by_lab(variants)
             if not variants:
-                raise errors.NoDutAvailable(
+                raise errors.DutAllocateSpecError(
                     'Invalid constraints: no dut_name=%s in the lab'
                     % spec.dut_name
                 )
@@ -298,7 +298,7 @@ class DutAllocator:
                 boards_with_prebuilt, variants, None
             )
             if not filtered:
-                raise errors.NoDutAvailable(
+                raise errors.DutAllocateSpecError(
                     'Devices with specified constraints (%s) have no prebuilt. '
                     'Wrong constraints or wrong version number?' % variants
                 )
@@ -307,7 +307,7 @@ class DutAllocator:
                 boards_with_prebuilt, variants, pools
             )
             if not filtered:
-                raise errors.NoDutAvailable(
+                raise errors.DutAllocateSpecError(
                     'The lab has %s devices; but there are no such devices in pool=%s'
                     % (variants, spec.pools)
                 )
