@@ -6,6 +6,12 @@
 # b/236854886: workaround before buildbucket re-generates its python proto.
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
+set -euo pipefail
+
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/setup_venv.sh" -r requirements.txt
+
+
 # Dry run all executable scripts and make sure they can be loaded correctly.
 find . -maxdepth 1 -perm -110 -type f -name '*.py' -print0 \
   | xargs -0 -P $(nproc) -I {} \

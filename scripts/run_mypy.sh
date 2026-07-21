@@ -3,12 +3,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-set -eu
+set -euo pipefail
 
-cd "$(dirname "$0")"/..
-
-# Try to load the venv if any.
-[ -f ./venv/bin/activate ] && source ./venv/bin/activate
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/setup_venv.sh" -r requirements.txt -r requirements_dev.txt
 
 # Check the mypy version. The default mypy on Debian may be old.
 REQUIRED_VER="1.19.1"

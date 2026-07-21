@@ -3,6 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+set -euo pipefail
+
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "${SCRIPT_DIR}/setup_venv.sh" -r requirements.txt -r requirements_dev.txt
+
 export PYTHONPATH="$(pwd):$(pwd)/third_party"
 
 if [ $# -eq 0 ]; then

@@ -42,6 +42,7 @@ env.bak/
 env/
 venv.bak/
 venv/
+venv.lock
 
 # mypy
 .mypy_cache/
