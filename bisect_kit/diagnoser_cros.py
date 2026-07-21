@@ -1907,6 +1907,7 @@ class DiagnoseCommandLineBase:
             extra_test_variables=opts.extra_test_variables,
             endpoint_verification=opts.endpoint_verification,
             consider_test_crash_as_failure=opts.consider_test_crash_as_failure,
+            filter_error_message=opts.filter_error_message,
             experiments=opts.experiments,
             sync_dut_allocate_spec_with_db=opts.sync_dut_allocate_spec_with_db,
         )
@@ -2253,6 +2254,12 @@ class DiagnoseCommandLineBase:
             '--consider-test-crash-as-failure',
             action='store_true',
             help='Consider test crashes as failure instead of skip',
+        )
+        group.add_argument(
+            '--filter-error-message',
+            type=str,
+            default='',
+            help='Regex or substring to match expected error message for functional bisection. Unmatched failures will be treated as skips.',
         )
         parser_init.set_defaults(func=self.cmd_init)
 

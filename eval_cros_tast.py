@@ -141,6 +141,12 @@ def create_argument_parser():
         help='Consider test crashes as failure instead of skip',
     )
     group.add_argument(
+        '--filter-error-message',
+        type=str,
+        default='',
+        help='Regex or substring to match expected error message for functional bisection. Unmatched failures will be treated as skips.',
+    )
+    group.add_argument(
         '--metric',
         help='Metric name of performance test; example: '
         '"cheets_SystemRawImageSize"',
@@ -397,6 +403,17 @@ def gather_test_result(
                 ) from e
             raise
         return core.StepResult('value', values=values)
+
+    if not passed and opts.filter_error_message:
+        if not re.search(opts.filter_error_message, reason or ''):
+            logger.warning(
+                'Test failed, but error message does not match filter.\n'
+                'Expected pattern: %s\nActual message: %s\n'
+                'Treating this failure as SKIPPED.',
+                opts.filter_error_message,
+                reason,
+            )
+            return core.StepResult('skip', reason)
 
     if opts.fail_to_pass:
         if passed:

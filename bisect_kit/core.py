@@ -447,6 +447,7 @@ class DiagnoserConfig:
     cts_timeout: str | None = None
     eval_script: str | None = None
     consider_test_crash_as_failure: bool = False
+    filter_error_message: str = ''
     experiments: list[experiment.ID] | None = None
     sync_dut_allocate_spec_with_db: bool = False
     board_cpu_arch: str = ''

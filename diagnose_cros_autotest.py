@@ -147,6 +147,9 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
 
         if self.config.consider_test_crash_as_failure:
             common_eval_cmd.append('--consider-test-crash-as-failure')
+        if self.config.filter_error_message:
+            common_eval_cmd.append('--filter-error-message')
+            common_eval_cmd.append(self.config.filter_error_message)
 
         return switch_test_harness_cmd, common_eval_cmd
 

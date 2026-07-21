@@ -346,6 +346,22 @@ class TestDiagnoseCommandLine(unittest.TestCase):
         )
         self.assertTrue(opts.chrome_cfi_thinlto_build)
 
+    def test_filter_error_message_arg(self):
+        opts = self.parser.parse_args(
+            [
+                'init',
+                '--old',
+                'old_ver',
+                '--new',
+                'new_ver',
+                '--filter-error-message',
+                'test error message',
+                '--session',
+                's',
+            ]
+        )
+        self.assertEqual(opts.filter_error_message, 'test error message')
+
 
 class TestCrosDiagnoser(unittest.TestCase):
     """Test CrosDiagnoser class."""
