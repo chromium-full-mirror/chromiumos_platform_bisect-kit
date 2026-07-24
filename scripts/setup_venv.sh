@@ -33,7 +33,7 @@ REQUIREMENTS=("$@")
       export PIP_INDEX_URL="${PIP_URL}"
     fi
 
-    if ! pip install "${REQUIREMENTS[@]}"; then
+    if ! pip install --require-hashes "${REQUIREMENTS[@]}"; then
       echo "ERROR: Failed to install Python requirements." >&2
       echo "If you added a new dependency, please run" >&2
       echo "  ./scripts/upload_to_python_ar.sh" >&2

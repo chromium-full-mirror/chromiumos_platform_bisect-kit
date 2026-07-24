@@ -17,7 +17,8 @@ if [ "$LOWER_VER" = "$REQUIRED_VER" ]; then
   echo "mypy version is ok (current $CURRENT_VER >= required $REQUIRED_VER)."
 else
   echo "Error: mypy version is $CURRENT_VER. You need $REQUIRED_VER or higher."
-  echo "Please upgrade it using: pip install -r requirements_dev.txt"
+  echo "Please upgrade it using:"
+  echo "  pip install --require-hashes -r requirements_dev.txt"
   exit 1
 fi
 
