@@ -15,7 +15,9 @@ VENV_DIR="${TMP_DIR}/venv"
 python3 -m venv "${VENV_DIR}"
 source "${VENV_DIR}/bin/activate"
 
-pip install --require-hashes -r "${SCRIPT_DIR}/bootstrap_requirements.txt"
+pip install --require-hashes \
+  -r bootstrap_requirements.txt \
+  -r "${SCRIPT_DIR}/upload_requirements.txt"
 
 PROJECT="google.com:crosperf"
 LOCATION="us"
@@ -28,6 +30,16 @@ mkdir -p "${DOWNLOAD_DIR}"
 echo "Re-generating universal requirements with hashes using uv..."
 (
   unset PIP_INDEX_URL
+  uv pip compile -U bootstrap_requirements.in \
+    --generate-hashes \
+    --universal \
+    --python-version 3.10 \
+    -o bootstrap_requirements.txt
+  uv pip compile -U "${SCRIPT_DIR}/upload_requirements.in" \
+    --generate-hashes \
+    --universal \
+    --python-version 3.10 \
+    -o "${SCRIPT_DIR}/upload_requirements.txt"
   uv pip compile pyproject.toml \
     --generate-hashes \
     --universal \
@@ -50,6 +62,8 @@ echo "Downloading packages from PyPI..."
       pip download \
         --require-hashes \
         --quiet \
+        -r bootstrap_requirements.txt \
+        -r "${SCRIPT_DIR}/upload_requirements.txt" \
         -r requirements.txt \
         -r requirements_dev.txt \
         -d "${DOWNLOAD_DIR}" \
