@@ -2,15 +2,51 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bisect_kit*"]
+
+[project]
+name = "bisect_kit"
+version = "0.1.0"
+description = "ChromeOS bisect kit"
+requires-python = ">=3.10"
+dependencies = [
+    "google-api-python-client",
+    "google-cloud-compute",
+    "google-cloud-datastore",
+    "google-genai==2.6.0",
+    "googleapis_common_protos",
+    "protobuf<5.0.0",
+    "psutil",
+    "scipy",
+    "sshconf==0.2.5",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pylint==4.0.6",
+    "pytest",
+    "pytest-xdist",
+    "pytest-cov",
+    "mypy>=1.19.1",
+]
+
 [tool.black]
 line-length = 80
-target_version = ["py38", "py39", "py310"]
+target-version = ["py310", "py311", "py312", "py313"]
 skip-string-normalization = true
 exclude = """
 /(
-  | third_party
-  | internal
-  | venv
+    | third_party
+    | internal
+    | venv
+    | \\.venv
 )/
 """
 
@@ -19,11 +55,14 @@ profile = "black"
 line_length = 80
 lines_after_imports = 2
 skip_glob = [
-    "third_party",
-    "internal",
-    "venv",
+    "third_party/*",
+    "internal/*",
+    "venv/*",
+    ".venv/*",
 ]
-extend_skip_glob = "*_pb2.py"
+extend_skip_glob = [
+    "*_pb2.py",
+]
 length_sort = false
 force_single_line = true
 from_first = false
@@ -33,23 +72,21 @@ order_by_type = false
 
 [tool.pytest.ini_options]
 minversion = "6.0"
+testpaths = ["."]
+python_files = ["*_test.py"]
 addopts = [
-    "--cov",
-    "--no-cov-on-fail",
     "--log-level=DEBUG",
-    "--quiet",
-    "--numprocesses=auto",
-    "--maxprocesses=16",
     "--durations=5",
 ]
 norecursedirs = [
     "third_party",
     "internal",
     "venv",
+    ".venv",
 ]
 
 [tool.coverage.run]
-source = ["."]
+source = ["bisect_kit"]
 disable_warnings = [
     "couldnt-parse",
 ]
@@ -57,18 +94,21 @@ omit = [
     "third_party/*",
     "internal/*",
     "venv/*",
+    ".venv/*",
+    "*_pb2.py",
     "*_test.py",
 ]
 
-[tool.pylint.MASTER]
-ignore-patterns = [
+[tool.pylint.main]
+source-roots = [".", "third_party"]
+ignore-paths = [
     ".*_pb2\\.py$",
-    ".*third_party\\/.*.py$",
-    ".*internal\\/.*.py$",
-    ".*venv\\/.*.py$",
+    ".*third_party/.*",
+    ".*internal/.*",
+    ".*venv/.*",
 ]
 
-[tool.pylint."MESSAGES CONTROL"]
+[tool.pylint.messages_control]
 disable = [
     "broad-except", # TODO(acewu): except them by comments if necessary
     "consider-using-f-string",
@@ -99,6 +139,9 @@ disable = [
 [tool.pyright]
 exclude = [
     "venv",
+    ".venv",
+    "third_party",
+    "internal",
 ]
 venvPath = "."
 venv = "venv"
@@ -110,8 +153,9 @@ extraPaths = [
 typeCheckingMode = "strict"
 
 [tool.mypy]
-exclude = "(^venv/)"
+exclude = "(^third_party/|^internal/|^venv/|^\\.venv/)"
 show_error_codes = true
+check_untyped_defs = true
 ignore_missing_imports = true
 
 # TODO: Enable strict checking.

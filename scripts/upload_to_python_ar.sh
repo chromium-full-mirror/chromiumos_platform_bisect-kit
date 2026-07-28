@@ -28,12 +28,13 @@ mkdir -p "${DOWNLOAD_DIR}"
 echo "Re-generating universal requirements with hashes using uv..."
 (
   unset PIP_INDEX_URL
-  uv pip compile requirements.in \
+  uv pip compile pyproject.toml \
     --generate-hashes \
     --universal \
     --python-version 3.10 \
     -o requirements.txt
-  uv pip compile requirements_dev.in \
+  uv pip compile pyproject.toml \
+    --extra dev \
     --generate-hashes \
     --universal \
     --python-version 3.10 \

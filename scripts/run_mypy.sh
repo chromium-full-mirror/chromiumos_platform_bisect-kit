@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "${SCRIPT_DIR}/setup_venv.sh" -r requirements.txt -r requirements_dev.txt
+source "${SCRIPT_DIR}/setup_venv.sh" -r requirements_dev.txt
 
 # Check the mypy version. The default mypy on Debian may be old.
 REQUIRED_VER="1.19.1"

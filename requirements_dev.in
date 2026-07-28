@@ -1,7 +1,0 @@
-#black  # provided by depot_tool
-#isort  # provided by depot_tool
-pylint==4.0.6
-pytest
-pytest-xdist
-pytest-cov
-mypy>=1.19.1
