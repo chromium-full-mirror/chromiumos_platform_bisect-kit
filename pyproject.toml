@@ -14,7 +14,7 @@ include = ["bisect_kit*"]
 name = "bisect_kit"
 version = "0.1.0"
 description = "ChromeOS bisect kit"
-requires-python = ">=3.10"
+requires-python = ">=3.10, <3.14"
 dependencies = [
     "google-api-python-client",
     "google-cloud-compute",
@@ -23,6 +23,7 @@ dependencies = [
     "googleapis_common_protos",
     "protobuf<5.0.0",
     "psutil",
+    "pyopenssl",
     "scipy",
     "sshconf==0.2.5",
     "numpy",
