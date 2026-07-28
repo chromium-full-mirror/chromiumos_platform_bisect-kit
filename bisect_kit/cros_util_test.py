@@ -675,14 +675,17 @@ class TestCrosUtil(unittest.TestCase):
             )
         ) as f:
             partial_metadata = f.read()
-        with mock.patch.object(
-            gs_util,
-            '_gsutil',
-            side_effect=create_fake_gsutil('', partial_metadata, ''),
-        ), mock.patch.object(
-            cros_util,
-            'fetch_buildbucket_version_info',
-            return_value=cros_util.VersionInfo(),
+        with (
+            mock.patch.object(
+                gs_util,
+                '_gsutil',
+                side_effect=create_fake_gsutil('', partial_metadata, ''),
+            ),
+            mock.patch.object(
+                cros_util,
+                'fetch_buildbucket_version_info',
+                return_value=cros_util.VersionInfo(),
+            ),
         ):
             info = cros_util.query_version_info(
                 'caroline', 'R89-13664.0.0', is_public_build=False
@@ -716,16 +719,19 @@ class TestCrosUtil(unittest.TestCase):
         ) as f:
             build_report = f.read()
 
-        with mock.patch.object(
-            gs_util,
-            '_gsutil',
-            side_effect=create_fake_gsutil(
-                metadata, partial_metadata, build_report
+        with (
+            mock.patch.object(
+                gs_util,
+                '_gsutil',
+                side_effect=create_fake_gsutil(
+                    metadata, partial_metadata, build_report
+                ),
             ),
-        ), mock.patch.object(
-            cros_util,
-            'fetch_buildbucket_version_info',
-            return_value=cros_util.VersionInfo(),
+            mock.patch.object(
+                cros_util,
+                'fetch_buildbucket_version_info',
+                return_value=cros_util.VersionInfo(),
+            ),
         ):
             info = cros_util.query_version_info(
                 'stronbad', 'R115-15452.0.0', is_public_build=False

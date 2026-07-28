@@ -232,18 +232,25 @@ LEASE_ID=73967320
                 )
             )
 
-        with mock.patch.object(
-            cros_lab_util, 'is_rootfs_verification_on', return_value=True
-        ), mock.patch.object(
-            cros_util, 'query_dut_short_version', side_effect='short_version'
-        ), mock.patch.object(
-            cros_util, 'query_dut_board', side_effect='board'
-        ), mock.patch.object(
-            cros_util, 'version_to_full', side_effect='full_version'
-        ), mock.patch.object(
-            cros_util, 'search_image', side_effect=cros_util.ImageInfo()
-        ), mock.patch.object(
-            cros_util, 'provision_image', side_effect=[]
+        with (
+            mock.patch.object(
+                cros_lab_util, 'is_rootfs_verification_on', return_value=True
+            ),
+            mock.patch.object(
+                cros_util,
+                'query_dut_short_version',
+                side_effect='short_version',
+            ),
+            mock.patch.object(
+                cros_util, 'query_dut_board', side_effect='board'
+            ),
+            mock.patch.object(
+                cros_util, 'version_to_full', side_effect='full_version'
+            ),
+            mock.patch.object(
+                cros_util, 'search_image', side_effect=cros_util.ImageInfo()
+            ),
+            mock.patch.object(cros_util, 'provision_image', side_effect=[]),
         ):
             self.assertTrue(
                 cros_lab_util.enable_rootfs_verification(

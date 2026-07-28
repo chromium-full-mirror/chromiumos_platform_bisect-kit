@@ -413,14 +413,15 @@ class TestCrosDiagnoser(unittest.TestCase):
         # Alternatively, we can test _narrow_down_chrome which is already tested.
 
         # Let's try to mock the steps before step 4.
-        with mock.patch.object(
-            self.diagnoser, 'narrow_down_chromeos_prebuilt'
-        ), mock.patch.object(
-            self.diagnoser, 'narrow_down_android'
-        ) as mock_narrow_down_android, mock.patch.object(
-            self.diagnoser, 'narrow_down_dlc_prebuilt'
-        ) as mock_narrow_down_dlc, mock.patch(
-            'bisect_kit.diagnoser_cros.run_switch_or_eval_cmd'
+        with (
+            mock.patch.object(self.diagnoser, 'narrow_down_chromeos_prebuilt'),
+            mock.patch.object(
+                self.diagnoser, 'narrow_down_android'
+            ) as mock_narrow_down_android,
+            mock.patch.object(
+                self.diagnoser, 'narrow_down_dlc_prebuilt'
+            ) as mock_narrow_down_dlc,
+            mock.patch('bisect_kit.diagnoser_cros.run_switch_or_eval_cmd'),
         ):
             mock_narrow_down_android.return_value = False
             mock_narrow_down_dlc.return_value = False
@@ -488,14 +489,15 @@ class TestCrosDiagnoser(unittest.TestCase):
         mock_api_instance.has_builder.return_value = False
 
         # Mock other steps to avoid running them
-        with mock.patch.object(
-            self.diagnoser, 'narrow_down_chromeos_prebuilt'
-        ), mock.patch.object(
-            self.diagnoser, 'narrow_down_android'
-        ) as mock_narrow_down_android, mock.patch.object(
-            self.diagnoser, 'narrow_down_dlc_prebuilt'
-        ) as mock_narrow_down_dlc, mock.patch(
-            'bisect_kit.diagnoser_cros.run_switch_or_eval_cmd'
+        with (
+            mock.patch.object(self.diagnoser, 'narrow_down_chromeos_prebuilt'),
+            mock.patch.object(
+                self.diagnoser, 'narrow_down_android'
+            ) as mock_narrow_down_android,
+            mock.patch.object(
+                self.diagnoser, 'narrow_down_dlc_prebuilt'
+            ) as mock_narrow_down_dlc,
+            mock.patch('bisect_kit.diagnoser_cros.run_switch_or_eval_cmd'),
         ):
             mock_narrow_down_android.return_value = False
             mock_narrow_down_dlc.return_value = False
