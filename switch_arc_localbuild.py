@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 
 from bisect_kit import android_util
@@ -40,32 +39,38 @@ def create_argument_parser():
         help='Instead of mere exit code, output detailed information in json',
     )
     parser.add_argument(
-        'rev',
-        nargs='?',
+        '--intra-rev',
         type=cli.argtype_notempty,
         metavar='INTRA_REV',
-        default=os.environ.get('INTRA_REV', ''),
+        required=True,
         help='Android build id, or bisecting intra version number',
     )
     parser.add_argument(
         '--android-root',
         type=cli.argtype_dir_path,
         metavar='ANDROID_ROOT',
-        default=os.environ.get('ANDROID_ROOT', ''),
+        required=True,
         help='Android tree root',
     )
     parser.add_argument(
         '--android-mirror',
         type=cli.argtype_dir_path,
-        default=os.environ.get('ANDROID_MIRROR', ''),
+        default='',
         help='Android repo mirror path',
     )
     parser.add_argument(
         '--flavor',
         type=cli.argtype_notempty,
         metavar='ANDROID_FLAVOR',
-        default=os.environ.get('ANDROID_FLAVOR', ''),
+        required=True,
         help='example: cheets_x86-user',
+    )
+    parser.add_argument(
+        '--branch',
+        type=cli.argtype_notempty,
+        metavar='ANDROID_BRANCH',
+        default='',
+        help='Ignored. Supplied by generic AndroidRepoDomain.',
     )
     return parser
 
@@ -86,7 +91,7 @@ def switch(opts):
             cache,
             common.get_session_cache_dir(opts.session),
         )
-        code_manager.switch(opts.rev)
+        code_manager.switch(opts.intra_rev)
 
     if not opts.no_build:
         logger.info('build')

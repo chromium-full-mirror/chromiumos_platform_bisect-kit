@@ -21,11 +21,23 @@ class TestSwitchArcPrebuilt(unittest.TestCase):
         dut = 'this_is_dut'
         flavor = 'flavor'
         bid = '123456789'
+        branch = 'main'
         query_dut_lsb_release.return_value = {
             'CHROMEOS_ARC_VERSION': flavor + '_' + bid
         }
 
-        switch_arc_prebuilt.main(['--flavor', flavor, '--dut', dut, bid])
+        switch_arc_prebuilt.main(
+            [
+                '--flavor',
+                flavor,
+                '--dut',
+                dut,
+                '--branch',
+                branch,
+                '--android-build-id',
+                bid,
+            ]
+        )
         push_prebuilt_to_device.assert_called_with(dut, flavor, bid)
 
 
