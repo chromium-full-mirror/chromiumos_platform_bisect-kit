@@ -32,8 +32,8 @@ GEMINI_API_KEY_SECRET_LOCATION = (
     'https://secretmanager.googleapis.com/'
     'v1/projects/43146777051/secrets/gemini-api-key/versions/latest'
 )
-MODEL_GEMINI_3_5_FLASH = 'gemini-3.5-flash'
-MODEL_DEFAULT = MODEL_GEMINI_3_5_FLASH
+MODEL_GEMINI_3_6_FLASH = 'gemini-3.6-flash'
+MODEL_DEFAULT = MODEL_GEMINI_3_6_FLASH
 
 PROMPT = (
     "You're a Software Engineer investigating test regressions.\n"
@@ -105,10 +105,16 @@ PROMPT = (
 
 FUNCTIONS = [
     {
+        "type": "function",
         "name": "get_test_name",
         "description": "Get name of the regressed test",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
     },
     {
+        "type": "function",
         "name": "get_range",
         "description": (
             "Get all revisions and first line of commit message (aka subject) "
@@ -149,6 +155,7 @@ FUNCTIONS = [
         },
     },
     {
+        "type": "function",
         "name": "get_revision_detail",
         "description": (
             "Get all details, like commit messages, code diffs for a specific "
@@ -173,6 +180,7 @@ FUNCTIONS = [
         },
     },
     {
+        "type": "function",
         "name": "read_last_log",
         "description": (
             "Read logs from the last test run. "
@@ -195,6 +203,7 @@ FUNCTIONS = [
         },
     },
     {
+        "type": "function",
         "name": "read_log",
         "description": (
             "Read the test execution log or a specific collected system log "
@@ -228,6 +237,7 @@ FUNCTIONS = [
         },
     },
     {
+        "type": "function",
         "name": "run_at",
         "description": (
             "Run the test at given commit. Returns a dictionary containing "
@@ -259,6 +269,7 @@ FUNCTIONS = [
         },
     },
     {
+        "type": "function",
         "name": "conclude",
         "description": (
             "Make conclusion on the culprit CL. The conclusion must be "
@@ -287,9 +298,18 @@ class PrefixLoggerAdapter(logging.LoggerAdapter):
 
 
 def _is_retriable_gemini_error(e) -> bool:
-    if isinstance(e, genai.errors.ClientError) and e.code == 429:
+    if (
+        isinstance(e, genai.errors.ClientError)
+        and getattr(e, 'code', None) == 429
+    ):
         return True
-    if isinstance(e, genai.errors.ServerError) and e.code == 503:
+    if (
+        isinstance(e, genai.errors.ServerError)
+        and getattr(e, 'code', None) == 503
+    ):
+        return True
+    status_code = getattr(e, 'status_code', None)
+    if status_code in (429, 503):
         return True
     return False
 
@@ -318,10 +338,15 @@ class ProbModelResultType(TypedDict):
 class GeminiAgent:
     """A stub agent to Gemini"""
 
-    def __init__(self, prompt: str, functions: dict, model: str | None = None):
+    def __init__(
+        self,
+        prompt: str,
+        functions: list[dict[str, Any]],
+        model: str | None = None,
+    ):
         """Initializes GeminiAgent with prompt and functions.
 
-        promot: initial prompt to Gemini.
+        prompt: initial prompt to Gemini.
         functions: functions that gemini can call.
         """
         self._prompt = prompt
@@ -341,27 +366,26 @@ class GeminiAgent:
                 f"Error: {e}"
             ) from e
         self._client = genai.Client(api_key=self._key)
-        tools = genai.types.Tool(function_declarations=functions)
-        self._config = genai.types.GenerateContentConfig(
-            system_instruction=self._prompt,
-            tools=[tools],
-            thinking_config=genai.types.ThinkingConfig(
-                thinking_level='high',
-            ),
-            tool_config=genai.types.ToolConfig(
-                function_calling_config=genai.types.FunctionCallingConfig(
-                    mode='ANY'
-                )
-            ),
-        )
-        self._contents: list[genai.types.Content] = []
+        self._tools = []
+        for f in functions:
+            func_dict = (
+                {'type': 'function', **f} if 'type' not in f else dict(f)
+            )
+            if 'parameters' not in func_dict or not func_dict['parameters']:
+                func_dict['parameters'] = {'type': 'object', 'properties': {}}
+            self._tools.append(func_dict)
+        self._generation_config = {
+            'thinking_level': 'high',
+            'tool_choice': 'any',
+        }
+        self._last_interaction_id: str | None = None
 
     def __deepcopy__(self, memo):
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if k in ('_client', '_config'):
+            if k in ('_client',):
                 setattr(result, k, v)
             else:
                 setattr(result, k, copy.deepcopy(v, memo))
@@ -386,46 +410,36 @@ class GeminiAgent:
             )
         )
 
-    def start(self) -> genai.types.GenerateContentResponse:
+    def start(self) -> Any:
         """Starts the agent by sending a start trigger.
 
         Returns the response from Gemini.
         """
-        return self.reply(
-            genai.types.Content(
-                role='user',
-                parts=[genai.types.Part(text="Start bisection investigation.")],
-            )
-        )
+        return self.reply("Start bisection investigation.")
 
     @retry.Retry(predicate=_is_retriable_gemini_error)
-    def reply(
-        self, reply: genai.types.Content
-    ) -> genai.types.GenerateContentResponse:
-        """Send a reply content to Gemini.
+    def reply(self, reply: str | list[dict[str, Any]]) -> Any:
+        """Send a reply to Gemini.
 
-        reply: the content reply to Gemini.
-        Returns the response from Gemini.
+        reply: the input string or list of function results to send to Gemini.
+        Returns the interaction from Gemini.
         """
-        contents = self._contents + [reply]
-        response = self._client.models.generate_content(
-            model=self._model, contents=contents, config=self._config
-        )
-        # Only append to context history after successful call to avoid
-        # duplicates caused from retry.
-        if not response.candidates:
+        kwargs: dict[str, Any] = {
+            'model': self._model,
+            'input': reply,
+            'system_instruction': self._prompt,
+            'tools': self._tools,
+            'generation_config': self._generation_config,
+        }
+        if self._last_interaction_id:
+            kwargs['previous_interaction_id'] = self._last_interaction_id
+        interaction = self._client.interactions.create(**kwargs)
+        if not interaction:
             raise RuntimeError(
-                f"No candidates returned from Gemini. Response: {response}"
+                f"No interaction returned from Gemini. Response: {interaction}"
             )
-        candidate = response.candidates[0]
-        if not candidate.content or not candidate.content.parts:
-            finish_reason = getattr(candidate, 'finish_reason', 'UNKNOWN')
-            raise RuntimeError(
-                f"Gemini response candidate has no content or parts. "
-                f"Finish reason: {finish_reason}. Response: {response}"
-            )
-        self._contents = contents + [candidate.content]
-        return response
+        self._last_interaction_id = interaction.id
+        return interaction
 
 
 def _get_git_repo_path(root: str, action_path: str) -> str:
@@ -469,7 +483,7 @@ class BisectAgent:
         self._old_p = old_p
         self._new_p = new_p
         self._conclusion: str | None = None
-        self._pending_parts: list[genai.types.Part] = []
+        self._pending_results: list[dict[str, Any]] = []
         self._pending_run_at_call: Any = None
         self._session = session
         self._last_run_eval_log: str | None = None
@@ -740,39 +754,30 @@ class BisectAgent:
                 ret = self._agent.start()
                 self._started = True
             else:
-                for part in self._pending_parts:
+                for item in self._pending_results:
                     self.logger.info(
                         'Sending response to Gemini: %s',
-                        self._short(part.function_response.response),
+                        self._short(item.get('result')),
                     )
-                ret = self._agent.reply(
-                    genai.types.Content(
-                        role='function',
-                        parts=self._pending_parts,
-                    )
-                )
-                self._pending_parts = []
-
-            assert ret.candidates
-            text = '\n'.join(
-                [
-                    v.text
-                    for v in ret.candidates[0].content.parts
-                    if v.text and not getattr(v, 'thought', False)
-                ]
-            )
-            if not ret.function_calls:
+                ret = self._agent.reply(self._pending_results)
+                self._pending_results = []
+            function_calls = [
+                s for s in (ret.steps or []) if s.type == 'function_call'
+            ]
+            text = getattr(ret, 'output_text', '') or ''
+            if not function_calls:
                 raise RuntimeError(
                     f"Gemini failed to return any function calls. "
                     f"Response text: {text}. Response: {ret}"
                 )
+
             self.logger.info(
                 'Gemini replied %s, calling %s',
                 self._short(text),
                 ', '.join(
                     [
-                        f'{call.name}({self._short(call.args)})'
-                        for call in ret.function_calls
+                        f'{call.name}({self._short(call.arguments)})'
+                        for call in function_calls
                     ]
                 ),
             )
@@ -780,68 +785,66 @@ class BisectAgent:
             run_at_call = None
             conclude_call = None
 
-            for call in ret.function_calls:
+            for call in function_calls:
+                call_args = call.arguments or {}
+
                 if call.name == 'get_test_name':
-                    self._pending_parts.append(
-                        genai.types.Part(
-                            function_response=genai.types.FunctionResponse(
-                                id=call.id,
-                                name='get_test_name',
-                                response={'name': self._test_name},
-                            )
-                        )
+                    self._pending_results.append(
+                        {
+                            'type': 'function_result',
+                            'call_id': call.id,
+                            'name': 'get_test_name',
+                            'result': {'name': self._test_name},
+                        }
                     )
                 elif call.name == 'get_range':
-                    include_reason = call.args.get('include_reason', False)
-                    self._pending_parts.append(
-                        genai.types.Part(
-                            function_response=genai.types.FunctionResponse(
-                                id=call.id,
-                                name='get_range',
-                                response={
-                                    'revisions': self._get_revisions(
-                                        include_reason
-                                    ),
-                                    'old_p': self._old_p,
-                                    'new_p': self._new_p,
-                                },
-                            )
-                        )
+                    include_reason = call_args.get('include_reason', False)
+                    self._pending_results.append(
+                        {
+                            'type': 'function_result',
+                            'call_id': call.id,
+                            'name': 'get_range',
+                            'result': {
+                                'revisions': self._get_revisions(
+                                    include_reason
+                                ),
+                                'old_p': self._old_p,
+                                'new_p': self._new_p,
+                            },
+                        }
                     )
                 elif call.name == 'get_revision_detail':
-                    rev_id = call.args.get('rev_id')
+                    rev_id = call_args.get('rev_id')
                     if not rev_id or rev_id not in self._rev2commit:
                         self.logger.warning(
                             'Gemini requested detail for invalid rev_id: %s',
                             rev_id,
                         )
-                        self._pending_parts.append(
-                            genai.types.Part(
-                                function_response=genai.types.FunctionResponse(
-                                    id=call.id,
-                                    name='get_revision_detail',
-                                    response={
-                                        'error': (
-                                            f'Invalid rev_id {rev_id}. '
-                                            'Please use a rev_id from '
-                                            'get_range.'
-                                        )
-                                    },
-                                )
-                            )
+                        self._pending_results.append(
+                            {
+                                'type': 'function_result',
+                                'call_id': call.id,
+                                'name': 'get_revision_detail',
+                                'result': {
+                                    'error': (
+                                        f'Invalid rev_id {rev_id}. '
+                                        'Please use a rev_id from '
+                                        'get_range.'
+                                    )
+                                },
+                            }
                         )
                     else:
-                        self._pending_parts.append(
-                            genai.types.Part(
-                                function_response=genai.types.FunctionResponse(
-                                    id=call.id,
-                                    name='get_revision_detail',
-                                    response=self._get_revision_detail(rev_id),
-                                )
-                            )
+                        self._pending_results.append(
+                            {
+                                'type': 'function_result',
+                                'call_id': call.id,
+                                'name': 'get_revision_detail',
+                                'result': self._get_revision_detail(rev_id),
+                            }
                         )
                 elif call.name == 'read_last_log':
-                    file_name = call.args.get('file_name')
+                    file_name = call_args.get('file_name')
                     resp = self._read_log_file(
                         self._last_run_eval_log,
                         file_name=file_name,
@@ -850,75 +853,71 @@ class BisectAgent:
                         resp['available_files'] = self._list_collected_files(
                             self._last_run_eval_log
                         )
-                    self._pending_parts.append(
-                        genai.types.Part(
-                            function_response=genai.types.FunctionResponse(
-                                id=call.id,
-                                name='read_last_log',
-                                response=resp,
-                            )
-                        )
+                    self._pending_results.append(
+                        {
+                            'type': 'function_result',
+                            'call_id': call.id,
+                            'name': 'read_last_log',
+                            'result': resp,
+                        }
                     )
                 elif call.name == 'read_log':
                     resp = self._handle_read_log(
-                        call.args.get('rev_id'),
-                        call.args.get('run_index'),
-                        file_name=call.args.get('file_name'),
+                        call_args.get('rev_id'),
+                        call_args.get('run_index'),
+                        file_name=call_args.get('file_name'),
                     )
-                    self._pending_parts.append(
-                        genai.types.Part(
-                            function_response=genai.types.FunctionResponse(
-                                id=call.id,
-                                name='read_log',
-                                response=resp,
-                            )
-                        )
+                    self._pending_results.append(
+                        {
+                            'type': 'function_result',
+                            'call_id': call.id,
+                            'name': 'read_log',
+                            'result': resp,
+                        }
                     )
                 elif call.name == 'run_at':
-                    rev_id = call.args.get('rev_id')
+                    rev_id = call_args.get('rev_id')
                     if not rev_id or rev_id not in self._rev2commit:
                         self.logger.warning(
                             'Gemini requested run_at for invalid rev_id: %s',
                             rev_id,
                         )
-                        self._pending_parts.append(
-                            genai.types.Part(
-                                function_response=genai.types.FunctionResponse(
-                                    id=call.id,
-                                    name='run_at',
-                                    response={
-                                        'error': (
-                                            f'Invalid rev_id {rev_id}. '
-                                            'Please use a rev_id from '
-                                            'get_range.'
-                                        )
-                                    },
-                                )
-                            )
+                        self._pending_results.append(
+                            {
+                                'type': 'function_result',
+                                'call_id': call.id,
+                                'name': 'run_at',
+                                'result': {
+                                    'error': (
+                                        f'Invalid rev_id {rev_id}. '
+                                        'Please use a rev_id from '
+                                        'get_range.'
+                                    )
+                                },
+                            }
                         )
                     else:
                         run_at_call = call
                 elif call.name == 'conclude':
-                    rev_id = call.args.get('rev_id')
+                    rev_id = call_args.get('rev_id')
                     if not rev_id or rev_id not in self._rev2commit:
                         self.logger.warning(
                             'Gemini requested conclude for invalid rev_id: %s',
                             rev_id,
                         )
-                        self._pending_parts.append(
-                            genai.types.Part(
-                                function_response=genai.types.FunctionResponse(
-                                    id=call.id,
-                                    name='conclude',
-                                    response={
-                                        'error': (
-                                            f'Invalid rev_id {rev_id}. '
-                                            'Please use a rev_id from '
-                                            'get_range.'
-                                        )
-                                    },
-                                )
-                            )
+                        self._pending_results.append(
+                            {
+                                'type': 'function_result',
+                                'call_id': call.id,
+                                'name': 'conclude',
+                                'result': {
+                                    'error': (
+                                        f'Invalid rev_id {rev_id}. '
+                                        'Please use a rev_id from '
+                                        'get_range.'
+                                    )
+                                },
+                            }
                         )
                     else:
                         conclude_call = call
@@ -928,23 +927,22 @@ class BisectAgent:
                     )
 
             if conclude_call is not None:
-                assert conclude_call.args is not None
-                self._conclusion = conclude_call.args['rev_id']
-                self._pending_parts.append(
-                    genai.types.Part(
-                        function_response=genai.types.FunctionResponse(
-                            id=conclude_call.id,
-                            name='conclude',
-                            response={'status': 'concluded'},
-                        )
-                    )
+                assert conclude_call.arguments is not None
+                self._conclusion = conclude_call.arguments['rev_id']
+                self._pending_results.append(
+                    {
+                        'type': 'function_result',
+                        'call_id': conclude_call.id,
+                        'name': 'conclude',
+                        'result': {'status': 'concluded'},
+                    }
                 )
                 return None
 
             if run_at_call is not None:
-                assert run_at_call.args is not None
+                assert run_at_call.arguments is not None
                 self._pending_run_at_call = run_at_call
-                return run_at_call.args['rev_id']
+                return run_at_call.arguments['rev_id']
 
     def add_sample(
         self,
@@ -989,14 +987,18 @@ class BisectAgent:
             }
             if 'likelihood_new' in status:
                 response['likelihood_new'] = status['likelihood_new']
-            self._pending_parts.append(
-                genai.types.Part(
-                    function_response=genai.types.FunctionResponse(
-                        id=self._pending_run_at_call.id,
-                        name='run_at',
-                        response=response,
-                    )
-                )
+            call_id = (
+                getattr(self._pending_run_at_call, 'id', None)
+                if not isinstance(self._pending_run_at_call, dict)
+                else self._pending_run_at_call.get('id')
+            )
+            self._pending_results.append(
+                {
+                    'type': 'function_result',
+                    'call_id': call_id,
+                    'name': 'run_at',
+                    'result': response,
+                }
             )
             self._pending_run_at_call = None
         return self._run()
@@ -1105,7 +1107,7 @@ def demo(
         testname,
         repo,
         revlist,
-        model=MODEL_GEMINI_3_5_FLASH,
+        model=MODEL_GEMINI_3_6_FLASH,
         chromeos_mirror=chromeos_mirror if not is_chrome else None,
         board=board if not is_chrome else None,
         old_p=model_old_p,
