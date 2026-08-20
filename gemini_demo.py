@@ -11,8 +11,8 @@ Simulates running Gemini-assisted bisection on known test regression cases.
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
 from collections.abc import Callable
+import dataclasses
 import logging
 import os
 import random
@@ -115,6 +115,118 @@ def _get_simulated_cost_table(
     return cost_table
 
 
+@dataclasses.dataclass
+class SimulationResult:
+    """Stores bisection simulation run metrics."""
+
+    total_runs: int
+    agent_runs: int = 0
+    additional_runs: int = 0
+    total_cost: float = 0.0
+    agent_cost: float = 0.0
+    additional_cost: float = 0.0
+    concluded_prob_on_stop: float | None = None
+    real_prob_on_stop: float | None = None
+    agent_concluded_culprit: str | None = None
+
+
+def _extract_prob_on_stop(
+    bsearch: strategy.NoisyBinarySearch,
+    agent_concluded_culprit: str | None,
+    culprit_idx: int,
+) -> tuple[float | None, float | None]:
+    prob = bsearch.prob
+    if not prob:
+        return None, None
+    concluded_prob = None
+    if agent_concluded_culprit:
+        revlist = [x.rev for x in bsearch.rev_info]
+        if agent_concluded_culprit in revlist:
+            concluded_prob = prob[revlist.index(agent_concluded_culprit)]
+    return concluded_prob, prob[culprit_idx]
+
+
+def _run_simulation(
+    bsearch: strategy.NoisyBinarySearch,
+    culprit_idx: int,
+    sim_old_p: float,
+    sim_new_p: float,
+    reason_func: Callable[[], str | None] | None = None,
+) -> SimulationResult:
+    """Runs a simulated bisection loop on the given strategy until done."""
+    num_revs = len(bsearch.rev_info)
+    prev_rev_idx = num_revs - 1
+    agent_runs = 0
+    additional_runs = 0
+    agent_cost = 0.0
+    additional_cost = 0.0
+    agent_stopped = False
+    concluded_prob_on_stop = None
+    real_prob_on_stop = None
+    agent_concluded_culprit = None
+
+    while not bsearch.is_done():
+        cost_table = _get_simulated_cost_table(0, num_revs - 1, prev_rev_idx)
+        idx = bsearch.next_idx(cost_table=cost_table)
+
+        gemini = getattr(bsearch, 'gemini', None)
+        if gemini is not None:
+            if gemini.get_result() and not agent_stopped:
+                agent_stopped = True
+                agent_concluded_culprit = gemini.get_result()
+                concluded_prob_on_stop, real_prob_on_stop = (
+                    _extract_prob_on_stop(
+                        bsearch, agent_concluded_culprit, culprit_idx
+                    )
+                )
+
+        is_fail = (
+            random.random() < sim_new_p
+            if idx >= culprit_idx
+            else random.random() < sim_old_p
+        )
+        if idx == prev_rev_idx:
+            step_cost = 30.0 if is_fail else 60.0
+        else:
+            step_cost = 270.0 if is_fail else 300.0
+
+        if gemini is not None and not agent_stopped:
+            agent_runs += 1
+            agent_cost += step_cost
+        else:
+            additional_runs += 1
+            additional_cost += step_cost
+
+        prev_rev_idx = idx
+
+        run_reason = reason_func() if (is_fail and reason_func) else None
+        bsearch.add_sample(
+            idx,
+            'new' if is_fail else 'old',
+            reason=run_reason,
+        )
+
+    gemini = getattr(bsearch, 'gemini', None)
+    if gemini and gemini.get_result() and not agent_stopped:
+        agent_stopped = True
+        agent_concluded_culprit = gemini.get_result()
+        concluded_prob_on_stop, real_prob_on_stop = _extract_prob_on_stop(
+            bsearch, agent_concluded_culprit, culprit_idx
+        )
+
+    return SimulationResult(
+        total_runs=agent_runs + additional_runs,
+        agent_runs=agent_runs,
+        additional_runs=additional_runs,
+        total_cost=agent_cost + additional_cost,
+        agent_cost=agent_cost,
+        additional_cost=additional_cost,
+        concluded_prob_on_stop=concluded_prob_on_stop,
+        real_prob_on_stop=real_prob_on_stop,
+        agent_concluded_culprit=agent_concluded_culprit,
+    )
+
+
 def demo(
     testname: str,
     good: str,
@@ -133,9 +245,6 @@ def demo(
 
     model_old_p, sim_old_p = old_p
     model_new_p, sim_new_p = new_p
-
-    def get_reason() -> str | None:
-        return reason_func() if reason_func else None
 
     is_chrome = '@' in good or good.startswith('refs/') or good.isdigit()
     chromeos_mirror = os.path.join(
@@ -160,132 +269,34 @@ def demo(
 
     culprit_idx = revlist.index(culprit)
 
-    agent = gemini_util.BisectAgent(
-        testname,
-        repo,
-        revlist,
-        model=model or gemini_util.MODEL_DEFAULT,
-        chromeos_mirror=chromeos_mirror if not is_chrome else None,
-        board=board if not is_chrome else None,
-        old_p=model_old_p,
-        new_p=model_new_p,
-    )
-    agent.add_sample(good, 'PASS')
-    agent.add_sample(bad, 'FAIL', reason=get_reason())
-    stat = defaultdict(list)
-    stat[good].append('PASS')
-    stat[bad].append('FAIL')
-
-    bsearch = strategy.NoisyBinarySearch(
+    bsearch = strategy.GeminiFusionStrategy(
         [core.RevInfo(x) for x in revlist],
         old_idx=0,
         new_idx=len(revlist) - 1,
         oracle=(model_old_p, model_new_p),
         confidence=target_confidence,
+        term_map={'old': 'PASS', 'new': 'FAIL'},
+        enable_gemini=True,
+        test_name=testname,
+        source_root=repo,
+        chromeos_mirror=chromeos_mirror if not is_chrome else None,
+        board=board if not is_chrome else None,
+        model=model,
     )
     bsearch.add_sample(0, 'old')
-    bsearch.add_sample(len(revlist) - 1, 'new')
+    bsearch.add_sample(
+        len(revlist) - 1,
+        'new',
+        reason=reason_func() if reason_func else None,
+    )
     assert bsearch.state == bsearch.STARTED
-    prob = bsearch.prob
-    assert prob is not None
-
-    # The last run revision was 'bad' (index len(revlist) - 1)
-    cost_table = _get_simulated_cost_table(
-        0, len(revlist) - 1, len(revlist) - 1
+    res_strategy = _run_simulation(
+        bsearch,
+        culprit_idx,
+        sim_old_p,
+        sim_new_p,
+        reason_func=reason_func,
     )
-    # pylint: disable=protected-access
-    utilities = strategy.NoisyBinarySearch._calculate_utilities(
-        model_old_p, model_new_p, prob, cost_table=cost_table
-    )
-
-    agent.update_stats(
-        {
-            revlist[x]: {
-                'prob': prob[x],
-                'status': {
-                    'PASS': stat[revlist[x]].count('PASS'),
-                    'FAIL': stat[revlist[x]].count('FAIL'),
-                },
-                'info_gain': utilities[x][0],
-                'info_gain_per_cost': utilities[x][1],
-            }
-            for x in range(len(revlist))
-        },
-        old_p=model_old_p,
-        new_p=model_new_p,
-    )
-    attempt = agent.next()
-    runs_llm = 0
-    while attempt:
-        attempt_idx = revlist.index(attempt)
-        runs_llm += 1
-        run_reason = None
-        is_fail = (
-            random.random() < sim_new_p
-            if attempt_idx >= culprit_idx
-            else random.random() < sim_old_p
-        )
-        if is_fail:
-            status = 'FAIL'
-            run_reason = get_reason()
-        else:
-            status = 'PASS'
-        stat[attempt].append(status)
-        agent.add_sample(attempt, status, reason=run_reason)
-
-        bsearch.add_sample(attempt_idx, 'old' if status == 'PASS' else 'new')
-        prob = bsearch.prob
-        assert prob is not None
-        # Current revision is 'attempt_idx'
-        cost_table = _get_simulated_cost_table(0, len(revlist) - 1, attempt_idx)
-        # pylint: disable=protected-access
-        utilities = strategy.NoisyBinarySearch._calculate_utilities(
-            model_old_p, model_new_p, prob, cost_table=cost_table
-        )
-
-        agent.update_stats(
-            {
-                revlist[x]: {
-                    'prob': prob[x],
-                    'status': {
-                        'PASS': stat[revlist[x]].count('PASS'),
-                        'FAIL': stat[revlist[x]].count('FAIL'),
-                    },
-                    'info_gain': utilities[x][0],
-                    'info_gain_per_cost': utilities[x][1],
-                }
-                for x in range(len(revlist))
-            },
-            old_p=model_old_p,
-            new_p=model_new_p,
-        )
-        likelihood_new = float(sum(prob[: attempt_idx + 1]))
-        attempt = agent.next(
-            {
-                'status': status,
-                'reason': run_reason,
-                'likelihood_new': likelihood_new,
-            }
-        )
-    concluded_culprit = agent.get_result()
-    assert bsearch.prob is not None
-    concluded_prob_on_stop = (
-        bsearch.prob[revlist.index(concluded_culprit)]
-        if concluded_culprit in revlist
-        else 0.0
-    )
-    real_prob_on_stop = bsearch.prob[culprit_idx]
-
-    runs_additional_math = 0
-    while not bsearch.is_done():
-        runs_additional_math += 1
-        idx = bsearch.next_idx()
-        is_fail = (
-            random.random() < sim_new_p
-            if idx >= culprit_idx
-            else random.random() < sim_old_p
-        )
-        bsearch.add_sample(idx, 'new' if is_fail else 'old')
 
     bsearch_std = strategy.NoisyBinarySearch(
         [core.RevInfo(x) for x in revlist],
@@ -293,43 +304,56 @@ def demo(
         new_idx=len(revlist) - 1,
         oracle=(model_old_p, model_new_p),
         confidence=target_confidence,
+        term_map={'old': 'PASS', 'new': 'FAIL'},
     )
     bsearch_std.add_sample(0, 'old')
     bsearch_std.add_sample(len(revlist) - 1, 'new')
     assert bsearch_std.state == bsearch_std.STARTED
-    runs_bisect = 0
-    while not bsearch_std.is_done():
-        runs_bisect += 1
-        idx = bsearch_std.next_idx()
-        is_fail = (
-            random.random() < sim_new_p
-            if idx >= culprit_idx
-            else random.random() < sim_old_p
-        )
-        bsearch_std.add_sample(idx, 'new' if is_fail else 'old')
+    res_bisect = _run_simulation(
+        bsearch_std,
+        culprit_idx,
+        sim_old_p,
+        sim_new_p,
+    )
 
+    if res_strategy.agent_concluded_culprit:
+        assert (
+            res_strategy.agent_concluded_culprit == culprit
+        ), f'Agent result {res_strategy.agent_concluded_culprit} does not match expected culprit {culprit}'
+
+    concluded_culprit = revlist[bsearch.get_best_guess()]
     assert (
-        agent.get_result() == culprit
-    ), f'Agent result {agent.get_result()} does not match expected culprit {culprit}'
-    bsearch_culprit = revlist[bsearch.get_best_guess()]
-    assert (
-        bsearch_culprit == culprit
-    ), f'Math result {bsearch_culprit} does not match expected culprit {culprit}'
+        concluded_culprit == culprit
+    ), f'Strategy result {concluded_culprit} does not match expected culprit {culprit}'
     bsearch_std_culprit = revlist[bsearch_std.get_best_guess()]
     assert (
         bsearch_std_culprit == culprit
     ), f'Pure math result {bsearch_std_culprit} does not match expected culprit {culprit}'
 
+    if (
+        res_strategy.concluded_prob_on_stop is not None
+        and res_strategy.real_prob_on_stop is not None
+    ):
+        confidence_info = (
+            f', likelihood when agent stopped: '
+            f'concluded={res_strategy.concluded_prob_on_stop:.2%}, '
+            f'real={res_strategy.real_prob_on_stop:.2%}'
+        )
+    else:
+        confidence_info = ''
+
     # ANSI color formatting:
     # \033[1;32m = bold green (text)
     # \033[1;36m = bold cyan (culprit)
-    # \033[1;33m = bold yellow (run counts)
+    # \033[1;33m = bold yellow (run counts / times)
     # \033[0m    = reset
     print(
         f'\033[1;32mConcluded culprit \033[1;36m{concluded_culprit}\033[1;32m '
-        f'in \033[1;33m{runs_llm}+{runs_additional_math}\033[1;32m runs instead of '
-        f'\033[1;33m{runs_bisect}\033[1;32m runs by bisect (confidence: {target_confidence:.2%}, '
-        f'likelihood when agent stopped: concluded={concluded_prob_on_stop:.2%}, real={real_prob_on_stop:.2%}).\033[0m'
+        f'in \033[1;33m{res_strategy.agent_runs}+{res_strategy.additional_runs}\033[1;32m runs '
+        f'(\033[1;33m{res_strategy.total_cost:.0f}s\033[1;32m) instead of '
+        f'\033[1;33m{res_bisect.total_runs}\033[1;32m runs '
+        f'(\033[1;33m{res_bisect.total_cost:.0f}s\033[1;32m) by bisect '
+        f'(confidence: {target_confidence:.2%}{confidence_info}).\033[0m'
     )
 
 

@@ -1572,10 +1572,10 @@ class GeminiFusionStrategy(NoisyBinarySearch):
         chromeos_mirror=None,
         board=None,
         session=None,
+        model=None,
         **kwargs,
     ):
-        """
-        Initializes a GeminiFusionStrategy that fusions NoisyBinarySearch with Gemini.
+        """Initializes a GeminiFusionStrategy that fusions NoisyBinarySearch with Gemini.
 
         Args:
           enable_gemini: should use gemini to analyze commit message and diffs.
@@ -1583,6 +1583,8 @@ class GeminiFusionStrategy(NoisyBinarySearch):
           source_root: root of the source tree bisected.
           chromeos_mirror: optional ChromeOS mirror path.
           board: optional board name.
+          session: optional session name.
+          model: optional Gemini model name.
         """
         super().__init__(*args, **kwargs)
 
@@ -1594,6 +1596,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 test_name,
                 source_root,
                 [x.rev for x in self.rev_info[self.old_idx : self.new_idx + 1]],
+                model=model,
                 chromeos_mirror=chromeos_mirror,
                 board=board,
                 old_p=self.old_p,
