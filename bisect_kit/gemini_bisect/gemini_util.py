@@ -92,6 +92,38 @@ PROMPT = (
     'the revision with high info_gain_per_cost or info_gain) to narrow '
     'down the ranges, which can be better.\n'
     '\n'
+    'Speculative parallel builds:\n'
+    'Running a test on a physical DUT takes 15-30 minutes, whereas building ChromeOS takes 30-60 minutes. '
+    'To avoid idle wait time between iterations, whenever you call run_at, you MUST provide "future_build_tree" '
+    'specifying candidate commits to pre-build in parallel on remote builders while this run executes on the DUT. '
+    'You should decide the depth and breadth of the tree based on your reasoning and confidence: provide predictions '
+    'for the immediate "PASS" and "FAIL" outcomes (unless a conclusion can be made directly after that result, '
+    'in which case that branch should be omitted), include your estimated conditional "confidence" (a float between '
+    '0.0 and 1.0 representing the conditional probability of reaching this branch given its parent node was reached, '
+    'such that sibling branches at each layer add up to 1.0), and arbitrarily deep nested "next" outcomes as appropriate. '
+    'If you have no speculative preference for a branch, use the candidate with high info_gain / math utility for that branch.\n'
+    'Example:\n'
+    '{\n'
+    '  "FAIL": {\n'
+    '    "next_revision": "<rev_id>",\n'
+    '    "reason": "<short explanation why this revision is best if current test fails>",\n'
+    '    "confidence": 0.8,\n'
+    '    "next": {\n'
+    '      "FAIL": {"next_revision": "<rev_id>", "reason": "...", "confidence": 0.7},\n'
+    '      "PASS": {"next_revision": "<rev_id>", "reason": "...", "confidence": 0.3}\n'
+    '    }\n'
+    '  },\n'
+    '  "PASS": {\n'
+    '    "next_revision": "<rev_id>",\n'
+    '    "reason": "<short explanation why this revision is best if current test passes>",\n'
+    '    "confidence": 0.2,\n'
+    '    "next": {\n'
+    '      "FAIL": {"next_revision": "<rev_id>", "reason": "...", "confidence": 0.5},\n'
+    '      "PASS": {"next_revision": "<rev_id>", "reason": "...", "confidence": 0.5}\n'
+    '    }\n'
+    '  }\n'
+    '}\n'
+    '\n'
     'You have external functions available to use. '
     'You can call multiple independent query functions in parallel in a '
     'single turn (e.g., get_revision_detail, get_test_name, '
@@ -237,10 +269,11 @@ FUNCTIONS = [
         "type": "function",
         "name": "run_at",
         "description": (
-            "Run the test at given commit. Returns a dictionary containing "
-            "the status (e.g., 'PASS', 'FAIL'), optionally a 'reason' "
-            "key containing the test failure output or error log if the "
-            "run failed, and 'likelihood_new' (a float between 0.0 and 1.0) "
+            "Run the test at given commit and specify a speculative decision "
+            "tree of future candidate commits to pre-build in parallel.\n"
+            "Returns a dictionary containing the status (e.g., 'PASS', 'FAIL'), "
+            "optionally a 'reason' key containing the test failure output or error "
+            "log if the run failed, and 'likelihood_new' (a float between 0.0 and 1.0) "
             "representing the likelihood of this commit having the 'new/FAIL' "
             "behavior based on all past test run history (the cumulative "
             "probability that the culprit is at or before this commit; this is "
@@ -261,8 +294,88 @@ FUNCTIONS = [
                         "revision."
                     ),
                 },
+                "future_build_tree": {
+                    "type": "object",
+                    "description": (
+                        "Hierarchical speculative decision tree of next commits to pre-build in "
+                        "parallel while this run executes. Keys are possible outcomes ('PASS', 'FAIL', etc.). "
+                        "Each branch contains 'next_revision' (rev_id string), 'reason', 'confidence' (float 0.0-1.0), "
+                        "and optional recursive 'next' sub-tree to arbitrary depth. If a conclusion can be made "
+                        "immediately upon observing a specific outcome, that branch can be omitted or empty."
+                    ),
+                    "properties": {
+                        "PASS": {
+                            "type": "object",
+                            "description": (
+                                "Speculative branch if current test PASSes (omit if a conclusion can be "
+                                "made directly when this test PASSes)."
+                            ),
+                            "properties": {
+                                "next_revision": {
+                                    "type": "string",
+                                    "description": "rev_id to test if current run PASSes.",
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "description": "Explanation for why this rev_id is chosen if current run PASSes.",
+                                },
+                                "confidence": {
+                                    "type": "number",
+                                    "description": (
+                                        "Conditional probability/confidence (float between 0.0 and 1.0) "
+                                        "that the test will result in PASS given this parent branch was reached. "
+                                        "Sibling branches at the same depth level should add up to 1.0."
+                                    ),
+                                },
+                                "next": {
+                                    "type": "object",
+                                    "description": "Optional nested decision tree of further speculative outcomes to arbitrary depth.",
+                                },
+                            },
+                            "required": [
+                                "next_revision",
+                                "reason",
+                                "confidence",
+                            ],
+                        },
+                        "FAIL": {
+                            "type": "object",
+                            "description": (
+                                "Speculative branch if current test FAILs (omit if a conclusion can be "
+                                "made directly when this test FAILs)."
+                            ),
+                            "properties": {
+                                "next_revision": {
+                                    "type": "string",
+                                    "description": "rev_id to test if current run FAILs.",
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "description": "Explanation for why this rev_id is chosen if current run FAILs.",
+                                },
+                                "confidence": {
+                                    "type": "number",
+                                    "description": (
+                                        "Conditional probability/confidence (float between 0.0 and 1.0) "
+                                        "that the test will result in FAIL given this parent branch was reached. "
+                                        "Sibling branches at the same depth level should add up to 1.0."
+                                    ),
+                                },
+                                "next": {
+                                    "type": "object",
+                                    "description": "Optional nested decision tree of further speculative outcomes to arbitrary depth.",
+                                },
+                            },
+                            "required": [
+                                "next_revision",
+                                "reason",
+                                "confidence",
+                            ],
+                        },
+                    },
+                },
             },
-            "required": ["rev_id", "reason"],
+            "required": ["rev_id", "reason", "future_build_tree"],
         },
     },
     {
@@ -484,6 +597,7 @@ class BisectAgent:
         self._pending_run_at_call: Any = None
         self._session = session
         self._last_run_eval_log: str | None = None
+        self._last_future_build_tree: dict[str, Any] = {}
 
         is_chrome = (
             '@' in revlist[0]
@@ -939,7 +1053,15 @@ class BisectAgent:
             if run_at_call is not None:
                 assert run_at_call.arguments is not None
                 self._pending_run_at_call = run_at_call
+                self._last_future_build_tree = (
+                    run_at_call.arguments.get('future_build_tree') or {}
+                )
                 return run_at_call.arguments['rev_id']
+
+    @property
+    def future_build_tree(self) -> dict[str, Any]:
+        """Returns the last future build tree suggested by Gemini."""
+        return self._last_future_build_tree
 
     def add_sample(
         self,

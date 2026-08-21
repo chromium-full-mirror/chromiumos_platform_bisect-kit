@@ -1727,6 +1727,127 @@ class TestBisectAgent(unittest.TestCase):
             self.assertEqual(agent._old_p, 0.15)
             self.assertEqual(agent._new_p, 0.85)
 
+    def test_future_switch_indexes_math(self):
+        rev_info = [core.RevInfo(str(i)) for i in range(100)]
+        s = strategy.NoisyBinarySearch(
+            rev_info=rev_info,
+            old_idx=0,
+            new_idx=99,
+            endpoint_verification=False,
+            recompute_init_values=False,
+        )
+
+        def cost_func(_):
+            return None
+
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=0), [99]
+        )
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=1), [0, 99]
+        )
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=2), [0, 49, 99]
+        )
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=3),
+            [0, 24, 49, 74, 99],
+        )
+
+        sample1 = {'rev': '99', 'index': 99, 'status': 'new'}
+        s.add_sample(99, **sample1)
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=0), [0]
+        )
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=1), [0, 49]
+        )
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=2),
+            [0, 24, 49, 74],
+        )
+
+        sample2 = {'rev': '0', 'index': 0, 'status': 'old'}
+        s.add_sample(0, **sample2)
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=0), [49]
+        )
+        self.assertEqual(
+            s.future_switch_indexes(cost_func=cost_func, depth=1),
+            [24, 49, 74],
+        )
+
+        def custom_cost_func(prev_idx):
+            if prev_idx is None:
+                return [(1.0, 1.0)] * 100
+            return [
+                (1.0, 1.0) if i == prev_idx else (10.0, 10.0)
+                for i in range(100)
+            ]
+
+        self.assertEqual(
+            s.future_switch_indexes(
+                cost_func=custom_cost_func, depth=1, prev_idx=49
+            ),
+            [24, 49, 74],
+        )
+
+    def test_future_switch_indexes_gemini_tree(self):
+        rev_info = [core.RevInfo(str(i)) for i in range(10)]
+        strat = strategy.GeminiFusionStrategy(
+            rev_info=rev_info,
+            old_idx=0,
+            new_idx=9,
+            enable_gemini=False,
+        )
+        mock_gemini = mock.MagicMock()
+        mock_gemini.future_build_tree = {
+            'PASS': {
+                'next_revision': '7',
+                'reason': 'test upper half',
+                'confidence': 0.4,
+                'next': {
+                    'PASS': {
+                        'next_revision': '8',
+                        'reason': 'near top',
+                        'confidence': 0.6,
+                    },
+                },
+            },
+            'FAIL': {
+                'next_revision': '3',
+                'reason': 'test lower half',
+                'confidence': 0.6,
+                'next': {
+                    'FAIL': {
+                        'next_revision': '1',
+                        'reason': 'near bottom',
+                        'confidence': 0.8,
+                    },
+                },
+            },
+        }
+        strat.gemini = mock_gemini
+        strat._gemini_waiting_result = {'5': None}
+
+        def cost_func(_):
+            return None
+
+        # Depth 0: only primary
+        self.assertEqual(
+            strat.future_switch_indexes(cost_func=cost_func, depth=0), [5]
+        )
+        # Depth 1: primary + 1st level branches
+        self.assertEqual(
+            strat.future_switch_indexes(cost_func=cost_func, depth=1),
+            [3, 5, 7],
+        )
+        # Depth 2: primary + 1st & 2nd level branches
+        self.assertEqual(
+            strat.future_switch_indexes(cost_func=cost_func, depth=2),
+            [1, 3, 5, 7, 8],
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

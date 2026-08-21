@@ -531,6 +531,68 @@ class TestBisectAgentInteractions(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 agent.next({'status': 'PASS'})
 
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    def test_bisect_agent_future_build_tree(
+        self, mock_gemini_agent_cls, mock_build_revlist
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'c1'}]},
+                '2': {'actions': [{'rev': 'c2'}]},
+            },
+        )
+        mock_gemini_agent = mock.MagicMock()
+        mock_gemini_agent_cls.return_value = mock_gemini_agent
+
+        tree = {
+            'FAIL': {
+                'next_revision': '1',
+                'reason': 'test fail path',
+                'confidence': 0.8,
+                'next': {
+                    'FAIL': {
+                        'next_revision': '2',
+                        'reason': 'further isolate',
+                        'confidence': 0.9,
+                    }
+                },
+            },
+            'PASS': {
+                'next_revision': '2',
+                'reason': 'test pass path',
+                'confidence': 0.2,
+            },
+        }
+        interaction = MockInteraction(
+            'int_1',
+            [
+                MockFunctionCall(
+                    id='fc_1',
+                    name='run_at',
+                    arguments={
+                        'rev_id': '1',
+                        'reason': 'test reason',
+                        'future_build_tree': tree,
+                    },
+                )
+            ],
+        )
+        mock_gemini_agent.start.return_value = interaction
+
+        with mock.patch.dict(
+            'os.environ', {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'}
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_example',
+                repo='test_repo',
+                revlist=['1', '2'],
+            )
+            next_rev = agent.next()
+            self.assertEqual(next_rev, '1')
+            self.assertEqual(agent.future_build_tree, tree)
+
 
 if __name__ == '__main__':
     unittest.main()

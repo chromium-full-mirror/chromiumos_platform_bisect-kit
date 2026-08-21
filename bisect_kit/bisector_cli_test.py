@@ -611,20 +611,45 @@ class TestBisectorCommandLine(unittest.TestCase):
         bisector.states.add_history('sample', **sample_new)
         bisector.strategy.add_sample(4, **sample_new)
 
-        recorder = mock.MagicMock()
-        mock_strategy = mock.MagicMock(spec=strategy.GeminiFusionStrategy)
-        mock_strategy.is_done.return_value = False
-        mock_strategy.gemini = mock.MagicMock()
-        mock_strategy.next_idx.side_effect = lambda *a, **kw: (
-            recorder(*a, **kw),
-            [1, 2, 1, 3, 2][recorder.call_count - 1],
-        )[1]
-        bisector.strategy = mock_strategy
+        mock_gemini = mock.MagicMock()
+        mock_gemini.future_build_tree = {
+            'FAIL': {
+                'next_revision': '1',
+                'reason': 'left subtree',
+                'confidence': 0.7,
+                'next': {
+                    'FAIL': {
+                        'next_revision': '2',
+                        'reason': 'further left',
+                        'confidence': 0.8,
+                    },
+                },
+            },
+            'PASS': {
+                'next_revision': '3',
+                'reason': 'right subtree',
+                'confidence': 0.3,
+            },
+        }
+        gemini_strat = strategy.GeminiFusionStrategy(
+            rev_info=bisector.strategy.rev_info,
+            old_idx=0,
+            new_idx=4,
+            enable_gemini=False,
+        )
+        gemini_strat.gemini = mock_gemini
+        # pylint: disable=protected-access
+        gemini_strat._gemini_waiting_result = {'1': None}
+        bisector.strategy = gemini_strat
 
-        # Depth 1 returns next revision and child predictions. With possible_status duplicated (4 trials), next_idx is called 5 times
-        versions = bisector.future_switch_versions('0', 1)
-        self.assertEqual(recorder.call_count, 5)
-        self.assertEqual(sorted(versions), ['1', '2', '3'])
+        # Depth 0 returns primary suggestion '1'
+        self.assertEqual(bisector.future_switch_versions('0', 0), ['1'])
+        # Depth 1 returns primary '1' and 1st-level tree branches '1', '3'
+        self.assertEqual(bisector.future_switch_versions('0', 1), ['1', '3'])
+        # Depth 2 returns primary and 2nd-level branches '1', '2', '3'
+        self.assertEqual(
+            sorted(bisector.future_switch_versions('0', 2)), ['1', '2', '3']
+        )
 
     @mock.patch(
         'bisect_kit.gemini_bisect.gemini_util.BisectAgent', mock.MagicMock()

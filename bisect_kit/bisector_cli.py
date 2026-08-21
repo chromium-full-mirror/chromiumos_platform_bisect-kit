@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import collections
-import copy
 import datetime
 import enum
 import importlib
@@ -733,103 +732,29 @@ class BisectorCommandLine(typing.Generic[T_co]):
 
     def future_switch_versions(  # pylint: disable=dangerous-default-value
         self,
-        prev_rev: str,
+        prev_rev: str | None,
         depth: int,
         possible_status: list[str] = [
             'old',
             'new',
         ],
     ) -> list[str]:
-        """Returns a list of versions that may need to switch in the future.
+        """Returns a list of versions that may need to switch in the future."""
+        if not self.strategy:
+            return []
 
-        Assume p = len(possible_status), the longest list length returned would be:
-        p^0 + p^1 + ... + p^depth.
-        """
+        def cost_func(idx: int | None):
+            rev = self.states.idx2rev(idx) if idx is not None else None
+            return self.estimate_cost(rev)
 
-        def _enumerate_possible_statuses(
-            bisector_cli: BisectorCommandLine,
-            states: core.BisectStates,
-            bisector_strategy: strategy.NoisyBinarySearch,
-            prev_rev: str,
-            remain_depth: int,
-            possible_status: list[str],
-        ) -> typing.Iterator[int]:
-            """Recursively enumerates all the possible test result combinations."""
-            if remain_depth < 0:
-                return
-            if bisector_strategy.is_done():
-                return
-
-            idx = bisector_strategy.next_idx(
-                bisector_cli.estimate_cost(prev_rev)
-            )
-            rev = states.idx2rev(idx)
-            yield idx
-
-            # When Gemini is enabled, sample candidate statuses twice during lookahead
-            # to account for LLM non-determinism. Unlike traditional math models which
-            # are strictly deterministic, Gemini may suggest different candidate commits
-            # across trials even with identical input histories, allowing lookahead to
-            # explore multiple potential pathways. Duplicate predictions are naturally
-            # deduplicated downstream by the strategy sample collection.
-            statuses_to_try = possible_status
-            if getattr(bisector_strategy, 'gemini', None):
-                statuses_to_try = possible_status * 2
-
-            for status in statuses_to_try:
-                # Dummy switch and eval time could be ignored here because the strategy
-                # algorithm will ignore empty time sample and calculate the average of
-                # other samples automatically.
-                sample = {
-                    'rev': rev,
-                    'index': states.rev2idx(rev),
-                    'status': status,
-                    'reason': (
-                        'Simulated result to predict the next revision for'
-                        ' early build kickoff. There are no test logs or'
-                        ' failure details available, so no failure analysis'
-                        ' can be performed on this sample.'
-                    ),
-                }
-                states_copy = copy.deepcopy(states)
-                strategy_copy = copy.deepcopy(bisector_strategy)
-                if hasattr(strategy_copy, 'set_logger_prefix'):
-                    strategy_copy.set_logger_prefix('[Simulation] ')
-
-                try:
-                    states_copy.add_history('sample', **sample)
-                    strategy_copy.check_verification_range()
-                    strategy_copy.add_sample(idx, **sample)
-                except (
-                    errors.VerifyNewBehaviorFailed,
-                    errors.VerifyOldBehaviorFailed,
-                    errors.VerifyInitialRangeFailed,
-                    errors.WrongAssumption,
-                ):
-                    # Ignore test verfication errors.
-                    continue
-                yield from _enumerate_possible_statuses(
-                    bisector_cli,
-                    states_copy,
-                    strategy_copy,
-                    rev,
-                    remain_depth - 1,
-                    possible_status,
-                )
-
-        dedup_indexes = sorted(
-            set(
-                _enumerate_possible_statuses(
-                    self,
-                    self.states,
-                    self.strategy,
-                    prev_rev,
-                    depth,
-                    possible_status,
-                )
-            )
+        prev_idx = self.states.rev2idx(prev_rev) if prev_rev else None
+        indexes = self.strategy.future_switch_indexes(
+            cost_func=cost_func,
+            depth=depth,
+            prev_idx=prev_idx,
+            possible_status=possible_status,
         )
-        return [self.states.idx2rev(x) for x in dedup_indexes]
+        return [self.states.idx2rev(x) for x in indexes]
 
     def cmd_reset(self, _opts: ResetOptions):
         """Resets bisect session and clean up saved result."""

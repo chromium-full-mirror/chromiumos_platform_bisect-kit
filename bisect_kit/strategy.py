@@ -1521,6 +1521,128 @@ class NoisyBinarySearch:
             return None
         return self.prob
 
+    @staticmethod
+    def _update_prob_vector(old_p, new_p, prob, idx, is_new):
+        """Updates a probability vector in-memory given an observation at idx."""
+        new_prob = list(prob)
+        if is_new:
+            for i in range(idx + 1):
+                new_prob[i] *= new_p
+            for i in range(idx + 1, len(new_prob)):
+                new_prob[i] *= old_p
+        else:
+            for i in range(idx + 1):
+                new_prob[i] *= 1.0 - new_p
+            for i in range(idx + 1, len(new_prob)):
+                new_prob[i] *= 1.0 - old_p
+        s = sum(new_prob)
+        if s <= 0:
+            return None
+        return [p / s for p in new_prob]
+
+    def future_switch_indexes(
+        self,
+        *,
+        cost_func: typing.Callable[
+            [int | None], list[tuple[float, float]] | None
+        ],
+        depth: int = 1,
+        prev_idx: int | None = None,
+        possible_status: tuple[str, ...] | list[str] = ('old', 'new'),
+    ) -> list[int]:
+        """Returns candidate revision indices that may need to be tested up to `depth` levels.
+
+        Args:
+          cost_func: function mapping candidate idx to its cost table.
+          depth: lookahead depth (0 means only the next immediate revision).
+          prev_idx: index of current revision tested on DUT.
+          possible_status: possible test statuses to explore ('old', 'new').
+
+        Returns:
+          List of deduplicated candidate revision indices.
+        """
+        if depth < 0:
+            return []
+
+        if self.state == self.INITED:
+            idx = self._next_idx_for_initial()
+            if idx is None:
+                if self.prob is None:
+                    self._init_for_state_started()
+            else:
+                indexes = [idx]
+                if depth == 0:
+                    return indexes
+                other_idx = None
+                if (
+                    idx == self.new_idx
+                    and self.rev_info[self.old_idx]['old'] == 0
+                ):
+                    other_idx = self.old_idx
+                elif (
+                    idx == self.old_idx
+                    and self.rev_info[self.new_idx]['new'] == 0
+                ):
+                    other_idx = self.new_idx
+
+                if other_idx is not None:
+                    indexes.append(other_idx)
+                    if depth == 1:
+                        return sorted(set(indexes))
+                    rem_depth = depth - 2
+                else:
+                    rem_depth = depth - 1
+
+                init_prob = [0.0] + [1.0 / (len(self.rev_info) - 1)] * (
+                    len(self.rev_info) - 1
+                )
+
+                def _enum_init(p, rem, cur_idx):
+                    if rem < 0:
+                        return
+                    c_table = cost_func(cur_idx)
+                    best = self._next_idx_by_utility(
+                        self.old_p, self.new_p, p, c_table
+                    )
+                    if best is not None:
+                        yield best
+                        for st in possible_status:
+                            nxt_p = self._update_prob_vector(
+                                self.old_p,
+                                self.new_p,
+                                p,
+                                best,
+                                is_new=(st == 'new'),
+                            )
+                            if nxt_p:
+                                yield from _enum_init(nxt_p, rem - 1, best)
+
+                indexes.extend(_enum_init(init_prob, rem_depth, prev_idx))
+                return sorted(set(indexes))
+
+        assert self.state == self.STARTED
+        assert self.prob
+
+        def _enumerate(prob, rem, cur_idx):
+            if rem < 0:
+                return
+            if max(prob) > self.confidence:
+                return
+            c_table = cost_func(cur_idx)
+            best = self._next_idx_by_utility(
+                self.old_p, self.new_p, prob, c_table
+            )
+            if best is not None:
+                yield best
+                for st in possible_status:
+                    nxt_p = self._update_prob_vector(
+                        self.old_p, self.new_p, prob, best, is_new=(st == 'new')
+                    )
+                    if nxt_p:
+                        yield from _enumerate(nxt_p, rem - 1, best)
+
+        return sorted(set(_enumerate(self.prob, depth, prev_idx)))
+
     def next_idx(self, cost_table=None):
         """Determines next index to binary search.
 
@@ -1738,6 +1860,76 @@ class GeminiFusionStrategy(NoisyBinarySearch):
         return self._next_idx_by_utility(
             self.old_p, self.new_p, self.prob, cost_table
         )
+
+    def future_switch_indexes(
+        self,
+        *,
+        cost_func: typing.Callable[
+            [int | None], list[tuple[float, float]] | None
+        ],
+        depth: int = 1,
+        prev_idx: int | None = None,
+        possible_status: tuple[str, ...] | list[str] = ('old', 'new'),
+    ) -> list[int]:
+        """Returns candidate revision indices that may need to be tested up to `depth` levels."""
+        if not self.gemini or self.is_done():
+            return super().future_switch_indexes(
+                cost_func=cost_func,
+                depth=depth,
+                prev_idx=prev_idx,
+                possible_status=possible_status,
+            )
+
+        indexes = []
+        # Include primary revision suggested by Gemini
+        if self._gemini_waiting_result:
+            primary_rev = list(self._gemini_waiting_result.keys())[0]
+            try:
+                indexes.append(self._rev_to_idx(primary_rev))
+            except ValueError:
+                pass
+
+        # Extract branches from Gemini's hierarchical future_build_tree
+        tree = getattr(self.gemini, 'future_build_tree', {}) or {}
+
+        def _extract_from_tree(tree_dict: dict, current_depth: int):
+            if not isinstance(tree_dict, dict) or current_depth > depth:
+                return
+            for _, node in tree_dict.items():
+                if isinstance(node, dict):
+                    rev = node.get('next_revision')
+                    if rev and isinstance(rev, str):
+                        try:
+                            indexes.append(self._rev_to_idx(rev))
+                        except ValueError:
+                            self.logger.warning(
+                                'Gemini suggested invalid future build rev: %s',
+                                rev,
+                            )
+                    next_level = node.get('next')
+                    if isinstance(next_level, dict) and current_depth < depth:
+                        _extract_from_tree(next_level, current_depth + 1)
+                elif isinstance(node, str):
+                    try:
+                        indexes.append(self._rev_to_idx(node))
+                    except ValueError:
+                        self.logger.warning(
+                            'Gemini suggested invalid future build rev: %s',
+                            node,
+                        )
+
+        if depth >= 1 and isinstance(tree, dict):
+            _extract_from_tree(tree, current_depth=1)
+
+        if not indexes:
+            return super().future_switch_indexes(
+                cost_func=cost_func,
+                depth=depth,
+                prev_idx=prev_idx,
+                possible_status=possible_status,
+            )
+
+        return sorted(set(indexes))
 
     def set_logger_prefix(self, prefix: str):
         super().set_logger_prefix(prefix)
