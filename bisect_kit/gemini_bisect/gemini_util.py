@@ -29,8 +29,11 @@ GEMINI_API_KEY_SECRET_LOCATION = (
     'https://secretmanager.googleapis.com/'
     'v1/projects/43146777051/secrets/gemini-api-key/versions/latest'
 )
-MODEL_GEMINI_3_6_FLASH = 'gemini-3.6-flash'
-MODEL_DEFAULT = MODEL_GEMINI_3_6_FLASH
+MODEL_GEMINI_3_7_FLASH = 'gemini-3.7-flash'
+MODEL_DEFAULT = MODEL_GEMINI_3_7_FLASH
+MODEL_PRICING: dict[str, tuple[float, float, float]] = {
+    'gemini-3.7-flash': (0.75, 0.075, 3.75),
+}
 
 PROMPT = (
     "You're a Software Engineer investigating test regressions.\n"
@@ -558,6 +561,50 @@ def _get_git_repo_path(root: str, action_path: str) -> str:
     return os.path.join(root, action_path)
 
 
+def _format_tokens(n: int) -> str:
+    """Format token count into compact human readable string (e.g. 500, 1.2k, 12k, 1.5M)."""
+    if n >= 1_000_000:
+        return f'{n / 1_000_000:.1f}M'.replace('.0M', 'M')
+    if n >= 1_000:
+        return f'{n / 1_000:.1f}k'.replace('.0k', 'k')
+    return str(n)
+
+
+def _format_cost(cost: float) -> str:
+    """Format cost in USD into a concise string."""
+    if cost <= 0:
+        return '$0'
+    if cost >= 1.0:
+        return f'${cost:.2f}'
+    if cost >= 0.01:
+        return f'${cost:.3f}'.rstrip('0').rstrip('.')
+    if cost >= 0.0001:
+        return f'${cost:.4f}'.rstrip('0').rstrip('.')
+    return f'${cost:.5f}'.rstrip('0').rstrip('.')
+
+
+def estimate_gemini_token_cost(
+    model: str | None,
+    input_tokens: int,
+    cached_tokens: int,
+    output_tokens: int,
+) -> float | None:
+    """Estimates the USD cost of a Gemini interaction based on token counts.
+
+    Returns None if the model's pricing is unknown.
+    """
+    model_name = (model or '').lower()
+    if model_name not in MODEL_PRICING:
+        return None
+    p_input, p_cached, p_output = MODEL_PRICING[model_name]
+    uncached_input = max(0, input_tokens - cached_tokens)
+    return (
+        uncached_input * p_input
+        + cached_tokens * p_cached
+        + output_tokens * p_output
+    ) / 1_000_000
+
+
 class BisectAgent:
     """The agent that allows Gemini to analyze commit messages, diffs for
     smarter bisection."""
@@ -578,8 +625,9 @@ class BisectAgent:
         """Initializes BisectAgent.
 
         test_name: Name of the regressed test."""
+        self._model = model or MODEL_DEFAULT
         self._agent = GeminiAgent(
-            prompt=PROMPT, functions=FUNCTIONS, model=model
+            prompt=PROMPT, functions=FUNCTIONS, model=self._model
         )
         self.logger = custom_logger or PrefixLoggerAdapter(
             logging.getLogger(__name__), {'prefix': ''}
@@ -598,6 +646,12 @@ class BisectAgent:
         self._session = session
         self._last_run_eval_log: str | None = None
         self._last_future_build_tree: dict[str, Any] = {}
+        self._total_tokens_used: int = 0
+        self._total_input_tokens: int = 0
+        self._total_cached_tokens: int = 0
+        self._total_cost: float | None = (
+            0.0 if (self._model.lower() in MODEL_PRICING) else None
+        )
 
         is_chrome = (
             '@' in revlist[0]
@@ -872,6 +926,7 @@ class BisectAgent:
                     )
                 ret = self._agent.reply(self._pending_results)
                 self._pending_results = []
+
             function_calls = [
                 s for s in (ret.steps or []) if s.type == 'function_call'
             ]
@@ -882,8 +937,52 @@ class BisectAgent:
                     f"Response text: {text}. Response: {ret}"
                 )
 
+            usage_str = ''
+            if ret.usage:
+                round_input = ret.usage.total_input_tokens or 0
+                round_total = ret.usage.total_tokens or 0
+                round_cached = ret.usage.total_cached_tokens or 0
+                round_output = getattr(
+                    ret.usage, 'total_output_tokens', None
+                ) or max(0, round_total - round_input)
+                round_cache_rate = (
+                    (round_cached / round_input) if round_input else 0.0
+                )
+                round_cost = estimate_gemini_token_cost(
+                    self._model,
+                    round_input,
+                    round_cached,
+                    round_output,
+                )
+
+                self._total_input_tokens += round_input
+                self._total_cached_tokens += round_cached
+                self._total_tokens_used += round_total
+                accumulative_cache_rate = (
+                    (self._total_cached_tokens / self._total_input_tokens)
+                    if self._total_input_tokens
+                    else 0.0
+                )
+
+                cost_str = ''
+                acc_cost_str = ''
+                if round_cost is not None:
+                    self._total_cost = (self._total_cost or 0.0) + round_cost
+                    cost_str = f', {_format_cost(round_cost)}'
+                    acc_cost_str = f', Acc{_format_cost(self._total_cost)}'
+
+                usage_str = (
+                    f' (I{_format_tokens(round_input)}, '
+                    f'T{_format_tokens(round_total)}, '
+                    f'C{round_cache_rate * 100:.0f}%'
+                    f'{cost_str}, '
+                    f'AccT{_format_tokens(self._total_tokens_used)}, '
+                    f'AccC{accumulative_cache_rate * 100:.0f}%'
+                    f'{acc_cost_str})'
+                )
+
             self.logger.info(
-                'Gemini replied %s, calling %s',
+                'Gemini replied %s, calling %s%s',
                 self._short(text),
                 ', '.join(
                     [
@@ -891,6 +990,7 @@ class BisectAgent:
                         for call in function_calls
                     ]
                 ),
+                usage_str,
             )
 
             run_at_call = None
@@ -1062,6 +1162,33 @@ class BisectAgent:
     def future_build_tree(self) -> dict[str, Any]:
         """Returns the last future build tree suggested by Gemini."""
         return self._last_future_build_tree
+
+    @property
+    def total_tokens_used(self) -> int:
+        """Returns the total number of tokens used across all Gemini interactions."""
+        return self._total_tokens_used
+
+    @property
+    def total_input_tokens(self) -> int:
+        """Returns the total number of input tokens across all Gemini interactions."""
+        return self._total_input_tokens
+
+    @property
+    def total_cached_tokens(self) -> int:
+        """Returns the total number of cached tokens across all Gemini interactions."""
+        return self._total_cached_tokens
+
+    @property
+    def accumulative_cache_rate(self) -> float:
+        """Returns the cumulative cache rate across all Gemini interactions."""
+        if not self._total_input_tokens:
+            return 0.0
+        return self._total_cached_tokens / self._total_input_tokens
+
+    @property
+    def total_cost(self) -> float | None:
+        """Returns the total estimated USD cost across all Gemini interactions."""
+        return self._total_cost
 
     def add_sample(
         self,

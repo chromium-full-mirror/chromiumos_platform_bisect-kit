@@ -26,6 +26,16 @@ MockThought = namedtuple(
     ['signature', 'summary', 'type'],
     defaults=[None, None, 'thought'],
 )
+MockUsage = namedtuple(
+    'MockUsage',
+    [
+        'total_input_tokens',
+        'total_tokens',
+        'total_cached_tokens',
+        'total_output_tokens',
+    ],
+    defaults=[None, None, None, None],
+)
 
 
 class MockInteraction:
@@ -37,11 +47,13 @@ class MockInteraction:
         steps: list,
         status: str = 'completed',
         output_text: str = '',
+        usage=None,
     ):
         self.id = id_str
         self.status = status
         self.steps = steps
         self.output_text = output_text
+        self.usage = usage
 
 
 class TestGeminiAgent(unittest.TestCase):
@@ -592,6 +604,130 @@ class TestBisectAgentInteractions(unittest.TestCase):
             next_rev = agent.next()
             self.assertEqual(next_rev, '1')
             self.assertEqual(agent.future_build_tree, tree)
+
+    @mock.patch('google.auth.transport.requests.AuthorizedSession')
+    @mock.patch(
+        'google.oauth2.service_account.Credentials.from_service_account_file'
+    )
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    def test_bisect_agent_token_logging(
+        self,
+        mock_build_revlist,
+        mock_gemini_agent_cls,
+        _mock_creds,
+        _mock_session,
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'commit1'}]},
+                '2': {'actions': [{'rev': 'commit2'}]},
+            },
+        )
+        mock_gemini_agent = mock.MagicMock()
+        mock_gemini_agent_cls.return_value = mock_gemini_agent
+
+        interaction1 = MockInteraction(
+            'int_1',
+            [
+                MockFunctionCall(
+                    id='fc_1',
+                    name='get_range',
+                    arguments={},
+                )
+            ],
+            usage=MockUsage(
+                total_input_tokens=500,
+                total_tokens=550,
+                total_cached_tokens=250,
+            ),
+        )
+        interaction2 = MockInteraction(
+            'int_2',
+            [
+                MockFunctionCall(
+                    id='fc_2',
+                    name='run_at',
+                    arguments={'rev_id': '1', 'reason': 'test reason'},
+                )
+            ],
+            usage=MockUsage(
+                total_input_tokens=1200,
+                total_tokens=1280,
+                total_cached_tokens=600,
+            ),
+        )
+        mock_gemini_agent.start.return_value = interaction1
+        mock_gemini_agent.reply.return_value = interaction2
+
+        with mock.patch.dict(
+            'os.environ', {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'}
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_example',
+                repo='test_repo',
+                revlist=['1', '2'],
+            )
+            with self.assertLogs(agent.logger.logger, level='INFO') as log_ctx:
+                next_rev = agent.next()
+                self.assertEqual(next_rev, '1')
+                self.assertEqual(agent.total_input_tokens, 500 + 1200)
+                self.assertEqual(agent.total_cached_tokens, 250 + 600)
+                self.assertEqual(agent.total_tokens_used, 550 + 1280)
+                self.assertAlmostEqual(
+                    agent.accumulative_cache_rate, (250 + 600) / (500 + 1200)
+                )
+                self.assertAlmostEqual(agent.total_cost, 0.00039375 + 0.000795)
+                log_text = '\n'.join(log_ctx.output)
+                self.assertIn(
+                    'calling get_range({}) (I500, T550, C50%, $0.0004, AccT550, AccC50%, Acc$0.0004)',
+                    log_text,
+                )
+                self.assertIn(
+                    "calling run_at({'rev_id': '1', 'reason': 'test reason'}) (I1.2k, T1.3k, C50%, $0.0008, AccT1.8k, AccC50%, Acc$0.0012)",
+                    log_text,
+                )
+
+    def test_format_tokens(self):
+        self.assertEqual(gemini_util._format_tokens(0), '0')
+        self.assertEqual(gemini_util._format_tokens(500), '500')
+        self.assertEqual(gemini_util._format_tokens(1000), '1k')
+        self.assertEqual(gemini_util._format_tokens(1200), '1.2k')
+        self.assertEqual(gemini_util._format_tokens(5000), '5k')
+        self.assertEqual(gemini_util._format_tokens(5500), '5.5k')
+        self.assertEqual(gemini_util._format_tokens(12000), '12k')
+        self.assertEqual(gemini_util._format_tokens(1000000), '1M')
+        self.assertEqual(gemini_util._format_tokens(1500000), '1.5M')
+
+    def test_format_cost(self):
+        self.assertEqual(gemini_util._format_cost(0), '$0')
+        self.assertEqual(gemini_util._format_cost(0.000076875), '$0.00008')
+        self.assertEqual(gemini_util._format_cost(0.00039375), '$0.0004')
+        self.assertEqual(gemini_util._format_cost(0.000795), '$0.0008')
+        self.assertEqual(gemini_util._format_cost(0.0012), '$0.0012')
+        self.assertEqual(gemini_util._format_cost(0.015), '$0.015')
+        self.assertEqual(gemini_util._format_cost(0.25), '$0.25')
+        self.assertEqual(gemini_util._format_cost(1.5), '$1.50')
+
+    def test_estimate_gemini_token_cost(self):
+        cost_37_flash = gemini_util.estimate_gemini_token_cost(
+            'gemini-3.7-flash',
+            input_tokens=500,
+            cached_tokens=250,
+            output_tokens=50,
+        )
+        self.assertAlmostEqual(cost_37_flash, 0.00039375)
+
+        # Unknown model returns None
+        self.assertIsNone(
+            gemini_util.estimate_gemini_token_cost(
+                'unknown-model',
+                input_tokens=1000,
+                cached_tokens=0,
+                output_tokens=100,
+            )
+        )
 
 
 if __name__ == '__main__':
