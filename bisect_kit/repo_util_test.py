@@ -54,10 +54,23 @@ class TestRepoOperation(unittest.TestCase):
         self.repo_dir = os.path.join(self.tmp_dir, 'repo')
         os.mkdir(self.repo_dir)
 
+        # Create dummy update_depot_tools to skip the real command during tests
+        bin_dir = os.path.join(self.tmp_dir, 'bin')
+        os.mkdir(bin_dir)
+        dummy_cmd = os.path.join(bin_dir, 'update_depot_tools')
+        with open(dummy_cmd, 'w') as f:
+            f.write('#!/bin/sh\nexit 0\n')
+        os.chmod(dummy_cmd, 0o755)
+
+        self.orig_environ = os.environ.copy()
+        os.environ['PATH'] = f"{bin_dir}:{os.environ.get('PATH', '')}"
+
         self.gitbase = os.path.join(self.tmp_dir, 'gitbase')
         self._create_dummy_repo()
 
     def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.orig_environ)
         shutil.rmtree(self.tmp_dir)
 
     def test_repo_init_and_sync(self):
