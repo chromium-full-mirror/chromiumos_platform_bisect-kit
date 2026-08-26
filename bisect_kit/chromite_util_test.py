@@ -163,16 +163,22 @@ class TestChromiteUtil(unittest.TestCase):
                 chromite_util._get_required_python_version(chromite_dir)
             )
 
-    @mock.patch.object(chromite_util, '_find_chromite_dir')
     @mock.patch.object(chromite_util, '_get_required_python_version')
     @mock.patch.object(os.path, 'exists')
     @mock.patch.object(os, 'symlink')
     def test_run_with_python_version(
-        self, mock_symlink, mock_exists, mock_get_version, mock_find_dir
+        self, mock_symlink, mock_exists, mock_get_version
     ):
         # pylint: disable=protected-access
         mock_func = mock.Mock()
-        cwd = '/some/path'
+
+        # Prepare the mock repo and chromite directories.
+        (self.root / '.repo').mkdir()
+        (self.root / 'chromite' / '.git').mkdir(parents=True)
+        cwd_path = self.root / 'some' / 'path'
+        cwd_path.mkdir(parents=True)
+        cwd = str(cwd_path)
+        chromite_dir = self.root / 'chromite'
 
         # Case 1: No python override needed.
         mock_get_version.return_value = None
@@ -180,11 +186,11 @@ class TestChromiteUtil(unittest.TestCase):
             mock_func, 'arg1', 'arg2', cwd=cwd
         )
         mock_func.assert_called_once_with('arg1', 'arg2', cwd=cwd)
-        mock_find_dir.assert_called_once_with(Path(cwd))
+        mock_get_version.assert_called_once_with(chromite_dir)
 
         # Case 2: Override needed, desired python exists.
         mock_func.reset_mock()
-        mock_find_dir.reset_mock()
+        mock_get_version.reset_mock()
         mock_get_version.return_value = ['python3.11']
         mock_exists.return_value = True
         chromite_util._run_with_python_version(
@@ -194,7 +200,7 @@ class TestChromiteUtil(unittest.TestCase):
         # Check that env was modified
         self.assertIn('env', mock_func.call_args.kwargs)
         env = mock_func.call_args.kwargs['env']
-        self.assertTrue(env['PATH'].startswith('/tmp/'))
+        self.assertTrue(env['PATH'].startswith(tempfile.gettempdir()))
         mock_symlink.assert_called_once()
 
     @mock.patch.object(chromite_util, '_run_with_python_version')
