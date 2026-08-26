@@ -679,6 +679,7 @@ class TestBisectorCommandLine(unittest.TestCase):
         bisector.config.experiments = [experiment.ID.GEMINI_ASSIST]
         s = bisector._strategy_factory()
         self.assertIsInstance(s, strategy.GeminiFusionStrategy)
+        self.assertEqual(s.term_map, {'old': 'PASS', 'new': 'FAIL'})
 
         # 3. gemini_assist_basic flag + no noisy config: GeminiFusionStrategy
         bisector.config.experiments = [experiment.ID.GEMINI_ASSIST_BASIC]
@@ -699,6 +700,13 @@ class TestBisectorCommandLine(unittest.TestCase):
         bisector.config.experiments = [experiment.ID.GEMINI_ASSIST]
         s = bisector._strategy_factory()
         self.assertIsInstance(s, strategy.GeminiFusionStrategy)
+
+        # 7. Reverse bisection (term_old='FAIL', term_new='PASS') with gemini_assist: GeminiFusionStrategy
+        bisector.config.term_old = 'FAIL'
+        bisector.config.term_new = 'PASS'
+        s = bisector._strategy_factory()
+        self.assertIsInstance(s, strategy.GeminiFusionStrategy)
+        self.assertEqual(s.term_map, {'old': 'FAIL', 'new': 'PASS'})
 
 
 # Shorthand for testing.

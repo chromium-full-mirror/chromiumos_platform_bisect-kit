@@ -9,9 +9,10 @@ from __future__ import annotations
 import base64
 from collections import defaultdict
 import copy
+import dataclasses
 import logging
 import os
-from typing import Any, TypedDict, Union
+from typing import Any, TypedDict, TypeVar, Union
 
 from bisect_kit import common
 from bisect_kit import cr_util
@@ -35,26 +36,30 @@ MODEL_PRICING: dict[str, tuple[float, float, float]] = {
     'gemini-3.7-flash': (0.75, 0.075, 3.75),
 }
 
-PROMPT = (
-    "You're a Software Engineer investigating test regressions.\n"
+_PROMPT_TEMPLATE = (
+    "You're a Software Engineer investigating {domain}.\n"
     '\n'
-    'You have a failed test to investigate. '
+    "{intro} "
     "You're a smart engineer and want to do faster than simple bisect, "
-    'by reading changes, commits, and diffs within the culprit range to '
+    'by reading changes, commits, and diffs within the {range_name} to '
     'find better bisection point than midpoint at each step.\n'
     '\n'
     'Tests may be flaky. The get_range call returns flaky rates "old_p" (the '
-    'probability of observing FAIL/new behavior on a good/old commit) and '
-    '"new_p" (the probability of observing FAIL/new behavior on a bad/new '
+    'probability of observing {term_new}/new behavior on a {term_old}/old commit) and '
+    '"new_p" (the probability of observing {term_new}/new behavior on a {term_new}/new '
     'commit). Because tests can be flaky, you may choose to run a single commit '
     'multiple times (calling run_at on the same revision again) or test the same '
     'commit later to gain higher statistical confidence. Note that when "old_p" '
-    'is non-zero, a good commit can hit an unlucky streak of FAILs, causing '
-    '"likelihood_new" to climb high (e.g. 80-90%). Conversely, a single PASS '
-    'is strong proof that the commit is good/old. Therefore, do not blindly '
-    'trust a high likelihood_new after a few FAILs; if you suspect a boundary '
-    'commit might be a flaky good commit, re-test it on the device (skips '
-    'rebuild, though still reflashes!) to see if it can produce a PASS.\n'
+    'is non-zero, a {term_old}/old commit can hit an unlucky streak of {term_new_plural}, causing '
+    '"likelihood_new" to climb high (e.g. 80-90%). Conversely, when "new_p" is '
+    'non-100% (less than 1.0), a {term_new}/new commit can hit an unlucky streak of '
+    '{term_old_plural}, causing "likelihood_new" to drop low (e.g. 10-20%). '
+    'When "old_p" is zero, a single {term_old} is strong proof that the commit is '
+    '{term_old}/old; conversely, when "new_p" is 1.0, a single {term_new} is strong '
+    'proof that the commit is {term_new}/new. Therefore, do not blindly trust a '
+    'skewed likelihood_new after only a few runs; if you suspect a boundary commit might '
+    'be flaky, re-test it on the device (skips rebuild, though still reflashes!) to confirm '
+    'its outcome.\n'
     '\n'
     'Be aware of execution cost: switching to a different commit requires '
     'rebuilding and deploying code, which takes significantly more time '
@@ -67,16 +72,18 @@ PROMPT = (
     'can call get_range again on-demand if you need to fetch the latest '
     'values. You can also optionally request the test failure log / reasons '
     'by passing include_reason=True to get_range, which will populate '
-    'run_results with dictionaries containing the status and the test '
+    'run_results with dictionaries containing the test outcome "result" (e.g., '
+    '"PASS", "FAIL"), bisection "status" ("old", "new"), and the test '
     'failure reason (representing the error logs or timeout output from the '
     'test execution if it failed).\n'
     '\n'
-    'The run_at function returns a dictionary containing the test run "status", '
-    'optional "reason", and "likelihood_new" (a float between 0.0 and 1.0 '
-    'representing the likelihood of this commit having the "new/FAIL" '
+    'The run_at function returns a dictionary containing the test outcome "result" '
+    '(e.g., "PASS", "FAIL"), bisection "status" ("old", "new"), optional "reason", '
+    'and "likelihood_new" (a float between 0.0 and 1.0 '
+    'representing the likelihood of this commit having the "new/{term_new}" '
     'behavior based on all past test run history; note that this is NOT the '
-    'probability of this commit being the culprit, but rather the cumulative '
-    'probability that the regression was introduced at or before this commit).\n'
+    'probability of this commit being the {target_name}, but rather the cumulative '
+    'probability that the {target_name} is at or before this commit).\n'
     'Log contains the full log from ssh to DUT until test completes. But '
     'does not contain any system log like chrome log or syslog grabbed on DUT. '
     'You can call read_last_log to read the execution log of the last run_at. '
@@ -88,7 +95,7 @@ PROMPT = (
     'You must balance your code diff knowledge with the probability '
     'model:\n'
     '- If you are very confident in your code analysis (e.g., you find '
-    'a commit that obviously breaks the test), the probability model '
+    'a commit that obviously {diff_action}), the probability model '
     'can be ignored, and you can test or conclude that commit directly.\n'
     '- If you have zero or low confidence in your code analysis, you '
     'should move a step forward with the probability model (e.g., choose '
@@ -106,26 +113,26 @@ PROMPT = (
     'such that sibling branches at each layer add up to 1.0), and arbitrarily deep nested "next" outcomes as appropriate. '
     'If you have no speculative preference for a branch, use the candidate with high info_gain / math utility for that branch.\n'
     'Example:\n'
-    '{\n'
-    '  "FAIL": {\n'
+    '{{\n'
+    '  "FAIL": {{\n'
     '    "next_revision": "<rev_id>",\n'
     '    "reason": "<short explanation why this revision is best if current test fails>",\n'
     '    "confidence": 0.8,\n'
-    '    "next": {\n'
-    '      "FAIL": {"next_revision": "<rev_id>", "reason": "...", "confidence": 0.7},\n'
-    '      "PASS": {"next_revision": "<rev_id>", "reason": "...", "confidence": 0.3}\n'
-    '    }\n'
-    '  },\n'
-    '  "PASS": {\n'
+    '    "next": {{\n'
+    '      "FAIL": {{"next_revision": "<rev_id>", "reason": "...", "confidence": 0.7}},\n'
+    '      "PASS": {{"next_revision": "<rev_id>", "reason": "...", "confidence": 0.3}}\n'
+    '    }}\n'
+    '  }},\n'
+    '  "PASS": {{\n'
     '    "next_revision": "<rev_id>",\n'
     '    "reason": "<short explanation why this revision is best if current test passes>",\n'
     '    "confidence": 0.2,\n'
-    '    "next": {\n'
-    '      "FAIL": {"next_revision": "<rev_id>", "reason": "...", "confidence": 0.5},\n'
-    '      "PASS": {"next_revision": "<rev_id>", "reason": "...", "confidence": 0.5}\n'
-    '    }\n'
-    '  }\n'
-    '}\n'
+    '    "next": {{\n'
+    '      "FAIL": {{"next_revision": "<rev_id>", "reason": "...", "confidence": 0.5}},\n'
+    '      "PASS": {{"next_revision": "<rev_id>", "reason": "...", "confidence": 0.5}}\n'
+    '    }}\n'
+    '  }}\n'
+    '}}\n'
     '\n'
     'You have external functions available to use. '
     'You can call multiple independent query functions in parallel in a '
@@ -135,11 +142,87 @@ PROMPT = (
     'in parallel with any other function calls.'
 )
 
-FUNCTIONS = [
+
+@dataclasses.dataclass(frozen=True)
+class TemplateReplacements:
+    """Replacements table for prompt and function templates."""
+
+    domain: str
+    intro: str
+    range_name: str
+    term_new: str
+    term_new_plural: str
+    term_old: str
+    term_old_plural: str
+    target_name: str
+    diff_action: str
+    test_type: str
+    old_quality: str
+    new_quality: str
+    behavior_noun: str
+    action_desc: str
+
+
+FIX_REPLACEMENTS = TemplateReplacements(
+    domain='test fixes',
+    intro=(
+        'You have a test fix to investigate (finding the commit that '
+        'resolved the test failure).'
+    ),
+    range_name='candidate range',
+    term_new='PASS',
+    term_new_plural='PASSes',
+    term_old='FAIL',
+    term_old_plural='FAILs',
+    target_name='fix CL',
+    diff_action='fixes the test',
+    test_type='fixed',
+    old_quality='bad',
+    new_quality='good',
+    behavior_noun='success',
+    action_desc='fixes the test failure',
+)
+
+REGRESSION_REPLACEMENTS = TemplateReplacements(
+    domain='test regressions',
+    intro='You have a failed test to investigate.',
+    range_name='culprit range',
+    term_new='FAIL',
+    term_new_plural='FAILs',
+    term_old='PASS',
+    term_old_plural='PASSes',
+    target_name='culprit',
+    diff_action='breaks the test',
+    test_type='regressed',
+    old_quality='good',
+    new_quality='bad',
+    behavior_noun='failure',
+    action_desc='introduces the regression',
+)
+
+
+_T = TypeVar('_T')
+
+
+def format_template(template: _T, replacements: TemplateReplacements) -> _T:
+    """Recursively formats strings within a template using a TemplateReplacements dataclass."""
+    mapping = dataclasses.asdict(replacements)
+    if isinstance(template, str):
+        return template.format(**mapping)  # type: ignore[return-value]
+    if isinstance(template, list):
+        return [format_template(item, replacements) for item in template]  # type: ignore[return-value]
+    if isinstance(template, dict):
+        return {
+            k: format_template(v, replacements) for k, v in template.items()
+        }  # type: ignore[return-value]
+    return template
+
+
+_FUNCTIONS_TEMPLATE = [
     {
         "type": "function",
         "name": "get_test_name",
-        "description": "Get name of the regressed test",
+        "description": "Get name of the {test_type} test",
         "parameters": {
             "type": "object",
             "properties": {},
@@ -150,23 +233,23 @@ FUNCTIONS = [
         "name": "get_range",
         "description": (
             "Get all revisions and first line of commit message (aka subject) "
-            "for these revisions from known good to known bad (aka oldest to "
+            "for these revisions from known {old_quality} to known {new_quality} (aka oldest to "
             "newest), inclusive on both ends. Returns a dictionary containing "
-            "'revisions' (list of dicts), 'old_p' (flaky failure probability on "
-            "good commits), and 'new_p' (failure probability on bad commits).\n"
+            "'revisions' (list of dicts), 'old_p' (flaky {behavior_noun} probability on "
+            "{old_quality} commits), and 'new_p' ({behavior_noun} probability on {new_quality} commits).\n"
             "Each revision dict contains:\n"
             "- 'rev_id': unique string to identify a revision.\n"
             "- 'subject': first line of commit message.\n"
             "- 'run_results': history of past test runs on this revision. "
-            "By default, this is a list of status strings (e.g., 'PASS', 'FAIL'). "
+            "By default, this is a list of result strings (e.g., 'PASS', 'FAIL'). "
             "If include_reason=True is passed, this will instead be a "
-            "list of dictionaries containing 'status' and 'reason' "
+            "list of dictionaries containing 'result', 'status', and 'reason' "
             "(the test's failure output or error log if it failed).\n"
             "- 'stats': dict of probability model parameters:\n"
-            "  - 'prob': the probability that this revision is the culprit "
-            "(the first revision that introduces the regression).\n"
+            "  - 'prob': the probability that this revision is the {target_name} "
+            "(the first revision that {action_desc}).\n"
             "  - 'info_gain': the expected decrease in entropy "
-            "(uncertainty) of the culprit range if you test this revision.\n"
+            "(uncertainty) of the {range_name} if you test this revision.\n"
             "  - 'info_gain_per_cost': the info_gain divided by the estimated "
             "cost (build + deploy + run time) of testing this revision.\n"
             "Note that the run results and revision stats update dynamically "
@@ -274,13 +357,14 @@ FUNCTIONS = [
         "description": (
             "Run the test at given commit and specify a speculative decision "
             "tree of future candidate commits to pre-build in parallel.\n"
-            "Returns a dictionary containing the status (e.g., 'PASS', 'FAIL'), "
+            "Returns a dictionary containing the test outcome 'result' (e.g., 'PASS', 'FAIL'), "
+            "the bisection 'status' ('old', 'new'), "
             "optionally a 'reason' key containing the test failure output or error "
             "log if the run failed, and 'likelihood_new' (a float between 0.0 and 1.0) "
-            "representing the likelihood of this commit having the 'new/FAIL' "
+            "representing the likelihood of this commit having the 'new/{term_new}' "
             "behavior based on all past test run history (the cumulative "
-            "probability that the culprit is at or before this commit; this is "
-            "NOT the probability of this commit itself being the culprit)."
+            "probability that the {target_name} is at or before this commit; this is "
+            "NOT the probability of this commit itself being the {target_name})."
         ),
         "parameters": {
             "type": "object",
@@ -385,8 +469,8 @@ FUNCTIONS = [
         "type": "function",
         "name": "conclude",
         "description": (
-            "Make conclusion on the culprit CL. The conclusion must be "
-            "verified on the culprit and its previous commit."
+            "Make conclusion on the {target_name}. The conclusion must be "
+            "verified on the {target_name} and its previous commit."
         ),
         "parameters": {
             "type": "object",
@@ -430,6 +514,7 @@ def _is_retriable_gemini_error(e) -> bool:
 class TrialResult(TypedDict, total=False):
     """Type annotation for a single run trial result."""
 
+    result: str | None
     status: str
     reason: str | None
     likelihood_new: float | None
@@ -621,13 +706,24 @@ class BisectAgent:
         new_p: float = 1.0,
         session: str | None = None,
         custom_logger: logging.Logger | logging.LoggerAdapter | None = None,
+        term_old: str = 'PASS',
+        term_new: str = 'FAIL',
     ):
         """Initializes BisectAgent.
 
-        test_name: Name of the regressed test."""
+        test_name: Name of the bisected test."""
         self._model = model or MODEL_DEFAULT
+        self._term_old = term_old
+        self._term_new = term_new
+        replacements = (
+            FIX_REPLACEMENTS
+            if term_old == 'FAIL' and term_new == 'PASS'
+            else REGRESSION_REPLACEMENTS
+        )
+        prompt = format_template(_PROMPT_TEMPLATE, replacements)
+        functions = format_template(_FUNCTIONS_TEMPLATE, replacements)
         self._agent = GeminiAgent(
-            prompt=PROMPT, functions=FUNCTIONS, model=self._model
+            prompt=prompt, functions=functions, model=self._model
         )
         self.logger = custom_logger or PrefixLoggerAdapter(
             logging.getLogger(__name__), {'prefix': ''}
@@ -709,13 +805,16 @@ class BisectAgent:
             if include_reason:
                 run_results = [
                     TrialResult(
-                        status=sample['status'], reason=sample['reason']
+                        result=sample.get('result') or sample['status'],
+                        status=sample['status'],
+                        reason=sample.get('reason'),
                     )
                     for sample in self._rev_samples[x]
                 ]
             else:
                 run_results = [
-                    sample['status'] for sample in self._rev_samples[x]
+                    sample.get('result') or sample['status']
+                    for sample in self._rev_samples[x]
                 ]
             if self._rev2commit[x]['commit'] == x:
                 subject = f"Endpoint revision: {x}"
@@ -1194,15 +1293,25 @@ class BisectAgent:
         self,
         rev: str,
         status: str,
+        result: str | None = None,
         reason: str | None = None,
         eval_log: str | None = None,
     ):
         """Add run result
 
         rev: revision
-        status: status of a run."""
+        status: status of a run ('old', 'new', etc.).
+        result: mapped test result ('PASS', 'FAIL', etc.).
+        """
+        if result is None:
+            result = status
         self._rev_samples[rev].append(
-            {'status': status, 'reason': reason, 'eval_log': eval_log}
+            {
+                'result': result,
+                'status': status,
+                'reason': reason,
+                'eval_log': eval_log,
+            }
         )
 
     def update_stats(
@@ -1228,6 +1337,7 @@ class BisectAgent:
             assert self._pending_run_at_call is not None
             self._last_run_eval_log = status.get('eval_log')
             response: dict[str, Any] = {
+                'result': status.get('result', status.get('status')),
                 'status': status['status'],
                 'reason': status.get('reason'),
             }
@@ -1250,5 +1360,5 @@ class BisectAgent:
         return self._run()
 
     def get_result(self) -> str:
-        """Returns the concluded culprit revision."""
+        """Returns the concluded revision."""
         return self._conclusion

@@ -1614,9 +1614,17 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 self.config.new.startswith('refs/heads/main@')
                 or cros_util.is_cros_or_snapshot_version(self.config.new)
             )
-            # and is regression from pass to fail
-            and self.config.term_old == 'PASS'
-            and self.config.term_new == 'FAIL'
+            # and is regression from pass to fail or fix from fail to pass
+            and (
+                (
+                    self.config.term_old == 'PASS'
+                    and self.config.term_new == 'FAIL'
+                )
+                or (
+                    self.config.term_old == 'FAIL'
+                    and self.config.term_new == 'PASS'
+                )
+            )
         )
         if enable_gemini:
             is_chrome = self.config.new.startswith('refs/heads/main@')
@@ -1635,6 +1643,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 self.states.rev2idx(self.config.new),
                 old_value=self.config.old_value,
                 new_value=self.config.new_value,
+                term_map=term_map,
                 recompute_init_values=self.config.recompute_init_values,
                 confidence=self.config.confidence,
                 observation=self.config.noisy,

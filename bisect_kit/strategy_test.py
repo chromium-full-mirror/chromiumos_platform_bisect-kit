@@ -1120,6 +1120,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
         self.rev_info = []
         for i in range(10):
             self.rev_info.append(core.RevInfo(str(i)))
+        self.term_map = {'old': 'PASS', 'new': 'FAIL'}
 
     def test_update_stats_provides_info_gain(self):
         mock_agent = mock.MagicMock()
@@ -1133,6 +1134,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 self.rev_info,
                 confidence=0.99,
                 oracle=(0.1, 0.9),
+                term_map=self.term_map,
                 enable_gemini=True,
                 test_name='my_test',
                 source_root='my_root',
@@ -1148,6 +1150,8 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 old_p=0.1,
                 new_p=0.9,
                 session=None,
+                term_old='PASS',
+                term_new='FAIL',
             )
             # Before bisection starts, state is INITED. Prob is None, utilities are None.
             bsearch.add_sample(0, 'old')
@@ -1192,6 +1196,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 self.rev_info,
                 confidence=0.99,
                 oracle=(0.1, 0.9),
+                term_map=self.term_map,
                 enable_gemini=True,
                 test_name='my_test',
                 source_root='my_root',
@@ -1219,6 +1224,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 self.rev_info,
                 confidence=0.99,
                 oracle=(0.1, 0.9),
+                term_map=self.term_map,
                 enable_gemini=True,
                 test_name='my_test',
                 source_root='my_root',
@@ -1235,8 +1241,46 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             mock_agent.add_sample.assert_any_call(
                 '5',
                 'new',
+                result='FAIL',
                 reason='Test crashed with null pointer',
                 eval_log=None,
+            )
+
+    def test_term_map_result_and_status(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.next.return_value = '5'
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ):
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                oracle=(0.1, 0.9),
+                term_map={'old': 'PASS', 'new': 'FAIL'},
+                enable_gemini=True,
+                test_name='my_test',
+                source_root='my_root',
+                endpoint_verification=False,
+            )
+            bsearch.add_sample(0, 'old')
+            bsearch.add_sample(9, 'new')
+
+            bsearch.next_idx()
+            bsearch.add_sample(5, 'new', reason='Assertion failure')
+
+            mock_agent.add_sample.assert_any_call(
+                '5',
+                'new',
+                result='FAIL',
+                reason='Assertion failure',
+                eval_log=None,
+            )
+            self.assertEqual(
+                bsearch._gemini_waiting_result['5']['result'], 'FAIL'
+            )
+            self.assertEqual(
+                bsearch._gemini_waiting_result['5']['status'], 'new'
             )
 
     def test_likelihood_new_handling(self):
@@ -1250,6 +1294,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 self.rev_info,
                 confidence=0.99,
                 oracle=(0.1, 0.9),
+                term_map=self.term_map,
                 enable_gemini=True,
                 test_name='my_test',
                 source_root='my_root',
@@ -1265,6 +1310,8 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 old_p=0.1,
                 new_p=0.9,
                 session=None,
+                term_old='PASS',
+                term_new='FAIL',
             )
             bsearch.add_sample(0, 'old')
             bsearch.add_sample(9, 'new')
@@ -1289,6 +1336,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             bsearch = strategy.GeminiFusionStrategy(
                 self.rev_info,
                 confidence=0.99,
+                term_map=self.term_map,
                 enable_gemini=True,
                 test_name='my_test',
                 source_root='my_root',
@@ -1304,6 +1352,8 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 old_p=0,
                 new_p=1,
                 session=None,
+                term_old='PASS',
+                term_new='FAIL',
             )
             bsearch.add_sample(0, 'old')
             bsearch.add_sample(9, 'new')
@@ -1317,6 +1367,54 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             self.assertIsInstance(waiting_res['likelihood_new'], float)
             self.assertAlmostEqual(waiting_res['likelihood_new'], 1.0)
 
+    def test_reverse_bisection_term_map(self):
+        mock_agent = mock.MagicMock()
+        mock_agent.next.return_value = '5'
+        with mock.patch(
+            'bisect_kit.gemini_bisect.gemini_util.BisectAgent',
+            return_value=mock_agent,
+        ) as mock_agent_class:
+            bsearch = strategy.GeminiFusionStrategy(
+                self.rev_info,
+                confidence=0.99,
+                enable_gemini=True,
+                test_name='my_fixed_test',
+                source_root='my_root',
+                endpoint_verification=False,
+                term_map={'old': 'FAIL', 'new': 'PASS'},
+            )
+            mock_agent_class.assert_called_once_with(
+                'my_fixed_test',
+                'my_root',
+                [str(i) for i in range(10)],
+                model=None,
+                chromeos_mirror=None,
+                board=None,
+                old_p=0,
+                new_p=1,
+                session=None,
+                term_old='FAIL',
+                term_new='PASS',
+            )
+            bsearch.add_sample(0, 'old')
+            bsearch.add_sample(9, 'new')
+
+            mock_agent.add_sample.assert_any_call(
+                '0', 'old', result='FAIL', reason=None, eval_log=None
+            )
+            mock_agent.add_sample.assert_any_call(
+                '9', 'new', result='PASS', reason=None, eval_log=None
+            )
+
+            bsearch.next_idx()
+            bsearch.add_sample(5, 'new', reason='Test passed')
+
+            self.assertIn('5', bsearch._gemini_waiting_result)
+            waiting_res = bsearch._gemini_waiting_result['5']
+            self.assertEqual(waiting_res['result'], 'PASS')
+            self.assertEqual(waiting_res['status'], 'new')
+            self.assertEqual(waiting_res['reason'], 'Test passed')
+
     def test_next_idx_exception_fallback(self):
         mock_agent = mock.MagicMock()
         mock_agent.next.side_effect = Exception('Gemini Internal Error')
@@ -1328,6 +1426,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 self.rev_info,
                 confidence=0.99,
                 oracle=(0.1, 0.9),
+                term_map=self.term_map,
                 enable_gemini=True,
                 test_name='my_test',
                 source_root='my_root',
@@ -1350,6 +1449,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 self.rev_info,
                 confidence=0.99,
                 oracle=(0.1, 0.9),
+                term_map=self.term_map,
                 enable_gemini=True,
                 test_name='my_test',
                 source_root='my_root',
@@ -1377,6 +1477,7 @@ class TestGeminiFusionStrategy(unittest.TestCase):
                 self.rev_info,
                 confidence=0.99,
                 oracle=(0.1, 0.9),
+                term_map=self.term_map,
                 enable_gemini=True,
                 test_name='my_test',
                 source_root='my_root',
@@ -1474,13 +1575,14 @@ class TestBisectAgent(unittest.TestCase):
             self.assertEqual(revs_with_reason[0]['rev_id'], '1')
             self.assertEqual(
                 revs_with_reason[0]['run_results'],
-                [{'status': 'PASS', 'reason': None}],
+                [{'result': 'PASS', 'status': 'PASS', 'reason': None}],
             )
             self.assertEqual(revs_with_reason[1]['rev_id'], '2')
             self.assertEqual(
                 revs_with_reason[1]['run_results'],
                 [
                     {
+                        'result': 'FAIL',
                         'status': 'FAIL',
                         'reason': 'Crashed with NullPointer',
                     }

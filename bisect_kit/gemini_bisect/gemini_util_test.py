@@ -453,17 +453,41 @@ class TestBisectAgentInteractions(unittest.TestCase):
 
             # Next step: simulate run_at result
             agent.add_sample(
-                '2', 'FAIL', reason='AssertionError', eval_log=None
+                '2',
+                'new',
+                result='FAIL',
+                reason='AssertionError',
+                eval_log=None,
             )
             next_rev2 = agent.next(
                 {
-                    'status': 'FAIL',
+                    'result': 'FAIL',
+                    'status': 'new',
                     'reason': 'AssertionError',
                     'likelihood_new': 0.95,
                 }
             )
             self.assertIsNone(next_rev2)
             self.assertEqual(agent.get_result(), '2')
+
+            # Verify response format sent to Gemini
+            turn2_results = mock_gemini_agent.reply.call_args[0][0]
+            self.assertEqual(
+                turn2_results,
+                [
+                    {
+                        'type': 'function_result',
+                        'call_id': 'fc_4',
+                        'name': 'run_at',
+                        'result': {
+                            'result': 'FAIL',
+                            'status': 'new',
+                            'reason': 'AssertionError',
+                            'likelihood_new': 0.95,
+                        },
+                    }
+                ],
+            )
 
     @mock.patch('google.auth.transport.requests.AuthorizedSession')
     @mock.patch(
@@ -728,6 +752,109 @@ class TestBisectAgentInteractions(unittest.TestCase):
                 output_tokens=100,
             )
         )
+
+    def test_format_template_prompt(self):
+        prompt_regression = gemini_util.format_template(
+            gemini_util._PROMPT_TEMPLATE, gemini_util.REGRESSION_REPLACEMENTS
+        )
+        self.assertIn('investigating test regressions', prompt_regression)
+        self.assertIn('culprit range', prompt_regression)
+        self.assertIn(
+            'FAIL/new behavior on a PASS/old commit', prompt_regression
+        )
+        self.assertIn('new/FAIL', prompt_regression)
+        self.assertIn(
+            'unlucky streak of FAILs, causing "likelihood_new" to climb high',
+            prompt_regression,
+        )
+        self.assertIn(
+            'unlucky streak of PASSes, causing "likelihood_new" to drop low',
+            prompt_regression,
+        )
+        self.assertIn(
+            'cumulative probability that the culprit is at or before this commit',
+            prompt_regression,
+        )
+
+        prompt_fix = gemini_util.format_template(
+            gemini_util._PROMPT_TEMPLATE, gemini_util.FIX_REPLACEMENTS
+        )
+        self.assertIn('investigating test fixes', prompt_fix)
+        self.assertIn('candidate range', prompt_fix)
+        self.assertIn('PASS/new behavior on a FAIL/old commit', prompt_fix)
+        self.assertIn('new/PASS', prompt_fix)
+        self.assertIn(
+            'unlucky streak of PASSes, causing "likelihood_new" to climb high',
+            prompt_fix,
+        )
+        self.assertIn(
+            'unlucky streak of FAILs, causing "likelihood_new" to drop low',
+            prompt_fix,
+        )
+        self.assertIn('fix CL', prompt_fix)
+        self.assertIn(
+            'cumulative probability that the fix CL is at or before this commit',
+            prompt_fix,
+        )
+        self.assertNotIn('culprit', prompt_fix)
+
+    def test_format_template_functions(self):
+        funcs_regression = gemini_util.format_template(
+            gemini_util._FUNCTIONS_TEMPLATE, gemini_util.REGRESSION_REPLACEMENTS
+        )
+        funcs_by_name = {f['name']: f for f in funcs_regression}
+        self.assertIn(
+            'regressed test', funcs_by_name['get_test_name']['description']
+        )
+        self.assertIn(
+            'known good to known bad', funcs_by_name['get_range']['description']
+        )
+        self.assertIn('culprit', funcs_by_name['get_range']['description'])
+        self.assertIn('new/FAIL', funcs_by_name['run_at']['description'])
+        self.assertIn('culprit', funcs_by_name['conclude']['description'])
+
+        funcs_fix = gemini_util.format_template(
+            gemini_util._FUNCTIONS_TEMPLATE, gemini_util.FIX_REPLACEMENTS
+        )
+        funcs_by_name_fix = {f['name']: f for f in funcs_fix}
+        self.assertIn(
+            'fixed test', funcs_by_name_fix['get_test_name']['description']
+        )
+        self.assertIn(
+            'known bad to known good',
+            funcs_by_name_fix['get_range']['description'],
+        )
+        self.assertIn('fix CL', funcs_by_name_fix['get_range']['description'])
+        self.assertIn('new/PASS', funcs_by_name_fix['run_at']['description'])
+        self.assertIn('fix CL', funcs_by_name_fix['conclude']['description'])
+
+    @mock.patch(
+        'bisect_kit.gemini_bisect.gemini_util.GeminiAgent',
+    )
+    def test_bisect_agent_reverse_mode(self, mock_gemini_agent_cls):
+        with mock.patch.object(
+            gemini_util.cros_util,
+            'build_revlist',
+            return_value=(None, {}),
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='fixed_test',
+                repo='test_repo',
+                revlist=['rev1', 'rev2'],
+                term_old='FAIL',
+                term_new='PASS',
+            )
+            mock_gemini_agent_cls.assert_called_once_with(
+                prompt=gemini_util.format_template(
+                    gemini_util._PROMPT_TEMPLATE, gemini_util.FIX_REPLACEMENTS
+                ),
+                functions=gemini_util.format_template(
+                    gemini_util._FUNCTIONS_TEMPLATE,
+                    gemini_util.FIX_REPLACEMENTS,
+                ),
+                model='gemini-3.7-flash',
+            )
+            self.assertEqual(agent.get_result(), None)
 
 
 if __name__ == '__main__':

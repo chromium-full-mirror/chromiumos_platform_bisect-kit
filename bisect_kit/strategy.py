@@ -1714,6 +1714,8 @@ class GeminiFusionStrategy(NoisyBinarySearch):
         self.gemini = None
         if enable_gemini:
             self._gemini_waiting_result = {}
+            term_old = self.term_map['old']
+            term_new = self.term_map['new']
             self.gemini = gemini_util.BisectAgent(
                 test_name,
                 source_root,
@@ -1724,6 +1726,8 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 old_p=self.old_p,
                 new_p=self.new_p,
                 session=session,
+                term_old=term_old,
+                term_new=term_new,
             )
 
     def _rev_to_idx(self, rev: str) -> int:
@@ -1780,17 +1784,16 @@ class GeminiFusionStrategy(NoisyBinarySearch):
         if self.gemini:
             reason = kwargs.get('reason')
             eval_log = kwargs.get('eval_log')
+            result_str = self.term_map.get(sample['status'], sample['status'])
             self.gemini.add_sample(
                 self.rev_info[idx].rev,
-                self.term_map.get(sample['status'], sample['status']),
+                sample['status'],
+                result=result_str,
                 reason=reason,
                 eval_log=eval_log,
             )
 
             if self.rev_info[idx].rev in self._gemini_waiting_result:
-                status_str = self.term_map.get(
-                    sample['status'], sample['status']
-                )
                 prob = self.prob
                 if not prob:
                     prob = [0.0] + [1.0 / (len(self.rev_info) - 1)] * (
@@ -1798,7 +1801,8 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                     )
                 likelihood_new = float(sum(prob[: idx + 1]))
                 self._gemini_waiting_result[self.rev_info[idx].rev] = {
-                    'status': status_str,
+                    'result': result_str,
+                    'status': sample['status'],
                     'reason': reason,
                     'likelihood_new': likelihood_new,
                     'eval_log': eval_log,
