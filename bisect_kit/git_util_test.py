@@ -38,6 +38,17 @@ class GitOperation:
             cwd=self.git_repo,
         )
 
+        # Set the temporary user and email to the test repository to suppress
+        # the warnings when the global user ane email are not set.
+        subprocess.check_call(
+            ['git', 'config', 'user.name', 'Test User (git_util_test.py)'],
+            cwd=self.git_repo,
+        )
+        subprocess.check_call(
+            ['git', 'config', 'user.email', 'git-util-test@example.com'],
+            cwd=self.git_repo,
+        )
+
         # Remove git hooks in order to save time.
         shutil.rmtree(os.path.join(self.git_repo, '.git', 'hooks'))
 
@@ -236,7 +247,11 @@ class TestGitOperationReadOnly(unittest.TestCase):
         # simple case
         self.assertEqual(
             git_util.get_rev_by_time(
-                self.git_repo, '2017-01-03T12:00:00', None
+                self.git_repo,
+                # Specify the same timezone as the mock commits created by
+                # `GitOperation.create_commits` method.
+                '2017-01-03T12:00:00+08:00',
+                None,
             ),
             self.revs[2],
         )
