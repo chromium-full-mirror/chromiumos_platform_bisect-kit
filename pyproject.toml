@@ -165,7 +165,7 @@ strict = false
 # TODO: Enable the suppressed errors.
 disable_error_code = [
     "arg-type",
-    "call-arg",
+
     "return-value",
     "union-attr",
 ]
