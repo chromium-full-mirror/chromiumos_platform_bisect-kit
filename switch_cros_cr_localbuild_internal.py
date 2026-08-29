@@ -19,6 +19,7 @@ alternative binaries.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 import logging
 import os
 import subprocess
@@ -185,7 +186,7 @@ def patch_cls(chrome_src: str, chromium_patch_cls: list[str]):
             raise errors.PatchApplyError(error_message) from exc
 
 
-def switch_main(args: tuple[str] | None):
+def switch_main(args: list[str] | None):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     switch_helper.post_init_local_build_flags(opts)
@@ -317,7 +318,7 @@ def action() -> bisector_cli.SwitchAction:
     return bisector_cli.SwitchAction.BUILD_AND_DEPLOY
 
 
-def main(args: tuple[str] | None = None) -> int:
+def main(args: Sequence[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 

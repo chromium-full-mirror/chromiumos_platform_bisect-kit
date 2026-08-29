@@ -261,6 +261,7 @@ class AndroidSpecManager(codechange.SpecManager):
 
     def __init__(self, config: core.BisectConfig):
         self.config = config
+        assert self.config.android_root is not None, "android_root must be set"
         self.manifest_dir = os.path.join(
             self.config.android_root, '.repo', 'manifests'
         )

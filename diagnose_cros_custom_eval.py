@@ -54,6 +54,8 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
     def _build_cmds(self):
         switch_test_harness_cmd = None
         eval_script = self.config.eval_script
+        if not eval_script:
+            raise ValueError('config.eval_script must not be None')
         eval_script_filename = self._get_eval_script_file_name(eval_script)
         common_eval_cmd = [
             f'./{eval_script_filename}',
@@ -63,6 +65,8 @@ class DiagnoseCustomEvalCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         return switch_test_harness_cmd, common_eval_cmd
 
     def do_run(self):
+        if not self.states:
+            raise ValueError('self.states must not be None')
         diagnoser = diagnoser_cros.CrosDiagnoser(self.states, self.config)
 
         switch_test_harness_cmd, common_eval_cmd = self._build_cmds()

@@ -5,6 +5,7 @@
 
 """Tests for gerrit_util.py."""
 
+import http.client
 import io
 import json
 import logging
@@ -89,7 +90,10 @@ class TestGerritUtil(unittest.TestCase):
             )
 
     def test_get_gerrit_cl_info_http_error(self):
-        http_error = urllib.error.HTTPError("url", 404, "Not Found", {}, None)
+
+        http_error = urllib.error.HTTPError(
+            "url", 404, "Not Found", http.client.HTTPMessage(), None
+        )
         # Mock the read method for the HTTPError object itself
         http_error.read = MagicMock(return_value=b"Error content")  # type: ignore
 

@@ -211,9 +211,9 @@ class DutManager:
         dut_allocate_spec: dut_allocate_spec_module.DutAllocateSpec | None,
         pre_allocated_dut: str | None,
         should_auto_allocate: bool,
-        dut_init_func: typing.Callable[[DutManager], None] | None = None,
+        dut_init_func: typing.Callable[[str], None] | None = None,
         dut_leave_context_check_func: (
-            typing.Callable[[DutManager], None] | None
+            typing.Callable[[str], None] | None
         ) = None,
         should_force_monitoring: bool = False,
         vm_cros_version: Optional[str] = None,
@@ -249,11 +249,9 @@ class DutManager:
         self._pre_allocated_dut: str | None = None
         if pre_allocated_dut != cros_lab_util.LAB_DUT:
             self._pre_allocated_dut = pre_allocated_dut
-        self._dut_init_func: typing.Callable[[DutManager], None] | None = (
-            dut_init_func
-        )
+        self._dut_init_func: typing.Callable[[str], None] | None = dut_init_func
         self._dut_leave_context_check_func: (
-            typing.Callable[[DutManager], None] | None
+            typing.Callable[[str], None] | None
         ) = dut_leave_context_check_func
         self._should_force_monitoring: bool = should_force_monitoring
 
@@ -370,6 +368,7 @@ class DutManager:
         Raises:
             errors.SshConnectionError: If unable to ssh after timeout.
         """
+        assert self._auto_allocated_dut is not None
         util.ssh_cmd(
             self._auto_allocated_dut,
             'cat',
@@ -492,7 +491,7 @@ class DutManager:
             )
         else:
             enable_shared_dut_pool = experiment.is_in_experiment(
-                self.config.experiments,
+                self.config.experiments or [],
                 experiment.ID.SHARED_DUT_POOL,
             )
             host, builder = dut_allocator.allocate_dut(
@@ -632,7 +631,7 @@ class DutManager:
             self._auto_allocated_dut,
             dut_is_broken,
             experiment.is_in_experiment(
-                self.config.experiments,
+                self.config.experiments or [],
                 experiment.ID.SHARED_DUT_POOL,
             ),
             functools.partial(add_dut_lease_record, self._auto_allocated_time),

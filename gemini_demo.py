@@ -11,7 +11,7 @@ Simulates running Gemini-assisted bisection on known test regression cases.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import dataclasses
 import logging
 import os
@@ -419,7 +419,7 @@ def prompt_case_ids(max_cases: int) -> list[int]:
             sys.exit(1)
 
 
-def main(args: list[str] | None = None) -> None:
+def main(args: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,

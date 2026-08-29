@@ -38,7 +38,7 @@ _DEFAULT_CHROMEOS_ROOT = str(pathlib.Path('~/chromiumos').expanduser())
 class WorkBasePathFactory:
     """Factory for generating session paths."""
 
-    def __init__(self, work_base: str | None = None):
+    def __init__(self, work_base: PathLike | None = None):
         if not work_base:
             work_base = DEFAULT_WORK_BASE
         self._work_base = pathlib.Path(work_base).absolute()

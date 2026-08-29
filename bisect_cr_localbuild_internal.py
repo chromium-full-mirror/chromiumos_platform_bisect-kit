@@ -207,6 +207,15 @@ class ChromeSrcDomain(core.BisectDomain):
             git_util.get_commit_metadata(chrome_src, new_hash)
         )
 
+        if not old_commit_position:
+            raise ValueError(
+                f'old_commit_position must not be None for old_hash {old_hash}'
+            )
+        if not new_commit_position:
+            raise ValueError(
+                f'new_commit_position must not be None for new_hash {new_hash}'
+            )
+
         revlist, details = cr_util.build_revlist(
             chrome_src, old_commit_position, new_commit_position
         )
@@ -235,6 +244,10 @@ class ChromeSrcDomain(core.BisectDomain):
         self, phase: core.Phase, _rev: str, rev_details=None
     ) -> list[str]:
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
+            if not self.config.chrome_root:
+                raise ValueError('config.chrome_root must be set')
+            if not self.config.chrome_mirror:
+                raise ValueError('config.chrome_mirror must be set')
             args = [
                 '--chrome-root',
                 self.config.chrome_root,
@@ -251,6 +264,8 @@ class ChromeSrcDomain(core.BisectDomain):
     def fill_candidate_summary(self, summary):
         if 'current_range' in summary:
             old, new = summary['current_range']
+            if not self.config.chrome_root:
+                raise ValueError('config.chrome_root must be set')
             chrome_src = os.path.join(self.config.chrome_root, 'src')
             old_rev = cr_util.query_git_rev_by_commit_position(chrome_src, old)
             new_rev = cr_util.query_git_rev_by_commit_position(chrome_src, new)

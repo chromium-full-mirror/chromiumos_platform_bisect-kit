@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 import logging
 import sys
 
@@ -145,7 +146,7 @@ def action() -> bisector_cli.SwitchAction:
     return bisector_cli.SwitchAction.WITH_DUT
 
 
-def main(args: tuple[str] | None = None) -> int:
+def main(args: Sequence[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 

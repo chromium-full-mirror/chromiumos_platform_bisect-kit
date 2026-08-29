@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import logging
 import sys
 
@@ -16,6 +17,7 @@ from bisect_kit import bisector_cli
 from bisect_kit import cli
 from bisect_kit import codechange
 from bisect_kit import common
+from bisect_kit import core
 from bisect_kit import cros_lab_util
 from bisect_kit import cros_util
 from bisect_kit import errors
@@ -76,11 +78,11 @@ def create_argument_parser():
 
 
 def switch(opts):
-    config = {
-        "android_root": opts.android_root,
-        "flavor": opts.flavor,
-        "android_mirror": opts.android_mirror,
-    }
+    config = core.BisectConfig(
+        android_root=opts.android_root,
+        flavor=opts.flavor,
+        android_mirror=opts.android_mirror,
+    )
     if not opts.no_sync_code:
         logger.info('switch source code')
         spec_manager = android_util.AndroidSpecManager(config)
@@ -106,7 +108,7 @@ def switch(opts):
         )
 
 
-def switch_main(args: tuple[str] | None):
+def switch_main(args: list[str] | None):
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     switch_helper.post_init_local_build_flags(opts)
@@ -128,7 +130,7 @@ def action() -> bisector_cli.SwitchAction:
     return bisector_cli.SwitchAction.BUILD_AND_DEPLOY
 
 
-def main(args: tuple[str] | None = None) -> int:
+def main(args: Sequence[str] | None = None) -> int:
     return bisector_cli.switch_main_wrapper(switch_main, args)
 
 

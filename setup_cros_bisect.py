@@ -31,6 +31,7 @@ import pathlib
 import subprocess
 import sys
 import time
+import typing
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree
@@ -837,12 +838,12 @@ def create_parser():
     parents_session_optional = [
         cli.create_session_optional_parser(),
         base_parser,
-        experiment.common_flags(),
+        typing.cast(cli.ArgumentParser, experiment.common_flags()),
     ]
     parents_session_required = [
         cli.create_session_required_parser(),
         base_parser,
-        experiment.common_flags(),
+        typing.cast(cli.ArgumentParser, experiment.common_flags()),
     ]
 
     parser = cli.ArgumentParser(

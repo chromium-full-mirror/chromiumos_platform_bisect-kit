@@ -249,6 +249,7 @@ class TestDiagnoseTastCommandLineLogic(unittest.TestCase):
 
         # Replicates do_run from DiagnoseTastCommandLine
         def do_run(self):
+            assert self.states is not None
             diagnoser = diagnoser_cros.CrosDiagnoser(self.states, self.config)
             switch_test_harness_cmd, common_eval_cmd = self._build_cmds()
 

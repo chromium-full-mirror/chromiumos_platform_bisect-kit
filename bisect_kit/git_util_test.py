@@ -9,6 +9,7 @@ import pathlib
 import shutil
 import subprocess
 import tempfile
+from typing import Sequence
 import unittest
 from unittest import mock
 
@@ -254,7 +255,7 @@ class TestGitOperationReadOnly(unittest.TestCase):
                 self.git_repo,
                 # Specify the same timezone as the mock commits created by
                 # `GitOperation.create_commits` method.
-                '2017-01-03T12:00:00+08:00',
+                1483416000,  # '2017-01-03T12:00:00+08:00'
                 None,
             ),
             self.revs[2],
@@ -263,7 +264,7 @@ class TestGitOperationReadOnly(unittest.TestCase):
         # boundary case: equal timestamp
         self.assertEqual(
             git_util.get_rev_by_time(
-                self.git_repo, '2017-01-03T00:00:00+08:00', None
+                self.git_repo, 1483372800, None  # '2017-01-03T00:00:00+08:00'
             ),
             self.revs[2],
         )
@@ -398,7 +399,7 @@ class TestGitOperation(unittest.TestCase):
         shutil.rmtree(self.git_repo)
 
     def _create_file(
-        self, file_path: PathLike, lines: list[str] | None = None
+        self, file_path: PathLike, lines: Sequence[PathLike] | None = None
     ) -> pathlib.Path:
         file_path = pathlib.Path(self.git_repo) / file_path
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -409,19 +410,20 @@ class TestGitOperation(unittest.TestCase):
                     print(line, file=f)
         return file_path
 
-    def _touch_files(self, file_list: list[PathLike]) -> list[pathlib.Path]:
+    def _touch_files(self, file_list: Sequence[PathLike]) -> list[pathlib.Path]:
         path_list = []
         for file_path in file_list:
             path_list.append(self._create_file(file_path))
         return path_list
 
     def _create_gitignore(
-        self, file_list: list[PathLike], *, self_ignore: bool = False
+        self, file_list: Sequence[PathLike], *, self_ignore: bool = False
     ) -> pathlib.Path:
         gitignore_file = '.gitignore'
-        if self_ignore:
-            file_list = file_list + [gitignore_file]
-        return self._create_file(gitignore_file, file_list)
+        file_list_to_create = (
+            (list(file_list) + [gitignore_file]) if self_ignore else file_list
+        )
+        return self._create_file(gitignore_file, file_list_to_create)
 
     def _prepare_merged_repository(self):
         # Generates following commit graph:
@@ -615,7 +617,7 @@ class TestGitOperation(unittest.TestCase):
         # simple case
         self.assertEqual(
             git_util.get_rev_by_time(
-                self.git_repo, '2017-02-10T00:00:00+08:00', None
+                self.git_repo, 1486656000, None  # '2017-02-10T00:00:00+08:00'
             ),
             rev_c,
         )
@@ -623,7 +625,7 @@ class TestGitOperation(unittest.TestCase):
         # Not commit B because it is on different branch.
         self.assertEqual(
             git_util.get_rev_by_time(
-                self.git_repo, '2017-02-03T00:00:00+08:00', None
+                self.git_repo, 1486051200, None  # '2017-02-03T00:00:00+08:00'
             ),
             rev_a,
         )
@@ -1020,7 +1022,7 @@ class TestFastLookup(unittest.TestCase):
     def test_disabled(self):
         lookup = git_util.FastLookup()
         with self.assertRaises(git_util.FastLookupFailed):
-            lookup.get_rev_by_time(self.git_repo, self.branch, 123456789)
+            lookup.get_rev_by_time(self.git_repo, 123456789, self.branch)
         with self.assertRaises(git_util.FastLookupFailed):
             lookup.is_containing_commit(self.git_repo, '012345abcdef')
 

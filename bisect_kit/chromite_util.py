@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import typing
 from typing import Callable, cast, Optional, ParamSpec, TypeVar
 
 from bisect_kit import git_util
@@ -93,11 +94,13 @@ def _get_required_python_version(
     MIN_REV_FOR_3_12 = 'f220bbd3d92693db4a51c2d5e5d0575f231127e2'
     MIN_REV_FOR_3_13 = '822b9e35d8052a39b83c08cf44748defce0e3e2d'
 
-    if not chromite_dir or not git_util.is_git_root(chromite_dir):
+    if not chromite_dir or not git_util.is_git_root(str(chromite_dir)):
         return None
 
     try:
-        current_commit_hash = git_util.get_commit_hash(chromite_dir, 'HEAD')
+        current_commit_hash = git_util.get_commit_hash(
+            str(chromite_dir), 'HEAD'
+        )
     except ValueError:
         # Sometimes the git repo gets broken for some reason. In that case, it
         # proceeds without doing the hack.
@@ -151,7 +154,7 @@ def _run_with_python_version(
     cwd = kwargs.get('cwd', os.getcwd())
 
     # Retrieve the python name appropriate to the chromite revision.
-    chromite_dir = _find_chromite_dir(Path(cwd))
+    chromite_dir = _find_chromite_dir(Path(typing.cast(str, cwd)))
     desired_python_names = _get_required_python_version(chromite_dir)
 
     if not desired_python_names:

@@ -3134,7 +3134,7 @@ def parse_chromeos_overlays(chromeos_root: str) -> dict[str, list[str]]:
     return overlays
 
 
-def resolve_basic_boards(overlays: dict[str, list[str]]) -> str:
+def resolve_basic_boards(overlays: dict[str, list[str]]) -> dict[str, str]:
     def normalize(name: str) -> str:
         return name.replace('-private', '')
 
@@ -3282,6 +3282,9 @@ class ChromeOSSpecManager(codechange.SpecManager):
         # generate.
         old_timestamp = None
         new_timestamp = None
+        assert self.config.board is not None
+        assert old is not None
+        assert new is not None
         old_path = SnapshotStore.query_snapshot_image(
             self.config.board, old, self.is_public_build
         )
@@ -3568,7 +3571,11 @@ class ChromeOSSpecManager(codechange.SpecManager):
         result = []
         path = 'snapshot.xml'
         revisions = self.lookup_snapshot_manifest_revisions(old, new)
+        assert self.config.board is not None
+        assert old is not None
+        assert new is not None
         for timestamp, _git_rev, snapshot_id in revisions:
+            assert snapshot_id is not None
             snapshot_version = SnapshotStore.query_snapshot_version_by_id(
                 self.config.board,
                 snapshot_id,

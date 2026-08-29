@@ -724,7 +724,11 @@ def build_revlist(chrome_src: str, old: str, new: str):
     details = {}
 
     for revision in revisions:
-        commit_position = get_commit_position(metadata[revision])
+        meta = metadata.get(revision)
+        if not meta:
+            logger.warning('Failed to get metadata for %s', revision)
+            continue
+        commit_position = get_commit_position(meta)
         if not commit_position:
             logger.warning('Failed to get the commit position of %s', revision)
             continue

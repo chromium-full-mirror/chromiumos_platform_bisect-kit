@@ -29,12 +29,13 @@ class BisectorWrapper:
         self.dut_manager = dut_manager
         self.is_stateless = is_stateless
 
-        self.domain_cls = None
+        domain_cls = None
         for x in vars(self.module).values():
             if isinstance(x, type) and issubclass(x, core.BisectDomain):
-                self.domain_cls = x
+                domain_cls = x
                 break
-        assert self.domain_cls
+        assert domain_cls
+        self.domain_cls: type[core.BisectDomain] = domain_cls
 
     def call(self, cmd, *args, stdout=sys.stdout):
         bisector = bisector_cli.BisectorCommandLine(

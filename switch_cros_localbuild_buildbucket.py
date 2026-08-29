@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 import copy
 import logging
 import os
@@ -597,9 +598,17 @@ def switch(opts) -> core.StepResult:
     if opts.no_deploy or cros_util.is_vm_board(opts.board):
         if not opts.no_deploy:
             logger.warning('skip cros_flash for vm boards')
-        status = 'skip' if opts.no_wait_for_build_completion else 'old'
+
+        if opts.no_wait_for_build_completion:
+            return core.StepResult(
+                'skip',
+                reason=buildbucket_util.get_luci_link(
+                    opts.board, buildbucket_id, bucket=opts.bucket
+                ),
+            )
+
         return core.StepResult(
-            status,
+            'old',
             reason=buildbucket_util.get_luci_link(
                 opts.board, buildbucket_id, bucket=opts.bucket
             ),
@@ -630,7 +639,7 @@ def switch(opts) -> core.StepResult:
     )
 
 
-def switch_main(args: tuple[str] | None) -> core.StepResult:
+def switch_main(args: list[str] | None) -> core.StepResult:
     parser = create_argument_parser()
     opts = parser.parse_args(args)
     switch_helper.post_init_local_build_flags(opts)
@@ -678,7 +687,7 @@ def action() -> bisector_cli.SwitchAction:
     return bisector_cli.SwitchAction.BUILD_AND_DEPLOY
 
 
-def main(args: tuple[str] | None = None) -> int:
+def main(args: Sequence[str] | None = None) -> int:
     return bisector_cli.step_main_wrapper(switch_main, args)
 
 

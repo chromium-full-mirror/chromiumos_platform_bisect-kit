@@ -174,7 +174,7 @@ class StatesEncoder(json.JSONEncoder):
     """
 
     def default(self, o):
-        if dataclasses.is_dataclass(o):
+        if dataclasses.is_dataclass(o) and not isinstance(o, type):
             d = dataclasses.asdict(o)
             d['__class__'] = {
                 '__module__': o.__class__.__module__,

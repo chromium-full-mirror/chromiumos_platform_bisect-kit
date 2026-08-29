@@ -90,6 +90,7 @@ class BuildArtifactsCache:
     }
 
     def _get_bucket_name(self):
+        assert self._GAC_JSON
         with open(self._GAC_JSON) as f:
             data = json.load(f)
         project_id = data.get('project_id')

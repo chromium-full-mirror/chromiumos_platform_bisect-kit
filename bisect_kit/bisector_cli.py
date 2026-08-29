@@ -519,7 +519,7 @@ def do_future_build(
 
 def step_main_wrapper(
     step_main: typing.Callable[..., core.StepResult],
-    args: tuple[str] | None,
+    args: typing.Sequence[str] | None,
 ) -> int:
     """Wrapper function for switch and eval step.
 
@@ -580,7 +580,7 @@ def step_main_wrapper(
 
 
 def switch_main_wrapper(
-    switch_main: typing.Callable[..., None], args: tuple[str] | None
+    switch_main: typing.Callable[..., None], args: typing.Sequence[str] | None
 ) -> int:
     def func(args):
         # "switch" step usually has no return values. No exception is good (old).
@@ -1045,6 +1045,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 future_build_log_full_path = common.get_session_log_path(
                     self.session, future_build_log
                 )
+                assert self.domain is not None
                 do_future_build(
                     self.config.future_build,
                     self.domain,
@@ -1647,6 +1648,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 )
             )
             # and is bisecting Chrome or ChromeOS
+            and self.config.new is not None
             and (
                 self.config.new.startswith('refs/heads/main@')
                 or cros_util.is_cros_or_snapshot_version(self.config.new)
@@ -1664,6 +1666,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
             )
         )
         if enable_gemini:
+            assert self.config.new is not None
             is_chrome = self.config.new.startswith('refs/heads/main@')
             if is_chrome:
                 source_root = (
@@ -1674,6 +1677,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
             else:
                 source_root = self.config.chromeos_root
 
+            assert self.config.old is not None
+            assert self.config.new is not None
             return strategy.GeminiFusionStrategy(
                 rev_info,
                 self.states.rev2idx(self.config.old),
@@ -1696,6 +1701,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
                 session=self.session,
             )
 
+        assert self.config.old is not None
+        assert self.config.new is not None
         return strategy.NoisyBinarySearch(
             rev_info,
             self.states.rev2idx(self.config.old),
@@ -1964,7 +1971,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
     """
         )
 
-        parents: list[argparse.ArgumentParser] = [
+        parents: typing.Sequence[cli.ArgumentParser] = [
             cli.create_session_optional_parser()
         ]
         parser = cli.ArgumentParser(
@@ -1987,7 +1994,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
         parser_init = subparsers.add_parser(
             'init',
             help='Initializes bisect session',
-            parents=parents + [experiment.common_flags()],
+            parents=list(parents)
+            + [typing.cast(cli.ArgumentParser, experiment.common_flags())],
             formatter_class=argparse.RawDescriptionHelpFormatter,
             description=textwrap.dedent(
                 """

@@ -45,7 +45,7 @@ class Popen:
 
     def __init__(
         self,
-        args: PathLike | list[PathLike],
+        args: PathLike | typing.Sequence[PathLike],
         cwd: PathLike | None = None,
         stdout_callback: typing.Callable | None = None,
         stderr_callback: typing.Callable | None = None,
@@ -92,8 +92,8 @@ class Popen:
             cwd = str(cwd)
 
         if isinstance(args, PathLike):
-            args = [args]
-        args = [str(arg) for arg in args]
+            args = (args,)
+        args = tuple(str(arg) for arg in args)
 
         logger.debug('cwd=%s, run %r', cwd, subprocess.list2cmdline(args))
 
@@ -105,6 +105,8 @@ class Popen:
             **kwargs,
         )
 
+        assert self.p.stdout is not None
+        assert self.p.stderr is not None
         self.stdout_thread = self._start_reader_thread('stdout', self.p.stdout)
         self.stderr_thread = self._start_reader_thread('stderr', self.p.stderr)
 
@@ -143,7 +145,9 @@ class Popen:
           return code.
         """
         logger.debug(
-            '[%d] running %r', self.p.pid, subprocess.list2cmdline(self.p.args)
+            '[%d] running %r',
+            self.p.pid,
+            subprocess.list2cmdline(typing.cast(list[str], self.p.args)),
         )
         t0 = time.time()
         ended = 0
@@ -599,7 +603,7 @@ def forward_ssh(from_host: str, to_port: int):
             to_port,
         )
         p = Popen(
-            [
+            (
                 'go',
                 'run',
                 os.path.expanduser(
@@ -607,7 +611,7 @@ def forward_ssh(from_host: str, to_port: int):
                 ),
                 from_host,
                 str(to_port),
-            ]
+            )
         )
         wait_until(is_port_in_use, 360, 1, to_port)
         logger.debug(

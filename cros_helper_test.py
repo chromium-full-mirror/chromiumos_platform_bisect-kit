@@ -7,6 +7,7 @@
 import unittest
 from unittest import mock
 
+from bisect_kit import dut_allocate_spec_type
 from bisect_kit import dut_allocator
 import cros_helper
 
@@ -21,7 +22,8 @@ class TestCmdAllocateDut(unittest.TestCase):
     @mock.patch.object(dut_allocator, 'allocate_dut')
     def test_success(self, mock_allocate_dut):
         mock_allocate_dut.return_value = ('host', 'board1')
-        result = cros_helper.allocate_dut(None, None)
+        spec = dut_allocate_spec_type.DutAllocateSpec()
+        result = cros_helper.allocate_dut(spec, "")
         self.assertEqual(
             result,
             cros_helper.AllocateDutResult(
@@ -34,7 +36,8 @@ class TestCmdAllocateDut(unittest.TestCase):
     @mock.patch.object(dut_allocator, 'allocate_dut')
     def test_fail(self, mock_allocate_dut):
         mock_allocate_dut.side_effect = DummyException('blah')
-        result = cros_helper.allocate_dut(None, None)
+        spec = dut_allocate_spec_type.DutAllocateSpec()
+        result = cros_helper.allocate_dut(spec, "")
         self.assertEqual(
             result,
             cros_helper.AllocateDutResult(

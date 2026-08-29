@@ -14,7 +14,7 @@ from bisect_kit import cros_util
 class DutAllocateSpec:
     """A class to keep parameters used to allocate DUTs."""
 
-    pools: str | None = None
+    pools: list[str] | None = None
     # List of "key:val".
     dimensions: list[str] = dataclasses.field(default_factory=list)
     boards: list[str] = dataclasses.field(default_factory=list)

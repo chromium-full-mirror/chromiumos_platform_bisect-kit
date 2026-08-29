@@ -75,7 +75,9 @@ def get_default_credential() -> service_account.Credentials:
 
 def get_default_client_option() -> ClientOptions:
     """Returns default ClientOptions for cloud client."""
-    return ClientOptions(credentials_file=get_default_credential())
+    return ClientOptions(
+        credentials_file=os.environ.get('SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON')
+    )
 
 
 def grpc(server: str, method: str, content: dict) -> str:

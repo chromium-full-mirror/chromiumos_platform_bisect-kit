@@ -89,14 +89,14 @@ class TestChromiteUtil(unittest.TestCase):
     def test_is_ancestor_or_equal(self):
         # pylint: disable=protected-access
         git_repo = self.root / 'repo'
-        git_util.init(git_repo)
+        git_util.init(str(git_repo))
 
-        git_util.commit_file(git_repo, 'file', 'commit 1', 'content 1')
-        c1 = git_util.get_commit_hash(git_repo, 'HEAD')
-        git_util.commit_file(git_repo, 'file', 'commit 2', 'content 2')
-        c2 = git_util.get_commit_hash(git_repo, 'HEAD')
-        git_util.commit_file(git_repo, 'file', 'commit 3', 'content 3')
-        c3 = git_util.get_commit_hash(git_repo, 'HEAD')
+        git_util.commit_file(str(git_repo), 'file', 'commit 1', 'content 1')
+        c1 = git_util.get_commit_hash(str(git_repo), 'HEAD')
+        git_util.commit_file(str(git_repo), 'file', 'commit 2', 'content 2')
+        c2 = git_util.get_commit_hash(str(git_repo), 'HEAD')
+        git_util.commit_file(str(git_repo), 'file', 'commit 3', 'content 3')
+        c3 = git_util.get_commit_hash(str(git_repo), 'HEAD')
 
         # Equal
         self.assertTrue(chromite_util._is_ancestor_or_equal(git_repo, c1, c1))
@@ -115,9 +115,9 @@ class TestChromiteUtil(unittest.TestCase):
     def test_is_ancestor_or_equal_invalid_hash(self):
         # pylint: disable=protected-access
         git_repo = self.root / 'repo'
-        git_util.init(git_repo)
-        git_util.commit_file(git_repo, 'file', 'commit 1', 'content 1')
-        c1 = git_util.get_commit_hash(git_repo, 'HEAD')
+        git_util.init(str(git_repo))
+        git_util.commit_file(str(git_repo), 'file', 'commit 1', 'content 1')
+        c1 = git_util.get_commit_hash(str(git_repo), 'HEAD')
 
         with self.assertRaises(ValueError):
             chromite_util._is_ancestor_or_equal(git_repo, 'invalid-hash', c1)

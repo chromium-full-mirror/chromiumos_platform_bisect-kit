@@ -308,7 +308,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
             # E.g., label-model:quackingstick, label-pools:DUT_POOL_QUOTA.
             return [d.split(':', 1) for d in dimensions]
 
-        and_filters = []
+        and_filters: list[typing.Any] = []
         if dimensions:
             and_filters.append(
                 datastore.query.And(

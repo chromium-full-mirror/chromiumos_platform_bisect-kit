@@ -46,8 +46,10 @@ def _session_file_name(session: str) -> str:
 def _load_from_local_file(session: str) -> DutAllocateSpec:
     session_file = _session_file_name(session)
     with open(session_file) as f:
-        spec = DutAllocateSpec(**json.load(f))
+        spec = dut_allocate_spec_type.DutAllocateSpec(**json.load(f))
     logger.info('DutAllocateSpec loaded from %s: %s', session_file, spec)
+    if spec is None:
+        return None
     return _tweak_spec(spec)
 
 
@@ -69,6 +71,8 @@ def load(session: str, sync_with_db=False) -> DutAllocateSpec | None:
     logger.info(
         'DutAllocateSpec loaded from Datastore for %s: %s', session, spec
     )
+    if spec is None:
+        return None
     return _tweak_spec(spec)
 
 
@@ -140,7 +144,7 @@ def parse_from_command_line_args(opts: argparse.Namespace) -> DutAllocateSpec:
 
     It is used when invoked from cros_helper.py (i.e., stateful bisections).
     """
-    spec = DutAllocateSpec(
+    spec = dut_allocate_spec_type.DutAllocateSpec(
         pools=_str_to_list(opts.pool),
         dimensions=[f'{k}:{v}' for k, v in opts.dimensions],
         boards=_str_to_list(opts.board),
@@ -155,6 +159,8 @@ def parse_from_command_line_args(opts: argparse.Namespace) -> DutAllocateSpec:
         parallel=opts.parallel,
         session=opts.session,
     )
+    if spec is None:
+        return None
     return _tweak_spec(spec)
 
 
@@ -165,7 +171,7 @@ def parse_from_dut_allocate_command_line_args(
 
     It is used when invoked from diagnose_cros_*.py init (i.e., stateless bisections).
     """
-    spec = DutAllocateSpec(
+    spec = dut_allocate_spec_type.DutAllocateSpec(
         pools=_str_to_list(opts.allocate_dut_pool),
         dimensions=[f'{k}:{v}' for k, v in opts.allocate_dut_dimensions],
         boards=_str_to_list(opts.allocate_dut_board),
@@ -181,4 +187,6 @@ def parse_from_dut_allocate_command_line_args(
         session=opts.session,
         public=opts.public_build,
     )
+    if spec is None:
+        return None
     return _tweak_spec(spec)

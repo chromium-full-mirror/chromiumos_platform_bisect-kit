@@ -157,6 +157,8 @@ class DiagnoseAutotestCommandLine(diagnoser_cros.DiagnoseCommandLineBase):
         return switch_test_harness_cmd, common_eval_cmd
 
     def do_run(self):
+        if not self.states:
+            raise ValueError('self.states must not be None')
         diagnoser = diagnoser_cros.CrosDiagnoser(self.states, self.config)
 
         switch_test_harness_cmd, common_eval_cmd = self._build_cmds()

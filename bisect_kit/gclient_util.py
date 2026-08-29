@@ -33,7 +33,7 @@ from depot_tools import gclient_eval
 
 
 logger = logging.getLogger(__name__)
-emitted_warnings: set[str] = set()
+emitted_warnings: set[tuple[str, str, str]] = set()
 
 # If the dependency is not pinned in DEPS file, the default branch.
 # ref: gclient_scm.py GitWrapper.update default_rev
@@ -556,7 +556,8 @@ class Dep:
                     '    "packages": [',
                 ]
             )
-            for p in sorted(self.packages, key=lambda x: x['package']):
+            assert self.packages is not None
+            for p in sorted(self.packages, key=lambda x: x["package"]):
                 s.extend(
                     [
                         '      {',
@@ -583,7 +584,8 @@ class Dep:
                     '    "objects": [',
                 ]
             )
-            for obj in sorted(self.objects, key=lambda x: x['object_name']):
+            assert self.objects is not None
+            for obj in sorted(self.objects, key=lambda x: x["object_name"]):
                 s.extend(
                     [
                         '      {',

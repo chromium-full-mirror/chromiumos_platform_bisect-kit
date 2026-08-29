@@ -65,8 +65,8 @@ class TestDiagnoseStates(unittest.TestCase):
         self.session_file = tempfile.mktemp()
         self._fake_config = core.DiagnoserConfig(
             session='session1',
-            old_value='version_old',
-            new_value='version_new',
+            old_value=1.0,
+            new_value=2.0,
         )
 
     def tearDown(self):
@@ -100,8 +100,8 @@ class TestDiagnoseStates(unittest.TestCase):
             loaded_states.config,
             core.DiagnoserConfig(
                 session='session1',
-                old_value='version_old',
-                new_value='version_new',
+                old_value=1.0,
+                new_value=2.0,
                 board='board1',
             ),
         )
@@ -158,8 +158,8 @@ class TestDiagnoseStates(unittest.TestCase):
         fake_data = {
             'config': {
                 'session': 'session1',
-                'old_value': 'version_old',
-                'new_value': 'version_new',
+                'old_value': 1.0,
+                'new_value': 2.0,
             },
             'history': [],
             'statistics': {},
@@ -170,8 +170,8 @@ class TestDiagnoseStates(unittest.TestCase):
         self.assertTrue(states.inited)
         self.assertIsInstance(states.config, core.DiagnoserConfig)
         self.assertEqual(states.config.session, 'session1')
-        self.assertEqual(states.config.old_value, 'version_old')
-        self.assertEqual(states.config.new_value, 'version_new')
+        self.assertEqual(states.config.old_value, 1.0)
+        self.assertEqual(states.config.new_value, 2.0)
 
 
 class TestBisectStates(unittest.TestCase):

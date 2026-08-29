@@ -15,7 +15,13 @@ class TestCodeChange(unittest.TestCase):
     """Test functions in codechange module."""
 
     def test_static_constructors(self):
-        args = ['dummy_name', 1688000000, 'dummy_path', None, 'dummy_rev']
+        args: tuple[str, int, str, dict[str, codechange.PathSpec], str] = (
+            'dummy_name',
+            1688000000,
+            'dummy_path',
+            {},
+            'dummy_rev',
+        )
         self.assertEqual(
             codechange.Spec(codechange.Spec.FIXED, *args),
             codechange.Spec.new_fixed(*args),

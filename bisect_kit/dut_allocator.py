@@ -176,6 +176,7 @@ class DutAllocator:
             )
 
         if spec.satlab_ip:
+            assert spec.dut_name is not None
             if not cros_lab_util.is_satlab_dut(spec.dut_name):
                 raise errors.ArgumentError(
                     '--satlab-ip', 'Should be only provided with a satlab dut'
@@ -412,6 +413,8 @@ class DutAllocator:
             # If failed to lease a DUT from the shared DUT pool, lease one from
             # the lab and add the leasead DUT to the shared pool.
             host, _ = self.allocate_dut_from_lab()
+            assert host is not None
+            assert spec.session is not None
             add_dut_to_shared_pool(host, spec.session)
 
             # At this point, there should already be a DUT ready to be used.

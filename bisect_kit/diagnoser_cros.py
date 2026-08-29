@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import sys
+import typing
 from typing import Optional
 
 from bisect_kit import android_util
@@ -48,7 +49,7 @@ def run_switch_or_eval_cmd(cmd):
         # reconstruct_from_string() return None if the exception is not
         # a custom error defined in our own errors module.
         e = errors.reconstruct_from_string(
-            result.get('exception'), result.get('reason')
+            result.get('exception', ''), result.get('reason', '')
         )
         if e:
             raise e
@@ -64,7 +65,7 @@ class DutManagerRecycler:
     def __init__(self):
         self._manager: dut_manager_module.DutManager | None = None
 
-    def reset(self, manager: dut_manager_module.DutManager):
+    def reset(self, manager: dut_manager_module.DutManager | None):
         """Wait for the owned manager to clean up, if one exists."""
         if self._manager:
             self._manager.wait_for_release()
@@ -104,7 +105,7 @@ class CrosDiagnoser:
         # Note that '--dut' is stored in self.config.dut.
         self.pre_allocated_dut = None
         if not experiment.is_in_experiment(
-            self.config.experiments,
+            self.config.experiments or [],
             experiment.ID.STATELESS,
         ):
             user_specified_dut = self.config.dut
@@ -162,7 +163,7 @@ class CrosDiagnoser:
         self._dut_manager.reset(None)
 
         enable_shared_dut_pool = experiment.is_in_experiment(
-            self.config.experiments,
+            self.config.experiments or [],
             experiment.ID.SHARED_DUT_POOL,
         )
         if not enable_shared_dut_pool:
@@ -424,7 +425,7 @@ class CrosDiagnoser:
 
         def bisect_prebuilt_on_old_cros_dut_init_func(
             dut: str,
-        ):
+        ) -> None:
             if not self.is_vm_board:
                 init_dut_to_old_cros(dut)
             if switch_test_harness_cmd:
@@ -494,7 +495,7 @@ class CrosDiagnoser:
 
         def bisect_local_chrome_dut_init_func(
             dut: str,
-        ):
+        ) -> None:
             if not self.is_vm_board:
                 init_dut_to_old_cros(dut)
             if switch_test_harness_cmd:
@@ -503,7 +504,7 @@ class CrosDiagnoser:
 
         def bisect_local_chrome_dut_leave_context_check_func(
             dut: str,
-        ):
+        ) -> None:
             # If chrome is not deployed with cros image, do the sanity check to ensure
             # OS version.
             if (
@@ -876,9 +877,11 @@ class CrosDiagnoser:
         verified = False
         if not self._need_android_bisect(self.old_info, self.new_info):
             return verified
+        assert self.old_info.android_build_id is not None
+        assert self.new_info.android_build_id is not None
 
         android_flavor = android_util.get_flavor(
-            self.old_info.android_target, self.config.board_cpu_arch
+            self.old_info.android_target or '', self.config.board_cpu_arch
         )
         if android_flavor is None:
             self.make_decision(
@@ -1263,7 +1266,7 @@ class CrosDiagnoser:
 
             # Currently only local build supports custom patches to chromium.
             # This assertion must be true here since the condition should have been checked.
-            assert len(chromium_patch_cls) == 0
+            assert not chromium_patch_cls
             assert gn_extra_args is None or gn_extra_args == ''
         else:
             switch_cmd = [
@@ -1310,6 +1313,8 @@ class CrosDiagnoser:
             dut_manager,
             self.is_stateless,
         )
+        assert self.old_info.cr_version is not None
+        assert self.new_info.cr_version is not None
         try:
             bisector.init_if_necessary(
                 self.old_info.cr_version,
@@ -1325,7 +1330,11 @@ class CrosDiagnoser:
                 noisy=self.noisy,
                 endpoint_verification=self.config.endpoint_verification,
                 test_name=self.config.test_name,
-                experiments=self.config.experiments,
+                experiments=(
+                    [e.value for e in self.config.experiments]
+                    if self.config.experiments
+                    else None
+                ),
             )
 
             bisector.narrow_down(should_allocate_dut=False, init_once=init_once)
@@ -1468,7 +1477,11 @@ class CrosDiagnoser:
             noisy=self.noisy,
             endpoint_verification=self.config.endpoint_verification,
             test_name=self.config.test_name,
-            experiments=self.config.experiments,
+            experiments=(
+                [str(e) for e in self.config.experiments]
+                if self.config.experiments
+                else None
+            ),
         )
 
         try:
@@ -1962,7 +1975,7 @@ class DiagnoseCommandLineBase:
         pass  # implemented by subclass if necessary
 
     def create_argument_parser(self):
-        parents: list[argparse.ArgumentParser] = [
+        parents: list[cli.ArgumentParser] = [
             cli.create_session_optional_parser(),
         ]
         parser = cli.ArgumentParser(raise_bad_status=False)
@@ -1973,7 +1986,11 @@ class DiagnoseCommandLineBase:
         parser_init = subparsers.add_parser(
             'init',
             help='Initialize',
-            parents=parents + [experiment.common_flags()],
+            parents=typing.cast(
+                list[cli.ArgumentParser],
+                parents
+                + [typing.cast(cli.ArgumentParser, experiment.common_flags())],
+            ),
         )
         group = parser_init.add_argument_group(
             title='Source tree path options',
@@ -2283,12 +2300,16 @@ class DiagnoseCommandLineBase:
         parser_init.set_defaults(func=self.cmd_init)
 
         parser_run = subparsers.add_parser(
-            'run', help='Start auto bisection', parents=parents
+            'run',
+            help='Start auto bisection',
+            parents=typing.cast(list[cli.ArgumentParser], parents),
         )
         parser_run.set_defaults(func=self.cmd_run)
 
         parser_log = subparsers.add_parser(
-            'log', help='Prints what has been done so far', parents=parents
+            'log',
+            help='Prints what has been done so far',
+            parents=typing.cast(list[cli.ArgumentParser], parents),
         )
         parser_log.add_argument(
             '--json', action='store_true', help='Machine readable output'
@@ -2296,7 +2317,9 @@ class DiagnoseCommandLineBase:
         parser_log.set_defaults(func=self.cmd_log)
 
         parser_view = subparsers.add_parser(
-            'view', help='Prints summary of current status', parents=parents
+            'view',
+            help='Prints summary of current status',
+            parents=typing.cast(list[cli.ArgumentParser], parents),
         )
         parser_view.add_argument('--verbose', '-v', action='store_true')
         parser_view.add_argument(

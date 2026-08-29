@@ -704,6 +704,7 @@ class TestBisectAgentInteractions(unittest.TestCase):
                 self.assertAlmostEqual(
                     agent.accumulative_cache_rate, (250 + 600) / (500 + 1200)
                 )
+                assert agent.total_cost is not None
                 self.assertAlmostEqual(agent.total_cost, 0.00039375 + 0.000795)
                 log_text = '\n'.join(log_ctx.output)
                 self.assertIn(
@@ -743,6 +744,7 @@ class TestBisectAgentInteractions(unittest.TestCase):
             cached_tokens=250,
             output_tokens=50,
         )
+        assert cost_37_flash is not None
         self.assertAlmostEqual(cost_37_flash, 0.00039375)
 
         # Unknown model returns None

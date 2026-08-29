@@ -5,6 +5,7 @@
 
 """Evaluate if a DUT is bootable"""
 
+from collections.abc import Sequence
 import logging
 import os
 import sys
@@ -83,7 +84,7 @@ def action() -> bisector_cli.EvalAction:
     return bisector_cli.EvalAction.WITH_DUT
 
 
-def main(args: tuple[str] | None = None) -> int:
+def main(args: Sequence[str] | None = None) -> int:
     return bisector_cli.step_main_wrapper(step_main, args)
 
 
