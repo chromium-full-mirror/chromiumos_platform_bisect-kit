@@ -11,11 +11,35 @@ cd "${SCRIPT_DIR}"/..
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
+UV_CMD=()
+if command -v uv >/dev/null 2>&1; then
+  UV_CMD=("uv")
+else
+  BOOTSTRAP_DIR="${TMP_DIR}/uv_bootstrap"
+  PIP_CMD=(python3 -m pip)
+  if ! python3 -m pip --version >/dev/null 2>&1; then
+    if command -v pip3 >/dev/null 2>&1; then
+      PIP_CMD=(pip3)
+    elif command -v pip >/dev/null 2>&1; then
+      PIP_CMD=(pip)
+    fi
+  fi
+  "${PIP_CMD[@]}" install \
+    --target "${BOOTSTRAP_DIR}" \
+    --require-hashes \
+    -r bootstrap_requirements.txt >/dev/null
+  UV_CMD=(env PYTHONPATH="${BOOTSTRAP_DIR}" python3 -m uv)
+fi
+
+PYTHON_VERSION="$(
+  cat .python-version 2>/dev/null | tr -d '[:space:]' || echo "3.13"
+)"
+
 VENV_DIR="${TMP_DIR}/venv"
-python3 -m venv "${VENV_DIR}"
+"${UV_CMD[@]}" venv "${VENV_DIR}" --python "${PYTHON_VERSION}"
 source "${VENV_DIR}/bin/activate"
 
-pip install --require-hashes \
+"${UV_CMD[@]}" pip install --python "${VENV_DIR}/bin/python" --require-hashes \
   -r bootstrap_requirements.txt \
   -r "${SCRIPT_DIR}/upload_requirements.txt"
 
@@ -27,9 +51,10 @@ AR_REPO="https://us-python.pkg.dev/${PROJECT}/${REPOSITORY}/"
 DOWNLOAD_DIR="${TMP_DIR}/download"
 mkdir -p "${DOWNLOAD_DIR}"
 
-echo "Re-generating universal requirements with hashes using uv..."
+echo "Re-generating requirements with hashes using uv..."
 (
   unset PIP_INDEX_URL
+  # Bootstrap requirements (uv) remain universal across Python versions.
   uv pip compile -U bootstrap_requirements.in \
     --generate-hashes \
     --universal \
@@ -37,41 +62,49 @@ echo "Re-generating universal requirements with hashes using uv..."
     -o bootstrap_requirements.txt
   uv pip compile -U "${SCRIPT_DIR}/upload_requirements.in" \
     --generate-hashes \
-    --universal \
-    --python-version 3.10 \
+    --python-version "${PYTHON_VERSION}" \
     -o "${SCRIPT_DIR}/upload_requirements.txt"
-  uv pip compile pyproject.toml \
+  uv pip compile -U pyproject.toml \
     --generate-hashes \
-    --universal \
-    --python-version 3.10 \
+    --python-version "${PYTHON_VERSION}" \
     -o requirements.txt
-  uv pip compile pyproject.toml \
+  uv pip compile -U pyproject.toml \
     --extra dev \
     --generate-hashes \
-    --universal \
-    --python-version 3.10 \
+    --python-version "${PYTHON_VERSION}" \
     -o requirements_dev.txt
 )
 
 echo "Downloading packages from PyPI..."
 (
   unset PIP_INDEX_URL
+  echo "Downloading bootstrap packages (uv) for all Python versions..."
   for py_ver in 3.10 3.11 3.12 3.13; do
-    echo "Downloading packages for Python ${py_ver}"
     uvx --python "${py_ver}" --with pip -- \
       pip download \
         --require-hashes \
         --quiet \
         -r bootstrap_requirements.txt \
-        -r "${SCRIPT_DIR}/upload_requirements.txt" \
-        -r requirements.txt \
-        -r requirements_dev.txt \
         -d "${DOWNLOAD_DIR}" \
         --platform manylinux2014_x86_64 \
         --platform manylinux_2_17_x86_64 \
         --platform manylinux_2_28_x86_64 \
         --only-binary=:all:
   done
+
+  echo "Downloading dependencies for Python ${PYTHON_VERSION}..."
+  uvx --python "${PYTHON_VERSION}" --with pip -- \
+    pip download \
+      --require-hashes \
+      --quiet \
+      -r "${SCRIPT_DIR}/upload_requirements.txt" \
+      -r requirements.txt \
+      -r requirements_dev.txt \
+      -d "${DOWNLOAD_DIR}" \
+      --platform manylinux2014_x86_64 \
+      --platform manylinux_2_17_x86_64 \
+      --platform manylinux_2_28_x86_64 \
+      --only-binary=:all:
 )
 
 echo "Fetching remote file list and hashes..."

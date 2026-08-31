@@ -14,7 +14,7 @@ include = ["bisect_kit*"]
 name = "bisect_kit"
 version = "0.1.0"
 description = "ChromeOS bisect kit"
-requires-python = ">=3.10, <3.14"
+requires-python = ">=3.13, <3.14"
 dependencies = [
     "google-api-python-client",
     "google-cloud-compute",
@@ -40,7 +40,7 @@ dev = [
 
 [tool.black]
 line-length = 80
-target-version = ["py310", "py311", "py312", "py313"]
+target-version = ["py313"]
 skip-string-normalization = true
 exclude = """
 /(
