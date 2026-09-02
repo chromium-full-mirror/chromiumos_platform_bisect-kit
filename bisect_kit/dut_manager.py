@@ -337,7 +337,7 @@ class DutManager:
         return self._pre_allocated_dut is not None or self._is_restored_dut
 
     @property
-    def dut(self) -> str:
+    def dut(self) -> str | None:
         """Returns the DUT managed by this DutManager.
 
         If a pre-allocated DUT exists, there should be no auto-allocated DUT.

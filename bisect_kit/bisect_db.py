@@ -219,9 +219,11 @@ class Client(gcloud.DataStoreClient):
         bisects = self._unfinished_bisects()
         logging.debug('%s unfinished bisects', len(bisects))
 
-        specs = {}
+        specs: dict[str, dut_allocate_spec_type.DutAllocateSpec] = {}
         for b in bisects:
             bisect_id = b.get('ID')
+            if not bisect_id or not isinstance(bisect_id, str):
+                continue
 
             # TODO(b/278200317): Remove it when all bisections are stateless.
             # Do not yield DUTs to non-stateless bisections since they'll never

@@ -117,14 +117,11 @@ class AndroidBuildIDDomain(core.BisectDomain):
         self, phase: core.Phase, rev: str, _rev_details=None
     ) -> list[str]:
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
-            args = [
-                '--android-build-id',
-                rev,
-                '--flavor',
-                self.config.flavor,
-                '--branch',
-                self.config.branch,
-            ]
+            args = ['--android-build-id', rev]
+            if self.config.flavor:
+                args += ['--flavor', self.config.flavor]
+            if self.config.branch:
+                args += ['--branch', self.config.branch]
             if self.config.dut:
                 args += ['--dut', self.config.dut]
             return args

@@ -179,16 +179,14 @@ class AndroidRepoDomain(core.BisectDomain):
         self, phase: core.Phase, rev: str, _rev_details=None
     ) -> list[str]:
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
-            args = [
-                '--android-root',
-                self.config.android_root,
-                '--flavor',
-                self.config.flavor,
-                '--branch',
-                self.config.branch,
-                '--intra-rev',
-                rev,
-            ]
+            args = []
+            if self.config.android_root:
+                args += ['--android-root', self.config.android_root]
+            if self.config.flavor:
+                args += ['--flavor', self.config.flavor]
+            if self.config.branch:
+                args += ['--branch', self.config.branch]
+            args += ['--intra-rev', rev]
             if self.config.android_mirror:
                 args += ['--android-mirror', self.config.android_mirror]
             if self.config.dut:

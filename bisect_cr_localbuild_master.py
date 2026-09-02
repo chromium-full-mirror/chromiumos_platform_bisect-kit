@@ -217,10 +217,9 @@ class ChromeSrcMasterDomain(core.BisectDomain):
         self, phase: core.Phase, rev: str, _rev_details=None
     ) -> list[str]:
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
-            args = [
-                '--chrome-root',
-                self.config.chrome_root,
-            ]
+            args = []
+            if self.config.chrome_root:
+                args += ['--chrome-root', self.config.chrome_root]
             if self.config.board:
                 args += ['--board', self.config.board]
             args += ['--chrome-rev', rev]

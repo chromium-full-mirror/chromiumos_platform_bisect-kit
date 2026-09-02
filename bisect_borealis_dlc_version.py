@@ -177,12 +177,10 @@ class BorealisVersionDomain(core.BisectDomain):
         self, phase: core.Phase, rev: str, _rev_details=None
     ) -> list[str]:
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
-            args = [
-                '--chromeos-root',
-                self.config.chromeos_root,
-                '--borealis-dlc-version',
-                rev,
-            ]
+            args = []
+            if self.config.chromeos_root:
+                args += ['--chromeos-root', self.config.chromeos_root]
+            args += ['--borealis-dlc-version', rev]
             if self.config.board:
                 args += ['--board', self.config.board]
             if self.config.dut:

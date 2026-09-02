@@ -76,7 +76,10 @@ class GitDomain(core.BisectDomain):
         self, phase: core.Phase, rev: str, _rev_details=None
     ) -> list[str]:
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
-            args = ['--git-repo', self.config.git_repo, '--git-rev', rev]
+            args = []
+            if self.config.git_repo:
+                args += ['--git-repo', self.config.git_repo]
+            args += ['--git-rev', rev]
             return args
         return []
 

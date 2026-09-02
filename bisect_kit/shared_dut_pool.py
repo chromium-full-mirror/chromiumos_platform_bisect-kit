@@ -218,7 +218,7 @@ class SharedDutPoolManager(gcloud.DataStoreClient):
         name: str,
         owner: str,
         dimensions: dict,
-    ) -> str:
+    ) -> str | None:
         """Insert a DUT to the shared DUT pool.
 
         If the owner has already owned some DUTs, try finding a successor

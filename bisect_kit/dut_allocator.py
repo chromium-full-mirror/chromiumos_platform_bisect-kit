@@ -143,7 +143,7 @@ class DutAllocator:
 
     def _parse_spec(
         self,
-    ) -> typing.Tuple[list[str], list[str], list[str], list[str]]:
+    ) -> tuple[list[str], list[str], list[str] | None, list[str] | None]:
         """Parses the DutAllocateSpec and save the intermediate artifacts."""
         # Alias for easier access.
         spec = self._spec

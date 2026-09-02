@@ -1216,7 +1216,7 @@ def query_milestone_by_version(
     if spec_manager:
         info = spec_manager.lookup_chromeos_version(short_version)
         if info:
-            return info.chrome_branch
+            return str(info.chrome_branch)
 
     # Use the internal builds to look up the milestone.
     for archive_path in _iter_valid_prebuilt_gs_path(

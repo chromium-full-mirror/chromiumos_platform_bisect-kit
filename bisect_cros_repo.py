@@ -160,12 +160,11 @@ class ChromeOSRepoDomain(core.BisectDomain):
         self, phase: core.Phase, rev: str, _rev_details=None
     ) -> list[str]:
         if phase in (core.Phase.SWITCH, core.Phase.FUTURE_BUILD):
-            args = [
-                '--chromeos-root',
-                self.config.chromeos_root,
-                '--chromeos-mirror',
-                self.config.chromeos_mirror,
-            ]
+            args = []
+            if self.config.chromeos_root:
+                args += ['--chromeos-root', self.config.chromeos_root]
+            if self.config.chromeos_mirror:
+                args += ['--chromeos-mirror', self.config.chromeos_mirror]
             if self.config.board:
                 args += ['--board', self.config.board]
             args += ['--chromeos-version', rev]

@@ -522,6 +522,7 @@ def step_main(args: tuple[str] | None) -> core.StepResult:
         if last_test_result.data['status'] in ['fatal', 'skip']:
             break
 
+    assert last_test_result is not None
     return last_test_result
 
 

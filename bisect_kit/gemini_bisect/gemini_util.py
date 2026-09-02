@@ -1360,6 +1360,6 @@ class BisectAgent:
             self._pending_run_at_call = None
         return self._run()
 
-    def get_result(self) -> str:
+    def get_result(self) -> str | None:
         """Returns the concluded revision."""
         return self._conclusion

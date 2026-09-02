@@ -1617,8 +1617,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
           A strategy.NoisyBinarySearch instance.
 
         """
-        if not self.states.inited:
-            return None
+        assert self.states.inited
         term_map = {
             'old': self.config.term_old,
             'new': self.config.term_new,
