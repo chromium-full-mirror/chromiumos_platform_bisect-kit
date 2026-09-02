@@ -1160,17 +1160,25 @@ class TestGeminiFusionStrategy(unittest.TestCase):
             # We transition to STARTED, and self.prob is populated.
             self.assertEqual(bsearch.state, bsearch.STARTED)
 
-            # Let's call next_idx to trigger _update_gemini_stats with cost_table
+            # Let's call next_idx to trigger _update_gemini_stats with cost_table and cost_func
             cost_table = [(1, 10)] * len(bsearch.rev_info)
-            bsearch.next_idx(cost_table=cost_table)
 
-            # Check that update_stats was called with old_p and new_p
+            def cost_func(_):
+                return cost_table
+
+            bsearch.next_idx(cost_table=cost_table, cost_func=cost_func)
+
+            # Check that update_stats was called with old_p, new_p, and cost_func
             self.assertTrue(mock_agent.update_stats.called)
             self.assertEqual(
                 mock_agent.update_stats.call_args[1].get('old_p'), 0.1
             )
             self.assertEqual(
                 mock_agent.update_stats.call_args[1].get('new_p'), 0.9
+            )
+            self.assertEqual(
+                mock_agent.update_stats.call_args[1].get('cost_func'),
+                cost_func,
             )
 
             # Retrieve the last call arguments

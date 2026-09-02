@@ -816,6 +816,8 @@ class TestBisectAgentInteractions(unittest.TestCase):
         self.assertIn('culprit', funcs_by_name['get_range']['description'])
         self.assertIn('new/FAIL', funcs_by_name['run_at']['description'])
         self.assertIn('culprit', funcs_by_name['conclude']['description'])
+        self.assertIn('get_revisions_order_by_utility', funcs_by_name)
+        self.assertNotIn('get_future_utility_prediction', funcs_by_name)
 
         funcs_fix = gemini_util.format_template(
             gemini_util._FUNCTIONS_TEMPLATE, gemini_util.FIX_REPLACEMENTS
@@ -831,6 +833,564 @@ class TestBisectAgentInteractions(unittest.TestCase):
         self.assertIn('fix CL', funcs_by_name_fix['get_range']['description'])
         self.assertIn('new/PASS', funcs_by_name_fix['run_at']['description'])
         self.assertIn('fix CL', funcs_by_name_fix['conclude']['description'])
+        self.assertIn('get_revisions_order_by_utility', funcs_by_name_fix)
+        self.assertNotIn('get_future_utility_prediction', funcs_by_name_fix)
+
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    def test_get_revisions_order_by_utility(
+        self, _mock_gemini_agent, mock_build_revlist
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'c1'}]},
+                '2': {'actions': [{'rev': 'c2'}]},
+                '3': {'actions': [{'rev': 'c3'}]},
+                '4': {'actions': [{'rev': 'c4'}]},
+                '5': {'actions': [{'rev': 'c5'}]},
+            },
+        )
+        with (
+            mock.patch(
+                'bisect_kit.git_util.CommitMeta.get_summary',
+                side_effect=lambda meta: f"Summary for {meta}",
+            ),
+            mock.patch(
+                'bisect_kit.git_util.get_commit_metadata',
+                side_effect=lambda repo, commit: commit,
+            ),
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_example',
+                repo='test_repo',
+                revlist=['1', '2', '3', '4', '5'],
+            )
+            # Initially no stats, returns in utility order for default prior [0, 0.25, 0.25, 0.25, 0.25]
+            res = agent._get_revisions_order_by_utility()
+            self.assertEqual(
+                [r['rev_id'] for r in res['revisions']],
+                ['3', '4', '2', '1', '5'],
+            )
+            self.assertNotIn('future_build_tree', res)
+
+            # Update stats with various utilities
+            agent.update_stats(
+                {
+                    '1': {
+                        'prob': 0.05,
+                        'info_gain': 0.1,
+                        'info_gain_per_cost': 0.1,
+                        'status': {},
+                    },
+                    '2': {
+                        'prob': 0.40,
+                        'info_gain': 0.8,
+                        'info_gain_per_cost': 0.8,
+                        'status': {},
+                    },
+                    '3': {
+                        'prob': 0.25,
+                        'info_gain': 0.5,
+                        'info_gain_per_cost': 0.5,
+                        'status': {},
+                    },
+                    '4': {
+                        'prob': 0.15,
+                        'info_gain': 0.3,
+                        'info_gain_per_cost': 0.3,
+                        'status': {},
+                    },
+                    '5': {
+                        'prob': 0.15,
+                        'info_gain': 0.2,
+                        'info_gain_per_cost': 0.2,
+                        'status': {},
+                    },
+                }
+            )
+
+            # 1. Order all by utility descending (2: 0.8, 3: 0.5, 4: 0.3, 1: 0.1, 5: 0.0)
+            all_ordered = agent._get_revisions_order_by_utility()
+            self.assertEqual(
+                [r['rev_id'] for r in all_ordered['revisions']],
+                ['2', '3', '4', '1', '5'],
+            )
+
+            # 2. limit=1 gets only the single highest utility revision
+            top_1 = agent._get_revisions_order_by_utility(limit=1)
+            self.assertEqual(len(top_1['revisions']), 1)
+            self.assertEqual(top_1['revisions'][0]['rev_id'], '2')
+
+            # 3. limit=3 gets top 3
+            top_3 = agent._get_revisions_order_by_utility(limit=3)
+            self.assertEqual(
+                [r['rev_id'] for r in top_3['revisions']], ['2', '3', '4']
+            )
+
+            # 4. limit=0 gets empty list
+            top_0 = agent._get_revisions_order_by_utility(limit=0)
+            self.assertEqual(top_0['revisions'], [])
+
+            # 5. Purpose 2a: Candidate subset specified: return highest within the list
+            subset = agent._get_revisions_order_by_utility(
+                revisions=['1', '4', '5']
+            )
+            self.assertEqual(
+                [r['rev_id'] for r in subset['revisions']], ['4', '1', '5']
+            )
+
+            # 6. Candidate subset with limit=1: get highest within the subset
+            subset_top_1 = agent._get_revisions_order_by_utility(
+                limit=1, revisions=['1', '4', '5']
+            )
+            self.assertEqual(len(subset_top_1['revisions']), 1)
+            self.assertEqual(subset_top_1['revisions'][0]['rev_id'], '4')
+
+            # 7. Candidate subset with unknown rev_id: ignores unknown
+            subset_with_unknown = agent._get_revisions_order_by_utility(
+                limit=1, revisions=['1', 'unknown_rev', '5']
+            )
+            self.assertEqual(len(subset_with_unknown['revisions']), 1)
+            self.assertEqual(subset_with_unknown['revisions'][0]['rev_id'], '1')
+
+            # 8. Empty candidate subset: returns empty list
+            empty_subset = agent._get_revisions_order_by_utility(revisions=[])
+            self.assertEqual(empty_subset['revisions'], [])
+
+            # 9. Tie breaking: preserve relative revlist order for equal utilities
+            agent.update_stats(
+                {
+                    '1': {
+                        'prob': 0.5,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '2': {
+                        'prob': 0.0,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '3': {
+                        'prob': 0.5,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                }
+            )
+            tied = agent._get_revisions_order_by_utility(
+                revisions=['1', '2', '3']
+            )
+            self.assertEqual(
+                [r['rev_id'] for r in tied['revisions']], ['1', '2', '3']
+            )
+            self.assertEqual(
+                agent._get_revisions_order_by_utility(
+                    limit=1, revisions=['1', '2', '3']
+                )['revisions'][0]['rev_id'],
+                '1',
+            )
+
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    def test_get_revisions_order_by_utility_suspects(
+        self, _mock_gemini_agent, mock_build_revlist
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'c1'}]},
+                '2': {'actions': [{'rev': 'c2'}]},
+                '3': {'actions': [{'rev': 'c3'}]},
+                '4': {'actions': [{'rev': 'c4'}]},
+                '5': {'actions': [{'rev': 'c5'}]},
+            },
+        )
+        with (
+            mock.patch(
+                'bisect_kit.git_util.CommitMeta.get_summary',
+                side_effect=lambda meta: f"Summary for {meta}",
+            ),
+            mock.patch(
+                'bisect_kit.git_util.get_commit_metadata',
+                side_effect=lambda repo, commit: commit,
+            ),
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_example',
+                repo='test_repo',
+                revlist=['1', '2', '3', '4', '5'],
+                old_p=0.05,
+                new_p=0.95,
+            )
+            agent.update_stats(
+                {
+                    '1': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '2': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '3': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '4': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '5': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                }
+            )
+
+            # Purpose 2b: Only suspects '2' and '5' are suspected (0 prob on 1, 3, 4).
+            # Testing middle commits ('2', '3', '4') gives highest utility to discriminate 2 from 5.
+            res_suspects = agent._get_revisions_order_by_utility(
+                suspects=['2', '5']
+            )
+            self.assertEqual(len(res_suspects['revisions']), 5)
+            # Middle commits have highest info gain
+            self.assertIn(
+                res_suspects['revisions'][0]['rev_id'], ('2', '3', '4')
+            )
+            # Commit 1 has info gain 0
+            stats_1 = [
+                r['stats']
+                for r in res_suspects['revisions']
+                if r['rev_id'] == '1'
+            ][0]
+            self.assertEqual(stats_1['prob'], 0.0)
+            self.assertEqual(stats_1['info_gain'], 0.0)
+
+            # Commit 3 has high info gain
+            stats_3 = [
+                r['stats']
+                for r in res_suspects['revisions']
+                if r['rev_id'] == '3'
+            ][0]
+            self.assertEqual(stats_3['prob'], 0.0)
+            self.assertGreater(stats_3['info_gain'], 0.4)
+
+            # Suspects '1' and '2': commit '1' splits the suspects
+            res_1_2 = agent._get_revisions_order_by_utility(suspects=['1', '2'])
+            self.assertEqual(res_1_2['revisions'][0]['rev_id'], '1')
+
+            # Invalid suspects
+            res_invalid = agent._get_revisions_order_by_utility(
+                suspects=['unknown_rev']
+            )
+            self.assertIn('error', res_invalid)
+            self.assertEqual(res_invalid['revisions'], [])
+
+            # Suspects with candidate subset: only rank within revisions=['1', '3', '5']
+            res_sub = agent._get_revisions_order_by_utility(
+                suspects=['2', '5'], revisions=['1', '3', '5']
+            )
+            self.assertEqual(
+                [r['rev_id'] for r in res_sub['revisions']], ['3', '1', '5']
+            )
+
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    def test_get_revisions_order_by_utility_future_tree(
+        self, _mock_gemini_agent, mock_build_revlist
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'c1'}]},
+                '2': {'actions': [{'rev': 'c2'}]},
+                '3': {'actions': [{'rev': 'c3'}]},
+                '4': {'actions': [{'rev': 'c4'}]},
+                '5': {'actions': [{'rev': 'c5'}]},
+            },
+        )
+        with (
+            mock.patch(
+                'bisect_kit.git_util.CommitMeta.get_summary',
+                side_effect=lambda meta: f"Summary for {meta}",
+            ),
+            mock.patch(
+                'bisect_kit.git_util.get_commit_metadata',
+                side_effect=lambda repo, commit: commit,
+            ),
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_example',
+                repo='test_repo',
+                revlist=['1', '2', '3', '4', '5'],
+                old_p=0.05,
+                new_p=0.95,
+            )
+            agent.update_stats(
+                {
+                    '1': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '2': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '3': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '4': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '5': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                }
+            )
+
+            # Purpose 3: depth=1 produces 1st-level future tree
+            res_d1 = agent._get_revisions_order_by_utility(depth=1)
+            self.assertIn('revisions', res_d1)
+            self.assertIn('future_build_tree', res_d1)
+            tree_d1 = res_d1['future_build_tree']
+            self.assertIn('FAIL', tree_d1)
+            self.assertIn('PASS', tree_d1)
+            self.assertIn('next_revision', tree_d1['FAIL'])
+            self.assertIn('confidence', tree_d1['FAIL'])
+            self.assertNotIn('next', tree_d1['FAIL'])
+
+            # depth=2 produces 2nd-level 'next' subtrees
+            res_d2 = agent._get_revisions_order_by_utility(depth=2, limit=1)
+            self.assertEqual(len(res_d2['revisions']), 1)
+            tree_d2 = res_d2['future_build_tree']
+            self.assertIn('next', tree_d2['FAIL'])
+            self.assertIn('FAIL', tree_d2['FAIL']['next'])
+            self.assertIn('PASS', tree_d2['FAIL']['next'])
+            self.assertIn('next', tree_d2['PASS'])
+
+            # depth=3 produces 3rd-level 'next' subtrees
+            res_d3 = agent._get_revisions_order_by_utility(depth=3)
+            tree_d3 = res_d3['future_build_tree']
+            self.assertIn('next', tree_d3['FAIL']['next']['FAIL'])
+
+            # Specifying root_revision
+            res_root = agent._get_revisions_order_by_utility(
+                root_revision='4', depth=2
+            )
+            self.assertIn('future_build_tree', res_root)
+
+            # Combining suspects with depth
+            res_suspects_tree = agent._get_revisions_order_by_utility(
+                suspects=['1', '5'], depth=2
+            )
+            self.assertIn('future_build_tree', res_suspects_tree)
+
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    def test_get_revisions_order_by_utility_simulated_runs(
+        self, _mock_gemini_agent, mock_build_revlist
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'c1'}]},
+                '2': {'actions': [{'rev': 'c2'}]},
+                '3': {'actions': [{'rev': 'c3'}]},
+                '4': {'actions': [{'rev': 'c4'}]},
+                '5': {'actions': [{'rev': 'c5'}]},
+            },
+        )
+        with (
+            mock.patch(
+                'bisect_kit.git_util.CommitMeta.get_summary',
+                side_effect=lambda meta: f"Summary for {meta}",
+            ),
+            mock.patch(
+                'bisect_kit.git_util.get_commit_metadata',
+                side_effect=lambda repo, commit: commit,
+            ),
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_example',
+                repo='test_repo',
+                revlist=['1', '2', '3', '4', '5'],
+                old_p=0.1,
+                new_p=0.9,
+            )
+            agent.update_stats(
+                {
+                    '1': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '2': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '3': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '4': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                    '5': {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': None,
+                        'info_gain_per_cost': None,
+                    },
+                }
+            )
+
+            # 2nd-level: If we simulate that rev '3' resulted in FAIL (new behavior)
+            sim_revs = agent._get_revisions_order_by_utility(
+                simulated_runs=[{'rev_id': '3', 'result': 'FAIL'}]
+            )
+            self.assertEqual(len(sim_revs['revisions']), 5)
+            # Under FAIL at '3', candidates <= 3 get higher probability
+            self.assertIn(sim_revs['revisions'][0]['rev_id'], ('1', '2'))
+
+            # 3rd-level: If we simulate rev '3' FAIL, then rev '2' PASS
+            sim_revs_3rd = agent._get_revisions_order_by_utility(
+                simulated_runs=[
+                    {'rev_id': '3', 'result': 'FAIL'},
+                    {'rev_id': '2', 'result': 'PASS'},
+                ]
+            )
+            self.assertEqual(len(sim_revs_3rd['revisions']), 5)
+            # Between 2 and 3, boundary candidates have highest utility
+            self.assertIn(sim_revs_3rd['revisions'][0]['rev_id'], ('2', '3'))
+
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    def test_bisect_agent_get_revisions_order_by_utility_interaction(
+        self, mock_gemini_agent_cls, mock_build_revlist
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'c1'}]},
+                '2': {'actions': [{'rev': 'c2'}]},
+                '3': {'actions': [{'rev': 'c3'}]},
+            },
+        )
+        mock_gemini_agent = mock.MagicMock()
+        mock_gemini_agent_cls.return_value = mock_gemini_agent
+
+        # Interaction: Gemini calls get_revisions_order_by_utility(depth=2, limit=1, revisions=['1', '3'])
+        interaction_1 = MockInteraction(
+            'int_1',
+            [
+                MockFunctionCall(
+                    id='fc_1',
+                    name='get_revisions_order_by_utility',
+                    arguments={'depth': 2, 'limit': 1, 'revisions': ['1', '3']},
+                ),
+            ],
+        )
+        interaction_2 = MockInteraction(
+            'int_2',
+            [
+                MockFunctionCall(
+                    id='fc_2',
+                    name='run_at',
+                    arguments={
+                        'rev_id': '1',
+                        'reason': 'highest utility in subset',
+                        'future_build_tree': {
+                            'FAIL': {
+                                'next_revision': '1',
+                                'confidence': 0.5,
+                                'reason': 'r',
+                            }
+                        },
+                    },
+                ),
+            ],
+        )
+        mock_gemini_agent.start.return_value = interaction_1
+        mock_gemini_agent.reply.return_value = interaction_2
+
+        with mock.patch.dict(
+            'os.environ', {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'}
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_example',
+                repo='test_repo',
+                revlist=['1', '2', '3'],
+            )
+            agent.update_stats(
+                {
+                    '1': {
+                        'prob': 0.1,
+                        'info_gain': 0.2,
+                        'info_gain_per_cost': 0.2,
+                        'status': {},
+                    },
+                    '2': {
+                        'prob': 0.6,
+                        'info_gain': 0.9,
+                        'info_gain_per_cost': 0.9,
+                        'status': {},
+                    },
+                    '3': {
+                        'prob': 0.3,
+                        'info_gain': 0.7,
+                        'info_gain_per_cost': 0.7,
+                        'status': {},
+                    },
+                }
+            )
+            next_rev = agent.next()
+            self.assertEqual(next_rev, '1')
+
+            reply_call_args = mock_gemini_agent.reply.call_args[0][0]
+            self.assertEqual(len(reply_call_args), 1)
+            self.assertEqual(
+                reply_call_args[0]['name'], 'get_revisions_order_by_utility'
+            )
+            result = reply_call_args[0]['result']
+            self.assertIn('revisions', result)
+            self.assertIn('future_build_tree', result)
+            self.assertEqual(len(result['revisions']), 1)
+            self.assertEqual(result['revisions'][0]['rev_id'], '1')
 
     @mock.patch(
         'bisect_kit.gemini_bisect.gemini_util.GeminiAgent',
@@ -859,6 +1419,140 @@ class TestBisectAgentInteractions(unittest.TestCase):
                 model='gemini-3.7-flash',
             )
             self.assertEqual(agent.get_result(), None)
+
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    def test_dynamic_cost_table_generation(
+        self, _mock_agent, mock_build_revlist
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'c1'}]},
+                '2': {'actions': [{'rev': 'c2'}]},
+                '3': {'actions': [{'rev': 'c3'}]},
+            },
+        )
+        with mock.patch.dict(
+            'os.environ', {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'}
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_cost',
+                repo='test_repo',
+                revlist=['1', '2', '3'],
+            )
+
+            # 1. Default (no cost info) -> uniform (1.0, 1.0)
+            self.assertEqual(
+                agent._get_cost_table(),
+                [(1.0, 1.0), (1.0, 1.0), (1.0, 1.0)],
+            )
+
+            # 2. Dynamic cost_func
+            agent.update_stats(
+                {},
+                cost_func=lambda dut: [
+                    (10.0 if r == dut else 100.0, 10.0 if r == dut else 100.0)
+                    for r in agent._revlist
+                ],
+            )
+            self.assertEqual(
+                agent._get_cost_table('2'),
+                [(100.0, 100.0), (10.0, 10.0), (100.0, 100.0)],
+            )
+
+            # 3. Setting cost_func to None explicitly clears cost function
+            agent.update_stats({}, cost_func=None)
+            self.assertEqual(
+                agent._get_cost_table('2'),
+                [(1.0, 1.0), (1.0, 1.0), (1.0, 1.0)],
+            )
+
+            # 4. cost_func covers entire rev_stats (5 revs), but _revlist is a subset ['1', '2', '3']
+            all_revs = ['0', '1', '2', '3', '4']
+            agent.update_stats(
+                {
+                    r: {
+                        'prob': 0.2,
+                        'status': {},
+                        'info_gain': 0.1,
+                        'info_gain_per_cost': 0.1,
+                    }
+                    for r in all_revs
+                },
+                cost_func=lambda dut: [
+                    (float(i), float(i)) for i, _ in enumerate(all_revs)
+                ],
+            )
+            self.assertEqual(
+                agent._get_cost_table('2'),
+                [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)],
+            )
+
+    @mock.patch('bisect_kit.cr_util.build_revlist')
+    @mock.patch('bisect_kit.gemini_bisect.gemini_util.GeminiAgent')
+    def test_dynamic_cost_tree_and_simulation(
+        self, _mock_agent, mock_build_revlist
+    ):
+        mock_build_revlist.return_value = (
+            None,
+            {
+                '1': {'actions': [{'rev': 'c1'}]},
+                '2': {'actions': [{'rev': 'c2'}]},
+                '3': {'actions': [{'rev': 'c3'}]},
+            },
+        )
+        with mock.patch.dict(
+            'os.environ', {'SKYLAB_CLOUD_SERVICE_ACCOUNT_JSON': 'dummy_path'}
+        ):
+            agent = gemini_util.BisectAgent(
+                test_name='test_cost_sim',
+                repo='test_repo',
+                revlist=['1', '2', '3'],
+                old_p=0.0,
+                new_p=1.0,
+            )
+
+            def cost_func(dut):
+                return [
+                    (30.0 if r == dut else 630.0, 30.0 if r == dut else 630.0)
+                    for r in agent._revlist
+                ]
+
+            agent.update_stats(
+                {
+                    '1': {
+                        'prob': 0.0,
+                        'status': {},
+                        'info_gain': 0.0,
+                        'info_gain_per_cost': 0.0,
+                    },
+                    '2': {
+                        'prob': 0.5,
+                        'status': {},
+                        'info_gain': 0.5,
+                        'info_gain_per_cost': 0.5,
+                    },
+                    '3': {
+                        'prob': 0.5,
+                        'status': {},
+                        'info_gain': 0.5,
+                        'info_gain_per_cost': 0.5,
+                    },
+                },
+                old_p=0.0,
+                new_p=1.0,
+                cost_func=cost_func,
+            )
+
+            # With simulated run at 2, DUT becomes 2
+            res = agent._get_revisions_order_by_utility(
+                simulated_runs=[{'rev_id': '2', 'result': 'FAIL'}],
+                depth=1,
+            )
+            self.assertIn('revisions', res)
+            # In future tree branching from 2, DUT is 2 for subsequent evaluations
+            self.assertIn('future_build_tree', res)
 
 
 if __name__ == '__main__':

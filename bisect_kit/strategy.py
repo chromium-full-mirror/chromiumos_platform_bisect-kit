@@ -1645,7 +1645,7 @@ class NoisyBinarySearch:
 
         return sorted(set(_enumerate(self.prob, depth, prev_idx)))
 
-    def next_idx(self, cost_table=None):
+    def next_idx(self, cost_table=None, cost_func=None):
         """Determines next index to binary search.
 
         Args:
@@ -1653,11 +1653,13 @@ class NoisyBinarySearch:
                       estimation is a tuple (estimated_old, estimated_new) where
             estimated_old: estimated cost if this candidate has old behavior
             estimated_new: estimated cost if this candidate has new behavior
+          cost_func: optional function mapping candidate rev/idx to cost table.
 
         Returns:
           Index to try for binary search. The returned index is optimized for
           minimal total cost.
         """
+        del cost_func
         if self.state == self.INITED:
             idx = self._next_idx_for_initial()
             assert idx is not None
@@ -1738,7 +1740,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                 return idx
         raise ValueError(f"Revision {rev} not found in rev_info")
 
-    def _update_gemini_stats(self, cost_table=None):
+    def _update_gemini_stats(self, cost_table=None, cost_func=None):
         if not self.gemini:
             return
 
@@ -1777,6 +1779,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             },
             old_p=self.old_p,
             new_p=self.new_p,
+            cost_func=cost_func,
         )
 
     def add_sample(self, idx, status=None, **kwargs):
@@ -1810,7 +1813,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                     'eval_log': eval_log,
                 }
 
-    def next_idx(self, cost_table=None):
+    def next_idx(self, cost_table=None, cost_func=None):
         """Determines next index to binary search.
 
         Args:
@@ -1818,6 +1821,7 @@ class GeminiFusionStrategy(NoisyBinarySearch):
                       estimation is a tuple (estimated_old, estimated_new) where
             estimated_old: estimated cost if this candidate has old behavior
             estimated_new: estimated cost if this candidate has new behavior
+          cost_func: optional function mapping candidate rev/idx to cost table.
 
         Returns:
           Index to try for binary search. The returned index is optimized for
@@ -1842,7 +1846,9 @@ class GeminiFusionStrategy(NoisyBinarySearch):
             return self._rev_to_idx(list(self._gemini_waiting_result.keys())[0])
 
         if self.gemini and not self.is_done():
-            self._update_gemini_stats(cost_table=cost_table)
+            self._update_gemini_stats(
+                cost_table=cost_table, cost_func=cost_func
+            )
             try:
                 gemini_reasoning = self.gemini.next(
                     list(self._gemini_waiting_result.values() or [None])[0]

@@ -1270,7 +1270,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
         else:
             while force or not self.search_strategy.is_done():
                 idx = self.search_strategy.next_idx(
-                    self.estimate_cost(prev_rev)
+                    self.estimate_cost(prev_rev),
+                    cost_func=self.estimate_cost,
                 )
                 rev = self.states.idx2rev(idx)
                 logger.info('try idx=%d rev=%s', idx, rev)
@@ -1832,7 +1833,8 @@ class BisectorCommandLine(typing.Generic[T_co]):
             return
 
         idx = self.search_strategy.next_idx(
-            self.estimate_cost(opts.current_rev)
+            self.estimate_cost(opts.current_rev),
+            cost_func=self.estimate_cost,
         )
         rev = self.states.idx2rev(idx)
         print(rev)
