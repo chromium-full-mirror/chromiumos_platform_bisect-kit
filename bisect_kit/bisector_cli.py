@@ -57,7 +57,7 @@ class InitOptions(BaseOptions):
     confidence: float
     endpoint_verification: bool
     test_name: str
-    experiments: list[experiment.ID]
+    experiments: list[str]
     # Common dynamic args from domains
     dut: str
     board: str
@@ -831,7 +831,9 @@ class BisectorCommandLine(typing.Generic[T_co]):
             if opts.test_name:
                 config.test_name = opts.test_name
             if opts.experiments:
-                config.experiments = opts.experiments
+                config.experiments = [
+                    experiment.ID(value) for value in opts.experiments
+                ]
 
             config.confidence = opts.confidence
             config.noisy = opts.noisy
