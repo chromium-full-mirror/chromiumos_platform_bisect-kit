@@ -55,6 +55,7 @@ LAB_DUT_EXCEPTIONS = [
     r'chromeos8-.+-host.+',
     r'chromeos8-.+-labstation.+',
     r'cre.+',
+    r'cri.+',
 ]
 
 # Prefixes of bisecor task identifier string. On Prod/Staging/Dev environments,
