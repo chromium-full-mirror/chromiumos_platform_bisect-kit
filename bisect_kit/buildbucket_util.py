@@ -307,7 +307,6 @@ class BuildbucketApi:
         self,
         board: str,
         manifest_xml: str,
-        recipe: str = 'build_bisector',
         deps: str | None = None,
         git_auth: bool = True,
         bucket: str = 'bisector',
@@ -324,7 +323,6 @@ class BuildbucketApi:
         Args:
           board: ChromeOS board name
           manifest_xml: A full manifest xml for building chromeOS
-          recipe: Recipe name to execute
           deps: A full DEPS file for building Chrome
           git_auth: A workaround for crbug.com/1068743
           bucket: A bucket name of buildbucket that will handle this build
@@ -374,7 +372,6 @@ class BuildbucketApi:
                 'name': board,
             },
             'builder_name': '%s-%s' % (board, bucket),
-            'recipe': recipe,
         }
         if chromeos_version:
             old_rev, new_rev, cl_count = codechange.parse_intra_rev(
