@@ -972,10 +972,14 @@ class BisectAgent:
         """Gets utility (info_gain_per_cost or info_gain) for a revision."""
         stats = self._rev_stats.get(rev_id)
         if stats:
-            if stats.get('info_gain_per_cost') is not None:
-                return float(stats['info_gain_per_cost'])
-            if stats.get('info_gain') is not None:
-                return float(stats['info_gain'])
+            info_gain_per_cost = stats.get('info_gain_per_cost')
+            if info_gain_per_cost is not None:
+                return float(info_gain_per_cost)
+
+            info_gain = stats.get('info_gain')
+            if info_gain is not None:
+                return float(info_gain)
+
         return float('-inf')
 
     def _get_current_prob_vector(self) -> list[float]:
