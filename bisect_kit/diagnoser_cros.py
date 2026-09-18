@@ -87,8 +87,8 @@ class CrosDiagnoser:
           states: a core.DiagnoseStates objejct.
           config: a DiagnoserConfig object.
         """
-        self.states = states
-        self.config = config
+        self._states = states
+        self._config = config
         self.path_factory = common.ProjectPathFactory(
             self.config.session,
             self.config.work_base,
@@ -135,6 +135,14 @@ class CrosDiagnoser:
         ) = None
         self.is_vm_board: bool | None = None
         self._dut_manager: DutManagerRecycler | None = None
+
+    @property
+    def config(self) -> core.DiagnoserConfig:
+        return self._config
+
+    @property
+    def states(self) -> core.DiagnoseStates:
+        return self._states
 
     def _verified_chromeos_prebuilt(self):
         if self.config.bypass_chromeos_prebuilt:

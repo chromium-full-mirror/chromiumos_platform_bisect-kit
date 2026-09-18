@@ -379,6 +379,11 @@ class BisectConfig:
     flavor: str | None = None
     branch: str | None = None
 
+    @classmethod
+    def from_dict(cls, data: dict[str, typing.Any]) -> BisectConfig:
+        """Constructs BisectConfig from a json-decoded dict."""
+        return _config_from_dict(cls, data)
+
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class DiagnoserConfig:
@@ -453,6 +458,47 @@ class DiagnoserConfig:
     board_cpu_arch: str = ''
     allocated_dut: str | None = None
 
+    @classmethod
+    def from_dict(cls, data: dict[str, typing.Any]) -> DiagnoserConfig:
+        """Constructs DiagnoserConfig from a json-decoded dict."""
+        return _config_from_dict(cls, data)
+
+
+_ConfigT = typing.TypeVar('_ConfigT', BisectConfig, DiagnoserConfig)
+
+
+def _config_from_dict(
+    cls: type[_ConfigT], data: dict[str, typing.Any]
+) -> _ConfigT:
+    """Constructs a config dataclass from a json-decoded dict.
+
+    Unlike cls(**data), this restores the fields whose runtime type is not
+    representable in json, e.g. `experiments` is stored as a list of str.
+
+    Args:
+        cls: the config dataclass to construct.
+        data: json-decoded dict, e.g. read from a session file.
+
+    Returns:
+        The constructed config.
+
+    Raises:
+        ValueError: if `data` contains an unknown key, or an unknown
+            experiment id.
+    """
+    valid_keys = {f.name for f in dataclasses.fields(cls)}
+
+    kwargs: dict[str, typing.Any] = {}
+    for key, value in data.items():
+        if key not in valid_keys:
+            raise ValueError(f'Unknown key {key} found (value: {value})')
+        if key == 'experiments' and value is not None:
+            kwargs[key] = [experiment.ID(v) for v in value]
+        else:
+            kwargs[key] = value
+
+    return cls(**kwargs)
+
 
 class DiagnoseStates(States):
     """Diagnose states."""
@@ -479,7 +525,9 @@ class DiagnoseStates(States):
             and 'statistics' in self._data
         ):
             if isinstance(self._data['config'], dict):
-                self._data['config'] = DiagnoserConfig(**self._data['config'])
+                self._data['config'] = DiagnoserConfig.from_dict(
+                    self._data['config']
+                )
             self._init_done()
             return True
         return False
@@ -616,7 +664,7 @@ class BisectStates(States):
             self._history = rebuilt.get('history', [])
             config = rebuilt.get('config')
             if isinstance(config, dict):
-                config = BisectConfig(**config)
+                config = BisectConfig.from_dict(config)
             self._config = config
             self._revlist = rebuilt.get('revlist', [])
             self._details = rebuilt.get('details', {})

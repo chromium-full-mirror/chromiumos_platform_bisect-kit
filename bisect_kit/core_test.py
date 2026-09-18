@@ -11,6 +11,7 @@ import unittest
 
 from bisect_kit import core
 from bisect_kit import strategy_states
+import experiment
 
 
 class TestRevInfo(unittest.TestCase):
@@ -414,6 +415,150 @@ class TestBisectStates(unittest.TestCase):
             expected_rev_info, states.get_rev_info(ignore_history=True)
         ):
             self.assertEqual(want.to_dict(), got.to_dict())
+
+
+class TestConfigFromDict(unittest.TestCase):
+    """Test BisectConfig.from_dict() and DiagnoserConfig.from_dict()."""
+
+    def test_empty_dict_returns_default_config(self):
+        self.assertEqual(core.BisectConfig.from_dict({}), core.BisectConfig())
+        self.assertEqual(
+            core.DiagnoserConfig.from_dict({}), core.DiagnoserConfig()
+        )
+
+    def test_bisect_config_assigns_known_keys(self):
+        config = core.BisectConfig.from_dict(
+            {
+                'board': 'eve',
+                'old': '1.2.3',
+                'new': '4.5.6',
+                'is_public_build': True,
+                'confidence': 0.99,
+                'switch': [['./switch.py']],
+            }
+        )
+
+        self.assertEqual(config.board, 'eve')
+        self.assertEqual(config.old, '1.2.3')
+        self.assertEqual(config.new, '4.5.6')
+        self.assertTrue(config.is_public_build)
+        self.assertEqual(config.confidence, 0.99)
+        self.assertEqual(config.switch, [['./switch.py']])
+        # Untouched fields keep their default value.
+        self.assertEqual(config.eval, [])
+        self.assertIsNone(config.dut)
+
+    def test_diagnoser_config_assigns_known_keys(self):
+        config = core.DiagnoserConfig.from_dict(
+            {
+                'session': 'session1',
+                'board': 'eve',
+                'old_value': 1.0,
+                'chromium_patch_cls': ['crrev.com/c/123'],
+            }
+        )
+
+        self.assertEqual(config.session, 'session1')
+        self.assertEqual(config.board, 'eve')
+        self.assertEqual(config.old_value, 1.0)
+        self.assertEqual(config.chromium_patch_cls, ['crrev.com/c/123'])
+        self.assertEqual(config.extra_test_variables, [])
+
+    def test_unknown_key_raises(self):
+        for cls in (core.BisectConfig, core.DiagnoserConfig):
+            with self.subTest(cls=cls.__name__):
+                with self.assertRaises(ValueError) as ctx:
+                    cls.from_dict({'board': 'eve', 'no_such_key': 'value'})
+                self.assertIn('no_such_key', str(ctx.exception))
+
+    def test_experiments_restored_as_enum(self):
+        for cls in (core.BisectConfig, core.DiagnoserConfig):
+            with self.subTest(cls=cls.__name__):
+                config = cls.from_dict(
+                    {'experiments': ['stateless', 'vm']},
+                )
+
+                experiments = config.experiments
+                self.assertEqual(
+                    experiments,
+                    [experiment.ID.STATELESS, experiment.ID.VM],
+                )
+                assert experiments is not None
+                for value in experiments:
+                    self.assertIsInstance(value, experiment.ID)
+
+    def test_empty_experiments(self):
+        for cls in (core.BisectConfig, core.DiagnoserConfig):
+            with self.subTest(cls=cls.__name__):
+                config = cls.from_dict({'experiments': []})
+
+                self.assertEqual(config.experiments, [])
+
+    def test_none_experiments(self):
+        # DiagnoserConfig.experiments is optional, so a session file may store
+        # null. It should be loaded as-is instead of raising TypeError.
+        config = core.DiagnoserConfig.from_dict({'experiments': None})
+
+        self.assertIsNone(config.experiments)
+
+    def test_unknown_experiment_raises(self):
+        with self.assertRaises(ValueError):
+            core.DiagnoserConfig.from_dict({'experiments': ['no_such_exp']})
+
+    def _write_session_file(self, data: dict) -> str:
+        """Writes `data` to a temporary session file and returns its path."""
+        session_file = tempfile.mktemp()
+        self.addCleanup(os.unlink, session_file)
+        with open(session_file, 'w') as f:
+            json.dump(data, f)
+        return session_file
+
+    def test_diagnose_states_load_converts_experiments(self):
+        session_file = self._write_session_file(
+            {
+                'config': {'session': 'session1', 'experiments': ['vm']},
+                'history': [],
+                'statistics': {},
+            }
+        )
+
+        states = core.DiagnoseStates(session_file)
+
+        self.assertTrue(states.load_states())
+        experiments = states.config.experiments
+        self.assertEqual(experiments, [experiment.ID.VM])
+        assert experiments is not None
+        self.assertIsInstance(experiments[0], experiment.ID)
+
+    def test_bisect_states_load_converts_experiments(self):
+        session_file = self._write_session_file(
+            {
+                'config': {'board': 'eve', 'experiments': ['vm']},
+                'revlist': ['a', 'b'],
+                'history': [],
+            }
+        )
+
+        states = core.BisectStates(session_file)
+
+        self.assertTrue(states.load_states())
+        experiments = states.config.experiments
+        self.assertEqual(experiments, [experiment.ID.VM])
+        self.assertIsInstance(experiments[0], experiment.ID)
+
+    def test_diagnose_states_load_unknown_key_raises(self):
+        session_file = self._write_session_file(
+            {
+                'config': {'obsolete_option': True},
+                'history': [],
+                'statistics': {},
+            }
+        )
+
+        states = core.DiagnoseStates(session_file)
+
+        with self.assertRaises(ValueError):
+            states.load_states()
 
 
 class TestSerialization(unittest.TestCase):

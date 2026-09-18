@@ -5,6 +5,7 @@
 """Test diagnoser_cros module."""
 
 import logging
+import tempfile
 import unittest
 from unittest import mock
 
@@ -28,7 +29,7 @@ class TestDiagnose(unittest.TestCase):
         def __init__(self, config: core.DiagnoserConfig, is_stateless: bool):
             # pylint: disable=super-init-not-called
             # Only initializes needed fields.
-            self.config = config
+            self._config = config
             self.is_stateless = is_stateless
 
     def init(self, config: core.DiagnoserConfig, is_stateless: bool):
@@ -374,8 +375,8 @@ class TestCrosDiagnoser(unittest.TestCase):
         # pylint: disable=W0231
         # Not called the __init__method in the parent.
         def __init__(self, config: core.DiagnoserConfig):
-            self.config = config
-            self.states = mock.Mock()
+            self._config = config
+            self._states = mock.Mock()
             self.old_info = mock.Mock()
             self.new_info = mock.Mock()
             self.noisy: str | None = None
@@ -523,6 +524,47 @@ class TestCrosDiagnoser(unittest.TestCase):
         args, _ = mock_narrow_down_chromeos_localbuild.call_args
         # args[0] is dut_manager, args[1] is eval_cmd, args[2] is buildbucket_build
         self.assertFalse(args[2])
+
+
+class TestCrosDiagnoserAccessors(unittest.TestCase):
+    """Test CrosDiagnoser.config and CrosDiagnoser.states properties."""
+
+    def setUp(self):
+        self.config = core.DiagnoserConfig(
+            session='session1',
+            board='eve',
+            dut='dut1',
+            cros_prebuilt_old='1.2.3',
+            cros_prebuilt_new='4.5.6',
+        )
+        self.states = core.DiagnoseStates(tempfile.mktemp())
+        self.diagnoser = diagnoser_cros.CrosDiagnoser(self.states, self.config)
+
+    def test_returns_injected_objects(self):
+        self.assertIs(self.diagnoser.config, self.config)
+        self.assertIs(self.diagnoser.states, self.states)
+
+    def test_config_is_read_only(self):
+        with self.assertRaises(AttributeError):
+            # Assigning to the property is the error this test guards against.
+            self.diagnoser.config = core.DiagnoserConfig()  # type: ignore[misc]
+
+        self.assertIs(self.diagnoser.config, self.config)
+
+    def test_states_is_read_only(self):
+        with self.assertRaises(AttributeError):
+            self.diagnoser.states = core.DiagnoseStates(  # type: ignore[misc]
+                tempfile.mktemp()
+            )
+
+        self.assertIs(self.diagnoser.states, self.states)
+
+    def test_config_fields_are_still_mutable(self):
+        # The property only prevents rebinding; the diagnoser still updates
+        # config fields while running.
+        self.diagnoser.config.allocated_dut = 'dut2'
+
+        self.assertEqual(self.config.allocated_dut, 'dut2')
 
 
 if __name__ == '__main__':

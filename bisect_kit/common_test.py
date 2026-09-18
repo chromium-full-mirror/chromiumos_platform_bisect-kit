@@ -64,6 +64,16 @@ class TestCommon(unittest.TestCase):
         self.assertFalse(
             common.is_valid_uuid('0683b2c93-7c88-4ac5-b4ed-206137ac859b')
         )
+        # not a uuid at all
+        self.assertFalse(common.is_valid_uuid(''))
+        self.assertFalse(common.is_valid_uuid('not-a-uuid'))
+        # valid uuid4 but not in the canonical form
+        self.assertFalse(
+            common.is_valid_uuid('683B2C93-7C88-4AC5-B4ED-206137AC859B')
+        )
+        self.assertFalse(
+            common.is_valid_uuid('{683b2c93-7c88-4ac5-b4ed-206137ac859b}')
+        )
 
     def test_path_factory(self):
         path_facory = common.ProjectPathFactory(
