@@ -2662,50 +2662,6 @@ def prepare_chroot(chromeos_root, replace=False):
             ),
         )
 
-    # Workaround b/297481113 to setup config and credential files in chroot home
-    # directory correctly.
-    #
-    # When entering the chroot by running "cros_sdk", it tried to move data
-    # from "chroot/..." to "out/..." (b/265885353). Before
-    # https://chromium-review.googlesource.com/c/chromiumos/chromite/+/4522314,
-    # the "home" directory is not considered yet. That is, "chroot/home/..."
-    # is left intact and "out/home/..." is not populated yet. In chroot, the
-    # home directory is bound to "chroot/home/...".
-    #
-    # After that CL, "chroot/home/..." is moved to "out/home/..." when
-    # entering the chroot. The chroot home directory is bound to
-    # "out/home/..." instead.
-    #
-    # As a result, when switching local ChromeOS source tree to a specific
-    # version, we must ensure
-    # 1. If the version is older than that CL, either "chroot/home/..." has
-    #    not been moved to "out/home/..." yet. Or we need to copy it back.
-    # 2. If the version is newer than that CL, "chroot/home/..." will be moved
-    #    to "out/home/..." (again) via "rsync -aXH --remove-source-files" by
-    #    cros_sdk. We must ensure the operation is valid.
-    #
-    # We can remove this after we drop the support of bisecting CrOS versions
-    # before R118-15588.0.0.
-    #
-    if os.path.exists(home_mount_point):
-        legacy_home_mount_point = os.path.join(
-            chromeos_root, 'chroot', 'home', os.environ['USER']
-        )
-        logging.info(
-            'workaround b/297481113 by copying %s back to %s',
-            home_mount_point,
-            legacy_home_mount_point,
-        )
-        util.check_call(
-            'sudo',
-            'rsync',
-            '-aHX',
-            # rsync requires an extra '/' to get rid of the top level source
-            # directory in the dest directory.
-            home_mount_point + '/',
-            legacy_home_mount_point,
-        )
-
 
 @contextlib.contextmanager
 def raise_if_chroot_recreation_needed():
