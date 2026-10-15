@@ -1339,7 +1339,7 @@ class CrosDiagnoser:
                 endpoint_verification=self.config.endpoint_verification,
                 test_name=self.config.test_name,
                 experiments=(
-                    [e.value for e in self.config.experiments]
+                    [str(e) for e in self.config.experiments]
                     if self.config.experiments
                     else None
                 ),
@@ -1946,7 +1946,7 @@ class DiagnoseCommandLineBase:
             endpoint_verification=opts.endpoint_verification,
             consider_test_crash_as_failure=opts.consider_test_crash_as_failure,
             filter_error_message=opts.filter_error_message,
-            experiments=opts.experiments,
+            experiments=[experiment.ID(value) for value in opts.experiments],
             sync_dut_allocate_spec_with_db=opts.sync_dut_allocate_spec_with_db,
         )
 

@@ -114,6 +114,25 @@ class TestDiagnoseStates(unittest.TestCase):
             ),
         )
 
+    def test_save_and_load_restores_experiments(self):
+        # The session file stores experiments as str. They should be loaded
+        # back as experiment.ID (b/558048456).
+        experiments = [experiment.ID.STATELESS, experiment.ID.SHARED_DUT_POOL]
+        states = core.DiagnoseStates(self.session_file)
+        states.init_states(
+            core.DiagnoserConfig(session='session1', experiments=experiments)
+        )
+        states.save()
+
+        loaded_states = core.DiagnoseStates(self.session_file)
+
+        self.assertTrue(loaded_states.load_states())
+        loaded_experiments = loaded_states.config.experiments
+        self.assertEqual(loaded_experiments, experiments)
+        assert loaded_experiments is not None
+        for value in loaded_experiments:
+            self.assertIsInstance(value, experiment.ID)
+
     def test_load_empty_json_failed(self):
         with open(self.session_file, 'w') as f:
             f.write(json.dumps({}, indent=4, sort_keys=True))
@@ -244,6 +263,20 @@ class TestBisectStates(unittest.TestCase):
         self.assertEqual(loaded_states.details, self.fake_details)
         self.assertEqual(loaded_states.rev2idx('5'), 5)
         self.assertEqual(loaded_states.strategy_states, strategy_states_to_save)
+
+    def test_save_and_load_restores_experiments(self):
+        states = core.BisectStates(self.session_file)
+        states.init_states(
+            core.BisectConfig(experiments=[experiment.ID.VM]), ['a', 'b']
+        )
+        states.save()
+
+        loaded_states = core.BisectStates(self.session_file)
+
+        self.assertTrue(loaded_states.load_states())
+        experiments = loaded_states.config.experiments
+        self.assertEqual(experiments, [experiment.ID.VM])
+        self.assertIsInstance(experiments[0], experiment.ID)
 
     def test_load_failed(self):
         with open(self.session_file, 'w') as f:
@@ -591,6 +624,29 @@ class TestSerialization(unittest.TestCase):
         self.assertIsInstance(rebuilt_config, core.BisectConfig)
         self.assertEqual(rebuilt_config.board, 'bar')
         self.assertEqual(rebuilt_config.term_old, 'old_term')
+
+    def test_rebuild_from_json_uses_from_dict(self):
+        # (3) A dataclass with from_dict() is rebuilt by it, so experiments
+        # are restored as experiment.ID and unknown keys are rejected.
+        def make_json_data(**fields):
+            return {
+                '__class__': {
+                    '__module__': 'bisect_kit.core',
+                    '__name__': 'DiagnoserConfig',
+                },
+                **fields,
+            }
+
+        rebuilt_config = core.rebuild_from_json(
+            make_json_data(experiments=['stateless'])
+        )
+
+        self.assertIsInstance(rebuilt_config, core.DiagnoserConfig)
+        self.assertEqual(rebuilt_config.experiments, [experiment.ID.STATELESS])
+        self.assertIsInstance(rebuilt_config.experiments[0], experiment.ID)
+
+        with self.assertRaises(ValueError):
+            core.rebuild_from_json(make_json_data(obsolete_option=True))
 
 
 if __name__ == '__main__':

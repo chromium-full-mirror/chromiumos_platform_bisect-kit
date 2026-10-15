@@ -5,6 +5,7 @@
 """Test diagnoser_cros module."""
 
 import logging
+import os
 import tempfile
 import unittest
 from unittest import mock
@@ -365,6 +366,41 @@ class TestDiagnoseCommandLine(unittest.TestCase):
         )
         self.assertEqual(opts.filter_error_message, 'test error message')
 
+    def test_cmd_init_stores_experiments_as_enum(self):
+        session_file = tempfile.mktemp()
+        self.addCleanup(os.unlink, session_file)
+        states = core.DiagnoseStates(session_file)
+        self.cli.states = states
+        opts = self.parser.parse_args(
+            [
+                'init',
+                '--old',
+                'old_ver',
+                '--new',
+                'new_ver',
+                '--session',
+                's',
+                '--experiments',
+                'stateless',
+                'shared_dut_pool',
+            ]
+        )
+
+        with mock.patch.object(self.cli, 'check_options'):
+            self.cli.cmd_init(opts)
+
+        loaded_states = core.DiagnoseStates(session_file)
+        self.assertTrue(loaded_states.load_states())
+        for config in (states.config, loaded_states.config):
+            experiments = config.experiments
+            self.assertEqual(
+                experiments,
+                [experiment.ID.STATELESS, experiment.ID.SHARED_DUT_POOL],
+            )
+            assert experiments is not None
+            for value in experiments:
+                self.assertIsInstance(value, experiment.ID)
+
 
 class TestCrosDiagnoser(unittest.TestCase):
     """Test CrosDiagnoser class."""
@@ -467,6 +503,36 @@ class TestCrosDiagnoser(unittest.TestCase):
         cmd = switch_cmds[0]
         self.assertIn('--gn-extra-args', cmd)
         self.assertIn('dcheck_always_on=true', cmd)
+
+    @mock.patch('bisect_kit.wrapper.BisectorWrapper')
+    def test_narrow_down_chrome_with_experiments_from_session(
+        self, MockBisectorWrapper
+    ):
+        # b/558048456: Chrome bisection failed with AttributeError when the
+        # config with experiments was loaded from the session file.
+        session_file = tempfile.mktemp()
+        self.addCleanup(os.unlink, session_file)
+        self.config.experiments = [
+            experiment.ID.STATELESS,
+            experiment.ID.SHARED_DUT_POOL,
+        ]
+        states = core.DiagnoseStates(session_file)
+        states.init_states(self.config)
+        states.save()
+        loaded_states = core.DiagnoseStates(session_file)
+        self.assertTrue(loaded_states.load_states())
+        diagnoser = self.FakeDiagnoser(loaded_states.config)
+
+        # pylint: disable=protected-access
+        diagnoser._narrow_down_chrome(
+            mock.Mock(), eval_cmd=['eval.sh'], init_once=None
+        )
+
+        MockBisectorWrapper.return_value.init_if_necessary.assert_called()
+        _, kwargs = MockBisectorWrapper.return_value.init_if_necessary.call_args
+        self.assertEqual(
+            kwargs['experiments'], ['stateless', 'shared_dut_pool']
+        )
 
     @mock.patch('bisect_kit.diagnoser_cros.buildbucket_util.BuildbucketApi')
     @mock.patch('bisect_kit.diagnoser_cros.cros_util.is_buildbucket_buildable')

@@ -186,7 +186,12 @@ class StatesEncoder(json.JSONEncoder):
 
 
 def rebuild_from_json(config):
-    """Reconstruct a dict which may contain dataclasses from serialized json."""
+    """Reconstruct a dict which may contain dataclasses from serialized json.
+
+    A dataclass is reconstructed by its from_dict() classmethod if it has one,
+    so that it can restore field types lost in json, e.g. experiment.ID.
+    Otherwise, it is reconstructed by cls(**fields).
+    """
     if isinstance(config, dict):
         if '__class__' in config:
             cls = getattr(
@@ -194,6 +199,9 @@ def rebuild_from_json(config):
                 config['__class__']['__name__'],
             )
             del config['__class__']
+            from_dict = getattr(cls, 'from_dict', None)
+            if from_dict is not None:
+                return from_dict(config)
             return cls(**config)
         for key, value in config.items():
             config[key] = rebuild_from_json(value)
