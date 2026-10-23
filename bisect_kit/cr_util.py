@@ -690,6 +690,8 @@ def get_RBE_environment_variables() -> dict[str, str]:
     # that check. For more details, see b/320639792.
     env['AUTONINJA_SKIP_EXTERNAL_ACCOUNT_CHECK'] = '1'
 
+    env['SISO_CREDENTIAL_HELPER'] = 'luci-auth'
+
     return env
 
 
