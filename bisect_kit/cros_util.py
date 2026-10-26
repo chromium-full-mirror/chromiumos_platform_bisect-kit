@@ -2594,6 +2594,15 @@ def prepare_chroot(chromeos_root, replace=False):
         home_mount_point,
     )
 
+    # Ensure ~/chromiumos inside chroot points to /mnt/host/source.
+    # chromite's ChrootCreator.init_user() only creates this symlink if the
+    # user's home directory does not already exist at chroot creation time, and
+    # tools like `tast` hardcode $HOME/chromiumos to locate the source tree.
+    os.makedirs(home_mount_point, exist_ok=True)
+    chromiumos_link = os.path.join(home_mount_point, 'chromiumos')
+    if not os.path.lexists(chromiumos_link):
+        os.symlink(chromeos_root_inside_chroot, chromiumos_link)
+
     # Copy local ssh configs into chromeos root.
     for name in ['config', 'chromeos_ssh_proxy']:
         path = os.path.expanduser(os.path.join('~/.ssh', name))

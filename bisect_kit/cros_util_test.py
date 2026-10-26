@@ -1913,6 +1913,48 @@ class TestCrosUtil(unittest.TestCase):
             ignore_errors=True,
         )
 
+    @mock.patch('bisect_kit.util.check_call')
+    @mock.patch('bisect_kit.cros_util.override_autotest_config')
+    @mock.patch('bisect_kit.cros_util.mount_chroot')
+    @mock.patch(
+        'bisect_kit.cros_util.ChromeOSVersionParser.query_repo_chromeos_version'
+    )
+    def test_prepare_chroot_creates_chromiumos_symlink(
+        self,
+        mock_query_version,
+        mock_mount_chroot,
+        mock_override_config,
+        mock_check_call,
+    ):
+        mock_query_version.return_value = cros_util.ChromeOSVersion(
+            chrome_branch=120,
+            chromeos_build=15000,
+            chromeos_branch=0,
+            chromeos_patch=0,
+        )
+        with tempfile.TemporaryDirectory() as tempdir:
+            chromeos_root = tempdir
+            home_mount_point = os.path.join(
+                chromeos_root, 'out', 'home', os.environ['USER']
+            )
+            chromiumos_link = os.path.join(home_mount_point, 'chromiumos')
+
+            # First run: out/home/$USER/chromiumos should be created as a symlink
+            cros_util.prepare_chroot(chromeos_root)
+            self.assertTrue(os.path.islink(chromiumos_link))
+            self.assertEqual(
+                os.readlink(chromiumos_link),
+                cros_util.chromeos_root_inside_chroot,
+            )
+
+            # Second run: existing symlink should be preserved without error
+            cros_util.prepare_chroot(chromeos_root)
+            self.assertTrue(os.path.islink(chromiumos_link))
+            self.assertEqual(
+                os.readlink(chromiumos_link),
+                cros_util.chromeos_root_inside_chroot,
+            )
+
 
 if __name__ == '__main__':
     unittest.main()
