@@ -84,6 +84,36 @@ def trend_score(prev_from, prev_to, now_from, now_to):
     return max(abs_score, ratio_score)
 
 
+def parse_observation(observation):
+    """Parses observation string into prior counts.
+
+    Args:
+      observation: A string denoting previous evaluation results (e.g.
+        'old=3/30,new=27/30'). See NoisyBinarySearch.__init__ for format.
+
+    Returns:
+      ((old false-positive, old trials), (new true-positive, new trials))
+    """
+    # default not noisy
+    old_f: tuple[int | None, int | None] = NOT_NOISY
+    new_t: tuple[int | None, int | None] = NOT_NOISY
+    if not observation:
+        return old_f, new_t
+
+    for term in observation.split(','):
+        m = re.match(r'^(old|new)=(\d+)/(\d+)$', term)
+        assert m
+        new_behavior, trial = int(m.group(2)), int(m.group(3))
+        assert 0 <= new_behavior <= trial
+
+        if m.group(1) == 'new':
+            new_t = new_behavior, trial
+        elif m.group(1) == 'old':
+            old_f = new_behavior, trial
+
+    return old_f, new_t
+
+
 class NoisyBinarySearch:
     """Binary search algorithm supporting noisy signal.
 
@@ -250,7 +280,7 @@ class NoisyBinarySearch:
             self.old_p, self.new_p = self.oracle
             self.prior_observation = None
         elif observation:
-            self.prior_observation = self._parse_observation(observation)
+            self.prior_observation = parse_observation(observation)
             self.observation = None
             (left_new, left_trial), (
                 right_new,
@@ -453,55 +483,6 @@ class NoisyBinarySearch:
                 self._update(idx, status)
         else:
             assert 0, 'unexpected state: ' + self.state
-
-    @staticmethod
-    def _parse_observation(observation):
-        """Parses prior from argument.
-
-        Args:
-          observation: A string denoting previous evaluation results. See comments
-              of __init__ for detail format.
-
-        Returns:
-          ((old false-positive, old trials), (new true-positive, new trials))
-        """
-        # default not noisy
-        old_f: tuple[int | None, int | None] = NOT_NOISY
-        new_t: tuple[int | None, int | None] = NOT_NOISY
-        if not observation:
-            return old_f, new_t
-
-        for term in observation.split(','):
-            m = re.match(r'^(old|new)=(\d+)/(\d+)$', term)
-            assert m
-            new_behavior, trial = int(m.group(2)), int(m.group(3))
-            assert 0 <= new_behavior <= trial
-
-            if m.group(1) == 'new':
-                new_t = new_behavior, trial
-            elif m.group(1) == 'old':
-                old_f = new_behavior, trial
-
-        return old_f, new_t
-
-    @staticmethod
-    def is_noisy_observation(observation: str | None) -> bool:
-        """Returns whether an observation string indicates noisy (non-deterministic) results."""
-        if not observation:
-            return False
-        (old_new, _old_trial), (
-            new_new,
-            new_trial,
-        ) = NoisyBinarySearch._parse_observation(observation)
-        if old_new is not None and old_new > 0:
-            return True
-        if (
-            new_new is not None
-            and new_trial is not None
-            and new_new < new_trial
-        ):
-            return True
-        return False
 
     def _gather_noise_count(self):
         """Gathers noise count from current run results.
@@ -1684,6 +1665,26 @@ class NoisyBinarySearch:
                 self.count_revnew_old += 1
             if status == 'new':
                 self.count_revnew_new += 1
+
+
+GEMINI_BASIC_MAX_FLAKE_RATE = 0.2
+
+
+def is_too_flaky_for_gemini_basic(
+    observation: str | None,
+    max_flake_rate: float = GEMINI_BASIC_MAX_FLAKE_RATE,
+) -> bool:
+    """Returns whether an observation string is too flaky for gemini_assist_basic."""
+    if not observation:
+        return False
+    (old_new, old_trial), (new_new, new_trial) = parse_observation(observation)
+    if old_new is not None and old_trial:
+        if old_new / old_trial > max_flake_rate:
+            return True
+    if new_new is not None and new_trial:
+        if (new_trial - new_new) / new_trial > max_flake_rate:
+            return True
+    return False
 
 
 class GeminiFusionStrategy(NoisyBinarySearch):

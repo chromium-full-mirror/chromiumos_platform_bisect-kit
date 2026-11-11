@@ -1644,7 +1644,7 @@ class BisectorCommandLine(typing.Generic[T_co]):
                         self.config.experiments,
                         experiment.ID.GEMINI_ASSIST_BASIC,
                     )
-                    and not strategy.NoisyBinarySearch.is_noisy_observation(
+                    and not strategy.is_too_flaky_for_gemini_basic(
                         self.config.noisy
                     )
                 )

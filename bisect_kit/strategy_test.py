@@ -36,6 +36,41 @@ class TestStrategy(unittest.TestCase):
         self.assertEqual(strategy.trend_score(0.0, 300.0, 0.0, 30.0), 0.1)
         self.assertLess(strategy.trend_score(-10.0, 10.0, 10.0, -10.0), 0)
 
+    def test_parse_observation(self):
+        self.assertEqual(
+            strategy.parse_observation('new=9/10'),
+            (strategy.NOT_NOISY, (9, 10)),
+        )
+        self.assertEqual(
+            strategy.parse_observation('old=1/10,new=9/10'), ((1, 10), (9, 10))
+        )
+
+    def test_is_too_flaky_for_gemini_basic(self):
+        self.assertFalse(strategy.is_too_flaky_for_gemini_basic(None))
+        self.assertFalse(strategy.is_too_flaky_for_gemini_basic(''))
+        self.assertFalse(
+            strategy.is_too_flaky_for_gemini_basic('old=0/1,new=1/1')
+        )
+        self.assertFalse(
+            strategy.is_too_flaky_for_gemini_basic('old=0/5,new=5/5')
+        )
+        self.assertFalse(strategy.is_too_flaky_for_gemini_basic('new=9/10'))
+        self.assertFalse(strategy.is_too_flaky_for_gemini_basic('old=1/10'))
+        self.assertFalse(
+            strategy.is_too_flaky_for_gemini_basic('old=3/30,new=27/30')
+        )
+        self.assertFalse(
+            strategy.is_too_flaky_for_gemini_basic('old=6/30,new=24/30')
+        )
+        self.assertTrue(
+            strategy.is_too_flaky_for_gemini_basic('old=6/30,new=21/30')
+        )
+        self.assertTrue(strategy.is_too_flaky_for_gemini_basic('new=5/10'))
+        self.assertTrue(strategy.is_too_flaky_for_gemini_basic('old=3/10'))
+        self.assertTrue(
+            strategy.is_too_flaky_for_gemini_basic('old=9/30,new=21/30')
+        )
+
 
 # pylint: disable=protected-access
 class TestNoisyBinarySearch(unittest.TestCase):
@@ -47,26 +82,6 @@ class TestNoisyBinarySearch(unittest.TestCase):
             self.rev_info.append(core.RevInfo(str(i)))
         self.init_prob = [1.0] * len(self.rev_info)
         self.random_list = testing.RandomNum()
-
-    def test_parse_observation(self):
-        Strategy = strategy.NoisyBinarySearch
-        self.assertEqual(
-            Strategy._parse_observation('new=9/10'),
-            (strategy.NOT_NOISY, (9, 10)),
-        )
-        self.assertEqual(
-            Strategy._parse_observation('old=1/10,new=9/10'), ((1, 10), (9, 10))
-        )
-
-    def test_is_noisy_observation(self):
-        Strategy = strategy.NoisyBinarySearch
-        self.assertFalse(Strategy.is_noisy_observation(None))
-        self.assertFalse(Strategy.is_noisy_observation(''))
-        self.assertFalse(Strategy.is_noisy_observation('old=0/1,new=1/1'))
-        self.assertFalse(Strategy.is_noisy_observation('old=0/5,new=5/5'))
-        self.assertTrue(Strategy.is_noisy_observation('new=9/10'))
-        self.assertTrue(Strategy.is_noisy_observation('old=1/10'))
-        self.assertTrue(Strategy.is_noisy_observation('old=1/10,new=9/10'))
 
     def test_calculate_probs_0_1(self):
         prob = strategy.NoisyBinarySearch._calculate_probs(

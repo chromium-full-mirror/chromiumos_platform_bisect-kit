@@ -695,17 +695,22 @@ class TestBisectorCommandLine(unittest.TestCase):
         s = bisector._strategy_factory()
         self.assertIsInstance(s, strategy.GeminiFusionStrategy)
 
-        # 5. gemini_assist_basic flag + non-deterministic observation ('new=9/10'): NoisyBinarySearch
-        bisector.config.noisy = 'new=9/10'
+        # 5. gemini_assist_basic flag + mild flake ('old=3/30,new=27/30'): GeminiFusionStrategy
+        bisector.config.noisy = 'old=3/30,new=27/30'
+        s = bisector._strategy_factory()
+        self.assertIsInstance(s, strategy.GeminiFusionStrategy)
+
+        # 6. gemini_assist_basic flag + very flaky observation ('old=6/30,new=21/30'): NoisyBinarySearch
+        bisector.config.noisy = 'old=6/30,new=21/30'
         s = bisector._strategy_factory()
         self.assertNotIsInstance(s, strategy.GeminiFusionStrategy)
 
-        # 6. gemini_assist (not basic) + non-deterministic observation ('new=9/10'): GeminiFusionStrategy
+        # 7. gemini_assist (not basic) + very flaky observation ('old=6/30,new=21/30'): GeminiFusionStrategy
         bisector.config.experiments = [experiment.ID.GEMINI_ASSIST]
         s = bisector._strategy_factory()
         self.assertIsInstance(s, strategy.GeminiFusionStrategy)
 
-        # 7. Reverse bisection (term_old='FAIL', term_new='PASS') with gemini_assist: GeminiFusionStrategy
+        # 8. Reverse bisection (term_old='FAIL', term_new='PASS') with gemini_assist: GeminiFusionStrategy
         bisector.config.term_old = 'FAIL'
         bisector.config.term_new = 'PASS'
         s = bisector._strategy_factory()
