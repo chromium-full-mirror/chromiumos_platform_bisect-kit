@@ -338,7 +338,9 @@ def ssh_cmd(
     cmd += ['-oPreferredAuthentications=publickey']
     if connect_timeout:
         cmd += [f'-oConnectTimeout={connect_timeout}']
-    cmd.append(host)
+    # "--" stops ssh from parsing the host or the remote command as options
+    # even if they start with "-".
+    cmd += ['--', host]
     cmd += list(args)
 
     max_attempts = max(max_attempts, 1)
@@ -388,7 +390,9 @@ def scp_cmd(
     cmd += ['-oPreferredAuthentications=publickey']
     if connect_timeout:
         cmd += [f'-oConnectTimeout={connect_timeout}']
+    # "--" stops scp from parsing a file name that starts with "-" as an option.
     cmd += [
+        '--',
         from_file,
         to_file,
     ]

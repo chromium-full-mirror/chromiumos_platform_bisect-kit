@@ -253,5 +253,32 @@ class TestInitOnce(unittest.TestCase):
         mock_func.assert_called_once()
 
 
+class TestSshCmd(unittest.TestCase):
+    """Test ssh_cmd() and scp_cmd()."""
+
+    @mock.patch.object(util, 'check_output', return_value='')
+    def test_ssh_cmd_does_not_parse_host_as_option(self, mock_check_output):
+        util.ssh_cmd('-oProxyCommand=true', 'cat', '/etc/lsb-release')
+        mock_check_output.assert_called_once_with(
+            'ssh',
+            '-oPreferredAuthentications=publickey',
+            '--',
+            '-oProxyCommand=true',
+            'cat',
+            '/etc/lsb-release',
+        )
+
+    @mock.patch.object(util, 'check_output', return_value='')
+    def test_scp_cmd_does_not_parse_file_as_option(self, mock_check_output):
+        util.scp_cmd('-oProxyCommand=true', 'root@dut:/tmp/')
+        mock_check_output.assert_called_once_with(
+            'scp',
+            '-oPreferredAuthentications=publickey',
+            '--',
+            '-oProxyCommand=true',
+            'root@dut:/tmp/',
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
