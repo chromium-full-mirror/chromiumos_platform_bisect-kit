@@ -8,6 +8,7 @@ import fnmatch
 import logging
 import os
 import random
+import shutil
 import subprocess
 import tempfile
 import textwrap
@@ -1954,6 +1955,116 @@ class TestCrosUtil(unittest.TestCase):
                 os.readlink(chromiumos_link),
                 cros_util.chromeos_root_inside_chroot,
             )
+
+    @mock.patch('bisect_kit.supssh_relay.ensure_running')
+    @mock.patch('bisect_kit.supssh_relay.is_enabled', return_value=True)
+    @mock.patch('bisect_kit.chromite_util.check_output')
+    def test_cros_sdk_sets_up_supssh_relay_after_replace(
+        self,
+        mock_check_output,
+        _mock_is_enabled,
+        mock_ensure_running,
+    ):
+        with tempfile.TemporaryDirectory() as tempdir:
+            scripts_dir = os.path.join(tempdir, 'src', 'scripts')
+            os.makedirs(scripts_dir)
+            mounts_file = os.path.join(scripts_dir, '.local_mounts')
+            with open(mounts_file, 'w', encoding='utf-8') as f:
+                f.write(
+                    '/home/cros-bisect-service/.config\n'
+                    '/home/cros-bisect-service/supssh-helper-temporary/'
+                    'supssh-helper-client.py /usr/bin/supssh\n'
+                )
+
+            out_dir = os.path.join(tempdir, 'out')
+            os.makedirs(os.path.join(out_dir, 'sdk', 'bin'))
+            installed = os.path.join(out_dir, 'sdk', 'bin', 'supssh')
+            calls: list[tuple[str, ...]] = []
+
+            def fake_cros_sdk(*cmd, **_kwargs):
+                calls.append(cmd)
+                if len(calls) == 1:
+                    # Stale mounts must be cleaned before dummy cros_sdk runs,
+                    # while keeping non-legacy entries intact.
+                    with open(mounts_file, encoding='utf-8') as mounts_handle:
+                        self.assertEqual(
+                            mounts_handle.read(),
+                            '/home/cros-bisect-service/.config\n',
+                        )
+                    self.assertIn('--replace', cmd)
+                    self.assertEqual(cmd[-1], 'true')
+                    mock_ensure_running.assert_not_called()
+                    shutil.rmtree(out_dir)
+                    return ''
+
+                # Target command must run without repeating --replace and with
+                # both out/sdk/bin/supssh and the relay daemon already ready.
+                self.assertNotIn('--replace', cmd)
+                self.assertEqual(cmd[-2:], ('tast', 'run'))
+                self.assertTrue(os.path.isfile(installed))
+                self.assertEqual(os.stat(installed).st_mode & 0o777, 0o755)
+                mock_ensure_running.assert_called_once()
+                return 'command-output'
+
+            mock_check_output.side_effect = fake_cros_sdk
+
+            out = cros_util.cros_sdk(tempdir, 'tast', 'run', replace=True)
+            self.assertEqual(out, 'command-output')
+            self.assertEqual(mock_check_output.call_count, 2)
+            mock_ensure_running.assert_called_once()
+
+    @mock.patch('bisect_kit.supssh_relay.ensure_running')
+    @mock.patch('bisect_kit.supssh_relay.is_enabled', return_value=True)
+    @mock.patch(
+        'bisect_kit.chromite_util.check_output',
+        side_effect=subprocess.CalledProcessError(1, ['cros_sdk']),
+    )
+    def test_cros_sdk_init_failure_skips_supssh_relay_install(
+        self,
+        _mock_check_output,
+        _mock_is_enabled,
+        mock_ensure_running,
+    ):
+        with tempfile.TemporaryDirectory() as tempdir:
+            with self.assertRaises(errors.InternalError):
+                cros_util.cros_sdk(tempdir, 'true')
+            self.assertFalse(
+                os.path.exists(
+                    os.path.join(tempdir, 'out', 'sdk', 'bin', 'supssh')
+                )
+            )
+            mock_ensure_running.assert_not_called()
+
+    @mock.patch('bisect_kit.supssh_relay.ensure_running')
+    @mock.patch('bisect_kit.supssh_relay.is_enabled', return_value=False)
+    @mock.patch('bisect_kit.chromite_util.check_output', return_value='ok')
+    def test_cros_sdk_skips_supssh_relay_when_disabled(
+        self,
+        _mock_check_output,
+        _mock_is_enabled,
+        mock_ensure_running,
+    ):
+        with tempfile.TemporaryDirectory() as tempdir:
+            scripts_dir = os.path.join(tempdir, 'src', 'scripts')
+            os.makedirs(scripts_dir)
+            mounts_file = os.path.join(scripts_dir, '.local_mounts')
+            legacy_content = (
+                '/home/cros-bisect-service/supssh-helper-temporary/'
+                'supssh-helper-client.py /usr/bin/supssh\n'
+            )
+            with open(mounts_file, 'w', encoding='utf-8') as f:
+                f.write(legacy_content)
+
+            out = cros_util.cros_sdk(tempdir, 'true')
+            self.assertEqual(out, 'ok')
+            with open(mounts_file, encoding='utf-8') as mounts_handle:
+                self.assertEqual(mounts_handle.read(), legacy_content)
+            self.assertFalse(
+                os.path.exists(
+                    os.path.join(tempdir, 'out', 'sdk', 'bin', 'supssh')
+                )
+            )
+            mock_ensure_running.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -44,6 +44,7 @@ from bisect_kit import gclient_util
 from bisect_kit import git_util
 from bisect_kit import locking
 from bisect_kit import repo_util
+from bisect_kit import supssh_relay
 from bisect_kit import util
 import experiment
 
@@ -137,10 +138,13 @@ def _collect_removed_manifest_repos(repo_dir, last_sync_time, only_branch=None):
 
 
 def _add_local_mount(chromeos_tree: str):
-    """Add gsutil cred in ~/.config folder in chromeos local mount setting.
+    """Configures chromeos .local_mounts for gsutil creds and supssh cleanup.
 
-    This is necessary to run gsutil commands under chroot.
+    When the supssh relay is enabled, strips stale manual supssh workaround
+    mounts before ensuring ~/.config is mounted for gsutil inside the chroot.
     """
+    if supssh_relay.is_enabled():
+        supssh_relay.clean_legacy_local_mounts(chromeos_tree)
     user_config_dir = os.path.expanduser('~/.config')
     if not os.path.isdir(user_config_dir):
         return

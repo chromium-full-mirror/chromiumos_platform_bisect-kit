@@ -47,6 +47,7 @@ from bisect_kit import gs_util
 from bisect_kit import locking
 from bisect_kit import plugin_util
 from bisect_kit import repo_util
+from bisect_kit import supssh_relay
 from bisect_kit import util
 from google.protobuf import json_format
 
@@ -2427,19 +2428,29 @@ def cros_sdk(
         prefix += ['--chrome-root', chrome_root]
     if goma_dir:
         prefix += ['--goma-dir', goma_dir]
+    # Pass lifecycle flags (`--replace`, `--update`) only to the dummy init
+    # invocation so a subsequent command call does not recreate `out/` again.
+    init_prefix = list(prefix)
     if replace:
-        prefix += ['--replace']
+        init_prefix += ['--replace']
     if update:
-        prefix += ['--update']
+        init_prefix += ['--update']
 
+    init_prefix += envs + ['--']
     prefix += envs + ['--']
+
+    relay_enabled = supssh_relay.is_enabled()
+    if relay_enabled:
+        # Clean stale workaround mounts before enter_chroot.sh reads
+        # .local_mounts during the dummy cros_sdk invocation.
+        supssh_relay.clean_legacy_local_mounts(chromeos_root)
 
     # In addition to the output of command we are interested, cros_sdk may
     # generate its own messages. For example, chroot creation messages if we run
     # cros_sdk the first time.
     # This is the hack to run dummy command once, so we can get clean output for
     # the command we are interested.
-    cmd = prefix + ['true']
+    cmd = init_prefix + ['true']
     stderr_lines: list[str] = []
     try:
         chromite_util.check_output(
@@ -2455,6 +2466,12 @@ def cros_sdk(
         raise errors.InternalError(
             f'cros_sdk init/update failed: {error_message}'
         ) from e
+
+    if relay_enabled:
+        # Install after the dummy cros_sdk run so initial chroot creation and
+        # `--replace` (which recreates `out/`) leave `out/sdk/bin/supssh` ready.
+        supssh_relay.install_chroot_client(chromeos_root)
+        supssh_relay.ensure_running()
 
     if not args:
         return ''
